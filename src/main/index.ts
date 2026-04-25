@@ -10,8 +10,8 @@ function createWindow(): void {
     minHeight: 640,
     title: "ForgePad",
     backgroundColor: "#0f1115",
-    titleBarStyle: "hiddenInset",
-    trafficLightPosition: { x: 14, y: 14 },
+    titleBarStyle: "hidden",
+    trafficLightPosition: { x: 14, y: 15 },
     show: false,
     webPreferences: {
       preload: join(__dirname, "../preload/index.mjs"),
