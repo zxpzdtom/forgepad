@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import type { CSSProperties } from "react";
 import { FilePlus2, RefreshCw } from "lucide-react";
+import { themeToTreeStyles } from "@pierre/trees";
 import { FileTree, useFileTree } from "@pierre/trees/react";
 import type { FileTreeContextMenuItem, GitStatusEntry } from "@pierre/trees";
 import type { FileNode, Workspace } from "@shared/types";
@@ -48,6 +50,45 @@ function useActiveWorkspace(): Workspace | undefined {
   return workspaces.find((workspace) => workspace.id === activeWorkspaceId);
 }
 
+const treeThemeStyle = {
+  ...themeToTreeStyles({
+    type: "dark",
+    bg: "#10131a",
+    fg: "#d7dbe4",
+    colors: {
+      "sideBar.background": "#10131a",
+      "sideBar.foreground": "#d7dbe4",
+      "sideBar.border": "#2a303b",
+      "sideBarSectionHeader.foreground": "#8791a3",
+      "list.hoverBackground": "#1a2230",
+      "list.activeSelectionForeground": "#eef5ff",
+      "list.activeSelectionBackground": "#22323a",
+      "list.focusOutline": "#67d5b5",
+      focusBorder: "#67d5b5",
+      "input.background": "#0c0f15",
+      "input.border": "#2a303b",
+      "scrollbarSlider.background": "#3a4352",
+      "gitDecoration.addedResourceForeground": "#89d985",
+      "gitDecoration.modifiedResourceForeground": "#83b6ff",
+      "gitDecoration.deletedResourceForeground": "#ff7777",
+      "terminal.ansiGreen": "#67d5b5",
+      "terminal.ansiYellow": "#e9bd61",
+      "terminal.ansiBlue": "#83b6ff",
+      "terminal.ansiRed": "#ff7777",
+    },
+  }),
+  "--trees-accent-override": "#67d5b5",
+  "--trees-status-renamed-override": "#e9bd61",
+  "--trees-status-untracked-override": "#67d5b5",
+  "--trees-git-renamed-color-override": "#e9bd61",
+  "--trees-git-untracked-color-override": "#67d5b5",
+  "--trees-font-family-override":
+    'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  "--trees-font-size-override": "12px",
+  "--trees-padding-inline-override": "8px",
+  "--trees-border-radius-override": "6px",
+} as CSSProperties;
+
 export function FilesPanel() {
   const workspace = useActiveWorkspace();
   const [treeData, setTreeData] = useState<TreeData>({
@@ -77,9 +118,10 @@ export function FilesPanel() {
     paths: treeData.paths,
     gitStatus: treeData.gitStatus,
     initialExpansion: 1,
-    itemHeight: 26,
+    density: "compact",
     search: true,
     flattenEmptyDirectories: true,
+    icons: { set: "standard", colored: true },
     initialSelectedPaths: [],
     onSelectionChange: (paths) => {
       const next = [...paths];
@@ -92,48 +134,6 @@ export function FilesPanel() {
       contextFileSet.has(item.path)
         ? { text: "ctx", title: "In AI context" }
         : null,
-    unsafeCSS: `
-      :host {
-        color-scheme: dark;
-        --trees-bg-override: #10131a;
-        --trees-bg-muted-override: #1a2230;
-        --trees-fg-override: #d7dbe4;
-        --trees-fg-muted-override: #8791a3;
-        --trees-border-color-override: #2a303b;
-        --trees-accent-override: #67d5b5;
-
-        --trees-focus-ring-color-override: #67d5b5;
-        --trees-focus-ring-width-override: 1px;
-        --trees-focus-ring-offset-override: -1px;
-
-        --trees-search-fg-override: #e2e7ef;
-        --trees-search-bg-override: #0c0f15;
-        --trees-search-font-weight-override: 600;
-
-        --trees-selected-fg-override: #eef5ff;
-        --trees-selected-bg-override: #22323a;
-        --trees-selected-focused-border-color-override: #67d5b5;
-
-        --trees-status-added-override: #89d985;
-        --trees-status-modified-override: #83b6ff;
-        --trees-status-renamed-override: #e9bd61;
-        --trees-status-untracked-override: #67d5b5;
-        --trees-status-deleted-override: #ff7777;
-        --trees-git-added-color-override: #89d985;
-        --trees-git-modified-color-override: #83b6ff;
-        --trees-git-renamed-color-override: #e9bd61;
-        --trees-git-untracked-color-override: #67d5b5;
-        --trees-git-deleted-color-override: #ff7777;
-
-        --trees-scrollbar-thumb-override: #3a4352;
-        --trees-font-family-override: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-        --trees-font-size-override: 12px;
-        --trees-item-padding-x-override: 7px;
-        --trees-item-margin-x-override: 3px;
-        --trees-border-radius-override: 6px;
-        --trees-padding-inline-override: 8px;
-      }
-    `,
   });
 
   const load = useCallback(async () => {
@@ -218,7 +218,11 @@ export function FilesPanel() {
       </div>
       <div className="tree-wrap">
         {loading ? <div className="tree-loading">Refreshing</div> : null}
-        <FileTree model={model} renderContextMenu={renderContextMenu} />
+        <FileTree
+          model={model}
+          style={treeThemeStyle}
+          renderContextMenu={renderContextMenu}
+        />
       </div>
     </section>
   );
