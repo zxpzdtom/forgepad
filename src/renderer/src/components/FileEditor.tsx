@@ -1,5 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { createHighlighter, type Highlighter } from "shiki";
+import {
+  codeToHtml,
+  resolveTheme,
+  type BundledLanguage,
+} from "@pierre/diffs";
 import { Copy, FileCode } from "lucide-react";
 import type { Tab, Workspace } from "@shared/types";
 import { useAppStore } from "@renderer/store/app-store";
@@ -11,7 +15,7 @@ type FileEditorProps = {
   workspace: Workspace;
 };
 
-const LANG_MAP: Record<string, string> = {
+const LANG_MAP: Record<string, BundledLanguage> = {
   ts: "typescript",
   tsx: "tsx",
   js: "javascript",
@@ -23,11 +27,13 @@ const LANG_MAP: Record<string, string> = {
   html: "html",
   htm: "html",
   md: "markdown",
+  mdx: "mdx",
   py: "python",
   go: "go",
   rs: "rust",
   sh: "shellscript",
   bash: "shellscript",
+  zsh: "shellscript",
   yaml: "yaml",
   yml: "yaml",
   toml: "toml",
@@ -59,10 +65,9 @@ const LANG_MAP: Record<string, string> = {
   zig: "zig",
   dockerfile: "dockerfile",
   makefile: "makefile",
-  gitignore: "gitignore",
 };
 
-function langForPath(path: string): string {
+function langForPath(path: string): BundledLanguage {
   const name = path.split("/").pop() ?? "";
   const lower = name.toLowerCase();
   if (lower === "dockerfile") return "dockerfile";
@@ -73,25 +78,13 @@ function langForPath(path: string): string {
   return LANG_MAP[ext] ?? "text";
 }
 
-let highlighterPromise: Promise<Highlighter> | null = null;
+let themeReady: Promise<void> | null = null;
 
-function getHighlighter(): Promise<Highlighter> {
-  if (!highlighterPromise) {
-    highlighterPromise = createHighlighter({
-      themes: ["pierre-dark"],
-      langs: [
-        "typescript", "tsx", "javascript", "jsx", "json",
-        "css", "scss", "less", "html", "markdown",
-        "python", "go", "rust", "shellscript", "yaml",
-        "toml", "xml", "sql", "graphql",
-        "java", "c", "cpp", "ruby", "php",
-        "swift", "kotlin", "scala", "dart", "lua",
-        "elixir", "haskell", "zig",
-        "dockerfile", "makefile", "gitignore", "text",
-      ],
-    });
+function ensureTheme(): Promise<void> {
+  if (!themeReady) {
+    themeReady = resolveTheme("pierre-dark").then(() => {});
   }
-  return highlighterPromise;
+  return themeReady;
 }
 
 export function FileEditor({ tab, workspace }: FileEditorProps) {
@@ -115,26 +108,31 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
         if (disposed) return;
         fileText = text;
         setLineCount(text.split("\n").length);
-        return getHighlighter();
+        return ensureTheme();
       })
-      .then((hl) => {
-        if (!hl || disposed) return;
-        const loadedLang = hl.getLoadedLanguages().includes(lang) ? lang : "text";
-        const html = hl.codeToHtml(fileText, { lang: loadedLang, theme: "pierre-dark" });
-        if (!disposed) setHighlighted(html);
+      .then(() => {
+        if (disposed) return;
+        return codeToHtml(fileText, { lang, theme: "pierre-dark" });
+      })
+      .then((html) => {
+        if (!disposed && html) setHighlighted(html);
       })
       .catch((error) =>
-        addToast("error", error instanceof Error ? error.message : "Failed to load file."),
+        addToast(
+          "error",
+          error instanceof Error ? error.message : "Failed to load file.",
+        ),
       )
       .finally(() => {
         if (!disposed) setLoading(false);
       });
 
-    return () => { disposed = true; };
+    return () => {
+      disposed = true;
+    };
   }, [addToast, tab.relPath, workspace.worktreePath, lang]);
 
   const copyContent = async () => {
-    // Extract text content from highlighted HTML for clipboard
     const div = document.createElement("div");
     div.innerHTML = highlighted;
     const text = div.textContent ?? "";
