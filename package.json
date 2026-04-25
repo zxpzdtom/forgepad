@@ -13,7 +13,6 @@
     "rebuild": "electron-rebuild -f -w node-pty"
   },
   "dependencies": {
-    "@monaco-editor/react": "^4.7.0",
     "@pierre/diffs": "1.1.15",
     "@pierre/trees": "^1.0.0-beta.3",
     "@xterm/addon-fit": "^0.11.0",
@@ -22,10 +21,10 @@
     "@xterm/xterm": "^6.0.0",
     "allotment": "^1.20.4",
     "lucide-react": "^0.577.0",
-    "monaco-editor": "^0.55.1",
     "node-pty": "^1.1.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
+    "shiki": "^4.0.2",
     "zustand": "^5.0.11"
   },
   "devDependencies": {
@@ -40,4 +39,3 @@
     "vite": "^7.2.7"
   }
 }
-
