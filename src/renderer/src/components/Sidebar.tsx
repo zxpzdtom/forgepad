@@ -202,97 +202,99 @@ export function Sidebar() {
         )}
       </div>
 
-      <div className="sidebar-section grow">
-        <div className="section-label">Tasks</div>
-        <button
-          className="secondary-button full"
-          type="button"
-          disabled={!activeProject}
-          onClick={() => setIsCreatingTask((value) => !value)}
-        >
-          <ClipboardList size={16} />
-          New Task
-        </button>
+      <div className="sidebar-scroll">
+        <div className="sidebar-section grow">
+          <div className="section-label">Tasks</div>
+          <button
+            className="secondary-button full"
+            type="button"
+            disabled={!activeProject}
+            onClick={() => setIsCreatingTask((value) => !value)}
+          >
+            <ClipboardList size={16} />
+            New Task
+          </button>
 
-        {isCreatingTask ? (
-          <div className="task-row active">
-            <input
-              value={taskTitle}
-              onChange={(event) => setTaskTitle(event.currentTarget.value)}
-              placeholder="Task title"
-            />
-            <textarea
-              value={taskDescription}
-              onChange={(event) =>
-                setTaskDescription(event.currentTarget.value)
-              }
-              placeholder="Describe what the agent should do"
-            />
-            <button
-              className="primary-button full"
-              type="button"
-              disabled={!taskTitle.trim()}
-              onClick={submitTask}
-            >
-              Create Task
-            </button>
-          </div>
-        ) : null}
-
-        {visibleTasks.length === 0 ? (
-          <div className="soft-note">No tasks yet</div>
-        ) : (
-          visibleTasks.map((task) => (
-            <div
-              className={`task-row ${task.workspaceId === activeWorkspaceId ? "active" : ""}`}
-              key={task.id}
-            >
-              <span title={task.title}>{task.title}</span>
-              <small>
-                {task.status}
-                {task.workspaceId === activeWorkspaceId
-                  ? " · current workspace"
-                  : ""}
-              </small>
-              {task.description ? (
-                <small title={task.description}>{task.description}</small>
-              ) : null}
-              <select
-                value={task.status}
+          {isCreatingTask ? (
+            <div className="task-row active">
+              <input
+                value={taskTitle}
+                onChange={(event) => setTaskTitle(event.currentTarget.value)}
+                placeholder="Task title"
+              />
+              <textarea
+                value={taskDescription}
                 onChange={(event) =>
-                  updateTaskStatus(
-                    task.id,
-                    event.currentTarget.value as TaskStatus,
-                  )
+                  setTaskDescription(event.currentTarget.value)
                 }
+                placeholder="Describe what the agent should do"
+              />
+              <button
+                className="primary-button full"
+                type="button"
+                disabled={!taskTitle.trim()}
+                onClick={submitTask}
               >
-                {taskStatuses.map((status) => (
-                  <option key={status} value={status}>
-                    {status}
-                  </option>
-                ))}
-              </select>
-              <div className="toolbar-actions">
-                <button
-                  className="icon-button small"
-                  type="button"
-                  title="Add task to context"
-                  onClick={() => addTaskToContext(task.id)}
-                >
-                  <SendHorizontal size={14} />
-                </button>
-                <button
-                  className="icon-button small danger"
-                  type="button"
-                  title="Delete task"
-                  onClick={() => deleteTask(task.id)}
-                >
-                  <Trash2 size={14} />
-                </button>
-              </div>
+                Create Task
+              </button>
             </div>
-          ))
-        )}
+          ) : null}
+
+          {visibleTasks.length === 0 ? (
+            <div className="soft-note">No tasks yet</div>
+          ) : (
+            visibleTasks.map((task) => (
+              <div
+                className={`task-row ${task.workspaceId === activeWorkspaceId ? "active" : ""}`}
+                key={task.id}
+              >
+                <span title={task.title}>{task.title}</span>
+                <small>
+                  {task.status}
+                  {task.workspaceId === activeWorkspaceId
+                    ? " · current workspace"
+                    : ""}
+                </small>
+                {task.description ? (
+                  <small title={task.description}>{task.description}</small>
+                ) : null}
+                <select
+                  value={task.status}
+                  onChange={(event) =>
+                    updateTaskStatus(
+                      task.id,
+                      event.currentTarget.value as TaskStatus,
+                    )
+                  }
+                >
+                  {taskStatuses.map((status) => (
+                    <option key={status} value={status}>
+                      {status}
+                    </option>
+                  ))}
+                </select>
+                <div className="toolbar-actions">
+                  <button
+                    className="icon-button small"
+                    type="button"
+                    title="Add task to context"
+                    onClick={() => addTaskToContext(task.id)}
+                  >
+                    <SendHorizontal size={14} />
+                  </button>
+                  <button
+                    className="icon-button small danger"
+                    type="button"
+                    title="Delete task"
+                    onClick={() => deleteTask(task.id)}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
       </div>
 
       <button

@@ -1,7 +1,11 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { FilePlus2, RefreshCw } from "lucide-react";
-import { FileTree, useFileTree } from "@pierre/trees/react";
+import {
+  FileTree,
+  useFileTree,
+  useFileTreeSelection,
+} from "@pierre/trees/react";
 import type { FileTreeContextMenuItem, GitStatusEntry } from "@pierre/trees";
 import type { FileNode, Workspace } from "@shared/types";
 import { useAppStore } from "@renderer/store/app-store";
@@ -102,20 +106,30 @@ export function FilesPanel() {
     density: "default",
     search: true,
     flattenEmptyDirectories: true,
-    icons: { set: "standard", colored: false },
-    initialSelectedPaths: [],
-    onSelectionChange: (paths) => {
-      const next = [...paths];
-      setSelectedPaths(next);
-      const last = next.at(-1);
-      if (workspace && last && treeData.filePaths.has(last))
-        openFileTab(workspace.id, last);
-    },
+    icons: { set: "complete", colored: true },
     renderRowDecoration: ({ item }) =>
       contextFileSet.has(item.path)
         ? { text: "ctx", title: "In AI context" }
         : null,
   });
+
+  const selectedTreePaths = useFileTreeSelection(model);
+  const prevSelectedRef = useRef<readonly string[]>([]);
+
+  useEffect(() => {
+    const prev = prevSelectedRef.current;
+    const next = selectedTreePaths;
+    prevSelectedRef.current = next;
+
+    if (next === prev) return;
+
+    setSelectedPaths([...next]);
+
+    const added = next.filter((p) => !prev.includes(p));
+    const last = added.at(-1) ?? next.at(-1);
+    if (workspace && last && treeData.filePaths.has(last))
+      openFileTab(workspace.id, last);
+  }, [selectedTreePaths, openFileTab, treeData.filePaths, workspace]);
 
   const load = useCallback(async () => {
     if (!workspace) return;

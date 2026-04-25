@@ -124,9 +124,18 @@ textarea {
 .sidebar {
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  padding: 14px;
+  gap: 10px;
+  padding: 12px;
   border-right: 1px solid var(--border);
+}
+
+.sidebar-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .sidebar-collapsed {
@@ -577,40 +586,58 @@ textarea {
 }
 
 .right-panel-header {
-  justify-content: space-between;
-  gap: 8px;
-  min-height: 46px;
-  padding: 8px;
-  border-bottom: 1px solid var(--border);
-}
-
-.segmented-control {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  flex: 1;
-  gap: 4px;
-  min-width: 0;
-  padding: 3px;
-  border: 1px solid var(--border);
-  border-radius: 7px;
-  background: #11141a;
-}
-
-.segmented-control button {
-  min-width: 0;
-  height: 29px;
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 6px;
-  border-radius: 5px;
-  color: var(--muted);
-  background: transparent;
+  gap: 4px;
+  min-height: 40px;
+  padding: 0 4px 0 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
 }
 
-.segmented-control button.active {
+.right-panel-tabs {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+}
+
+.right-panel-tab {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 40px;
+  padding: 0 12px;
+  border-bottom: 2px solid transparent;
+  color: var(--muted);
+  font-size: 13px;
+  background: transparent;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.right-panel-tab:hover {
   color: var(--text);
-  background: var(--panel-3);
+  background: var(--panel-2);
+}
+
+.right-panel-tab.active {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+}
+
+.right-panel-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding-right: 4px;
+}
+
+.right-panel-content {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .panel-body {
