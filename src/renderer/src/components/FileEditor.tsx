@@ -21,24 +21,37 @@ function languageForPath(path: string): string | undefined {
     jsx: "javascript",
     json: "json",
     css: "css",
+    scss: "css",
+    less: "css",
     html: "html",
+    htm: "html",
     md: "markdown",
     py: "python",
     go: "go",
     rs: "rust",
     sh: "shell",
+    bash: "shell",
     yaml: "yaml",
     yml: "yaml",
+    toml: "ini",
+    xml: "xml",
+    svg: "xml",
+    sql: "sql",
+    graphql: "graphql",
+    vue: "html",
+    svelte: "html",
   };
   return map[ext ?? ""];
 }
 
 export function FileEditor({ tab, workspace }: FileEditorProps) {
+  const containerRef = useRef<HTMLElement | null>(null);
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
   const [content, setContent] = useState("");
   const [savedContent, setSavedContent] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [editorReady, setEditorReady] = useState(false);
   const editorFontSize = useAppStore((state) => state.settings.editorFontSize);
   const addToast = useAppStore((state) => state.addToast);
   const addContextFiles = useAppStore((state) => state.addContextFiles);
@@ -64,19 +77,39 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
     };
   }, [addToast, tab.relPath, workspace.worktreePath]);
 
-  const handleEditorMount: OnMount = useCallback((editor) => {
-    editorRef.current = editor;
-    requestAnimationFrame(() => {
-      editor.layout();
-    });
+  const handleEditorMount: OnMount = useCallback((ed) => {
+    editorRef.current = ed;
+    setEditorReady(true);
   }, []);
 
-  // Force re-layout when this tab becomes visible (e.g. switching back to a file tab)
+  // Force layout once the editor mounts AND content is ready
+  useEffect(() => {
+    const ed = editorRef.current;
+    if (!ed || loading) return;
+    // Double rAF ensures the DOM has settled before we measure
+    let raf1: number;
+    let raf2: number;
+    raf1 = requestAnimationFrame(() => {
+      ed.layout();
+      raf2 = requestAnimationFrame(() => {
+        ed.layout();
+        ed.revealLine(1);
+      });
+    });
+    return () => {
+      cancelAnimationFrame(raf1);
+      cancelAnimationFrame(raf2);
+    };
+  }, [loading, editorReady, tab.id]);
+
+  // Re-layout on window resize
   useEffect(() => {
     const ed = editorRef.current;
     if (!ed) return;
-    requestAnimationFrame(() => ed.layout());
-  }, [tab.id]);
+    const onResize = () => ed.layout();
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [editorReady]);
 
   const save = async () => {
     setSaving(true);
@@ -103,7 +136,7 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
   }, [save, saving, unsaved]);
 
   return (
-    <section className="editor-panel">
+    <section className="editor-panel" ref={containerRef}>
       <div className="surface-toolbar">
         <div className="toolbar-title" title={tab.relPath}>
           {tab.relPath}
@@ -125,22 +158,24 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
       {loading ? (
         <div className="panel-placeholder">Loading file</div>
       ) : (
-        <Editor
-          value={content}
-          language={language}
-          theme="vs-dark"
-          onMount={handleEditorMount}
-          onChange={(value) => setContent(value ?? "")}
-          options={{
-            fontSize: editorFontSize,
-            minimap: { enabled: false },
-            scrollBeyondLastLine: false,
-            wordWrap: "on",
-            automaticLayout: true,
-            renderWhitespace: "selection",
-            tabSize: 2,
-          }}
-        />
+        <div className="editor-host">
+          <Editor
+            defaultValue={content}
+            language={language}
+            theme="vs-dark"
+            onMount={handleEditorMount}
+            onChange={(value) => setContent(value ?? "")}
+            options={{
+              fontSize: editorFontSize,
+              minimap: { enabled: false },
+              scrollBeyondLastLine: false,
+              wordWrap: "on",
+              automaticLayout: true,
+              renderWhitespace: "selection",
+              tabSize: 2,
+            }}
+          />
+        </div>
       )}
     </section>
   );
