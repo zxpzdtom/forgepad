@@ -170,12 +170,22 @@ export type PersistedAppState = {
   settings: AppSettings;
 };
 
+export type DiffViewStyle = "split" | "unified";
+export type DiffIndicators = "classic" | "bars" | "none";
+export type DiffLineDiffType = "word-alt" | "word" | "char" | "none";
+export type DiffOverflow = "scroll" | "wrap";
+
 export type AppSettings = {
   defaultShell: string;
   defaultAgentCommand: string;
   terminalFontSize: number;
   editorFontSize: number;
   diffInline: boolean;
+  diffStyle: DiffViewStyle;
+  diffIndicators: DiffIndicators;
+  diffLineDiffType: DiffLineDiffType;
+  diffOverflow: DiffOverflow;
+  diffDisableBackground: boolean;
   sendAndClearComments: boolean;
 };
 
@@ -185,6 +195,11 @@ export const DEFAULT_SETTINGS: AppSettings = {
   terminalFontSize: 14,
   editorFontSize: 13,
   diffInline: false,
+  diffStyle: "split",
+  diffIndicators: "bars",
+  diffLineDiffType: "word-alt",
+  diffOverflow: "scroll",
+  diffDisableBackground: false,
   sendAndClearComments: false,
 };
 

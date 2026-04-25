@@ -882,6 +882,29 @@ textarea {
   font-size: 12px;
 }
 
+.toolbar-select {
+  height: 26px;
+  max-width: 112px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  background: #10131a;
+  outline: none;
+  font-size: 12px;
+}
+
+.diff-panel .surface-toolbar {
+  align-items: flex-start;
+  min-height: 48px;
+  padding-block: 8px;
+}
+
+.diff-panel .toolbar-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  row-gap: 6px;
+}
+
 .toast-stack {
   position: fixed;
   right: 16px;
