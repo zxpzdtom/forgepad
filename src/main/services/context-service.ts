@@ -31,24 +31,37 @@ function estimateTokens(text: string): number {
   return Math.ceil(text.length / 4);
 }
 
-async function safeReadText(rootPath: string, relPathInput: string): Promise<{ text: string; truncated: boolean } | null> {
+async function safeReadText(
+  rootPath: string,
+  relPathInput: string,
+): Promise<{ text: string; truncated: boolean } | null> {
   const relPath = normalizeRelPath(relPathInput);
   const abs = await resolveInsideRoot(rootPath, relPath);
   const stats = await stat(abs);
   if (stats.size > 2 * 1024 * 1024) {
-    return { text: `[File omitted: ${(stats.size / 1024 / 1024).toFixed(1)} MB exceeds context limit]`, truncated: false };
+    return {
+      text: `[File omitted: ${(stats.size / 1024 / 1024).toFixed(1)} MB exceeds context limit]`,
+      truncated: false,
+    };
   }
   const buffer = await readFile(abs);
   if (buffer.includes(0)) return null;
   const raw = buffer.toString("utf8");
   if (raw.length > MAX_CONTEXT_FILE_CHARS) {
-    return { text: raw.slice(0, MAX_CONTEXT_FILE_CHARS) + "\n\n[Truncated for context budget]", truncated: true };
+    return {
+      text:
+        raw.slice(0, MAX_CONTEXT_FILE_CHARS) +
+        "\n\n[Truncated for context budget]",
+      truncated: true,
+    };
   }
   return { text: raw, truncated: false };
 }
 
 export class ContextService {
-  static async createBundle(input: CreateBundleInput): Promise<ContextBundleResult> {
+  static async createBundle(
+    input: CreateBundleInput,
+  ): Promise<ContextBundleResult> {
     const id = new Date().toISOString().replace(/[:.]/g, "-");
     const lines: string[] = [
       "# ForgePad Context",
@@ -65,6 +78,20 @@ export class ContextService {
       "",
     ];
 
+    if (input.tasks.length > 0) {
+      lines.push("## Task Context", "");
+      for (const task of input.tasks) {
+        lines.push(`### ${task.title}`, "");
+        lines.push(`- Status: ${task.status}`, "");
+        if (task.description.trim()) {
+          lines.push(task.description.trim(), "");
+        } else {
+          lines.push("(No task description provided.)", "");
+        }
+        if (task.note?.trim()) lines.push(`User note: ${task.note.trim()}`, "");
+      }
+    }
+
     if (input.files.length > 0) {
       lines.push("## Selected Files", "");
       for (const item of input.files) {
@@ -76,10 +103,12 @@ export class ContextService {
           continue;
         }
 
-        const read = await safeReadText(input.workspacePath, relPath).catch((error) => ({
-          text: `[Could not read file: ${error instanceof Error ? error.message : String(error)}]`,
-          truncated: false,
-        }));
+        const read = await safeReadText(input.workspacePath, relPath).catch(
+          (error) => ({
+            text: `[Could not read file: ${error instanceof Error ? error.message : String(error)}]`,
+            truncated: false,
+          }),
+        );
         if (read === null) {
           lines.push("[Binary file referenced by path only.]", "");
           continue;
@@ -94,7 +123,12 @@ export class ContextService {
         const relPath = normalizeRelPath(item.relPath);
         lines.push(`### ${relPath} (${item.bucket}, ${item.status})`, "");
         if (item.note?.trim()) lines.push(`User note: ${item.note.trim()}`, "");
-        const diff = await GitService.getFileDiff(input.workspacePath, relPath, item.bucket, item.status);
+        const diff = await GitService.getFileDiff(
+          input.workspacePath,
+          relPath,
+          item.bucket,
+          item.status,
+        );
         if (diff.isBinary) {
           lines.push("[Binary diff omitted.]", "");
         } else if (diff.patch.trim()) {
@@ -135,4 +169,3 @@ export class ContextService {
     };
   }
 }
-
