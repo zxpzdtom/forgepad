@@ -184,14 +184,16 @@ export function Sidebar() {
                 </div>
                 {projectWorkspaces.map((workspace) => (
                   <button
-                    className={`workspace-row ${workspace.id === activeWorkspaceId ? "active" : ""}`}
+                    className={`workspace-row project-workspace-row ${workspace.id === activeWorkspaceId ? "active" : ""}`}
                     key={workspace.id}
                     type="button"
                     onClick={() => setActiveWorkspace(workspace.id)}
                   >
                     <GitBranch size={14} />
-                    <span>{workspace.name}</span>
-                    <small>{workspace.branch || "detached"}</small>
+                    <div>
+                      <span>{workspace.name}</span>
+                      <small>{workspace.branch || "detached"}</small>
+                    </div>
                   </button>
                 ))}
               </div>
