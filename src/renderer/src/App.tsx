@@ -1,6 +1,11 @@
 import { useEffect, useMemo } from "react";
 import { Allotment } from "allotment";
-import { FolderOpen, GitBranch, PanelRight, TerminalSquare } from "lucide-react";
+import {
+  FolderOpen,
+  GitBranch,
+  PanelRight,
+  TerminalSquare,
+} from "lucide-react";
 import { Sidebar } from "@renderer/components/Sidebar";
 import { TabBar } from "@renderer/components/TabBar";
 import { TerminalPanel } from "@renderer/components/TerminalPanel";
@@ -19,8 +24,12 @@ export function App() {
   const activeWorkspaceId = useAppStore((state) => state.activeWorkspaceId);
   const activeTabId = useAppStore((state) => state.activeTabId);
   const rightPanelOpen = useAppStore((state) => state.rightPanelOpen);
+  const sidebarOpen = useAppStore((state) => state.sidebarOpen);
   const openProject = useAppStore((state) => state.openProject);
   const createTerminal = useAppStore((state) => state.createTerminal);
+  const closeTab = useAppStore((state) => state.closeTab);
+  const setActiveTab = useAppStore((state) => state.setActiveTab);
+  const setRightPanelMode = useAppStore((state) => state.setRightPanelMode);
 
   useEffect(() => {
     let disposed = false;
@@ -33,7 +42,12 @@ export function App() {
         useAppStore.getState().hydrate(null);
         useAppStore
           .getState()
-          .addToast("error", error instanceof Error ? error.message : "Failed to load workspace state.");
+          .addToast(
+            "error",
+            error instanceof Error
+              ? error.message
+              : "Failed to load workspace state.",
+          );
       });
     return () => {
       disposed = true;
@@ -47,7 +61,12 @@ export function App() {
       if (saveTimer) window.clearTimeout(saveTimer);
       saveTimer = window.setTimeout(() => {
         window.forgepad.state.save(state.toPersistedState()).catch((error) => {
-          state.addToast("error", error instanceof Error ? error.message : "Failed to save workspace state.");
+          state.addToast(
+            "error",
+            error instanceof Error
+              ? error.message
+              : "Failed to save workspace state.",
+          );
         });
       }, 400);
     });
@@ -57,12 +76,75 @@ export function App() {
     };
   }, []);
 
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const isModifierShortcut = event.metaKey || event.ctrlKey;
+      if (!isModifierShortcut) return;
+
+      const key = event.key.toLowerCase();
+
+      if (key === "t") {
+        event.preventDefault();
+        void createTerminal(activeWorkspaceId ?? undefined);
+        return;
+      }
+
+      if (key === "w") {
+        event.preventDefault();
+        if (activeTabId) closeTab(activeTabId);
+        return;
+      }
+
+      if (key === "j") {
+        event.preventDefault();
+        const terminalTab = tabs.find(
+          (tab) =>
+            tab.workspaceId === activeWorkspaceId && tab.type === "terminal",
+        );
+        if (terminalTab) {
+          setActiveTab(terminalTab.id);
+        } else {
+          void createTerminal(activeWorkspaceId ?? undefined);
+        }
+        return;
+      }
+
+      if (!event.shiftKey) return;
+
+      if (key === "e") {
+        event.preventDefault();
+        setRightPanelMode("files");
+      } else if (key === "g") {
+        event.preventDefault();
+        setRightPanelMode("changes");
+      } else if (key === "c") {
+        event.preventDefault();
+        setRightPanelMode("context");
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [
+    activeTabId,
+    activeWorkspaceId,
+    closeTab,
+    createTerminal,
+    setActiveTab,
+    setRightPanelMode,
+    tabs,
+  ]);
+
   const activeWorkspace = useMemo(
     () => workspaces.find((workspace) => workspace.id === activeWorkspaceId),
     [activeWorkspaceId, workspaces],
   );
-  const activeTab = useMemo(() => tabs.find((tab) => tab.id === activeTabId), [activeTabId, tabs]);
-  const activeTabWorkspace = workspaceForTab(workspaces, activeTab) ?? activeWorkspace;
+  const activeTab = useMemo(
+    () => tabs.find((tab) => tab.id === activeTabId),
+    [activeTabId, tabs],
+  );
+  const activeTabWorkspace =
+    workspaceForTab(workspaces, activeTab) ?? activeWorkspace;
   const terminalTabs = tabs.filter((tab) => tab.type === "terminal");
 
   if (!hydrated) {
@@ -77,7 +159,11 @@ export function App() {
   return (
     <div className="app-shell">
       <Allotment proportionalLayout={false} className="app-allotment">
-        <Allotment.Pane preferredSize={260} minSize={220} maxSize={360}>
+        <Allotment.Pane
+          preferredSize={sidebarOpen ? 260 : 48}
+          minSize={sidebarOpen ? 220 : 48}
+          maxSize={sidebarOpen ? 360 : 48}
+        >
           <Sidebar />
         </Allotment.Pane>
         <Allotment.Pane minSize={460}>
@@ -89,8 +175,15 @@ export function App() {
                   <FolderOpen size={32} />
                 </div>
                 <h1>Open a repository to start</h1>
-                <p>ForgePad keeps the agent loop terminal-first, with file context and git diffs close at hand.</p>
-                <button className="primary-button" type="button" onClick={openProject}>
+                <p>
+                  ForgePad keeps the agent loop terminal-first, with file
+                  context and git diffs close at hand.
+                </p>
+                <button
+                  className="primary-button"
+                  type="button"
+                  onClick={openProject}
+                >
                   <FolderOpen size={16} />
                   Open Project
                 </button>
@@ -98,7 +191,9 @@ export function App() {
             ) : activeTab && activeTabWorkspace ? (
               <div className="tab-surface">
                 {terminalTabs.map((tab) => {
-                  const workspace = workspaces.find((item) => item.id === tab.workspaceId);
+                  const workspace = workspaces.find(
+                    (item) => item.id === tab.workspaceId,
+                  );
                   if (!workspace) return null;
                   return (
                     <TerminalPanel
@@ -109,9 +204,15 @@ export function App() {
                     />
                   );
                 })}
-                {activeTab.type === "file" ? <FileEditor tab={activeTab} workspace={activeTabWorkspace} /> : null}
-                {activeTab.type === "diff" ? <DiffViewer tab={activeTab} workspace={activeTabWorkspace} /> : null}
-                {activeTab.type === "context-preview" ? <ContextPreview /> : null}
+                {activeTab.type === "file" ? (
+                  <FileEditor tab={activeTab} workspace={activeTabWorkspace} />
+                ) : null}
+                {activeTab.type === "diff" ? (
+                  <DiffViewer tab={activeTab} workspace={activeTabWorkspace} />
+                ) : null}
+                {activeTab.type === "context-preview" ? (
+                  <ContextPreview />
+                ) : null}
               </div>
             ) : (
               <section className="empty-workspace compact">
@@ -120,14 +221,19 @@ export function App() {
                 <p>
                   {activeWorkspace ? (
                     <>
-                      <GitBranch size={14} /> {activeWorkspace.branch || "detached"}
+                      <GitBranch size={14} />{" "}
+                      {activeWorkspace.branch || "detached"}
                     </>
                   ) : (
                     "Pick a project from the sidebar."
                   )}
                 </p>
                 {activeWorkspace ? (
-                  <button className="primary-button" type="button" onClick={() => createTerminal(activeWorkspace.id)}>
+                  <button
+                    className="primary-button"
+                    type="button"
+                    onClick={() => createTerminal(activeWorkspace.id)}
+                  >
                     <TerminalSquare size={16} />
                     New Terminal
                   </button>

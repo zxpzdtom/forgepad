@@ -11,10 +11,27 @@ export type GitBucket = "staged" | "unstaged" | "untracked";
 export type RightPanelMode = "files" | "changes" | "context";
 
 export type Tab =
-  | { id: string; workspaceId: string; type: "terminal"; title: string; ptyId: string }
-  | { id: string; workspaceId: string; type: "file"; relPath: string; unsaved?: boolean }
+  | {
+      id: string;
+      workspaceId: string;
+      type: "terminal";
+      title: string;
+      ptyId: string;
+    }
+  | {
+      id: string;
+      workspaceId: string;
+      type: "file";
+      relPath: string;
+      unsaved?: boolean;
+    }
   | { id: string; workspaceId: string; type: "diff"; activePath?: string }
-  | { id: string; workspaceId: string; type: "context-preview"; bundleId?: string };
+  | {
+      id: string;
+      workspaceId: string;
+      type: "context-preview";
+      bundleId?: string;
+    };
 
 export type Project = {
   id: string;
@@ -34,6 +51,19 @@ export type Workspace = {
   isRoot: boolean;
   taskId?: string;
   createdAt: number;
+};
+
+export type TaskStatus = "backlog" | "ready" | "running" | "review" | "done";
+
+export type Task = {
+  id: string;
+  projectId: string;
+  workspaceId?: string;
+  title: string;
+  description: string;
+  status: TaskStatus;
+  createdAt: number;
+  updatedAt: number;
 };
 
 export type FileNode = {
@@ -83,6 +113,18 @@ export type ContextDiffItem = {
   addedAt: number;
 };
 
+export type ContextTaskItem = {
+  id: string;
+  type: "task";
+  workspaceId: string;
+  taskId: string;
+  title: string;
+  description: string;
+  status: TaskStatus;
+  note?: string;
+  addedAt: number;
+};
+
 export type DiffCommentItem = {
   id: string;
   type: "comment";
@@ -97,7 +139,11 @@ export type DiffCommentItem = {
   addedAt: number;
 };
 
-export type ContextItem = ContextFileItem | ContextDiffItem | DiffCommentItem;
+export type ContextItem =
+  | ContextFileItem
+  | ContextDiffItem
+  | ContextTaskItem
+  | DiffCommentItem;
 
 export type ContextBundleResult = {
   id: string;
@@ -112,6 +158,7 @@ export type PersistedAppState = {
   schemaVersion: 1;
   projects: Project[];
   workspaces: Workspace[];
+  tasks: Task[];
   tabs: Tab[];
   activeWorkspaceId: string | null;
   activeTabId: string | null;
@@ -153,8 +200,20 @@ export type CreateBundleInput = {
   workspaceName: string;
   branch: string;
   prompt: string;
+  tasks: Array<{
+    title: string;
+    description: string;
+    status: TaskStatus;
+    note?: string;
+  }>;
   files: Array<{ relPath: string; note?: string; includeContent: boolean }>;
-  diffs: Array<{ relPath: string; bucket: GitBucket; status: GitStatusKind; note?: string }>;
-  comments: Array<Omit<DiffCommentItem, "id" | "type" | "workspaceId" | "addedAt">>;
+  diffs: Array<{
+    relPath: string;
+    bucket: GitBucket;
+    status: GitStatusKind;
+    note?: string;
+  }>;
+  comments: Array<
+    Omit<DiffCommentItem, "id" | "type" | "workspaceId" | "addedAt">
+  >;
 };
-
