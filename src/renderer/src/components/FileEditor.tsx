@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  codeToHtml,
-  resolveTheme,
+  getSharedHighlighter,
   type BundledLanguage,
+  type DiffsHighlighter,
 } from "@pierre/diffs";
 import { Copy, FileCode } from "lucide-react";
 import type { Tab, Workspace } from "@shared/types";
@@ -78,13 +78,16 @@ function langForPath(path: string): BundledLanguage {
   return LANG_MAP[ext] ?? "text";
 }
 
-let themeReady: Promise<void> | null = null;
+let hlPromise: Promise<DiffsHighlighter> | null = null;
 
-function ensureTheme(): Promise<void> {
-  if (!themeReady) {
-    themeReady = resolveTheme("pierre-dark").then(() => {});
+function getHl(langs: BundledLanguage[]): Promise<DiffsHighlighter> {
+  if (!hlPromise) {
+    hlPromise = getSharedHighlighter({
+      themes: ["pierre-dark"],
+      langs,
+    });
   }
-  return themeReady;
+  return hlPromise;
 }
 
 export function FileEditor({ tab, workspace }: FileEditorProps) {
@@ -108,11 +111,14 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
         if (disposed) return;
         fileText = text;
         setLineCount(text.split("\n").length);
-        return ensureTheme();
+        return getHl([lang]);
       })
-      .then(() => {
-        if (disposed) return;
-        return codeToHtml(fileText, { lang, theme: "pierre-dark" });
+      .then((hl) => {
+        if (!hl || disposed) return;
+        const loaded = (hl.getLoadedLanguages() as string[]).includes(lang)
+          ? lang
+          : "text";
+        return hl.codeToHtml(fileText, { lang: loaded, theme: "pierre-dark" });
       })
       .then((html) => {
         if (!disposed && html) setHighlighted(html);
@@ -135,9 +141,8 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
   const copyContent = async () => {
     const div = document.createElement("div");
     div.innerHTML = highlighted;
-    const text = div.textContent ?? "";
     try {
-      await navigator.clipboard.writeText(text);
+      await navigator.clipboard.writeText(div.textContent ?? "");
       addToast("success", "Copied to clipboard");
     } catch {
       addToast("error", "Failed to copy");
