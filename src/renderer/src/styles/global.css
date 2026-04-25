@@ -367,6 +367,11 @@ textarea {
   min-width: 0;
   display: flex;
   overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.tabs-scroll::-webkit-scrollbar {
+  display: none;
 }
 
 .tabbar-actions {
