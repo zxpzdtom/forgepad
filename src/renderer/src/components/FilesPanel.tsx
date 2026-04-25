@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import { FilePlus2, RefreshCw } from "lucide-react";
-import { themeToTreeStyles } from "@pierre/trees";
 import { FileTree, useFileTree } from "@pierre/trees/react";
 import type { FileTreeContextMenuItem, GitStatusEntry } from "@pierre/trees";
 import type { FileNode, Workspace } from "@shared/types";
@@ -51,37 +50,19 @@ function useActiveWorkspace(): Workspace | undefined {
 }
 
 const treeThemeStyle = {
-  ...themeToTreeStyles({
-    type: "dark",
-    bg: "#11141a",
-    fg: "#cfd6e3",
-    colors: {
-      "sideBar.background": "#11141a",
-      "sideBar.foreground": "#cfd6e3",
-      "sideBar.border": "#252b36",
-      "sideBarSectionHeader.foreground": "#7f8998",
-      "list.hoverBackground": "#191d26",
-      "list.activeSelectionForeground": "#e2e7ef",
-      "list.activeSelectionBackground": "#202832",
-      "list.focusOutline": "#4aa894",
-      focusBorder: "#4aa894",
-      "input.background": "#0f1218",
-      "input.border": "#252b36",
-      "scrollbarSlider.background": "#313946",
-      "gitDecoration.addedResourceForeground": "#7acb83",
-      "gitDecoration.modifiedResourceForeground": "#83aee0",
-      "gitDecoration.deletedResourceForeground": "#e87676",
-      "terminal.ansiGreen": "#7acb83",
-      "terminal.ansiYellow": "#d6b466",
-      "terminal.ansiBlue": "#83aee0",
-      "terminal.ansiRed": "#e87676",
-    },
-  }),
-  "--trees-accent-override": "#4aa894",
-  "--trees-status-renamed-override": "#d6b466",
-  "--trees-status-untracked-override": "#7acb83",
-  "--trees-git-renamed-color-override": "#d6b466",
-  "--trees-git-untracked-color-override": "#7acb83",
+  colorScheme: "dark",
+  "--trees-bg-override": "oklch(20.5% 0 0)",
+  "--trees-fg-override": "oklch(98.5% 0 0)",
+  "--trees-fg-muted-override": "oklch(75% 0 0)",
+  "--trees-bg-muted-override": "oklch(26.9% 0 0)",
+  "--trees-search-fg-override": "oklch(85% 0 0)",
+  "--trees-search-bg-override": "oklch(20% 0 0)",
+  "--trees-border-color-override": "oklch(100% 0 0 / 0.12)",
+  "--trees-selected-fg-override": "oklch(97% 0.04 250)",
+  "--trees-selected-bg-override": "oklch(35% 0.08 250)",
+  "--trees-selected-border-color-override": "oklch(65% 0.2 250)",
+  "--trees-selected-focused-border-color-override": "oklch(75% 0.2 250)",
+  "--trees-focus-ring-color-override": "oklch(70% 0.15 250)",
   "--trees-font-family-override":
     'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   "--trees-font-size-override": "13px",
@@ -121,7 +102,7 @@ export function FilesPanel() {
     density: "default",
     search: true,
     flattenEmptyDirectories: true,
-    icons: { set: "minimal", colored: false },
+    icons: { set: "standard", colored: false },
     initialSelectedPaths: [],
     onSelectionChange: (paths) => {
       const next = [...paths];
