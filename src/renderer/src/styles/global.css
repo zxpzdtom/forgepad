@@ -445,6 +445,12 @@ textarea {
   flex-direction: column;
 }
 
+.editor-host {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .surface-toolbar {
   min-height: 42px;
   justify-content: space-between;

@@ -24,17 +24,30 @@ self.MonacoEnvironment = {
 
 loader.config({ monaco });
 
-// Disable TS/JS diagnostics that are irrelevant for a code viewer.
-// Monaco's built-in compiler has no access to node_modules or tsconfig paths.
+// Disable all TS/JS diagnostics — Monaco's compiler has no access to
+// node_modules, tsconfig, or module resolution. Only tokenization for
+// syntax highlighting is needed, not validation.
 monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions({
   noSemanticValidation: true,
-  noSyntaxValidation: false,
+  noSyntaxValidation: true,
   noSuggestionDiagnostics: true,
 });
 monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({
   noSemanticValidation: true,
-  noSyntaxValidation: false,
+  noSyntaxValidation: true,
   noSuggestionDiagnostics: true,
+});
+monaco.languages.typescript.typescriptDefaults.setCompilerOptions({
+  jsx: monaco.languages.typescript.JsxEmit.React,
+  jsxFactory: "React.createElement",
+  reactNamespace: "React",
+  allowNonTsExtensions: true,
+});
+monaco.languages.typescript.javascriptDefaults.setCompilerOptions({
+  jsx: monaco.languages.typescript.JsxEmit.React,
+  jsxFactory: "React.createElement",
+  reactNamespace: "React",
+  allowNonTsExtensions: true,
 });
 
 createRoot(document.getElementById("root")!).render(
