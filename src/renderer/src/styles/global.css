@@ -445,10 +445,41 @@ textarea {
   flex-direction: column;
 }
 
-.editor-host {
+.code-viewer-scroll {
   flex: 1;
   min-height: 0;
-  overflow: hidden;
+  overflow: auto;
+  background: #0c0d10;
+}
+
+.code-viewer {
+  margin: 0;
+  padding: 16px 20px;
+  min-width: fit-content;
+  font-size: 13px;
+  line-height: 1.6;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+}
+
+.code-viewer pre {
+  margin: 0;
+  padding: 0;
+  background: transparent !important;
+}
+
+.code-viewer code {
+  font-family: inherit;
+  background: transparent !important;
+}
+
+.code-viewer .line {
+  min-height: 1.6em;
+}
+
+.code-viewer .shiki {
+  background: transparent !important;
+  padding: 0;
+  margin: 0;
 }
 
 .surface-toolbar {
