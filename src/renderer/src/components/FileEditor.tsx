@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
-import Editor from "@monaco-editor/react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import Editor, { type OnMount } from "@monaco-editor/react";
+import type { editor } from "monaco-editor";
 import { Save } from "lucide-react";
 import type { Tab, Workspace } from "@shared/types";
 import { useAppStore } from "@renderer/store/app-store";
@@ -33,6 +34,7 @@ function languageForPath(path: string): string | undefined {
 }
 
 export function FileEditor({ tab, workspace }: FileEditorProps) {
+  const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
   const [content, setContent] = useState("");
   const [savedContent, setSavedContent] = useState("");
   const [loading, setLoading] = useState(true);
@@ -61,6 +63,20 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
       disposed = true;
     };
   }, [addToast, tab.relPath, workspace.worktreePath]);
+
+  const handleEditorMount: OnMount = useCallback((editor) => {
+    editorRef.current = editor;
+    requestAnimationFrame(() => {
+      editor.layout();
+    });
+  }, []);
+
+  // Force re-layout when this tab becomes visible (e.g. switching back to a file tab)
+  useEffect(() => {
+    const ed = editorRef.current;
+    if (!ed) return;
+    requestAnimationFrame(() => ed.layout());
+  }, [tab.id]);
 
   const save = async () => {
     setSaving(true);
@@ -113,6 +129,7 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
           value={content}
           language={language}
           theme="vs-dark"
+          onMount={handleEditorMount}
           onChange={(value) => setContent(value ?? "")}
           options={{
             fontSize: editorFontSize,

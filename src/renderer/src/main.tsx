@@ -24,6 +24,19 @@ self.MonacoEnvironment = {
 
 loader.config({ monaco });
 
+// Disable TS/JS diagnostics that are irrelevant for a code viewer.
+// Monaco's built-in compiler has no access to node_modules or tsconfig paths.
+monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions({
+  noSemanticValidation: true,
+  noSyntaxValidation: false,
+  noSuggestionDiagnostics: true,
+});
+monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({
+  noSemanticValidation: true,
+  noSyntaxValidation: false,
+  noSuggestionDiagnostics: true,
+});
+
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <App />
