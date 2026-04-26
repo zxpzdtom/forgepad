@@ -1,3 +1,4 @@
+import { arrayMove } from "@dnd-kit/sortable";
 import { create } from "zustand";
 import type {
   AgentPreset,
@@ -120,6 +121,8 @@ type AppState = {
   restoreAgentSessions: () => Promise<void>;
   setFocusedColumn: (column: AppState["focusedColumn"]) => void;
   refreshBranchStats: (workspaceId?: string) => Promise<void>;
+  reorderProjects: (activeId: string, overId: string) => void;
+  reorderWorkspaces: (projectId: string, activeId: string, overId: string) => void;
 };
 
 function id(): string {
@@ -1002,6 +1005,31 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   setFocusedColumn: (column) => set({ focusedColumn: column }),
+
+  reorderProjects: (activeId, overId) =>
+    set((state) => {
+      const oldIdx = state.projects.findIndex((p) => p.id === activeId);
+      const newIdx = state.projects.findIndex((p) => p.id === overId);
+      if (oldIdx === -1 || newIdx === -1) return state;
+      return { projects: arrayMove(state.projects, oldIdx, newIdx) };
+    }),
+
+  reorderWorkspaces: (projectId, activeId, overId) =>
+    set((state) => {
+      const projectWorkspaces = state.workspaces.filter(
+        (w) => w.projectId === projectId,
+      );
+      const oldIdx = projectWorkspaces.findIndex((w) => w.id === activeId);
+      const newIdx = projectWorkspaces.findIndex((w) => w.id === overId);
+      if (oldIdx === -1 || newIdx === -1) return state;
+      const reordered = arrayMove(projectWorkspaces, oldIdx, newIdx);
+      const reorderedMap = new Map(reordered.map((w) => [w.id, w]));
+      return {
+        workspaces: state.workspaces.map(
+          (w) => reorderedMap.get(w.id) ?? w,
+        ),
+      };
+    }),
 
   refreshBranchStats: async (workspaceId) => {
     const state = get();

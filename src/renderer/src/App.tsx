@@ -29,6 +29,7 @@ export function App() {
   const createAgentTerminal = useAppStore((state) => state.createAgentTerminal);
   const closeTab = useAppStore((state) => state.closeTab);
   const setActiveTab = useAppStore((state) => state.setActiveTab);
+  const setActiveWorkspace = useAppStore((state) => state.setActiveWorkspace);
   const setRightPanelMode = useAppStore((state) => state.setRightPanelMode);
   const setFocusedColumn = useAppStore((state) => state.setFocusedColumn);
   const triggerGitRefresh = useAppStore((state) => state.triggerGitRefresh);
@@ -112,29 +113,25 @@ export function App() {
         return;
       }
 
-      // Cmd+1/2/3/4: switch tab by index in focused column
+      // Cmd+1~9: switch workspace by global sidebar order
       if (
-        (event.metaKey || event.ctrlKey) &&
         !event.shiftKey &&
         !event.altKey &&
-        ["1", "2", "3", "4"].includes(key)
+        ["1", "2", "3", "4", "5", "6", "7", "8", "9"].includes(key)
       ) {
         event.preventDefault();
         const state = useAppStore.getState();
-        const wsTabs = state.tabs.filter(
-          (t) => t.workspaceId === state.activeWorkspaceId,
-        );
-        let columnTabs;
-        if (focusedColumn === "agent") {
-          columnTabs = wsTabs.filter((t) => t.type === "terminal");
-        } else if (focusedColumn === "file") {
-          columnTabs = wsTabs.filter((t) => t.type !== "terminal");
-        } else {
-          return;
+        const orderedIds: string[] = [];
+        for (const project of state.projects) {
+          for (const ws of state.workspaces.filter(
+            (w) => w.projectId === project.id,
+          )) {
+            orderedIds.push(ws.id);
+          }
         }
         const idx = parseInt(key, 10) - 1;
-        if (idx < columnTabs.length) {
-          setActiveTab(columnTabs[idx].id);
+        if (idx < orderedIds.length) {
+          state.setActiveWorkspace(orderedIds[idx]);
         }
         return;
       }
@@ -193,6 +190,7 @@ export function App() {
     createTerminal,
     focusedColumn,
     setActiveTab,
+    setActiveWorkspace,
     setRightPanelMode,
     tabs,
   ]);

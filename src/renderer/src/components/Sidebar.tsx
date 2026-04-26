@@ -1,12 +1,144 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import {
+  DndContext,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import {
   ChevronRight,
   FolderOpen,
+  GripVertical,
   PanelLeftClose,
   PanelLeftOpen,
   Plus,
 } from "lucide-react";
 import { useAppStore } from "@renderer/store/app-store";
+
+function SortableProjectHeader({
+  projectId,
+  name,
+  workspaceCount,
+  isCollapsed,
+  onToggle,
+}: {
+  projectId: string;
+  name: string;
+  workspaceCount: number;
+  isCollapsed: boolean;
+  onToggle: () => void;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: projectId });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <button
+      ref={setNodeRef}
+      style={style}
+      className={`sidebar-project-header${isDragging ? " dragging" : ""}`}
+      type="button"
+      onClick={onToggle}
+      {...attributes}
+    >
+      <span className="drag-handle" {...listeners}>
+        <GripVertical size={12} />
+      </span>
+      <ChevronRight
+        size={14}
+        className={`sidebar-chevron${isCollapsed ? "" : " open"}`}
+      />
+      <span className="sidebar-project-name">{name}</span>
+      <small className="sidebar-project-count">{workspaceCount}</small>
+    </button>
+  );
+}
+
+function SortableWorkspaceRow({
+  workspace,
+  globalIndex,
+  isActive,
+  onClick,
+}: {
+  workspace: { id: string; name: string; branch: string };
+  globalIndex: number;
+  isActive: boolean;
+  onClick: () => void;
+}) {
+  const branchStats = useAppStore((state) => state.branchStats[workspace.id]);
+  const stats = branchStats ?? { ahead: 0, behind: 0, additions: 0, deletions: 0 };
+
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: workspace.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <button
+      ref={setNodeRef}
+      style={style}
+      className={`sidebar-workspace${isActive ? " active" : ""}${isDragging ? " dragging" : ""}`}
+      type="button"
+      onClick={onClick}
+      {...attributes}
+      {...listeners}
+    >
+      <div className="sidebar-workspace-icon">
+        <span className="sidebar-workspace-dot" />
+      </div>
+      <div className="sidebar-workspace-info">
+        <div className="sidebar-workspace-top">
+          <span className="sidebar-workspace-name">{workspace.name}</span>
+          {stats.ahead > 0 && (
+            <span className="sidebar-stat ahead">↑{stats.ahead}</span>
+          )}
+          {(stats.additions > 0 || stats.deletions > 0) && (
+            <span className="sidebar-stat-diff">
+              {stats.additions > 0 && (
+                <span className="stat-add">+{stats.additions}</span>
+              )}
+              {stats.deletions > 0 && (
+                <span className="stat-del">−{stats.deletions}</span>
+              )}
+            </span>
+          )}
+        </div>
+        <span className="sidebar-workspace-branch">
+          {workspace.branch || "detached"}
+        </span>
+      </div>
+      <span className="sidebar-workspace-index">#{globalIndex + 1}</span>
+    </button>
+  );
+}
 
 function SidebarSkeleton() {
   return (
@@ -33,48 +165,6 @@ function SidebarSkeleton() {
   );
 }
 
-function WorkspaceRow({ workspace, isActive, onClick }: {
-  workspace: { id: string; name: string; branch: string };
-  isActive: boolean;
-  onClick: () => void;
-}) {
-  const branchStats = useAppStore((state) => state.branchStats[workspace.id]);
-  const stats = branchStats ?? { ahead: 0, behind: 0, additions: 0, deletions: 0 };
-
-  return (
-    <button
-      className={`sidebar-workspace${isActive ? " active" : ""}`}
-      type="button"
-      onClick={onClick}
-    >
-      <div className="sidebar-workspace-icon">
-        <span className="sidebar-workspace-dot" />
-      </div>
-      <div className="sidebar-workspace-info">
-        <div className="sidebar-workspace-top">
-          <span className="sidebar-workspace-name">{workspace.name}</span>
-          {stats.ahead > 0 && (
-            <span className="sidebar-stat ahead">↑{stats.ahead}</span>
-          )}
-          {(stats.additions > 0 || stats.deletions > 0) && (
-            <span className="sidebar-stat-diff">
-              {stats.additions > 0 && (
-                <span className="stat-add">+{stats.additions}</span>
-              )}
-              {stats.deletions > 0 && (
-                <span className="stat-del">−{stats.deletions}</span>
-              )}
-            </span>
-          )}
-        </div>
-        <span className="sidebar-workspace-branch">
-          {workspace.branch || "detached"}
-        </span>
-      </div>
-    </button>
-  );
-}
-
 export function Sidebar() {
   const [collapsedProjects, setCollapsedProjects] = useState<Set<string>>(
     new Set(),
@@ -87,6 +177,32 @@ export function Sidebar() {
   const hydrated = useAppStore((state) => state.hydrated);
   const openProject = useAppStore((state) => state.openProject);
   const setActiveWorkspace = useAppStore((state) => state.setActiveWorkspace);
+  const reorderProjects = useAppStore((state) => state.reorderProjects);
+  const reorderWorkspaces = useAppStore((state) => state.reorderWorkspaces);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 5 },
+    }),
+  );
+
+  const projectIds = useMemo(() => projects.map((p) => p.id), [projects]);
+
+  const workspaceOrder = useMemo(() => {
+    const ordered: string[] = [];
+    for (const project of projects) {
+      for (const ws of workspaces.filter((w) => w.projectId === project.id)) {
+        ordered.push(ws.id);
+      }
+    }
+    return ordered;
+  }, [projects, workspaces]);
+
+  const workspaceIndexMap = useMemo(() => {
+    const map = new Map<string, number>();
+    workspaceOrder.forEach((id, idx) => map.set(id, idx));
+    return map;
+  }, [workspaceOrder]);
 
   const toggleProject = (projectId: string) => {
     setCollapsedProjects((prev) => {
@@ -95,6 +211,27 @@ export function Sidebar() {
       else next.add(projectId);
       return next;
     });
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    const activeId = String(active.id);
+    const overId = String(over.id);
+
+    // Check if it's a project-level drag
+    if (projects.some((p) => p.id === activeId) && projects.some((p) => p.id === overId)) {
+      reorderProjects(activeId, overId);
+      return;
+    }
+
+    // Check if it's a workspace-level drag (same project)
+    const activeWs = workspaces.find((w) => w.id === activeId);
+    const overWs = workspaces.find((w) => w.id === overId);
+    if (activeWs && overWs && activeWs.projectId === overWs.projectId) {
+      reorderWorkspaces(activeWs.projectId, activeId, overId);
+    }
   };
 
   if (!sidebarOpen) {
@@ -116,25 +253,18 @@ export function Sidebar() {
               <div className="sidebar-rail-skeleton" />
             </>
           ) : (
-            projects.map((project) => {
-              const projectWorkspaces = workspaces.filter(
-                (w) => w.projectId === project.id,
-              );
-              const isActive = projectWorkspaces.some(
-                (w) => w.id === activeWorkspaceId,
-              );
+            workspaceOrder.slice(0, 9).map((wsId, idx) => {
+              const ws = workspaces.find((w) => w.id === wsId);
+              if (!ws) return null;
               return (
                 <button
-                  key={project.id}
-                  className={`sidebar-rail-item${isActive ? " active" : ""}`}
+                  key={wsId}
+                  className={`sidebar-rail-item${wsId === activeWorkspaceId ? " active" : ""}`}
                   type="button"
-                  title={project.name}
-                  onClick={() => {
-                    const first = projectWorkspaces[0];
-                    if (first) setActiveWorkspace(first.id);
-                  }}
+                  title={`${ws.name} (#${idx + 1})`}
+                  onClick={() => setActiveWorkspace(wsId)}
                 >
-                  {project.name.charAt(0).toUpperCase()}
+                  {ws.name.charAt(0).toUpperCase()}
                 </button>
               );
             })
@@ -195,47 +325,55 @@ export function Sidebar() {
             <span>Open a project to get started</span>
           </button>
         ) : (
-          projects.map((project) => {
-            const projectWorkspaces = workspaces.filter(
-              (w) => w.projectId === project.id,
-            );
-            const isCollapsed = collapsedProjects.has(project.id);
-            const hasActive = projectWorkspaces.some(
-              (w) => w.id === activeWorkspaceId,
-            );
+          <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+            <SortableContext
+              items={projectIds}
+              strategy={verticalListSortingStrategy}
+            >
+              {projects.map((project) => {
+                const projectWorkspaces = workspaces.filter(
+                  (w) => w.projectId === project.id,
+                );
+                const isCollapsed = collapsedProjects.has(project.id);
+                const hasActive = projectWorkspaces.some(
+                  (w) => w.id === activeWorkspaceId,
+                );
+                const wsIds = projectWorkspaces.map((w) => w.id);
 
-            return (
-              <div
-                className={`sidebar-project${hasActive ? " has-active" : ""}`}
-                key={project.id}
-              >
-                <button
-                  className="sidebar-project-header"
-                  type="button"
-                  onClick={() => toggleProject(project.id)}
-                >
-                  <ChevronRight
-                    size={14}
-                    className={`sidebar-chevron${isCollapsed ? "" : " open"}`}
-                  />
-                  <span className="sidebar-project-name">{project.name}</span>
-                  <small className="sidebar-project-count">
-                    {projectWorkspaces.length}
-                  </small>
-                </button>
-
-                {!isCollapsed &&
-                  projectWorkspaces.map((workspace) => (
-                    <WorkspaceRow
-                      key={workspace.id}
-                      workspace={workspace}
-                      isActive={workspace.id === activeWorkspaceId}
-                      onClick={() => setActiveWorkspace(workspace.id)}
+                return (
+                  <div
+                    className={`sidebar-project${hasActive ? " has-active" : ""}`}
+                    key={project.id}
+                  >
+                    <SortableProjectHeader
+                      projectId={project.id}
+                      name={project.name}
+                      workspaceCount={projectWorkspaces.length}
+                      isCollapsed={isCollapsed}
+                      onToggle={() => toggleProject(project.id)}
                     />
-                  ))}
-              </div>
-            );
-          })
+
+                    {!isCollapsed && (
+                      <SortableContext
+                        items={wsIds}
+                        strategy={verticalListSortingStrategy}
+                      >
+                        {projectWorkspaces.map((workspace) => (
+                          <SortableWorkspaceRow
+                            key={workspace.id}
+                            workspace={workspace}
+                            globalIndex={workspaceIndexMap.get(workspace.id) ?? 0}
+                            isActive={workspace.id === activeWorkspaceId}
+                            onClick={() => setActiveWorkspace(workspace.id)}
+                          />
+                        ))}
+                      </SortableContext>
+                    )}
+                  </div>
+                );
+              })}
+            </SortableContext>
+          </DndContext>
         )}
       </div>
 
