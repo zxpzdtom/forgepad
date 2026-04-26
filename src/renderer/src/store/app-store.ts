@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type {
   AppSettings,
+  CodeSelectionItem,
   ContextBundleResult,
   ContextDiffItem,
   ContextFileItem,
@@ -19,7 +20,7 @@ import type {
   TaskStatus,
   Workspace,
 } from "@shared/types";
-import { DEFAULT_SETTINGS } from "@shared/types";
+import { AGENT_PRESETS, DEFAULT_SETTINGS } from "@shared/types";
 
 type Toast = {
   id: string;
@@ -43,6 +44,8 @@ type AppState = {
   lastBundle: ContextBundleResult | null;
   toasts: Toast[];
   hydrated: boolean;
+  gitRefreshEpoch: number;
+  triggerGitRefresh: () => void;
   hydrate: (state: Partial<PersistedAppState> | null) => void;
   toPersistedState: () => PersistedAppState;
   addToast: (kind: Toast["kind"], message: string) => void;
@@ -50,6 +53,10 @@ type AppState = {
   openProject: () => Promise<void>;
   setActiveWorkspace: (workspaceId: string | null) => void;
   createTerminal: (workspaceId?: string) => Promise<string | null>;
+  createAgentTerminal: (
+    workspaceId?: string,
+    commandOverride?: string,
+  ) => Promise<string | null>;
   addTab: (tab: Tab) => void;
   closeTab: (tabId: string) => void;
   setActiveTab: (tabId: string | null) => void;
@@ -89,7 +96,14 @@ type AppState = {
     },
     text: string,
   ) => void;
+  addCodeSelection: (
+    workspaceId: string,
+    relPath: string,
+    range: { start: number; end: number; selectedText: string },
+    text: string,
+  ) => void;
   updateFileNote: (id: string, note: string) => void;
+  updateFileIncludeContent: (id: string, includeContent: boolean) => void;
   sendContextToTerminal: () => Promise<void>;
   updateSettings: (partial: Partial<AppSettings>) => void;
   refreshBranch: (workspaceId: string) => Promise<void>;
@@ -108,6 +122,15 @@ function tabTitle(tab: Tab): string {
   if (tab.type === "diff") return "Changes";
   if (tab.type === "context-preview") return "Context";
   return tab.relPath.split("/").pop() || tab.relPath;
+}
+
+function agentLabelForCommand(command: string): string {
+  const normalized = command.trim();
+  const preset = AGENT_PRESETS.find((item) => item.command === normalized);
+  if (preset?.id === "claude") return "Claude";
+  if (preset?.id === "gemini") return "Gemini";
+  if (preset?.id === "codex") return "Codex";
+  return "Agent";
 }
 
 function serializeForSave(state: AppState): PersistedAppState {
@@ -137,6 +160,7 @@ function contextKey(item: ContextItem): string {
   if (item.type === "diff")
     return `${item.workspaceId}:diff:${item.bucket}:${item.relPath}`;
   if (item.type === "task") return `${item.workspaceId}:task:${item.taskId}`;
+  if (item.type === "selection") return `${item.workspaceId}:selection:${item.id}`;
   return `${item.workspaceId}:comment:${item.id}`;
 }
 
@@ -164,6 +188,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   lastBundle: null,
   toasts: [],
   hydrated: false,
+  gitRefreshEpoch: 0,
+  triggerGitRefresh: () =>
+    set((state) => ({ gitRefreshEpoch: state.gitRefreshEpoch + 1 })),
 
   hydrate: (state) => {
     if (state?.schemaVersion !== undefined && state.schemaVersion !== 1) {
@@ -306,6 +333,54 @@ export const useAppStore = create<AppState>((set, get) => ({
       get().addToast(
         "error",
         error instanceof Error ? error.message : "Failed to create terminal.",
+      );
+      return null;
+    }
+  },
+
+  createAgentTerminal: async (workspaceId, commandOverride) => {
+    const workspace = findWorkspace(get(), workspaceId);
+    if (!workspace) return null;
+    const command =
+      commandOverride?.trim() || get().settings.defaultAgentCommand.trim();
+    if (!command) {
+      get().addToast("error", "Default agent command is empty.");
+      return null;
+    }
+
+    try {
+      const ptyId = await window.forgepad.pty.create(
+        workspace.worktreePath,
+        get().settings.defaultShell || undefined,
+        command,
+        {
+          FORGEPAD_WORKSPACE_ID: workspace.id,
+          FORGEPAD_AGENT: "1",
+        },
+      );
+      const agentCount = get().tabs.filter(
+        (tab) =>
+          tab.workspaceId === workspace.id &&
+          tab.type === "terminal" &&
+          (tab.isAgent || tab.title.startsWith("Agent")),
+      ).length;
+      const agentLabel = agentLabelForCommand(command);
+      const tab: Tab = {
+        id: id(),
+        workspaceId: workspace.id,
+        type: "terminal",
+        title: agentCount === 0 ? agentLabel : `${agentLabel} ${agentCount + 1}`,
+        ptyId,
+        isAgent: true,
+      };
+      get().addTab(tab);
+      return ptyId;
+    } catch (error) {
+      get().addToast(
+        "error",
+        error instanceof Error
+          ? error.message
+          : "Failed to create agent terminal.",
       );
       return null;
     }
@@ -590,12 +665,45 @@ export const useAppStore = create<AppState>((set, get) => ({
     }));
   },
 
+  addCodeSelection: (workspaceId, relPath, range, text) => {
+    const trimmed = text.trim();
+    const selectedText = range.selectedText.trim();
+    if (!trimmed || !selectedText) return;
+    const startLine = Math.min(range.start, range.end);
+    const endLine = Math.max(range.start, range.end);
+    const next: CodeSelectionItem = {
+      id: id(),
+      type: "selection",
+      workspaceId,
+      relPath,
+      startLine,
+      endLine,
+      selectedText,
+      text: trimmed,
+      addedAt: now(),
+    };
+    set((state) => ({
+      contextItems: [...state.contextItems, next],
+      rightPanelMode: "context",
+      rightPanelOpen: true,
+    }));
+  },
+
   updateFileNote: (itemId, note) =>
     set((state) => ({
       contextItems: state.contextItems.map((item) =>
         item.id === itemId &&
         (item.type === "file" || item.type === "diff" || item.type === "task")
           ? { ...item, note }
+          : item,
+      ),
+    })),
+
+  updateFileIncludeContent: (itemId, includeContent) =>
+    set((state) => ({
+      contextItems: state.contextItems.map((item) =>
+        item.id === itemId && item.type === "file"
+          ? { ...item, includeContent }
           : item,
       ),
     })),
@@ -641,6 +749,17 @@ export const useAppStore = create<AppState>((set, get) => ({
           ...comment
         }) => comment,
       );
+    const selections = items
+      .filter((item): item is CodeSelectionItem => item.type === "selection")
+      .map(
+        ({
+          id: _id,
+          type: _type,
+          workspaceId: _workspaceId,
+          addedAt: _addedAt,
+          ...selection
+        }) => selection,
+      );
 
     const bundle = await window.forgepad.context.createBundle({
       workspacePath: workspace.worktreePath,
@@ -651,19 +770,26 @@ export const useAppStore = create<AppState>((set, get) => ({
       files,
       diffs,
       comments,
+      selections,
     });
 
     const activeTab = state.tabs.find((tab) => tab.id === state.activeTabId);
     let terminalTab =
       activeTab?.type === "terminal"
         ? activeTab
-        : state.tabs.find(
+        : (state.tabs.find(
+            (tab) =>
+              tab.workspaceId === workspace.id &&
+              tab.type === "terminal" &&
+              (tab.isAgent || tab.title.startsWith("Agent")),
+          ) ??
+          state.tabs.find(
             (tab) =>
               tab.workspaceId === workspace.id && tab.type === "terminal",
-          );
+          ));
 
     if (!terminalTab) {
-      const ptyId = await get().createTerminal(workspace.id);
+      const ptyId = await get().createAgentTerminal(workspace.id);
       terminalTab = get().tabs.find(
         (tab) => tab.type === "terminal" && tab.ptyId === ptyId,
       );
@@ -682,7 +808,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       contextItems: current.settings.sendAndClearComments
         ? current.contextItems.filter(
             (item) =>
-              item.workspaceId !== workspace.id || item.type !== "comment",
+              item.workspaceId !== workspace.id ||
+              (item.type !== "comment" && item.type !== "selection"),
           )
         : current.contextItems,
     }));

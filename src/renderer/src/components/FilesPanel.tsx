@@ -47,6 +47,31 @@ function treeDataFromNodes(nodes: FileNode[], rootPath: string): TreeData {
   return result;
 }
 
+function filesForTreePath(treeData: TreeData, treePath: string): string[] {
+  if (treeData.filePaths.has(treePath)) return [treePath];
+  const prefix = treePath.replace(/\/+$/, "") + "/";
+  return [...treeData.filePaths].filter((filePath) =>
+    filePath.startsWith(prefix),
+  );
+}
+
+function filesForTreeSelection(treeData: TreeData, selectedPaths: string[]) {
+  const files = new Set<string>();
+  for (const selectedPath of selectedPaths) {
+    for (const filePath of filesForTreePath(treeData, selectedPath)) {
+      files.add(filePath);
+    }
+  }
+  return [...files].sort((a, b) =>
+    a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }),
+  );
+}
+
+function sameStringArray(a: readonly string[], b: readonly string[]) {
+  if (a.length !== b.length) return false;
+  return a.every((value, index) => value === b[index]);
+}
+
 function useActiveWorkspace(): Workspace | undefined {
   const workspaces = useAppStore((state) => state.workspaces);
   const activeWorkspaceId = useAppStore((state) => state.activeWorkspaceId);
@@ -87,6 +112,7 @@ export function FilesPanel() {
   const addContextFiles = useAppStore((state) => state.addContextFiles);
   const contextItems = useAppStore((state) => state.contextItems);
   const addToast = useAppStore((state) => state.addToast);
+  const gitRefreshEpoch = useAppStore((state) => state.gitRefreshEpoch);
 
   const contextFileSet = useMemo(() => {
     return new Set(
@@ -119,9 +145,8 @@ export function FilesPanel() {
   useEffect(() => {
     const prev = prevSelectedRef.current;
     const next = selectedTreePaths;
-    prevSelectedRef.current = next;
-
-    if (next === prev) return;
+    if (sameStringArray(prev, next)) return;
+    prevSelectedRef.current = [...next];
 
     setSelectedPaths([...next]);
 
@@ -151,7 +176,7 @@ export function FilesPanel() {
 
   useEffect(() => {
     void load();
-  }, [load]);
+  }, [load, gitRefreshEpoch]);
 
   useEffect(() => {
     model.resetPaths(treeData.paths);
@@ -161,22 +186,63 @@ export function FilesPanel() {
   const selectedFiles = selectedPaths.filter((path) =>
     treeData.filePaths.has(path),
   );
+  const selectedContextFiles = useMemo(
+    () => filesForTreeSelection(treeData, selectedPaths),
+    [selectedPaths, treeData],
+  );
 
-  const renderContextMenu = (item: FileTreeContextMenuItem) => {
-    if (!workspace || item.kind !== "file") return null;
+  const addFilesToContext = useCallback(
+    (relPaths: string[]) => {
+      if (!workspace || relPaths.length === 0) return;
+      addContextFiles(workspace.id, relPaths);
+      addToast(
+        "success",
+        `Added ${relPaths.length} file${relPaths.length === 1 ? "" : "s"} to context.`,
+      );
+    },
+    [addContextFiles, addToast, workspace],
+  );
+
+  const renderContextMenu = (
+    item: FileTreeContextMenuItem,
+    context: { close: () => void },
+  ) => {
+    if (!workspace) return null;
+    const itemFiles = filesForTreePath(treeData, item.path);
+    const closeAfter = (action: () => void) => {
+      action();
+      context.close();
+    };
     return (
       <div className="tree-menu">
+        {item.kind === "file" ? (
+          <button
+            type="button"
+            onClick={() =>
+              closeAfter(() => openFileTab(workspace.id, item.path))
+            }
+          >
+            Open
+          </button>
+        ) : null}
         <button
           type="button"
-          onClick={() => openFileTab(workspace.id, item.path)}
+          disabled={itemFiles.length === 0}
+          onClick={() => closeAfter(() => addFilesToContext(itemFiles))}
         >
-          Open
+          {item.kind === "file"
+            ? "Add to Context"
+            : `Add Folder (${itemFiles.length})`}
         </button>
         <button
           type="button"
-          onClick={() => addContextFiles(workspace.id, [item.path])}
+          onClick={() =>
+            closeAfter(() => {
+              void navigator.clipboard.writeText(item.path);
+            })
+          }
         >
-          Add to Context
+          Copy Relative Path
         </button>
       </div>
     );
@@ -192,8 +258,8 @@ export function FilesPanel() {
         <button
           className="secondary-button"
           type="button"
-          disabled={selectedFiles.length === 0}
-          onClick={() => addContextFiles(workspace.id, selectedFiles)}
+          disabled={selectedContextFiles.length === 0}
+          onClick={() => addFilesToContext(selectedContextFiles)}
         >
           <FilePlus2 size={15} />
           Add Selected
@@ -209,7 +275,9 @@ export function FilesPanel() {
       </div>
       <div className="tree-meta">
         <span>{treeData.paths.length.toLocaleString()} files</span>
-        <span>{selectedFiles.length} selected</span>
+        <span>
+          {selectedFiles.length} selected · {selectedContextFiles.length} in context range
+        </span>
       </div>
       <div className="tree-wrap">
         {loading ? <div className="tree-loading">Refreshing</div> : null}

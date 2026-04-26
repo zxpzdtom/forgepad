@@ -17,6 +17,7 @@ export type Tab =
       type: "terminal";
       title: string;
       ptyId: string;
+      isAgent?: boolean;
     }
   | {
       id: string;
@@ -81,6 +82,8 @@ export type FileStatus = {
   bucket: GitBucket;
   staged: boolean;
   conflictKind?: string;
+  additions?: number;
+  deletions?: number;
 };
 
 export type DiffFileData = {
@@ -139,11 +142,24 @@ export type DiffCommentItem = {
   addedAt: number;
 };
 
+export type CodeSelectionItem = {
+  id: string;
+  type: "selection";
+  workspaceId: string;
+  relPath: string;
+  startLine: number;
+  endLine: number;
+  selectedText: string;
+  text: string;
+  addedAt: number;
+};
+
 export type ContextItem =
   | ContextFileItem
   | ContextDiffItem
   | ContextTaskItem
-  | DiffCommentItem;
+  | DiffCommentItem
+  | CodeSelectionItem;
 
 export type ContextBundleResult = {
   id: string;
@@ -174,6 +190,12 @@ export type DiffViewStyle = "split" | "unified";
 export type DiffIndicators = "classic" | "bars" | "none";
 export type DiffLineDiffType = "word-alt" | "word" | "char" | "none";
 export type DiffOverflow = "scroll" | "wrap";
+
+export const AGENT_PRESETS = [
+  { id: "codex", label: "Codex", command: "codex" },
+  { id: "claude", label: "Claude Code", command: "claude" },
+  { id: "gemini", label: "Gemini", command: "gemini" },
+] as const;
 
 export type AppSettings = {
   defaultShell: string;
@@ -210,6 +232,12 @@ export type OpenProjectResult = {
   isGitRepo: boolean;
 };
 
+export type WorkspaceChangeEvent = {
+  id: string;
+  paths: string[];
+  changedAt: number;
+};
+
 export type CreateBundleInput = {
   workspacePath: string;
   workspaceName: string;
@@ -230,5 +258,8 @@ export type CreateBundleInput = {
   }>;
   comments: Array<
     Omit<DiffCommentItem, "id" | "type" | "workspaceId" | "addedAt">
+  >;
+  selections: Array<
+    Omit<CodeSelectionItem, "id" | "type" | "workspaceId" | "addedAt">
   >;
 };

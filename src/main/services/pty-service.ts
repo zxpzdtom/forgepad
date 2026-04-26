@@ -35,8 +35,11 @@ export class PtyService {
     extraEnv?: Record<string, string>,
   ): string {
     const id = `pty-${++this.nextId}`;
-    const file = command?.trim() || shell?.trim() || process.env.SHELL || "/bin/zsh";
-    const proc = pty.spawn(file, [], {
+    const shellPath = shell?.trim() || process.env.SHELL || "/bin/zsh";
+    const commandText = command?.trim();
+    const file = shellPath;
+    const args = commandText ? ["-lc", commandText] : [];
+    const proc = pty.spawn(file, args, {
       name: "xterm-256color",
       cols: 100,
       rows: 30,
@@ -47,6 +50,7 @@ export class PtyService {
         COLORTERM: "truecolor",
         FORGEPAD_PTY_ID: id,
         FORGEPAD_CONTEXT_DIR: ".forgepad/context",
+        FORGEPAD_AGENT_COMMAND: commandText ?? "",
         ...extraEnv,
       } as Record<string, string>,
     });
@@ -104,4 +108,3 @@ export class PtyService {
     return { replay: instance.replayChunks.join(""), alive: true };
   }
 }
-

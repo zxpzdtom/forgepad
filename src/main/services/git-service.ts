@@ -106,6 +106,25 @@ function parseStatusOutput(stdout: string): FileStatus[] {
   return entries;
 }
 
+async function getNumstat(
+  worktreePath: string,
+  staged: boolean,
+): Promise<Map<string, { additions: number; deletions: number }>> {
+  const args = ["diff", "--numstat"];
+  if (staged) args.push("--staged");
+  const output = await git(args, worktreePath).catch(() => "");
+  const map = new Map<string, { additions: number; deletions: number }>();
+  for (const line of output.split(/\r?\n/)) {
+    if (!line) continue;
+    const [addStr, delStr, filePath] = line.split("\t");
+    if (!filePath) continue;
+    const additions = addStr === "-" ? 0 : Number.parseInt(addStr ?? "0", 10) || 0;
+    const deletions = delStr === "-" ? 0 : Number.parseInt(delStr ?? "0", 10) || 0;
+    map.set(filePath, { additions, deletions });
+  }
+  return map;
+}
+
 function patchIndicatesBinary(patch: string): boolean {
   return /^\s*Binary files /m.test(patch) || /^\s*GIT binary patch\b/m.test(patch);
 }
@@ -156,7 +175,23 @@ export class GitService {
     try {
       const output = await git(["status", "--porcelain=v2", "--untracked-files=all"], worktreePath);
       if (!output) return [];
-      return parseStatusOutput(output);
+      const entries = parseStatusOutput(output);
+      const [stagedStats, unstagedStats] = await Promise.all([
+        getNumstat(worktreePath, true),
+        getNumstat(worktreePath, false),
+      ]);
+      for (const entry of entries) {
+        const stats = entry.bucket === "staged"
+          ? stagedStats.get(entry.path) ?? stagedStats.get(entry.oldPath ?? "")
+          : entry.bucket === "unstaged"
+            ? unstagedStats.get(entry.path) ?? unstagedStats.get(entry.oldPath ?? "")
+            : undefined;
+        if (stats) {
+          entry.additions = stats.additions;
+          entry.deletions = stats.deletions;
+        }
+      }
+      return entries;
     } catch {
       return [];
     }

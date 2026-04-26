@@ -9,6 +9,7 @@ import type {
   GitStatusKind,
   OpenProjectResult,
   PersistedAppState,
+  WorkspaceChangeEvent,
 } from "@shared/types";
 
 const api = {
@@ -48,6 +49,15 @@ const api = {
       ipcRenderer.invoke(IPC.FS_READ_FILE, worktreePath, relPath) as Promise<string>,
     writeFile: (worktreePath: string, relPath: string, content: string) =>
       ipcRenderer.invoke(IPC.FS_WRITE_FILE, worktreePath, relPath, content) as Promise<void>,
+    watchWorkspace: (worktreePath: string) =>
+      ipcRenderer.invoke(IPC.FS_WATCH, worktreePath) as Promise<string>,
+    unwatchWorkspace: (watchId: string) => ipcRenderer.send(IPC.FS_UNWATCH, watchId),
+    onChanged: (watchId: string, callback: (event: WorkspaceChangeEvent) => void) => {
+      const channel = `${IPC.FS_CHANGED}:${watchId}`;
+      const listener = (_event: Electron.IpcRendererEvent, payload: WorkspaceChangeEvent) => callback(payload);
+      ipcRenderer.on(channel, listener);
+      return () => ipcRenderer.removeListener(channel, listener);
+    },
   },
   pty: {
     create: (worktreePath: string, shell?: string, command?: string, extraEnv?: Record<string, string>) =>
@@ -80,4 +90,3 @@ const api = {
 contextBridge.exposeInMainWorld("forgepad", api);
 
 export type ForgePadApi = typeof api;
-

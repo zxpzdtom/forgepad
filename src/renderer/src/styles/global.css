@@ -220,6 +220,12 @@ textarea {
   flex: 1;
 }
 
+.sidebar-bottom-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
 .section-label {
   text-transform: uppercase;
 }
@@ -285,8 +291,7 @@ textarea {
 
 .workspace-row span,
 .workspace-row small,
-.change-name span,
-.change-name small,
+.change-path,
 .toolbar-title,
 .tab-chip span,
 .context-item strong,
@@ -376,6 +381,7 @@ textarea {
 
 .tabbar-actions {
   display: flex;
+  align-items: center;
   gap: 6px;
   padding: 0 8px;
 }
@@ -418,6 +424,25 @@ textarea {
   overflow: hidden;
 }
 
+.workspace-surface,
+.workspace-split,
+.workspace-pane-slot {
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+
+.workspace-pane-slot {
+  position: relative;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.workspace-split .terminal-slot {
+  border-left: 1px solid var(--border);
+}
+
 .terminal-panel,
 .editor-panel,
 .diff-panel,
@@ -450,7 +475,8 @@ textarea {
   flex-direction: column;
 }
 
-.code-viewer-scroll {
+.code-viewer-scroll,
+.markdown-viewer-scroll {
   flex: 1;
   min-height: 0;
   overflow: auto;
@@ -462,7 +488,7 @@ textarea {
   padding: 16px 20px;
   min-width: fit-content;
   font-size: 13px;
-  line-height: 1.6;
+  line-height: 1.38;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
 }
 
@@ -475,16 +501,187 @@ textarea {
 .code-viewer code {
   font-family: inherit;
   background: transparent !important;
+  counter-reset: code-line;
 }
 
 .code-viewer .line {
-  min-height: 1.6em;
+  display: block;
+  position: relative;
+  min-height: 1.38em;
+  padding-left: 54px;
+}
+
+.code-viewer .line::before {
+  counter-increment: code-line;
+  content: counter(code-line);
+  position: absolute;
+  left: 0;
+  width: 38px;
+  padding-right: 10px;
+  color: var(--subtle);
+  text-align: right;
+  user-select: none;
+}
+
+.code-viewer .line:hover::before {
+  color: var(--muted);
 }
 
 .code-viewer .shiki {
   background: transparent !important;
   padding: 0;
   margin: 0;
+}
+
+.markdown-viewer-scroll {
+  background: #101218;
+}
+
+.markdown-preview {
+  width: min(860px, 100%);
+  padding: 24px 28px 40px;
+  color: #dce3ed;
+  font-size: 14px;
+  line-height: 1.68;
+}
+
+.markdown-preview h1,
+.markdown-preview h2,
+.markdown-preview h3,
+.markdown-preview h4,
+.markdown-preview h5,
+.markdown-preview h6 {
+  margin: 1.45em 0 0.55em;
+  color: #f1f5fb;
+  line-height: 1.25;
+}
+
+.markdown-preview h1:first-child,
+.markdown-preview h2:first-child,
+.markdown-preview h3:first-child {
+  margin-top: 0;
+}
+
+.markdown-preview h1 {
+  font-size: 26px;
+}
+
+.markdown-preview h2 {
+  font-size: 21px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.markdown-preview h3 {
+  font-size: 17px;
+}
+
+.markdown-preview p,
+.markdown-preview ul,
+.markdown-preview ol,
+.markdown-preview blockquote,
+.markdown-preview pre {
+  margin: 0 0 14px;
+}
+
+.markdown-preview ul,
+.markdown-preview ol {
+  padding-left: 24px;
+}
+
+.markdown-preview li + li {
+  margin-top: 4px;
+}
+
+.markdown-preview .task-list,
+.markdown-preview .contains-task-list {
+  padding-left: 0;
+  list-style: none;
+}
+
+.markdown-preview .task-list-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.markdown-preview .task-list-item input[type="checkbox"] {
+  appearance: none;
+  width: 15px;
+  height: 15px;
+  margin-top: 4px;
+  border: 1px solid #566070;
+  border-radius: 4px;
+  background: #11151c;
+  flex: 0 0 auto;
+}
+
+.markdown-preview .task-list-item input[type="checkbox"]:checked {
+  border-color: var(--accent);
+  background-color: var(--accent);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23071110' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'%3E%3C/polyline%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 11px;
+}
+
+.markdown-preview blockquote {
+  padding: 2px 0 2px 14px;
+  color: var(--muted);
+  border-left: 3px solid #3a5362;
+}
+
+.markdown-preview blockquote p:last-child {
+  margin-bottom: 0;
+}
+
+.markdown-preview code {
+  border: 1px solid var(--border-soft);
+  border-radius: 5px;
+  padding: 1px 5px;
+  color: #f1d897;
+  background: #171b23;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 0.92em;
+}
+
+.markdown-preview pre {
+  overflow: auto;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  padding: 12px 14px;
+  background: #0c0d10;
+}
+
+.markdown-preview pre code {
+  border: 0;
+  padding: 0;
+  color: #d7deeb;
+  background: transparent;
+}
+
+.markdown-preview a {
+  color: var(--accent-2);
+  text-decoration: none;
+}
+
+.markdown-preview a:hover {
+  text-decoration: underline;
+}
+
+.markdown-preview img {
+  max-width: 100%;
+  border-radius: 8px;
+}
+
+::highlight(forgepad-file-search) {
+  color: inherit;
+  background: rgba(233, 189, 97, 0.38);
+}
+
+::highlight(forgepad-file-search-active) {
+  color: #071110;
+  background: #67d5b5;
 }
 
 .surface-toolbar {
@@ -509,6 +706,96 @@ textarea {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.editor-panel .toolbar-actions {
+  min-width: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.file-search-bar {
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  border-bottom: 1px solid var(--border);
+  background: #11151c;
+}
+
+.file-search-bar input {
+  flex: 1;
+  min-width: 140px;
+  height: 28px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0 9px;
+  color: var(--text);
+  background: #0d1016;
+  outline: none;
+}
+
+.file-search-bar input:focus {
+  border-color: #3f756f;
+}
+
+.search-count {
+  width: 54px;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.selection-comment-bar {
+  display: grid;
+  grid-template-columns: minmax(160px, 240px) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-top: 1px solid var(--border);
+  background: #12161d;
+  box-shadow: 0 -12px 28px rgba(0, 0, 0, 0.18);
+}
+
+.selection-comment-meta {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.selection-comment-meta span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.selection-comment-bar textarea {
+  min-width: 0;
+  height: 36px;
+  min-height: 36px;
+  max-height: 92px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 9px;
+  color: var(--text);
+  background: #0d1016;
+  outline: none;
+  resize: vertical;
+}
+
+.selection-comment-bar textarea:focus {
+  border-color: #3f756f;
+}
+
+.selection-comment-actions {
+  display: flex;
+  align-items: center;
+  gap: 7px;
 }
 
 .dirty-dot {
@@ -749,6 +1036,11 @@ textarea {
   background: var(--panel-3);
 }
 
+.tree-menu button:disabled {
+  color: var(--subtle);
+  cursor: not-allowed;
+}
+
 .change-list,
 .context-list {
   flex: 1;
@@ -779,11 +1071,73 @@ textarea {
 
 .change-name {
   min-width: 0;
-  display: grid;
-  gap: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   text-align: left;
   color: var(--text);
   background: transparent;
+}
+
+.change-path {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  flex: 1;
+  min-width: 0;
+}
+
+.change-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.stat-add {
+  color: var(--ok);
+}
+
+.stat-del {
+  color: var(--danger);
+}
+
+.change-status-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  border: 1.5px solid;
+  flex-shrink: 0;
+}
+
+.change-status-dot.add {
+  border-color: var(--ok);
+  background: oklch(50% 0.15 140 / 0.25);
+}
+
+.change-status-dot.del {
+  border-color: var(--danger);
+  background: oklch(50% 0.15 25 / 0.25);
+}
+
+.change-status-dot.mod {
+  border-color: var(--warn);
+  background: oklch(50% 0.15 85 / 0.25);
+}
+
+.change-status-dot.ren {
+  border-color: var(--accent-2);
+  background: oklch(50% 0.15 260 / 0.25);
+}
+
+.change-status-dot.conf {
+  border-color: var(--warn);
+  background: oklch(50% 0.2 85 / 0.35);
 }
 
 .mini-button {
@@ -813,6 +1167,31 @@ textarea {
 
 .composer textarea {
   min-height: 108px;
+}
+
+.agent-command-row {
+  min-height: 32px;
+  display: grid;
+  grid-template-columns: 16px auto minmax(92px, 128px) minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.agent-command-row input {
+  min-width: 0;
+  height: 30px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0 9px;
+  color: var(--text);
+  background: #10131a;
+  outline: none;
+}
+
+.agent-command-row input:focus {
+  border-color: #3f756f;
 }
 
 .composer-actions {
@@ -853,6 +1232,30 @@ textarea {
   margin: 0;
   color: var(--muted);
   line-height: 1.45;
+}
+
+.context-selection-snippet {
+  max-height: 130px;
+  overflow: auto;
+  margin: 0;
+  border: 1px solid var(--border-soft);
+  border-radius: 6px;
+  padding: 8px;
+  color: #d7deeb;
+  background: #0d1016;
+  font: 11px/1.45 ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+}
+
+.context-file-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.context-file-option input {
+  accent-color: var(--accent);
 }
 
 .context-preview pre {
@@ -960,6 +1363,44 @@ textarea {
   background: #10131a;
   outline: none;
   font-size: 12px;
+}
+
+.agent-preset-select {
+  max-width: 132px;
+}
+
+.agent-preset-select.compact {
+  height: 30px;
+}
+
+.tabbar-command-button {
+  height: 30px;
+  min-height: 30px;
+}
+
+.segmented-control {
+  display: inline-flex;
+  align-items: center;
+  height: 30px;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: #10131a;
+}
+
+.segmented-control button {
+  height: 24px;
+  border-radius: 4px;
+  padding: 0 9px;
+  color: var(--muted);
+  background: transparent;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.segmented-control button.active {
+  color: var(--text);
+  background: var(--panel-3);
 }
 
 .diff-panel .surface-toolbar {

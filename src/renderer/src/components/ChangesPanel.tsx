@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Check, GitCommitHorizontal, RefreshCw, RotateCcw, Trash2 } from "lucide-react";
 import type { FileStatus, GitBucket, Workspace } from "@shared/types";
 import { useAppStore } from "@renderer/store/app-store";
@@ -19,6 +19,15 @@ function bucketTitle(bucket: GitBucket): string {
   return "Working Tree";
 }
 
+function StatusDot({ status }: { status: FileStatus["status"] }) {
+  const cls =
+    status === "deleted" ? "del" :
+    status === "added" || status === "untracked" ? "add" :
+    status === "renamed" ? "ren" :
+    status === "conflicted" ? "conf" : "mod";
+  return <span className={`change-status-dot ${cls}`} title={status} />;
+}
+
 export function ChangesPanel() {
   const workspace = useActiveWorkspace();
   const [statuses, setStatuses] = useState<FileStatus[]>([]);
@@ -28,24 +37,46 @@ export function ChangesPanel() {
   const addToast = useAppStore((state) => state.addToast);
   const openDiffTab = useAppStore((state) => state.openDiffTab);
   const addContextDiff = useAppStore((state) => state.addContextDiff);
+  const triggerGitRefresh = useAppStore((state) => state.triggerGitRefresh);
+  const gitRefreshEpoch = useAppStore((state) => state.gitRefreshEpoch);
 
-  const load = useCallback(async () => {
+  const prevSignature = useRef("");
+
+  const load = useCallback(async (silent?: boolean) => {
     if (!workspace) return;
-    setLoading(true);
+    if (!silent) setLoading(true);
     try {
       const next = await window.forgepad.git.getStatus(workspace.worktreePath);
+      const sig = next.map((s) => statusKey(s)).join(",");
       setStatuses(next);
       setSelectedKeys((current) => new Set([...current].filter((key) => next.some((status) => statusKey(status) === key))));
+      if (sig !== prevSignature.current) {
+        prevSignature.current = sig;
+        if (silent) triggerGitRefresh();
+      }
     } catch (error) {
       addToast("error", error instanceof Error ? error.message : "Failed to load git status.");
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
-  }, [addToast, workspace]);
+  }, [addToast, workspace, triggerGitRefresh]);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (!workspace || gitRefreshEpoch === 0) return;
+    void load(true);
+  }, [gitRefreshEpoch, load, workspace]);
+
+  useEffect(() => {
+    if (!workspace) return;
+    const timer = setInterval(() => {
+      void load(true);
+    }, 4000);
+    return () => clearInterval(timer);
+  }, [workspace, load]);
 
   const selected = useMemo(
     () => statuses.filter((status) => selectedKeys.has(statusKey(status))),
@@ -76,6 +107,7 @@ export function ChangesPanel() {
         setCommitMessage("");
       }
       await load();
+      triggerGitRefresh();
       addToast("success", "Git operation completed.");
     } catch (error) {
       addToast("error", error instanceof Error ? error.message : "Git operation failed.");
@@ -147,11 +179,16 @@ export function ChangesPanel() {
                       title={status.path}
                       onClick={() => openDiffTab(workspace.id, status.path)}
                     >
-                      <span>{status.path}</span>
-                      <small>
-                        {status.status}
-                        {status.conflictKind ? ` · ${status.conflictKind}` : ""}
-                      </small>
+                      <span className="change-path">{status.path}</span>
+                      <span className="change-meta">
+                        {status.additions != null && status.additions > 0 && (
+                          <span className="stat-add">+{status.additions}</span>
+                        )}
+                        {status.deletions != null && status.deletions > 0 && (
+                          <span className="stat-del">-{status.deletions}</span>
+                        )}
+                        <StatusDot status={status.status} />
+                      </span>
                     </button>
                     <button
                       className="mini-button"
