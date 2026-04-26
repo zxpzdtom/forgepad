@@ -303,6 +303,73 @@ textarea {
   background: transparent;
 }
 
+/* Markdown code blocks with header + copy */
+.md-code-block {
+  position: relative;
+  margin: 0 0 14px;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #0c0d10;
+}
+
+.md-code-block pre {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  padding: 12px 14px;
+  overflow: auto;
+}
+
+.md-code-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 10px;
+  background: #14171e;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.md-code-lang {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--muted);
+}
+
+.md-code-copy {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.md-code-copy:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+}
+
+/* Mermaid diagram */
+.mermaid-container {
+  margin: 0 0 14px;
+  padding: 16px;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  background: #0c0d10;
+  overflow: auto;
+  text-align: center;
+}
+
+.mermaid-container svg {
+  max-width: 100%;
+  height: auto;
+}
+
 .markdown-preview a {
   color: var(--accent-2);
   text-decoration: none;
