@@ -66,6 +66,9 @@ type AppState = {
   ) => Promise<string | null>;
   addTab: (tab: Tab) => void;
   closeTab: (tabId: string) => void;
+  closeOtherTabs: (tabId: string) => void;
+  closeAllTabs: (workspaceId: string, type: "terminal" | "file") => void;
+  closeTabsToRight: (tabId: string) => void;
   setActiveTab: (tabId: string | null) => void;
   openFileTab: (workspaceId: string, relPath: string) => void;
   openDiffTab: (workspaceId: string, activePath?: string) => void;
@@ -486,6 +489,83 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
       return patch;
     }),
+
+  closeOtherTabs: (tabId) => {
+    const state = get();
+    const tab = state.tabs.find((t) => t.id === tabId);
+    if (!tab) return;
+    const toClose = state.tabs.filter(
+      (t) => t.workspaceId === tab.workspaceId && t.id !== tabId && t.type === tab.type,
+    );
+    for (const t of toClose) {
+      if (t.type === "terminal") window.forgepad.pty.destroy(t.ptyId);
+    }
+    set((s) => {
+      const closeIds = new Set(toClose.map((t) => t.id));
+      const tabs = s.tabs.filter((t) => !closeIds.has(t.id));
+      const patch: Partial<AppState> = { tabs };
+      if (tab.type === "terminal") {
+        patch.activeAgentTabId = tabId;
+      } else {
+        patch.activeFileTabId = tabId;
+      }
+      patch.activeTabId = tabId;
+      return patch;
+    });
+  },
+
+  closeAllTabs: (workspaceId, type) => {
+    const state = get();
+    const toClose = state.tabs.filter(
+      (t) => t.workspaceId === workspaceId && t.type === type,
+    );
+    for (const t of toClose) {
+      if (t.type === "terminal") window.forgepad.pty.destroy(t.ptyId);
+    }
+    set((s) => {
+      const closeIds = new Set(toClose.map((t) => t.id));
+      const tabs = s.tabs.filter((t) => !closeIds.has(t.id));
+      const patch: Partial<AppState> = { tabs };
+      if (type === "terminal") {
+        const remaining = tabs.filter((t) => t.workspaceId === workspaceId && t.type === "terminal");
+        patch.activeAgentTabId = remaining.at(-1)?.id ?? null;
+      } else {
+        const remaining = tabs.filter((t) => t.workspaceId === workspaceId && t.type !== "terminal");
+        patch.activeFileTabId = remaining.at(-1)?.id ?? null;
+      }
+      const wsTabs = tabs.filter((t) => t.workspaceId === workspaceId);
+      patch.activeTabId = wsTabs.at(-1)?.id ?? null;
+      return patch;
+    });
+  },
+
+  closeTabsToRight: (tabId) => {
+    const state = get();
+    const tab = state.tabs.find((t) => t.id === tabId);
+    if (!tab) return;
+    const wsTabs = state.tabs.filter((t) => t.workspaceId === tab.workspaceId);
+    const idx = wsTabs.findIndex((t) => t.id === tabId);
+    if (idx === -1) return;
+    const toClose = wsTabs.slice(idx + 1).filter((t) => t.type === tab.type);
+    for (const t of toClose) {
+      if (t.type === "terminal") window.forgepad.pty.destroy(t.ptyId);
+    }
+    set((s) => {
+      const closeIds = new Set(toClose.map((t) => t.id));
+      const tabs = s.tabs.filter((t) => !closeIds.has(t.id));
+      const patch: Partial<AppState> = { tabs };
+      const wasActiveClosed = closeIds.has(s.activeTabId ?? "");
+      if (wasActiveClosed) {
+        patch.activeTabId = tabId;
+        if (tab.type === "terminal") {
+          patch.activeAgentTabId = tabId;
+        } else {
+          patch.activeFileTabId = tabId;
+        }
+      }
+      return patch;
+    });
+  },
 
   openFileTab: (workspaceId, relPath) => {
     const existing = get().tabs.find(

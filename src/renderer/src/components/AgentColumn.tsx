@@ -1,3 +1,4 @@
+import { useCallback, useState } from "react";
 import {
   Bot,
   TerminalSquare,
@@ -5,6 +6,7 @@ import {
 } from "lucide-react";
 import { useAppStore } from "@renderer/store/app-store";
 import { TerminalPanel } from "./TerminalPanel";
+import { TabContextMenu } from "./TabContextMenu";
 import type { Tab, Workspace } from "@shared/types";
 
 type TerminalTab = Extract<Tab, { type: "terminal" }>;
@@ -20,11 +22,20 @@ export function AgentColumn() {
   const workspaces = useAppStore((state) => state.workspaces);
   const setActiveTab = useAppStore((state) => state.setActiveTab);
   const closeTab = useAppStore((state) => state.closeTab);
+  const closeOtherTabs = useAppStore((state) => state.closeOtherTabs);
+  const closeAllTabs = useAppStore((state) => state.closeAllTabs);
+  const closeTabsToRight = useAppStore((state) => state.closeTabsToRight);
   const createTerminal = useAppStore((state) => state.createTerminal);
   const createAgentTerminal = useAppStore((state) => state.createAgentTerminal);
   const settings = useAppStore((state) => state.settings);
   const updateSettings = useAppStore((state) => state.updateSettings);
   const setFocusedColumn = useAppStore((state) => state.setFocusedColumn);
+
+  const [contextMenu, setContextMenu] = useState<{
+    tab: Tab;
+    x: number;
+    y: number;
+  } | null>(null);
 
   const terminalTabs = tabs.filter(
     (tab) =>
@@ -41,24 +52,37 @@ export function AgentColumn() {
 
   const handleMouseDown = () => setFocusedColumn("agent");
 
+  const handleContextMenu = useCallback(
+    (e: React.MouseEvent, tab: Tab) => {
+      e.preventDefault();
+      setContextMenu({ tab, x: e.clientX, y: e.clientY });
+    },
+    [],
+  );
+
   if (terminalTabs.length === 0) return null;
 
   return (
     <div className="flex size-full min-h-0 min-w-0 flex-col bg-bg relative" onMouseDown={handleMouseDown}>
-      <div className="flex h-[42px] shrink-0 items-center gap-1 overflow-hidden border-b border-border bg-bg px-2">
+      <div className="flex h-[42px] shrink-0 items-center gap-1 border-b border-border bg-bg px-2">
         <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto scrollbar-none">
           {terminalTabs.map((tab) => (
             <button
-              className={`flex items-center gap-[5px] whitespace-nowrap rounded-[5px] px-2 py-1 text-xs border-none min-w-0 cursor-pointer${tab.id === columnActiveId ? " bg-[var(--surface)] text-[var(--fg)]" : " bg-transparent text-muted hover:bg-[var(--hover)] hover:text-[var(--fg)]"}`}
+              className={`group flex shrink-0 items-center gap-[5px] whitespace-nowrap rounded-t-[5px] px-2.5 py-1.5 text-xs border-none cursor-pointer transition-colors duration-100${
+                tab.id === columnActiveId
+                  ? " bg-[var(--surface)] text-[var(--fg)] border-b-2 border-b-[var(--accent)]"
+                  : " bg-transparent text-muted hover:bg-[var(--hover)] hover:text-[var(--fg)]"
+              }`}
               key={tab.id}
               type="button"
               title={tab.title}
               onClick={() => setActiveTab(tab.id)}
+              onContextMenu={(e) => handleContextMenu(e, tab)}
             >
               {tabIcon(tab)}
               <span>{tab.title}</span>
               <span
-                className="flex size-4 items-center justify-center rounded-[3px] bg-transparent text-muted opacity-0 transition-opacity duration-100 cursor-pointer border-none p-0 hover:bg-[var(--hover)] hover:text-[var(--fg)]"
+                className="flex size-4 items-center justify-center rounded-[3px] bg-transparent text-muted opacity-0 group-hover:opacity-100 transition-opacity duration-100 cursor-pointer border-none p-0 hover:bg-[var(--hover)] hover:text-[var(--fg)]"
                 role="button"
                 tabIndex={0}
                 title="Close tab"
@@ -141,6 +165,18 @@ export function AgentColumn() {
           );
         })}
       </div>
+      {contextMenu && (
+        <TabContextMenu
+          tab={contextMenu.tab}
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onClose={() => setContextMenu(null)}
+          onCloseTab={closeTab}
+          onCloseOthers={closeOtherTabs}
+          onCloseAll={closeAllTabs}
+          onCloseToRight={closeTabsToRight}
+        />
+      )}
     </div>
   );
 }
