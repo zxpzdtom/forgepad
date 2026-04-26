@@ -37,20 +37,20 @@ export function TabBar() {
     )?.id ?? "custom";
 
   return (
-    <div className="tabbar">
-      <div className="tabs-scroll">
+    <div className="flex min-h-[42px] items-center border-b border-border bg-[#12151b]">
+      <div className="flex min-w-0 flex-1 overflow-x-auto scrollbar-none">
         {workspaceTabs.map((tab) => (
           <button
-            className={`tab-chip ${tab.id === activeTabId ? "active" : ""}`}
+            className={`grid min-w-[118px] max-w-[220px] grid-cols-[16px_minmax(0,1fr)_18px] items-center gap-2 px-2 border-r border-border-soft${tab.id === activeTabId ? " bg-panel text-text" : " bg-transparent text-muted"}`}
             key={tab.id}
             type="button"
             title={getTabTitle(tab)}
             onClick={() => setActiveTab(tab.id)}
           >
             {tabIcon(tab)}
-            <span>{getTabTitle(tab)}</span>
+            <span className="overflow-hidden text-ellipsis whitespace-nowrap">{getTabTitle(tab)}</span>
             <span
-              className="tab-close"
+              className="grid size-[18px] place-items-center rounded hover:bg-panel-3"
               role="button"
               tabIndex={0}
               title="Close tab"
@@ -71,7 +71,7 @@ export function TabBar() {
           </button>
         ))}
       </div>
-      <div className="tabbar-actions">
+      <div className="flex items-center gap-1.5 px-2 max-[900px]:hidden">
         <select
           className="toolbar-select agent-preset-select compact"
           value={selectedAgentPreset}
@@ -101,7 +101,7 @@ export function TabBar() {
           <GitCompare size={16} />
         </button>
         <button
-          className="secondary-button tabbar-command-button"
+          className="secondary-button min-h-[30px]"
           type="button"
           title={`New ${settings.defaultAgentCommand || "agent"} agent`}
           disabled={!activeWorkspaceId}

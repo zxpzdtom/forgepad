@@ -53,12 +53,12 @@ export function FileColumn() {
   if (fileTabs.length === 0 || !activeWorkspace) return null;
 
   return (
-    <div className="file-column" onMouseDown={handleMouseDown}>
-      <div className="column-tabbar">
-        <div className="tabs-scroll">
+    <div className="flex size-full min-h-0 min-w-0 flex-col bg-bg relative" onMouseDown={handleMouseDown}>
+      <div className="flex h-[42px] shrink-0 items-center gap-1 overflow-hidden border-b border-border bg-bg px-2">
+        <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto scrollbar-none">
           {fileTabs.map((tab) => (
             <button
-              className={`tab-chip${tab.id === columnActiveId ? " active" : ""}`}
+              className={`flex items-center gap-[5px] whitespace-nowrap rounded-[5px] px-2 py-1 text-xs border-none min-w-0 cursor-pointer${tab.id === columnActiveId ? " bg-[var(--surface)] text-[var(--fg)]" : " bg-transparent text-muted hover:bg-[var(--hover)] hover:text-[var(--fg)]"}`}
               key={tab.id}
               type="button"
               title={tabLabel(tab)}
@@ -67,7 +67,7 @@ export function FileColumn() {
               {tabIcon(tab)}
               <span>{tabLabel(tab)}</span>
               <span
-                className="tab-close"
+                className="flex size-4 items-center justify-center rounded-[3px] bg-transparent text-muted opacity-0 transition-opacity duration-100 cursor-pointer border-none p-0 hover:bg-[var(--hover)] hover:text-[var(--fg)]"
                 role="button"
                 tabIndex={0}
                 title="Close tab"
@@ -89,7 +89,7 @@ export function FileColumn() {
           ))}
         </div>
       </div>
-      <div className="column-content">
+      <div className="relative min-h-0 flex-1 overflow-hidden">
         {fileTabs.map((tab) => {
           if (tab.id !== activeFileTab?.id) return null;
           if (tab.type === "file") {

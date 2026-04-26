@@ -54,20 +54,20 @@ function SortableProjectHeader({
     <button
       ref={setNodeRef}
       style={style}
-      className={`sidebar-project-header${isDragging ? " dragging" : ""}`}
+      className={`flex h-8 w-full items-center gap-1 rounded-md bg-transparent px-1.5 text-left text-text${isDragging ? " opacity-40 z-10" : ""}`}
       type="button"
       onClick={onToggle}
       {...attributes}
     >
-      <span className="drag-handle" {...listeners}>
+      <span className="flex items-center text-subtle opacity-0 transition-opacity duration-150 group-header-hover:opacity-60 cursor-grab" {...listeners}>
         <GripVertical size={12} />
       </span>
       <ChevronRight
         size={14}
-        className={`sidebar-chevron${isCollapsed ? "" : " open"}`}
+        className={`text-subtle shrink-0 transition-transform duration-150 ease-[ease]${isCollapsed ? "" : " rotate-90"}`}
       />
-      <span className="sidebar-project-name">{name}</span>
-      <small className="sidebar-project-count">{workspaceCount}</small>
+      <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[13px] font-[620]">{name}</span>
+      <small className="shrink-0 text-[11px] text-subtle">{workspaceCount}</small>
     </button>
   );
 }
@@ -105,60 +105,63 @@ function SortableWorkspaceRow({
     <button
       ref={setNodeRef}
       style={style}
-      className={`sidebar-workspace${isActive ? " active" : ""}${isDragging ? " dragging" : ""}`}
+      className={`relative flex w-full items-start gap-2.5 rounded-none bg-transparent px-3 py-2 text-left${isActive ? " bg-[#1a2a30]" : ""}${isDragging ? " opacity-40 z-10" : ""}`}
       type="button"
       onClick={onClick}
       {...attributes}
       {...listeners}
     >
-      <div className="sidebar-workspace-icon">
-        <span className="sidebar-workspace-dot" />
+      {isActive && (
+        <span className="absolute bottom-0 left-0 top-0 w-0.5 rounded-r-sm bg-accent" />
+      )}
+      <div className="mt-px flex size-5 shrink-0 items-center justify-center">
+        <span className={`block size-2 rounded-full ${isActive ? "bg-accent" : "bg-muted"}`} />
       </div>
-      <div className="sidebar-workspace-info">
-        <div className="sidebar-workspace-top">
-          <span className="sidebar-workspace-name">{workspace.name}</span>
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <div className="flex items-center gap-1.5">
+          <span className="overflow-hidden text-ellipsis whitespace-nowrap text-[13px] font-medium">{workspace.name}</span>
           {stats.ahead > 0 && (
-            <span className="sidebar-stat ahead">↑{stats.ahead}</span>
+            <span className="shrink-0 text-[10px] font-mono text-[#34d399]">↑{stats.ahead}</span>
           )}
           {(stats.additions > 0 || stats.deletions > 0) && (
-            <span className="sidebar-stat-diff">
+            <span className="flex shrink-0 items-center gap-1 text-[10px] font-mono">
               {stats.additions > 0 && (
-                <span className="stat-add">+{stats.additions}</span>
+                <span className="text-[#34d399]">+{stats.additions}</span>
               )}
               {stats.deletions > 0 && (
-                <span className="stat-del">−{stats.deletions}</span>
+                <span className="text-[#f87171]">−{stats.deletions}</span>
               )}
             </span>
           )}
         </div>
-        <span className="sidebar-workspace-branch">
+        <span className="overflow-hidden text-ellipsis whitespace-nowrap font-mono text-[11px] text-subtle">
           {workspace.branch || "detached"}
         </span>
       </div>
-      <span className="sidebar-workspace-index">#{globalIndex + 1}</span>
+      <span className="absolute bottom-[3px] right-1.5 pointer-events-none text-[10px] text-subtle/50 tabular-nums">#{globalIndex + 1}</span>
     </button>
   );
 }
 
 function SidebarSkeleton() {
   return (
-    <div className="sidebar-skeleton-group">
-      <div className="sidebar-skeleton-header">
-        <div className="skeleton-bar" style={{ width: "45%" }} />
-        <div className="skeleton-bar skeleton-bar-sm" style={{ width: "20px" }} />
+    <div className="flex flex-col gap-2 p-2">
+      <div className="flex items-center gap-2 px-2 py-1.5">
+        <div className="h-3 w-[45%] animate-pulse rounded bg-border" />
+        <div className="h-2.5 w-5 animate-pulse rounded bg-border" />
       </div>
-      <div className="sidebar-skeleton-item">
-        <div className="skeleton-circle" />
-        <div className="skeleton-bars">
-          <div className="skeleton-bar" style={{ width: "60%" }} />
-          <div className="skeleton-bar skeleton-bar-sm" style={{ width: "35%" }} />
+      <div className="flex items-center gap-2.5 py-2 pl-[22px] pr-2">
+        <div className="size-3.5 shrink-0 animate-pulse rounded-full bg-border" />
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          <div className="h-3 w-[60%] animate-pulse rounded bg-border" />
+          <div className="h-2.5 w-[35%] animate-pulse rounded bg-border" />
         </div>
       </div>
-      <div className="sidebar-skeleton-item">
-        <div className="skeleton-circle" />
-        <div className="skeleton-bars">
-          <div className="skeleton-bar" style={{ width: "75%" }} />
-          <div className="skeleton-bar skeleton-bar-sm" style={{ width: "45%" }} />
+      <div className="flex items-center gap-2.5 py-2 pl-[22px] pr-2">
+        <div className="size-3.5 shrink-0 animate-pulse rounded-full bg-border" />
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          <div className="h-3 w-[75%] animate-pulse rounded bg-border" />
+          <div className="h-2.5 w-[45%] animate-pulse rounded bg-border" />
         </div>
       </div>
     </div>
@@ -236,9 +239,9 @@ export function Sidebar() {
 
   if (!sidebarOpen) {
     return (
-      <aside className="sidebar sidebar-collapsed">
+      <aside className="flex h-full min-h-0 flex-col items-center gap-1.5 border-r border-border bg-panel px-2 py-2.5">
         <button
-          className="icon-button sidebar-toggle"
+          className="icon-button border-transparent"
           type="button"
           title="Expand sidebar"
           onClick={() => useAppStore.setState({ sidebarOpen: true })}
@@ -246,11 +249,11 @@ export function Sidebar() {
           <PanelLeftOpen size={16} />
         </button>
 
-        <div className="sidebar-rail-items">
+        <div className="grid gap-1">
           {!hydrated ? (
             <>
-              <div className="sidebar-rail-skeleton" />
-              <div className="sidebar-rail-skeleton" />
+              <div className="size-7 animate-pulse rounded-md bg-border" />
+              <div className="size-7 animate-pulse rounded-md bg-border" />
             </>
           ) : (
             workspaceOrder.slice(0, 9).map((wsId, idx) => {
@@ -259,7 +262,7 @@ export function Sidebar() {
               return (
                 <button
                   key={wsId}
-                  className={`sidebar-rail-item${wsId === activeWorkspaceId ? " active" : ""}`}
+                  className={`grid size-7 place-items-center rounded-md text-xs font-semibold cursor-pointer border border-transparent${wsId === activeWorkspaceId ? " bg-panel-3 text-accent border-border" : " text-muted bg-transparent hover:bg-panel-2 hover:text-text"}`}
                   type="button"
                   title={`${ws.name} (#${idx + 1})`}
                   onClick={() => setActiveWorkspace(wsId)}
@@ -271,10 +274,10 @@ export function Sidebar() {
           )}
         </div>
 
-        <div className="sidebar-rail-spacer" />
+        <div className="flex-1" />
 
         <button
-          className="icon-button sidebar-toggle"
+          className="icon-button border-transparent"
           type="button"
           title="Open project"
           onClick={openProject}
@@ -286,13 +289,13 @@ export function Sidebar() {
   }
 
   return (
-    <aside className="sidebar">
-      <div className="sidebar-header">
-        <div className="sidebar-brand">
-          <div className="sidebar-logo">F</div>
-          <span className="sidebar-brand-name">ForgePad</span>
+    <aside className="flex h-full min-h-0 flex-col border-r border-border bg-panel">
+      <div className="flex items-center justify-between gap-2 px-3 pb-2.5 pt-[38px]">
+        <div className="flex items-center gap-2.5">
+          <div className="grid size-6.5 place-items-center rounded-md bg-accent text-[13px] font-extrabold text-[#071110]">F</div>
+          <span className="text-[15px] font-bold tracking-tight">ForgePad</span>
         </div>
-        <div className="toolbar-actions">
+        <div className="flex items-center gap-2">
           <button
             className="icon-button"
             type="button"
@@ -312,12 +315,12 @@ export function Sidebar() {
         </div>
       </div>
 
-      <div className="sidebar-content">
+      <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-2 py-1.5 scrollbar-thin">
         {!hydrated ? (
           <SidebarSkeleton />
         ) : projects.length === 0 ? (
           <button
-            className="sidebar-empty-action"
+            className="flex w-full items-center gap-2.5 rounded-lg border border-dashed border-border bg-transparent px-2.5 py-3.5 text-[13px] text-muted hover:bg-panel-2 hover:text-text hover:border-subtle cursor-pointer"
             type="button"
             onClick={openProject}
           >
@@ -342,7 +345,7 @@ export function Sidebar() {
 
                 return (
                   <div
-                    className={`sidebar-project${hasActive ? " has-active" : ""}`}
+                    className={`flex flex-col${hasActive ? " has-active" : ""}`}
                     key={project.id}
                   >
                     <SortableProjectHeader
@@ -377,9 +380,9 @@ export function Sidebar() {
         )}
       </div>
 
-      <div className="sidebar-footer">
+      <div className="border-t border-border p-2">
         <button
-          className="sidebar-footer-action"
+          className="flex h-8 w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-border bg-transparent text-xs text-muted hover:bg-panel-2 hover:text-text hover:border-subtle cursor-pointer"
           type="button"
           onClick={openProject}
         >

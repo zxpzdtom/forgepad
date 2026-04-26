@@ -71,18 +71,19 @@ export function ContextPanel() {
       ?.id ?? "custom";
 
   if (!workspace) {
-    return <div className="panel-placeholder">Open a project first</div>;
+    return <div className="grid min-h-[90px] place-items-center text-muted">Open a project first</div>;
   }
 
   return (
-    <section className="panel-body context-panel">
-      <div className="composer">
+    <section className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-hidden p-2.5">
+      <div className="grid gap-2">
         <textarea
+          className="composer-textarea"
           value={composerText}
           onChange={(event) => setComposerText(event.currentTarget.value)}
           placeholder="Ask the agent what to do with the selected context"
         />
-        <label className="agent-command-row">
+        <label className="grid min-h-8 grid-cols-[16px_auto_minmax(92px,128px)_minmax(0,1fr)] items-center gap-2 text-xs text-muted">
           <Bot size={15} />
           <span>Agent</span>
           <select
@@ -110,11 +111,11 @@ export function ContextPanel() {
             placeholder="codex"
           />
         </label>
-        <div className="composer-actions">
+        <div className="flex items-center justify-between text-xs text-muted">
           <span>
             {items.length} context item{items.length === 1 ? "" : "s"}
           </span>
-          <div style={{ display: "flex", gap: "6px" }}>
+          <div className="flex gap-1.5">
             <button
               className="secondary-button"
               type="button"
@@ -151,9 +152,9 @@ export function ContextPanel() {
       </div>
 
       {lastBundle ? (
-        <div className="bundle-note">
-          <strong>{lastBundle.relPath}</strong>
-          <span>{lastBundle.estimatedTokens.toLocaleString()} tokens est.</span>
+        <div className="grid gap-[3px] rounded-lg border border-border bg-[#11151c] p-2">
+          <strong className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{lastBundle.relPath}</strong>
+          <span className="text-xs text-muted">{lastBundle.estimatedTokens.toLocaleString()} tokens est.</span>
           <button
             className="secondary-button"
             type="button"
@@ -165,17 +166,17 @@ export function ContextPanel() {
         </div>
       ) : null}
 
-      <div className="context-list">
+      <div className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-auto scrollbar-thin">
         {items.length === 0 ? (
-          <div className="panel-placeholder slim">
+          <div className="grid min-h-[52px] place-items-center text-muted">
             Select files, diffs, or diff ranges to build context
           </div>
         ) : (
           items.map((item) => (
-            <article className="context-item" key={item.id}>
-              <div className="context-item-head">
+            <article className="grid gap-2 rounded-lg border border-border bg-[#11151c] p-[9px]" key={item.id}>
+              <div className="flex items-center gap-2">
                 {itemIcon(item)}
-                <strong title={itemTitle(item)}>{itemTitle(item)}</strong>
+                <strong className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[13px]" title={itemTitle(item)}>{itemTitle(item)}</strong>
                 <button
                   className="icon-button small"
                   type="button"
@@ -187,17 +188,16 @@ export function ContextPanel() {
               </div>
               {item.type === "selection" ? (
                 <>
-                  <p>{item.text}</p>
-                  <pre className="context-selection-snippet">
-                    {item.selectedText}
-                  </pre>
+                  <p className="m-0 text-sm leading-relaxed text-muted">{item.text}</p>
+                  <pre className="context-selection-snippet">{item.selectedText}</pre>
                 </>
               ) : item.type === "comment" ? (
-                <p>{item.text}</p>
+                <p className="m-0 text-sm leading-relaxed text-muted">{item.text}</p>
               ) : item.type === "task" ? (
                 <>
-                  <p>{item.description || "No task description provided."}</p>
+                  <p className="m-0 text-sm leading-relaxed text-muted">{item.description || "No task description provided."}</p>
                   <textarea
+                    className="context-textarea"
                     value={item.note ?? ""}
                     onChange={(event) =>
                       updateFileNote(item.id, event.currentTarget.value)
@@ -207,7 +207,7 @@ export function ContextPanel() {
                 </>
               ) : item.type === "file" ? (
                 <>
-                  <label className="context-file-option">
+                  <label className="inline-flex items-center gap-2 text-xs text-muted">
                     <input
                       type="checkbox"
                       checked={item.includeContent}
@@ -217,6 +217,7 @@ export function ContextPanel() {
                           event.currentTarget.checked,
                         )
                       }
+                      className="accent-accent"
                     />
                     <span>
                       {item.includeContent
@@ -225,6 +226,7 @@ export function ContextPanel() {
                     </span>
                   </label>
                   <textarea
+                    className="context-textarea"
                     value={item.note ?? ""}
                     onChange={(event) =>
                       updateFileNote(item.id, event.currentTarget.value)
@@ -234,6 +236,7 @@ export function ContextPanel() {
                 </>
               ) : (
                 <textarea
+                  className="context-textarea"
                   value={item.note ?? ""}
                   onChange={(event) =>
                     updateFileNote(item.id, event.currentTarget.value)
@@ -247,7 +250,7 @@ export function ContextPanel() {
       </div>
 
       <button
-        className="secondary-button full danger-text"
+        className="secondary-button w-full text-danger"
         type="button"
         disabled={items.length === 0}
         onClick={() => clearWorkspaceContext(workspace.id)}

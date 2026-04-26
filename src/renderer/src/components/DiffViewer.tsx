@@ -111,12 +111,12 @@ export function DiffViewer({ tab, workspace }: DiffViewerProps) {
   };
 
   return (
-    <section className="diff-panel">
-      <div className="surface-toolbar">
-        <div className="toolbar-title">
+    <section className="absolute inset-0 flex min-h-0 min-w-0 flex-col bg-bg">
+      <div className="flex min-h-12 items-start justify-between gap-3 border-b border-border bg-panel px-3 py-2">
+        <div className="min-w-0 flex items-center gap-[7px] overflow-hidden text-ellipsis whitespace-nowrap text-[13px] font-[620]">
           {tab.activePath ? `Changes: ${tab.activePath}` : "Workspace Changes"}
         </div>
-        <div className="toolbar-actions">
+        <div className="flex flex-wrap items-center justify-end gap-2">
           <label className="switch-row compact-switch">
             Layout
             <select
@@ -207,16 +207,22 @@ export function DiffViewer({ tab, workspace }: DiffViewerProps) {
           </button>
         </div>
       </div>
-      {loading ? <div className="panel-placeholder">Loading diffs</div> : null}
+      {loading ? (
+        <div className="grid min-h-[90px] place-items-center text-muted">
+          Loading diffs
+        </div>
+      ) : null}
       {!loading && statuses.length === 0 ? (
-        <div className="panel-placeholder">No git changes</div>
+        <div className="grid min-h-[90px] place-items-center text-muted">
+          No git changes
+        </div>
       ) : null}
       {!loading && diffs.length === 0 && statuses.length > 0 ? (
-        <div className="panel-placeholder">
+        <div className="grid min-h-[90px] place-items-center text-muted">
           Select a changed file from the Changes panel
         </div>
       ) : null}
-      <div className="diff-scroll">
+      <div className="flex min-h-0 flex-1 overflow-auto p-3 scrollbar-thin">
         {diffs.map((file) => {
           const selectedStatus = statuses.find(
             (status) => keyForStatus(status) === `${file.bucket}:${file.path}`,
@@ -229,11 +235,14 @@ export function DiffViewer({ tab, workspace }: DiffViewerProps) {
             },
           };
           return (
-            <article className="diff-file" key={`${file.bucket}:${file.path}`}>
-              <header className="diff-file-header">
-                <div>
+            <article
+              className="w-full mb-3.5 rounded-lg border border-border bg-[#11141a]"
+              key={`${file.bucket}:${file.path}`}
+            >
+              <header className="flex min-h-11 items-center justify-between gap-3 border-b border-border bg-panel-2 px-2.5 py-2">
+                <div className="grid min-w-0 gap-0.5">
                   <strong title={file.path}>{file.path}</strong>
-                  <span>
+                  <span className="text-xs text-muted">
                     {file.bucket} · {file.status}
                     {file.oldPath ? ` · from ${file.oldPath}` : ""}
                   </span>
@@ -254,7 +263,9 @@ export function DiffViewer({ tab, workspace }: DiffViewerProps) {
                 </button>
               </header>
               {file.isBinary ? (
-                <div className="binary-note">Binary diff omitted</div>
+                <div className="grid min-h-[90px] place-items-center text-muted">
+                  Binary diff omitted
+                </div>
               ) : file.patch.trim() ? (
                 <PatchDiff
                   patch={file.patch}
@@ -262,12 +273,14 @@ export function DiffViewer({ tab, workspace }: DiffViewerProps) {
                   disableWorkerPool
                 />
               ) : (
-                <div className="binary-note">No textual diff available</div>
+                <div className="grid min-h-[90px] place-items-center text-muted">
+                  No textual diff available
+                </div>
               )}
               {pending?.file.path === file.path &&
               pending.file.bucket === file.bucket ? (
-                <div className="inline-comment-box">
-                  <div>
+                <div className="m-2.5 rounded-lg border border-border bg-panel p-2.5">
+                  <div className="mb-2 flex items-center gap-2 text-xs text-accent">
                     <MessageSquarePlus size={15} />
                     Comment on {formatRange(pending.range)}
                   </div>
@@ -281,7 +294,7 @@ export function DiffViewer({ tab, workspace }: DiffViewerProps) {
                     }
                     placeholder="Add a note for the agent"
                   />
-                  <div className="inline-actions">
+                  <div className="mt-2 flex justify-end gap-2">
                     <button
                       className="secondary-button"
                       type="button"
@@ -309,17 +322,22 @@ export function DiffViewer({ tab, workspace }: DiffViewerProps) {
                 </div>
               ) : null}
               {fileComments.length > 0 ? (
-                <div className="diff-comments">
+                <div className="grid gap-2 border-t border-border p-2.5">
                   {fileComments.map((comment) => (
-                    <div className="context-item" key={comment.id}>
-                      <strong>
+                    <div
+                      className="grid gap-2 rounded-lg border border-border bg-[#11151c] p-[9px]"
+                      key={comment.id}
+                    >
+                      <strong className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[13px]">
                         L{comment.startLine}
                         {comment.endLine !== comment.startLine
                           ? `-L${comment.endLine}`
                           : ""}{" "}
                         {comment.side}
                       </strong>
-                      <p>{comment.text}</p>
+                      <p className="m-0 text-sm leading-relaxed text-muted">
+                        {comment.text}
+                      </p>
                     </div>
                   ))}
                 </div>

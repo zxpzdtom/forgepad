@@ -115,12 +115,12 @@ export function ChangesPanel() {
   };
 
   if (!workspace) {
-    return <div className="panel-placeholder">Open a project first</div>;
+    return <div className="grid min-h-[90px] place-items-center text-muted">Open a project first</div>;
   }
 
   return (
-    <section className="panel-body changes-panel">
-      <div className="panel-toolbar">
+    <section className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-hidden p-2.5">
+      <div className="flex min-h-8 items-center gap-2">
         <button className="secondary-button" type="button" disabled={selected.length === 0} onClick={() => mutate("stage")}>
           <Check size={15} />
           Stage
@@ -137,15 +137,15 @@ export function ChangesPanel() {
         </button>
       </div>
 
-      <div className="change-list">
-        {loading ? <div className="panel-placeholder slim">Refreshing changes</div> : null}
-        {!loading && statuses.length === 0 ? <div className="panel-placeholder slim">Clean working tree</div> : null}
+      <div className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-auto scrollbar-thin">
+        {loading ? <div className="grid min-h-[52px] place-items-center text-muted">Refreshing changes</div> : null}
+        {!loading && statuses.length === 0 ? <div className="grid min-h-[52px] place-items-center text-muted">Clean working tree</div> : null}
         {(["staged", "unstaged", "untracked"] as GitBucket[]).map((bucket) => {
           const items = byBucket[bucket];
           if (items.length === 0) return null;
           return (
-            <div className="change-group" key={bucket}>
-              <div className="change-group-title">
+            <div className="grid gap-[5px]" key={bucket}>
+              <div className="flex justify-between text-xs text-muted">
                 <span>{bucketTitle(bucket)}</span>
                 <small>{items.length}</small>
               </div>
@@ -154,7 +154,7 @@ export function ChangesPanel() {
                 const checked = selectedKeys.has(key);
                 return (
                   <div
-                    className={`change-row ${checked ? "selected" : ""}`}
+                    className={`grid w-full grid-cols-[20px_minmax(0,1fr)_34px] items-center gap-2 rounded-md border border-transparent px-[7px] py-1.5${checked ? " bg-[#22323a]" : " bg-transparent"}`}
                     key={key}
                     role="button"
                     tabIndex={0}
@@ -174,18 +174,18 @@ export function ChangesPanel() {
                       }}
                     />
                     <button
-                      className="change-name"
+                      className="min-w-0 flex items-center justify-between gap-2 text-left bg-transparent text-text"
                       type="button"
                       title={status.path}
                       onClick={() => openDiffTab(workspace.id, status.path)}
                     >
-                      <span className="change-path">{status.path}</span>
-                      <span className="change-meta">
+                      <span className="flex-1 min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{status.path}</span>
+                      <span className="inline-flex shrink-0 items-center gap-[5px] whitespace-nowrap font-mono text-[11px]">
                         {status.additions != null && status.additions > 0 && (
-                          <span className="stat-add">+{status.additions}</span>
+                          <span className="text-ok">+{status.additions}</span>
                         )}
                         {status.deletions != null && status.deletions > 0 && (
-                          <span className="stat-del">-{status.deletions}</span>
+                          <span className="text-danger">-{status.deletions}</span>
                         )}
                         <StatusDot status={status.status} />
                       </span>
@@ -206,13 +206,14 @@ export function ChangesPanel() {
         })}
       </div>
 
-      <div className="commit-box">
+      <div className="grid gap-2 border-t border-border pt-2.5">
         <textarea
+          className="commit-textarea"
           value={commitMessage}
           onChange={(event) => setCommitMessage(event.currentTarget.value)}
           placeholder="Commit message"
         />
-        <button className="primary-button full" type="button" disabled={!commitMessage.trim()} onClick={() => mutate("commit")}>
+        <button className="primary-button w-full" type="button" disabled={!commitMessage.trim()} onClick={() => mutate("commit")}>
           <GitCommitHorizontal size={16} />
           Commit Staged
         </button>

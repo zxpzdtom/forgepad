@@ -214,10 +214,11 @@ export function FilesPanel() {
       context.close();
     };
     return (
-      <div className="tree-menu">
+      <div className="min-w-[150px] grid gap-[3px] rounded-[7px] border border-border bg-panel-2 p-[5px] shadow-[0_14px_32px_rgba(0,0,0,0.22)]">
         {item.kind === "file" ? (
           <button
             type="button"
+            className="h-7 rounded-[5px] px-[9px] text-left bg-transparent text-text hover:bg-panel-3"
             onClick={() =>
               closeAfter(() => openFileTab(workspace.id, item.path))
             }
@@ -228,6 +229,7 @@ export function FilesPanel() {
         <button
           type="button"
           disabled={itemFiles.length === 0}
+          className="h-7 rounded-[5px] px-[9px] text-left bg-transparent text-text hover:bg-panel-3 disabled:text-subtle disabled:cursor-not-allowed"
           onClick={() => closeAfter(() => addFilesToContext(itemFiles))}
         >
           {item.kind === "file"
@@ -236,6 +238,7 @@ export function FilesPanel() {
         </button>
         <button
           type="button"
+          className="h-7 rounded-[5px] px-[9px] text-left bg-transparent text-text hover:bg-panel-3"
           onClick={() =>
             closeAfter(() => {
               void navigator.clipboard.writeText(item.path);
@@ -249,12 +252,12 @@ export function FilesPanel() {
   };
 
   if (!workspace) {
-    return <div className="panel-placeholder">Open a project first</div>;
+    return <div className="grid min-h-[90px] place-items-center text-muted">Open a project first</div>;
   }
 
   return (
-    <section className="panel-body files-panel">
-      <div className="panel-toolbar">
+    <section className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-hidden p-2.5">
+      <div className="flex min-h-8 items-center gap-2">
         <button
           className="secondary-button"
           type="button"
@@ -273,14 +276,14 @@ export function FilesPanel() {
           <RefreshCw size={15} />
         </button>
       </div>
-      <div className="tree-meta">
+      <div className="flex justify-between">
         <span>{treeData.paths.length.toLocaleString()} files</span>
         <span>
           {selectedFiles.length} selected · {selectedContextFiles.length} in context range
         </span>
       </div>
-      <div className="tree-wrap">
-        {loading ? <div className="tree-loading">Refreshing</div> : null}
+      <div className="relative min-h-0 flex-1 overflow-hidden rounded-lg border border-border bg-[#10131a]">
+        {loading ? <div className="absolute insetset-0 z-2 grid min-h-0 place-items-center bg-bg/72">Refreshing</div> : null}
         <FileTree
           model={model}
           style={treeThemeStyle}

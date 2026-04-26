@@ -584,14 +584,14 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
   };
 
   return (
-    <section className="editor-panel">
-      <div className="surface-toolbar">
-        <div className="toolbar-title" title={tab.relPath}>
-          <FileCode size={14} className="muted" />
+    <section className="absolute inset-0 flex min-h-0 min-w-0 flex-col bg-bg">
+      <div className="flex min-h-[42px] items-center justify-between gap-3 border-b border-border bg-panel px-3">
+        <div className="min-w-0 flex items-center gap-[7px] overflow-hidden text-ellipsis whitespace-nowrap text-[13px] font-[620]" title={tab.relPath}>
+          <FileCode size={14} className="text-muted" />
           {tab.relPath}
-          <span className="toolbar-meta">{lineCount} lines</span>
+          <span className="text-muted">{lineCount} lines</span>
         </div>
-        <div className="toolbar-actions">
+        <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
           {isImage ? (
             <div className="view-mode-toggle">
               <button
@@ -657,13 +657,13 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
       </div>
       {searchOpen ? (
         <form
-          className="file-search-bar"
+          className="flex min-h-[38px] items-center gap-2 border-b border-border bg-[#11151c] px-2.5 py-1"
           onSubmit={(event) => {
             event.preventDefault();
             goToMatch(1);
           }}
         >
-          <Search size={14} className="muted" />
+          <Search size={14} className="text-muted" />
           <input
             ref={searchInputRef}
             value={searchQuery}
@@ -673,7 +673,7 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
               setActiveMatchIndex(0);
             }}
           />
-          <span className="search-count">{activeSearchLabel}</span>
+          <span className="w-[54px] text-center text-xs tabular-nums text-muted">{activeSearchLabel}</span>
           <button
             className="icon-button"
             type="button"
@@ -703,17 +703,17 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
         </form>
       ) : null}
       {loading ? (
-        <div className="panel-placeholder">Loading file</div>
+        <div className="grid min-h-[90px] place-items-center text-muted">Loading file</div>
       ) : showImagePreview && imageUrl ? (
-        <div className="image-preview-scroll">
+        <div className="flex flex-1 min-h-0 items-center justify-center overflow-auto bg-[#0c0d10] p-6 scrollbar-thin">
           <img
-            className="image-preview"
+            className="max-h-full max-w-full rounded object-contain"
             src={imageUrl}
             alt={tab.relPath}
           />
         </div>
       ) : showRenderedMarkdown ? (
-        <div className="markdown-viewer-scroll" ref={scrollRef}>
+        <div className="markdown-viewer-scroll flex-1 min-h-0 overflow-auto scrollbar-thin" ref={scrollRef}>
           <div ref={previewRef} className="markdown-preview">
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
@@ -725,7 +725,7 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
         </div>
       ) : (
         <div
-          className="code-viewer-scroll"
+          className="code-viewer-scroll flex-1 min-h-0 overflow-auto bg-[#0c0d10]"
           ref={scrollRef}
           onMouseUp={captureCodeSelection}
           onKeyUp={captureCodeSelection}
@@ -740,15 +740,15 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
       {pendingSelection ? (
         <form
           ref={selectionFormRef}
-          className="selection-comment-bar"
+          className="grid grid-cols-[minmax(160px,240px)_minmax(0,1fr)_auto] items-center gap-2.5 border-t border-border bg-[#12161d] px-2.5 py-2 shadow-[0_-12px_28px_rgba(0,0,0,0.18)]"
           onSubmit={(event) => {
             event.preventDefault();
             submitCodeSelection();
           }}
         >
-          <div className="selection-comment-meta">
+          <div className="flex min-w-0 items-center gap-[7px] text-xs text-muted">
             <MessageSquarePlus size={15} />
-            <span title={tab.relPath}>
+            <span className="overflow-hidden text-ellipsis whitespace-nowrap" title={tab.relPath}>
               {tab.relPath} · L{pendingSelection.startLine}
               {pendingSelection.endLine !== pendingSelection.startLine
                 ? `-L${pendingSelection.endLine}`
@@ -771,7 +771,7 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
               }
             }}
           />
-          <div className="selection-comment-actions">
+          <div className="flex items-center gap-[7px]">
             <button
               className="secondary-button"
               type="button"
