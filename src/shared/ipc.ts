@@ -12,6 +12,7 @@ export const IPC = {
   GIT_COMMIT: "git:commit",
   FS_TREE_WITH_STATUS: "fs:tree-with-status",
   FS_READ_FILE: "fs:read-file",
+  FS_READ_FILE_DATA_URL: "fs:read-file-data-url",
   FS_WRITE_FILE: "fs:write-file",
   FS_WATCH: "fs:watch",
   FS_UNWATCH: "fs:unwatch",

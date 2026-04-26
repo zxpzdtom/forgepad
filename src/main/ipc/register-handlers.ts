@@ -145,6 +145,9 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IPC.FS_READ_FILE, async (_event, worktreePath: string, relPath: string) =>
     FileService.readFile(worktreePath, relPath),
   );
+  ipcMain.handle(IPC.FS_READ_FILE_DATA_URL, async (_event, worktreePath: string, relPath: string) =>
+    FileService.readFileAsDataUrl(worktreePath, relPath),
+  );
   ipcMain.handle(IPC.FS_WRITE_FILE, async (_event, worktreePath: string, relPath: string, content: string) =>
     FileService.writeFile(worktreePath, relPath, content),
   );
