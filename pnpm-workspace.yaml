@@ -1,0 +1,7 @@
+ignoredBuiltDependencies:
+  - esbuild
+  - node-pty
+  - unicode-animations
+
+onlyBuiltDependencies:
+  - electron

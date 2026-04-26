@@ -15,7 +15,7 @@ import { CSS } from "@dnd-kit/utilities";
 import {
   ChevronRight,
   FolderOpen,
-  GripVertical,
+  FolderPlus,
   PanelLeftClose,
   PanelLeftOpen,
   Plus,
@@ -54,14 +54,12 @@ function SortableProjectHeader({
     <button
       ref={setNodeRef}
       style={style}
-      className={`flex h-8 w-full items-center gap-1 rounded-md bg-transparent px-1.5 text-left text-text${isDragging ? " opacity-40 z-10" : ""}`}
+      className={`flex h-8 w-full cursor-grab items-center gap-1 rounded-md bg-transparent px-1.5 text-left text-text${isDragging ? " opacity-40 z-10" : ""}`}
       type="button"
       onClick={onToggle}
       {...attributes}
+      {...listeners}
     >
-      <span className="flex items-center text-subtle opacity-0 transition-opacity duration-150 group-header-hover:opacity-60 cursor-grab" {...listeners}>
-        <GripVertical size={12} />
-      </span>
       <ChevronRight
         size={14}
         className={`text-subtle shrink-0 transition-transform duration-150 ease-[ease]${isCollapsed ? "" : " rotate-90"}`}
@@ -105,14 +103,14 @@ function SortableWorkspaceRow({
     <button
       ref={setNodeRef}
       style={style}
-      className={`relative flex w-full items-start gap-2.5 rounded-none bg-transparent px-3 py-2 text-left${isActive ? " bg-[#1a2a30]" : ""}${isDragging ? " opacity-40 z-10" : ""}`}
+      className={`relative flex w-full items-start gap-2.5 rounded-md bg-transparent px-3 py-2 text-left${isActive ? " bg-[#172424]" : " hover:bg-panel-2/40"}${isDragging ? " opacity-40 z-10" : ""}`}
       type="button"
       onClick={onClick}
       {...attributes}
       {...listeners}
     >
       {isActive && (
-        <span className="absolute bottom-0 left-0 top-0 w-0.5 rounded-r-sm bg-accent" />
+        <span className="absolute bottom-1 left-1 top-1 w-[3px] rounded-full bg-accent" />
       )}
       <div className="mt-px flex size-5 shrink-0 items-center justify-center">
         <span className={`block size-2 rounded-full ${isActive ? "bg-accent" : "bg-muted"}`} />
@@ -138,7 +136,7 @@ function SortableWorkspaceRow({
           {workspace.branch || "detached"}
         </span>
       </div>
-      <span className="absolute bottom-[3px] right-1.5 pointer-events-none text-[10px] text-subtle/50 tabular-nums">#{globalIndex + 1}</span>
+      <span className="absolute bottom-[3px] right-1.5 pointer-events-none text-[10px] text-subtle/40 tabular-nums">⌘{globalIndex + 1}</span>
     </button>
   );
 }
@@ -264,7 +262,7 @@ export function Sidebar() {
                   key={wsId}
                   className={`grid size-7 place-items-center rounded-md text-xs font-semibold cursor-pointer border border-transparent${wsId === activeWorkspaceId ? " bg-panel-3 text-accent border-border" : " text-muted bg-transparent hover:bg-panel-2 hover:text-text"}`}
                   type="button"
-                  title={`${ws.name} (#${idx + 1})`}
+                  title={`${ws.name} (⌘${idx + 1})`}
                   onClick={() => setActiveWorkspace(wsId)}
                 >
                   {ws.name.charAt(0).toUpperCase()}
@@ -333,7 +331,7 @@ export function Sidebar() {
               items={projectIds}
               strategy={verticalListSortingStrategy}
             >
-              {projects.map((project) => {
+              {projects.map((project, projectIdx) => {
                 const projectWorkspaces = workspaces.filter(
                   (w) => w.projectId === project.id,
                 );
@@ -345,7 +343,7 @@ export function Sidebar() {
 
                 return (
                   <div
-                    className={`flex flex-col${hasActive ? " has-active" : ""}`}
+                    className={`flex flex-col${projectIdx > 0 ? " mt-2 border-t border-border/30 pt-2" : ""}${hasActive ? " has-active" : ""}`}
                     key={project.id}
                   >
                     <SortableProjectHeader
@@ -386,8 +384,8 @@ export function Sidebar() {
           type="button"
           onClick={openProject}
         >
-          <Plus size={14} />
-          <span>Open Project</span>
+          <FolderPlus size={14} />
+          <span>Add repository</span>
         </button>
       </div>
     </aside>
