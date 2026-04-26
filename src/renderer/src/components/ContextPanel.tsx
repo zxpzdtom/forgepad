@@ -10,7 +10,7 @@ import {
   X,
 } from "lucide-react";
 import { useMemo } from "react";
-import { AGENT_PRESETS, type ContextItem, type Workspace } from "@shared/types";
+import type { ContextItem, Workspace } from "@shared/types";
 import { useAppStore } from "@renderer/store/app-store";
 
 function useActiveWorkspace(): Workspace | undefined {
@@ -65,8 +65,9 @@ export function ContextPanel() {
   const openContextPreviewTab = useAppStore(
     (state) => state.openContextPreviewTab,
   );
+  const enabledPresets = settings.agentPresets.filter((p) => p.enabled);
   const selectedAgentPreset =
-    AGENT_PRESETS.find((preset) => preset.command === settings.defaultAgentCommand)
+    enabledPresets.find((preset) => preset.command === settings.defaultAgentCommand)
       ?.id ?? "custom";
 
   if (!workspace) {
@@ -88,13 +89,13 @@ export function ContextPanel() {
             className="toolbar-select agent-preset-select"
             value={selectedAgentPreset}
             onChange={(event) => {
-              const preset = AGENT_PRESETS.find(
+              const preset = enabledPresets.find(
                 (item) => item.id === event.currentTarget.value,
               );
               if (preset) updateSettings({ defaultAgentCommand: preset.command });
             }}
           >
-            {AGENT_PRESETS.map((preset) => (
+            {enabledPresets.map((preset) => (
               <option key={preset.id} value={preset.id}>
                 {preset.label}
               </option>

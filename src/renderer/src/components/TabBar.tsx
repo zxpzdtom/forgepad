@@ -7,7 +7,7 @@ import {
   X,
 } from "lucide-react";
 import { getTabTitle, useAppStore } from "@renderer/store/app-store";
-import { AGENT_PRESETS, type Tab } from "@shared/types";
+import type { Tab } from "@shared/types";
 
 function tabIcon(tab: Tab) {
   if (tab.type === "terminal")
@@ -30,9 +30,11 @@ export function TabBar() {
   const updateSettings = useAppStore((state) => state.updateSettings);
 
   const workspaceTabs = tabs.filter((tab) => tab.workspaceId === activeWorkspaceId);
+  const enabledPresets = settings.agentPresets.filter((p) => p.enabled);
   const selectedAgentPreset =
-    AGENT_PRESETS.find((preset) => preset.command === settings.defaultAgentCommand)
-      ?.id ?? "custom";
+    enabledPresets.find(
+      (preset) => preset.command === settings.defaultAgentCommand,
+    )?.id ?? "custom";
 
   return (
     <div className="tabbar">
@@ -76,13 +78,13 @@ export function TabBar() {
           disabled={!activeWorkspaceId}
           title="Agent preset"
           onChange={(event) => {
-            const preset = AGENT_PRESETS.find(
+            const preset = enabledPresets.find(
               (item) => item.id === event.currentTarget.value,
             );
             if (preset) updateSettings({ defaultAgentCommand: preset.command });
           }}
         >
-          {AGENT_PRESETS.map((preset) => (
+          {enabledPresets.map((preset) => (
             <option key={preset.id} value={preset.id}>
               {preset.label}
             </option>
@@ -103,7 +105,16 @@ export function TabBar() {
           type="button"
           title={`New ${settings.defaultAgentCommand || "agent"} agent`}
           disabled={!activeWorkspaceId}
-          onClick={() => createAgentTerminal(activeWorkspaceId ?? undefined)}
+          onClick={() => {
+            const preset = enabledPresets.find(
+              (p) => p.command === settings.defaultAgentCommand,
+            );
+            createAgentTerminal(
+              activeWorkspaceId ?? undefined,
+              undefined,
+              preset?.id,
+            );
+          }}
         >
           <Bot size={16} />
           Agent

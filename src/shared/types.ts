@@ -18,6 +18,9 @@ export type Tab =
       title: string;
       ptyId: string;
       isAgent?: boolean;
+      agentPresetId?: string;
+      agentCommand?: string;
+      sessionId?: string;
     }
   | {
       id: string;
@@ -191,15 +194,46 @@ export type DiffIndicators = "classic" | "bars" | "none";
 export type DiffLineDiffType = "word-alt" | "word" | "char" | "none";
 export type DiffOverflow = "scroll" | "wrap";
 
-export const AGENT_PRESETS = [
-  { id: "codex", label: "Codex", command: "codex" },
-  { id: "claude", label: "Claude Code", command: "claude" },
-  { id: "gemini", label: "Gemini", command: "gemini" },
-] as const;
+export type AgentPreset = {
+  id: string;
+  label: string;
+  command: string;
+  enabled: boolean;
+  builtIn?: boolean;
+  restoreTemplate?: string;
+};
+
+export const DEFAULT_AGENT_PRESETS: AgentPreset[] = [
+  {
+    id: "claude",
+    label: "Claude Code",
+    command: "claude --permission-mode acceptEdits",
+    enabled: true,
+    builtIn: true,
+    restoreTemplate: "claude --resume {sessionId}",
+  },
+  {
+    id: "codex",
+    label: "Codex",
+    command: "codex",
+    enabled: true,
+    builtIn: true,
+    restoreTemplate: "codex --resume {sessionId}",
+  },
+  {
+    id: "gemini",
+    label: "Gemini",
+    command: "gemini --approval-mode=auto_edit",
+    enabled: true,
+    builtIn: true,
+    restoreTemplate: "gemini --resume {sessionId}",
+  },
+];
 
 export type AppSettings = {
   defaultShell: string;
   defaultAgentCommand: string;
+  agentPresets: AgentPreset[];
   terminalFontSize: number;
   editorFontSize: number;
   diffInline: boolean;
@@ -213,7 +247,8 @@ export type AppSettings = {
 
 export const DEFAULT_SETTINGS: AppSettings = {
   defaultShell: "",
-  defaultAgentCommand: "codex",
+  defaultAgentCommand: "claude",
+  agentPresets: [...DEFAULT_AGENT_PRESETS],
   terminalFontSize: 14,
   editorFontSize: 13,
   diffInline: false,

@@ -117,6 +117,9 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IPC.GIT_CURRENT_BRANCH, async (_event, worktreePath: string) =>
     GitService.getCurrentBranch(worktreePath),
   );
+  ipcMain.handle(IPC.GIT_BRANCH_STATS, async (_event, worktreePath: string) =>
+    GitService.getBranchStats(worktreePath),
+  );
   ipcMain.handle(IPC.GIT_STATUS, async (_event, worktreePath: string) => GitService.getStatus(worktreePath));
   ipcMain.handle(
     IPC.GIT_FILE_DIFF,

@@ -3,6 +3,7 @@ export const IPC = {
   STATE_LOAD: "state:load",
   STATE_SAVE: "state:save",
   GIT_CURRENT_BRANCH: "git:current-branch",
+  GIT_BRANCH_STATS: "git:branch-stats",
   GIT_STATUS: "git:status",
   GIT_FILE_DIFF: "git:file-diff",
   GIT_STAGE: "git:stage",

@@ -13,11 +13,25 @@ type TerminalPanelProps = {
   active: boolean;
 };
 
+const SESSION_ID_PATTERNS = [
+  /session\s*(?:id)?[:\s]+([a-f0-9-]{36})/i,
+  /resuming\s+(?:conversation|session)\s+([a-f0-9-]{36})/i,
+];
+
+function tryExtractSessionId(data: string): string | null {
+  for (const pattern of SESSION_ID_PATTERNS) {
+    const match = data.match(pattern);
+    if (match?.[1]) return match[1];
+  }
+  return null;
+}
+
 export function TerminalPanel({ tab, workspace, active }: TerminalPanelProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const terminalRef = useRef<Terminal | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
   const activeRef = useRef(active);
+  const sessionIdDetectedRef = useRef(false);
   const fontSize = useAppStore((state) => state.settings.terminalFontSize);
 
   useEffect(() => {
@@ -62,7 +76,20 @@ export function TerminalPanel({ tab, workspace, active }: TerminalPanelProps) {
     window.setTimeout(fitAndResize, 0);
 
     const dataDisposable = terminal.onData((data) => window.forgepad.pty.write(tab.ptyId, data));
-    const removeDataListener = window.forgepad.pty.onData(tab.ptyId, (data) => terminal.write(data));
+    const removeDataListener = window.forgepad.pty.onData(tab.ptyId, (data) => {
+      terminal.write(data);
+      if (
+        tab.isAgent &&
+        !tab.sessionId &&
+        !sessionIdDetectedRef.current
+      ) {
+        const sessionId = tryExtractSessionId(data);
+        if (sessionId) {
+          sessionIdDetectedRef.current = true;
+          useAppStore.getState().updateTerminalSessionId(tab.id, sessionId);
+        }
+      }
+    });
     const removeExitListener = window.forgepad.pty.onExit(tab.ptyId, (exitCode) => {
       terminal.writeln("");
       terminal.writeln(`[process exited with code ${exitCode}]`);

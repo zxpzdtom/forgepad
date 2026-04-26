@@ -1,20 +1,18 @@
 import { useEffect, useMemo } from "react";
 import { Allotment } from "allotment";
 import {
+  Bot,
   FolderOpen,
   GitBranch,
   PanelRight,
   TerminalSquare,
 } from "lucide-react";
 import { Sidebar } from "@renderer/components/Sidebar";
-import { TabBar } from "@renderer/components/TabBar";
-import { TerminalPanel } from "@renderer/components/TerminalPanel";
-import { FileEditor } from "@renderer/components/FileEditor";
-import { DiffViewer } from "@renderer/components/DiffViewer";
-import { ContextPreview } from "@renderer/components/ContextPreview";
+import { AgentColumn } from "@renderer/components/AgentColumn";
+import { FileColumn } from "@renderer/components/FileColumn";
 import { RightPanel } from "@renderer/components/RightPanel";
 import { ToastStack } from "@renderer/components/ToastStack";
-import { useAppStore, workspaceForTab } from "@renderer/store/app-store";
+import { useAppStore } from "@renderer/store/app-store";
 
 export function App() {
   const hydrated = useAppStore((state) => state.hydrated);
@@ -23,6 +21,7 @@ export function App() {
   const tabs = useAppStore((state) => state.tabs);
   const activeWorkspaceId = useAppStore((state) => state.activeWorkspaceId);
   const activeTabId = useAppStore((state) => state.activeTabId);
+  const focusedColumn = useAppStore((state) => state.focusedColumn);
   const rightPanelOpen = useAppStore((state) => state.rightPanelOpen);
   const sidebarOpen = useAppStore((state) => state.sidebarOpen);
   const openProject = useAppStore((state) => state.openProject);
@@ -31,6 +30,7 @@ export function App() {
   const closeTab = useAppStore((state) => state.closeTab);
   const setActiveTab = useAppStore((state) => state.setActiveTab);
   const setRightPanelMode = useAppStore((state) => state.setRightPanelMode);
+  const setFocusedColumn = useAppStore((state) => state.setFocusedColumn);
   const triggerGitRefresh = useAppStore((state) => state.triggerGitRefresh);
   const addToast = useAppStore((state) => state.addToast);
 
@@ -86,6 +86,59 @@ export function App() {
 
       const key = event.key.toLowerCase();
 
+      // Ctrl+Tab / Ctrl+Shift+Tab: cycle tabs in focused column
+      if (event.ctrlKey && key === "tab") {
+        event.preventDefault();
+        const state = useAppStore.getState();
+        const wsTabs = state.tabs.filter(
+          (t) => t.workspaceId === state.activeWorkspaceId,
+        );
+        let columnTabs;
+        if (focusedColumn === "agent") {
+          columnTabs = wsTabs.filter((t) => t.type === "terminal");
+        } else if (focusedColumn === "file") {
+          columnTabs = wsTabs.filter((t) => t.type !== "terminal");
+        } else {
+          columnTabs = wsTabs;
+        }
+        if (columnTabs.length <= 1) return;
+        const currentIdx = columnTabs.findIndex(
+          (t) => t.id === state.activeTabId,
+        );
+        const dir = event.shiftKey ? -1 : 1;
+        const nextIdx =
+          (currentIdx + dir + columnTabs.length) % columnTabs.length;
+        setActiveTab(columnTabs[nextIdx].id);
+        return;
+      }
+
+      // Cmd+1/2/3/4: switch tab by index in focused column
+      if (
+        (event.metaKey || event.ctrlKey) &&
+        !event.shiftKey &&
+        !event.altKey &&
+        ["1", "2", "3", "4"].includes(key)
+      ) {
+        event.preventDefault();
+        const state = useAppStore.getState();
+        const wsTabs = state.tabs.filter(
+          (t) => t.workspaceId === state.activeWorkspaceId,
+        );
+        let columnTabs;
+        if (focusedColumn === "agent") {
+          columnTabs = wsTabs.filter((t) => t.type === "terminal");
+        } else if (focusedColumn === "file") {
+          columnTabs = wsTabs.filter((t) => t.type !== "terminal");
+        } else {
+          return;
+        }
+        const idx = parseInt(key, 10) - 1;
+        if (idx < columnTabs.length) {
+          setActiveTab(columnTabs[idx].id);
+        }
+        return;
+      }
+
       if (key === "t") {
         event.preventDefault();
         if (event.shiftKey) {
@@ -138,6 +191,7 @@ export function App() {
     closeTab,
     createAgentTerminal,
     createTerminal,
+    focusedColumn,
     setActiveTab,
     setRightPanelMode,
     tabs,
@@ -189,64 +243,72 @@ export function App() {
     };
   }, [activeWorkspace, addToast, triggerGitRefresh]);
 
-  const activeTab = useMemo(
-    () => tabs.find((tab) => tab.id === activeTabId),
-    [activeTabId, tabs],
+  const workspaceTabs = tabs.filter(
+    (tab) => tab.workspaceId === activeWorkspaceId,
   );
-  const workspaceTabs = tabs.filter((tab) => tab.workspaceId === activeWorkspaceId);
-  const terminalTabs = workspaceTabs.filter((tab) => tab.type === "terminal");
-  const editorTabs = workspaceTabs.filter((tab) => tab.type !== "terminal");
-  const activeEditorTab =
-    activeTab && activeTab.type !== "terminal" ? activeTab : editorTabs.at(-1);
-  const activeTerminalTab =
-    activeTab?.type === "terminal"
-      ? activeTab
-      : (terminalTabs
-          .slice()
-          .reverse()
-          .find((tab) => tab.type === "terminal" && tab.isAgent) ??
-        terminalTabs.at(-1));
-  const activeEditorWorkspace =
-    workspaceForTab(workspaces, activeEditorTab) ?? activeWorkspace;
-  const activeTerminalWorkspace =
-    workspaceForTab(workspaces, activeTerminalTab) ?? activeWorkspace;
+  const hasTerminalTabs = workspaceTabs.some(
+    (tab) => tab.type === "terminal",
+  );
+  const hasFileTabs = workspaceTabs.some((tab) => tab.type !== "terminal");
 
-  const renderEditorSurface = () => {
-    if (!activeEditorTab || !activeEditorWorkspace) {
+  const renderEmptyState = () => {
+    if (projects.length === 0) {
       return (
-        <div className="panel-placeholder">Open a file or changes view</div>
+        <section className="empty-workspace">
+          <div className="empty-icon">
+            <FolderOpen size={32} />
+          </div>
+          <h1>Open a repository to start</h1>
+          <p>
+            ForgePad keeps the agent loop terminal-first, with file context and
+            git diffs close at hand.
+          </p>
+          <button
+            className="primary-button"
+            type="button"
+            onClick={openProject}
+          >
+            <FolderOpen size={16} />
+            Open Project
+          </button>
+        </section>
       );
     }
 
-    if (activeEditorTab.type === "file") {
-      return <FileEditor tab={activeEditorTab} workspace={activeEditorWorkspace} />;
-    }
-    if (activeEditorTab.type === "diff") {
-      return <DiffViewer tab={activeEditorTab} workspace={activeEditorWorkspace} />;
-    }
-    if (activeEditorTab.type === "context-preview") {
-      return <ContextPreview />;
-    }
-    return null;
-  };
-
-  const renderTerminalSurface = () => {
-    if (!activeTerminalTab || !activeTerminalWorkspace) return null;
     return (
-      <>
-        {terminalTabs.map((tab) => {
-          const workspace = workspaces.find((item) => item.id === tab.workspaceId);
-          if (!workspace) return null;
-          return (
-            <TerminalPanel
-              key={tab.id}
-              tab={tab}
-              workspace={workspace}
-              active={tab.id === activeTerminalTab.id}
-            />
-          );
-        })}
-      </>
+      <section className="empty-workspace compact">
+        <TerminalSquare size={30} />
+        <h1>{activeWorkspace?.name ?? "No workspace selected"}</h1>
+        <p>
+          {activeWorkspace ? (
+            <>
+              <GitBranch size={14} /> {activeWorkspace.branch || "detached"}
+            </>
+          ) : (
+            "Pick a project from the sidebar."
+          )}
+        </p>
+        {activeWorkspace ? (
+          <div style={{ display: "flex", gap: "8px" }}>
+            <button
+              className="primary-button"
+              type="button"
+              onClick={() => createAgentTerminal(activeWorkspace.id)}
+            >
+              <Bot size={16} />
+              New Agent
+            </button>
+            <button
+              className="secondary-button"
+              type="button"
+              onClick={() => createTerminal(activeWorkspace.id)}
+            >
+              <TerminalSquare size={16} />
+              Terminal
+            </button>
+          </div>
+        ) : null}
+      </section>
     );
   };
 
@@ -259,6 +321,8 @@ export function App() {
     );
   }
 
+  const hasAnyContent = hasTerminalTabs || hasFileTabs;
+
   return (
     <div className="app-shell">
       <Allotment proportionalLayout={false} className="app-allotment">
@@ -269,81 +333,55 @@ export function App() {
         >
           <Sidebar />
         </Allotment.Pane>
-        <Allotment.Pane minSize={460}>
-          <main className="center-pane">
-            <TabBar />
-            {projects.length === 0 ? (
-              <section className="empty-workspace">
-                <div className="empty-icon">
-                  <FolderOpen size={32} />
-                </div>
-                <h1>Open a repository to start</h1>
-                <p>
-                  ForgePad keeps the agent loop terminal-first, with file
-                  context and git diffs close at hand.
-                </p>
-                <button
-                  className="primary-button"
-                  type="button"
-                  onClick={openProject}
+
+        {!hasAnyContent ? (
+          <Allotment.Pane minSize={460}>
+            <main
+              className="center-pane"
+              onMouseDown={() => setFocusedColumn("agent")}
+            >
+              {renderEmptyState()}
+            </main>
+          </Allotment.Pane>
+        ) : hasTerminalTabs && hasFileTabs ? (
+          <Allotment.Pane minSize={460}>
+            <div style={{ width: "100%", height: "100%" }}>
+              <Allotment proportionalLayout={false}>
+                <Allotment.Pane
+                  minSize={280}
+                  preferredSize={440}
+                  className={focusedColumn === "agent" ? "pane-focused" : ""}
                 >
-                  <FolderOpen size={16} />
-                  Open Project
-                </button>
-              </section>
-            ) : activeEditorTab || activeTerminalTab ? (
-              <div className="tab-surface workspace-surface">
-                {activeEditorTab && activeTerminalTab ? (
-                  <Allotment proportionalLayout={false} className="workspace-split">
-                    <Allotment.Pane minSize={320} preferredSize={620}>
-                      <div className="workspace-pane-slot editor-slot">
-                        {renderEditorSurface()}
-                      </div>
-                    </Allotment.Pane>
-                    <Allotment.Pane minSize={300} preferredSize={440}>
-                      <div className="workspace-pane-slot terminal-slot">
-                        {renderTerminalSurface()}
-                      </div>
-                    </Allotment.Pane>
-                  </Allotment>
-                ) : activeEditorTab ? (
-                  <div className="workspace-pane-slot editor-slot">
-                    {renderEditorSurface()}
-                  </div>
-                ) : (
-                  <div className="workspace-pane-slot terminal-slot">
-                    {renderTerminalSurface()}
-                  </div>
-                )}
-              </div>
-            ) : (
-              <section className="empty-workspace compact">
-                <TerminalSquare size={30} />
-                <h1>{activeWorkspace?.name ?? "No workspace selected"}</h1>
-                <p>
-                  {activeWorkspace ? (
-                    <>
-                      <GitBranch size={14} />{" "}
-                      {activeWorkspace.branch || "detached"}
-                    </>
-                  ) : (
-                    "Pick a project from the sidebar."
-                  )}
-                </p>
-                {activeWorkspace ? (
-                  <button
-                    className="primary-button"
-                    type="button"
-                    onClick={() => createTerminal(activeWorkspace.id)}
-                  >
-                    <TerminalSquare size={16} />
-                    New Terminal
-                  </button>
-                ) : null}
-              </section>
-            )}
-          </main>
-        </Allotment.Pane>
+                  <AgentColumn />
+                </Allotment.Pane>
+                <Allotment.Pane
+                  minSize={280}
+                  preferredSize={500}
+                  className={focusedColumn === "file" ? "pane-focused" : ""}
+                >
+                  <FileColumn />
+                </Allotment.Pane>
+              </Allotment>
+            </div>
+          </Allotment.Pane>
+        ) : hasTerminalTabs ? (
+          <Allotment.Pane
+            minSize={320}
+            preferredSize={540}
+            className={focusedColumn === "agent" ? "pane-focused" : ""}
+          >
+            <AgentColumn />
+          </Allotment.Pane>
+        ) : (
+          <Allotment.Pane
+            minSize={320}
+            preferredSize={620}
+            className={focusedColumn === "file" ? "pane-focused" : ""}
+          >
+            <FileColumn />
+          </Allotment.Pane>
+        )}
+
         {rightPanelOpen ? (
           <Allotment.Pane preferredSize={390} minSize={320} maxSize={560}>
             <RightPanel />

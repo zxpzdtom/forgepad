@@ -23,6 +23,13 @@ const api = {
   git: {
     getCurrentBranch: (worktreePath: string) =>
       ipcRenderer.invoke(IPC.GIT_CURRENT_BRANCH, worktreePath) as Promise<string>,
+    getBranchStats: (worktreePath: string) =>
+      ipcRenderer.invoke(IPC.GIT_BRANCH_STATS, worktreePath) as Promise<{
+        ahead: number;
+        behind: number;
+        additions: number;
+        deletions: number;
+      }>,
     getStatus: (worktreePath: string) =>
       ipcRenderer.invoke(IPC.GIT_STATUS, worktreePath) as Promise<FileStatus[]>,
     getFileDiff: (
