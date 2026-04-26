@@ -54,6 +54,8 @@ const api = {
       ipcRenderer.invoke(IPC.FS_TREE_WITH_STATUS, worktreePath) as Promise<FileNode[]>,
     readFile: (worktreePath: string, relPath: string) =>
       ipcRenderer.invoke(IPC.FS_READ_FILE, worktreePath, relPath) as Promise<string>,
+    readFileAsDataUrl: (worktreePath: string, relPath: string) =>
+      ipcRenderer.invoke(IPC.FS_READ_FILE_DATA_URL, worktreePath, relPath) as Promise<string>,
     writeFile: (worktreePath: string, relPath: string, content: string) =>
       ipcRenderer.invoke(IPC.FS_WRITE_FILE, worktreePath, relPath, content) as Promise<void>,
     watchWorkspace: (worktreePath: string) =>

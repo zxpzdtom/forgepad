@@ -4,6 +4,18 @@ import path from "node:path";
 import { promisify } from "node:util";
 import type { FileNode, FileStatus } from "@shared/types";
 import { normalizeRelPath, resolveInsideRoot } from "./path-guard";
+
+const MIME_MAP: Record<string, string> = {
+  png: "image/png",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  gif: "image/gif",
+  webp: "image/webp",
+  bmp: "image/bmp",
+  ico: "image/x-icon",
+  svg: "image/svg+xml",
+  avif: "image/avif",
+};
 import { GitService } from "./git-service";
 
 const execFileAsync = promisify(execFile);
@@ -166,6 +178,23 @@ export class FileService {
     const relPath = normalizeRelPath(relPathInput);
     const abs = await resolveInsideRoot(rootPath, relPath);
     await writeFile(abs, content, "utf8");
+  }
+
+  static async readFileAsDataUrl(rootPath: string, relPathInput: string): Promise<string> {
+    const relPath = normalizeRelPath(relPathInput);
+    const abs = await resolveInsideRoot(rootPath, relPath);
+    const stats = await stat(abs);
+    if (stats.size > 10 * 1024 * 1024) {
+      throw new Error(`File too large for preview: ${(stats.size / 1024 / 1024).toFixed(1)} MB`);
+    }
+    const ext = relPath.split(".").pop()?.toLowerCase() ?? "";
+    const mime = MIME_MAP[ext] ?? "application/octet-stream";
+    if (mime === "image/svg+xml") {
+      const text = await readFile(abs, "utf8");
+      return `data:${mime};utf8,${encodeURIComponent(text)}`;
+    }
+    const buffer = await readFile(abs);
+    return `data:${mime};base64,${buffer.toString("base64")}`;
   }
 }
 

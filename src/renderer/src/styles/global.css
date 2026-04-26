@@ -839,6 +839,7 @@ textarea {
   margin: 0;
 }
 
+<<<<<<< Updated upstream
 .markdown-viewer-scroll {
   background: #101218;
 }
@@ -988,6 +989,56 @@ textarea {
 ::highlight(forgepad-file-search-active) {
   color: #071110;
   background: #67d5b5;
+}
+
+.image-preview-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  background: #0c0d10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.image-preview {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 4px;
+}
+
+.view-mode-toggle {
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.view-mode-btn {
+  width: 30px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  background: transparent;
+  cursor: pointer;
+  border: none;
+  border-right: 1px solid var(--border);
+}
+
+.view-mode-btn:last-child {
+  border-right: none;
+}
+
+.view-mode-btn:hover {
+  background: var(--panel-3);
+}
+
+.view-mode-btn.active {
+  color: var(--accent);
+  background: #172424;
 }
 
 .surface-toolbar {

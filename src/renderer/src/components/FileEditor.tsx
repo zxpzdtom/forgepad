@@ -18,8 +18,10 @@ import {
 import {
   ChevronDown,
   ChevronUp,
+  Code,
   Copy,
   FileCode,
+  Image,
   MessageSquarePlus,
   Search,
   X,
@@ -106,6 +108,23 @@ const LANG_MAP: Record<string, BundledLanguage> = {
   dockerfile: "dockerfile",
   makefile: "makefile",
 };
+
+const IMAGE_EXTENSIONS = new Set([
+  "png",
+  "jpg",
+  "jpeg",
+  "gif",
+  "webp",
+  "bmp",
+  "ico",
+  "svg",
+  "avif",
+]);
+
+function isImageFile(relPath: string): boolean {
+  const ext = relPath.split(".").pop()?.toLowerCase() ?? "";
+  return IMAGE_EXTENSIONS.has(ext);
+}
 
 function langForPath(path: string): BundledLanguage {
   const name = path.split("/").pop() ?? "";
@@ -289,12 +308,18 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
   const [activeMatchIndex, setActiveMatchIndex] = useState(0);
   const [pendingSelection, setPendingSelection] =
     useState<PendingCodeSelection | null>(null);
+  const [imageUrl, setImageUrl] = useState("");
+  const [imageViewMode, setImageViewMode] = useState<"preview" | "raw">(
+    "preview",
+  );
   const addToast = useAppStore((state) => state.addToast);
   const addContextFiles = useAppStore((state) => state.addContextFiles);
   const addCodeSelection = useAppStore((state) => state.addCodeSelection);
   const lang = useMemo(() => langForPath(tab.relPath), [tab.relPath]);
   const markdownFile = useMemo(() => isMarkdownPath(tab.relPath), [tab.relPath]);
+  const isImage = useMemo(() => isImageFile(tab.relPath), [tab.relPath]);
   const showRenderedMarkdown = markdownFile && markdownMode === "rendered";
+  const showImagePreview = isImage && imageViewMode === "preview";
   const activeSearchLabel =
     searchQuery.trim() && searchRanges.length > 0
       ? `${(activeMatchIndex % searchRanges.length) + 1}/${searchRanges.length}`
@@ -309,6 +334,24 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
     setHighlighted("");
     setSearchRanges([]);
     setPendingSelection(null);
+    setImageUrl("");
+
+    if (isImage) {
+      window.forgepad.fs
+        .readFileAsDataUrl(workspace.worktreePath, tab.relPath)
+        .then((dataUrl) => {
+          if (!disposed) setImageUrl(dataUrl);
+        })
+        .catch((error) =>
+          addToast(
+            "error",
+            error instanceof Error ? error.message : "Failed to load image.",
+          ),
+        )
+        .finally(() => {
+          if (!disposed) setLoading(false);
+        });
+    }
 
     let fileText = "";
 
@@ -331,12 +374,13 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
       .then((html) => {
         if (!disposed && html) setHighlighted(addLineMetadata(html));
       })
-      .catch((error) =>
+      .catch((error) => {
+        if (isImage) return;
         addToast(
           "error",
           error instanceof Error ? error.message : "Failed to load file.",
-        ),
-      )
+        );
+      })
       .finally(() => {
         if (!disposed) setLoading(false);
       });
@@ -344,11 +388,12 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
     return () => {
       disposed = true;
     };
-  }, [addToast, tab.relPath, workspace.worktreePath, lang]);
+  }, [addToast, tab.relPath, workspace.worktreePath, lang, isImage]);
 
   useEffect(() => {
     setMarkdownMode("rendered");
     setPendingSelection(null);
+    setImageViewMode("preview");
   }, [tab.relPath]);
 
   useEffect(() => {
@@ -547,6 +592,26 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
           <span className="toolbar-meta">{lineCount} lines</span>
         </div>
         <div className="toolbar-actions">
+          {isImage ? (
+            <div className="view-mode-toggle">
+              <button
+                className={`view-mode-btn ${imageViewMode === "preview" ? "active" : ""}`}
+                type="button"
+                title="Preview"
+                onClick={() => setImageViewMode("preview")}
+              >
+                <Image size={14} />
+              </button>
+              <button
+                className={`view-mode-btn ${imageViewMode === "raw" ? "active" : ""}`}
+                type="button"
+                title="Raw"
+                onClick={() => setImageViewMode("raw")}
+              >
+                <Code size={14} />
+              </button>
+            </div>
+          ) : null}
           {markdownFile ? (
             <div className="segmented-control" role="group" aria-label="Markdown view">
               <button
@@ -639,6 +704,14 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
       ) : null}
       {loading ? (
         <div className="panel-placeholder">Loading file</div>
+      ) : showImagePreview && imageUrl ? (
+        <div className="image-preview-scroll">
+          <img
+            className="image-preview"
+            src={imageUrl}
+            alt={tab.relPath}
+          />
+        </div>
       ) : showRenderedMarkdown ? (
         <div className="markdown-viewer-scroll" ref={scrollRef}>
           <div ref={previewRef} className="markdown-preview">
