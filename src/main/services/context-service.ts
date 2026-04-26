@@ -153,6 +153,25 @@ export class ContextService {
       lines.push("");
     }
 
+    if (input.selections.length > 0) {
+      lines.push("## Code Selection Notes", "");
+      for (const selection of input.selections) {
+        const relPath = normalizeRelPath(selection.relPath);
+        const range =
+          selection.startLine === selection.endLine
+            ? `L${selection.startLine}`
+            : `L${selection.startLine}-L${selection.endLine}`;
+        lines.push(`### ${relPath} ${range}`, "");
+        lines.push(`User note: ${selection.text.trim()}`, "");
+        lines.push(
+          "```" + fenceForPath(relPath),
+          selection.selectedText.slice(0, 20_000),
+          "```",
+          "",
+        );
+      }
+    }
+
     const markdown = lines.join("\n");
     const contextDir = path.join(input.workspacePath, ".forgepad", "context");
     await mkdir(contextDir, { recursive: true });

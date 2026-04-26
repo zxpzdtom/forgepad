@@ -16,12 +16,15 @@ The renderer dev server runs at `http://localhost:5173/`, and Electron opens the
 ## MVP Scope
 
 - Left sidebar for projects, root workspace, task creation, and terminal creation.
-- Center workspace with persistent terminal tabs, Monaco file editing, Pierre diff viewing, and context bundle preview.
+- Center workspace with persistent shell/agent terminal tabs, Pierre-powered file viewing, Pierre diff viewing, and context bundle preview.
 - Right panel with Pierre file tree, git changes, and an AI context basket.
-- Multi-file context selection from the tree.
+- Multi-file and folder context selection from the tree.
+- File context can include full contents or reference the path only.
 - Diff context selection from git changes.
 - Diff line-range comments that are bundled with selected files and diffs.
 - Task context selection from the sidebar, including task title, status, description, and optional notes.
+- Workspace file watching refreshes file tree, git changes, and open diffs after external edits.
+- Agent terminals launch the Context panel's Agent command (`codex` by default) in the active workspace.
 - Context bundles written to `.forgepad/context/*.md` and pasted into the active terminal as an agent prompt.
 
 ## Task Workflow
@@ -35,6 +38,7 @@ The renderer dev server runs at `http://localhost:5173/`, and Electron opens the
 ## Shortcuts
 
 - `Cmd/Ctrl+T`: create a new terminal.
+- `Shift+Cmd/Ctrl+T`: create a new agent terminal.
 - `Cmd/Ctrl+W`: close the active tab.
 - `Cmd/Ctrl+J`: focus the terminal workflow by creating a terminal for the active workspace.
 - `Shift+Cmd/Ctrl+E`: switch the right panel to Files.

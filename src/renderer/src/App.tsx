@@ -27,9 +27,12 @@ export function App() {
   const sidebarOpen = useAppStore((state) => state.sidebarOpen);
   const openProject = useAppStore((state) => state.openProject);
   const createTerminal = useAppStore((state) => state.createTerminal);
+  const createAgentTerminal = useAppStore((state) => state.createAgentTerminal);
   const closeTab = useAppStore((state) => state.closeTab);
   const setActiveTab = useAppStore((state) => state.setActiveTab);
   const setRightPanelMode = useAppStore((state) => state.setRightPanelMode);
+  const triggerGitRefresh = useAppStore((state) => state.triggerGitRefresh);
+  const addToast = useAppStore((state) => state.addToast);
 
   useEffect(() => {
     let disposed = false;
@@ -85,7 +88,11 @@ export function App() {
 
       if (key === "t") {
         event.preventDefault();
-        void createTerminal(activeWorkspaceId ?? undefined);
+        if (event.shiftKey) {
+          void createAgentTerminal(activeWorkspaceId ?? undefined);
+        } else {
+          void createTerminal(activeWorkspaceId ?? undefined);
+        }
         return;
       }
 
@@ -129,6 +136,7 @@ export function App() {
     activeTabId,
     activeWorkspaceId,
     closeTab,
+    createAgentTerminal,
     createTerminal,
     setActiveTab,
     setRightPanelMode,
@@ -139,13 +147,108 @@ export function App() {
     () => workspaces.find((workspace) => workspace.id === activeWorkspaceId),
     [activeWorkspaceId, workspaces],
   );
+
+  useEffect(() => {
+    if (!activeWorkspace) return;
+
+    let disposed = false;
+    let watchId: string | null = null;
+    let removeListener: (() => void) | null = null;
+    let refreshTimer: number | undefined;
+
+    window.forgepad.fs
+      .watchWorkspace(activeWorkspace.worktreePath)
+      .then((id) => {
+        if (disposed) {
+          window.forgepad.fs.unwatchWorkspace(id);
+          return;
+        }
+
+        watchId = id;
+        removeListener = window.forgepad.fs.onChanged(id, () => {
+          if (refreshTimer) window.clearTimeout(refreshTimer);
+          refreshTimer = window.setTimeout(() => {
+            triggerGitRefresh();
+          }, 120);
+        });
+      })
+      .catch((error) => {
+        addToast(
+          "error",
+          error instanceof Error
+            ? error.message
+            : "Failed to watch workspace changes.",
+        );
+      });
+
+    return () => {
+      disposed = true;
+      if (refreshTimer) window.clearTimeout(refreshTimer);
+      removeListener?.();
+      if (watchId) window.forgepad.fs.unwatchWorkspace(watchId);
+    };
+  }, [activeWorkspace, addToast, triggerGitRefresh]);
+
   const activeTab = useMemo(
     () => tabs.find((tab) => tab.id === activeTabId),
     [activeTabId, tabs],
   );
-  const activeTabWorkspace =
-    workspaceForTab(workspaces, activeTab) ?? activeWorkspace;
-  const terminalTabs = tabs.filter((tab) => tab.type === "terminal");
+  const workspaceTabs = tabs.filter((tab) => tab.workspaceId === activeWorkspaceId);
+  const terminalTabs = workspaceTabs.filter((tab) => tab.type === "terminal");
+  const editorTabs = workspaceTabs.filter((tab) => tab.type !== "terminal");
+  const activeEditorTab =
+    activeTab && activeTab.type !== "terminal" ? activeTab : editorTabs.at(-1);
+  const activeTerminalTab =
+    activeTab?.type === "terminal"
+      ? activeTab
+      : (terminalTabs
+          .slice()
+          .reverse()
+          .find((tab) => tab.type === "terminal" && tab.isAgent) ??
+        terminalTabs.at(-1));
+  const activeEditorWorkspace =
+    workspaceForTab(workspaces, activeEditorTab) ?? activeWorkspace;
+  const activeTerminalWorkspace =
+    workspaceForTab(workspaces, activeTerminalTab) ?? activeWorkspace;
+
+  const renderEditorSurface = () => {
+    if (!activeEditorTab || !activeEditorWorkspace) {
+      return (
+        <div className="panel-placeholder">Open a file or changes view</div>
+      );
+    }
+
+    if (activeEditorTab.type === "file") {
+      return <FileEditor tab={activeEditorTab} workspace={activeEditorWorkspace} />;
+    }
+    if (activeEditorTab.type === "diff") {
+      return <DiffViewer tab={activeEditorTab} workspace={activeEditorWorkspace} />;
+    }
+    if (activeEditorTab.type === "context-preview") {
+      return <ContextPreview />;
+    }
+    return null;
+  };
+
+  const renderTerminalSurface = () => {
+    if (!activeTerminalTab || !activeTerminalWorkspace) return null;
+    return (
+      <>
+        {terminalTabs.map((tab) => {
+          const workspace = workspaces.find((item) => item.id === tab.workspaceId);
+          if (!workspace) return null;
+          return (
+            <TerminalPanel
+              key={tab.id}
+              tab={tab}
+              workspace={workspace}
+              active={tab.id === activeTerminalTab.id}
+            />
+          );
+        })}
+      </>
+    );
+  };
 
   if (!hydrated) {
     return (
@@ -188,31 +291,30 @@ export function App() {
                   Open Project
                 </button>
               </section>
-            ) : activeTab && activeTabWorkspace ? (
-              <div className="tab-surface">
-                {terminalTabs.map((tab) => {
-                  const workspace = workspaces.find(
-                    (item) => item.id === tab.workspaceId,
-                  );
-                  if (!workspace) return null;
-                  return (
-                    <TerminalPanel
-                      key={tab.id}
-                      tab={tab}
-                      workspace={workspace}
-                      active={tab.id === activeTabId}
-                    />
-                  );
-                })}
-                {activeTab.type === "file" ? (
-                  <FileEditor tab={activeTab} workspace={activeTabWorkspace} />
-                ) : null}
-                {activeTab.type === "diff" ? (
-                  <DiffViewer tab={activeTab} workspace={activeTabWorkspace} />
-                ) : null}
-                {activeTab.type === "context-preview" ? (
-                  <ContextPreview />
-                ) : null}
+            ) : activeEditorTab || activeTerminalTab ? (
+              <div className="tab-surface workspace-surface">
+                {activeEditorTab && activeTerminalTab ? (
+                  <Allotment proportionalLayout={false} className="workspace-split">
+                    <Allotment.Pane minSize={320} preferredSize={620}>
+                      <div className="workspace-pane-slot editor-slot">
+                        {renderEditorSurface()}
+                      </div>
+                    </Allotment.Pane>
+                    <Allotment.Pane minSize={300} preferredSize={440}>
+                      <div className="workspace-pane-slot terminal-slot">
+                        {renderTerminalSurface()}
+                      </div>
+                    </Allotment.Pane>
+                  </Allotment>
+                ) : activeEditorTab ? (
+                  <div className="workspace-pane-slot editor-slot">
+                    {renderEditorSurface()}
+                  </div>
+                ) : (
+                  <div className="workspace-pane-slot terminal-slot">
+                    {renderTerminalSurface()}
+                  </div>
+                )}
               </div>
             ) : (
               <section className="empty-workspace compact">

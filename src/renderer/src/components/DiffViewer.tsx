@@ -40,6 +40,7 @@ export function DiffViewer({ tab, workspace }: DiffViewerProps) {
   const [loading, setLoading] = useState(false);
   const [pending, setPending] = useState<PendingComment | null>(null);
   const settings = useAppStore((state) => state.settings);
+  const gitRefreshEpoch = useAppStore((state) => state.gitRefreshEpoch);
   const addToast = useAppStore((state) => state.addToast);
   const addContextDiff = useAppStore((state) => state.addContextDiff);
   const addDiffComment = useAppStore((state) => state.addDiffComment);
@@ -93,7 +94,7 @@ export function DiffViewer({ tab, workspace }: DiffViewerProps) {
 
   useEffect(() => {
     void load();
-  }, [load]);
+  }, [load, gitRefreshEpoch]);
 
   const diffOptions: FileDiffOptions<undefined> = {
     theme: "pierre-dark",

@@ -7,7 +7,6 @@ import {
   PanelLeftOpen,
   Plus,
   SendHorizontal,
-  TerminalSquare,
   Trash2,
 } from "lucide-react";
 import type { TaskStatus } from "@shared/types";
@@ -33,7 +32,6 @@ export function Sidebar() {
   const sidebarOpen = useAppStore((state) => state.sidebarOpen);
   const openProject = useAppStore((state) => state.openProject);
   const setActiveWorkspace = useAppStore((state) => state.setActiveWorkspace);
-  const createTerminal = useAppStore((state) => state.createTerminal);
   const createTask = useAppStore((state) => state.createTask);
   const updateTaskStatus = useAppStore((state) => state.updateTaskStatus);
   const deleteTask = useAppStore((state) => state.deleteTask);
@@ -95,15 +93,6 @@ export function Sidebar() {
             }}
           >
             <ClipboardList size={16} />
-          </button>
-          <button
-            className="icon-button"
-            type="button"
-            title="New terminal"
-            disabled={!activeWorkspaceId}
-            onClick={() => createTerminal(activeWorkspaceId ?? undefined)}
-          >
-            <TerminalSquare size={16} />
           </button>
         </div>
 
@@ -297,15 +286,6 @@ export function Sidebar() {
         </div>
       </div>
 
-      <button
-        className="secondary-button full"
-        type="button"
-        disabled={!activeWorkspaceId}
-        onClick={() => createTerminal(activeWorkspaceId ?? undefined)}
-      >
-        <TerminalSquare size={16} />
-        New Terminal
-      </button>
     </aside>
   );
 }
