@@ -28,12 +28,12 @@ export function RightPanel() {
   const rightPanelOpen = useAppStore((state) => state.rightPanelOpen);
 
   return (
-    <aside className="right-panel">
-      <div className="right-panel-header">
-        <div className="right-panel-tabs">
+    <aside className="flex h-full min-h-0 flex-col border-l border-border bg-panel">
+      <div className="flex min-h-10 items-center gap-1 border-b border-border bg-panel pr-1">
+        <div className="flex min-w-0 flex-1">
           {modes.map(({ mode: nextMode, label, icon: Icon }) => (
             <button
-              className={`right-panel-tab ${nextMode === mode ? "active" : ""}`}
+              className={`flex h-10 items-center gap-1.5 whitespace-nowrap border-b-2 border-transparent px-3 text-[13px] bg-transparent cursor-pointer${nextMode === mode ? " border-b-accent text-text" : " text-muted hover:text-text hover:bg-panel-2"}`}
               key={nextMode}
               type="button"
               title={label}
@@ -44,7 +44,7 @@ export function RightPanel() {
             </button>
           ))}
         </div>
-        <div className="right-panel-actions">
+        <div className="flex items-center gap-0.5 pr-1">
           <button
             className="icon-button small"
             type="button"
@@ -63,7 +63,7 @@ export function RightPanel() {
           </button>
         </div>
       </div>
-      <div className="right-panel-content">
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         {mode === "files" ? <FilesPanel /> : null}
         {mode === "changes" ? <ChangesPanel /> : null}
         {mode === "context" ? <ContextPanel /> : null}

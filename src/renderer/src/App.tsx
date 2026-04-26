@@ -252,12 +252,12 @@ export function App() {
   const renderEmptyState = () => {
     if (projects.length === 0) {
       return (
-        <section className="empty-workspace">
-          <div className="empty-icon">
+        <section className="flex size-full flex-col items-center justify-center gap-3.5 p-8 text-center">
+          <div className="grid size-14 place-items-center rounded-lg border border-border bg-panel-2 text-accent">
             <FolderOpen size={32} />
           </div>
-          <h1>Open a repository to start</h1>
-          <p>
+          <h1 className="m-0 text-[22px] font-semibold">Open a repository to start</h1>
+          <p className="m-0 max-w-[460px] leading-relaxed text-muted">
             ForgePad keeps the agent loop terminal-first, with file context and
             git diffs close at hand.
           </p>
@@ -274,10 +274,10 @@ export function App() {
     }
 
     return (
-      <section className="empty-workspace compact">
+      <section className="flex size-full flex-col items-center justify-center gap-3.5 p-8 text-center">
         <TerminalSquare size={30} />
-        <h1>{activeWorkspace?.name ?? "No workspace selected"}</h1>
-        <p>
+        <h1 className="m-0 text-[22px] font-semibold">{activeWorkspace?.name ?? "No workspace selected"}</h1>
+        <p className="m-0 max-w-[460px] leading-relaxed text-muted flex items-center gap-[7px]">
           {activeWorkspace ? (
             <>
               <GitBranch size={14} /> {activeWorkspace.branch || "detached"}
@@ -287,7 +287,7 @@ export function App() {
           )}
         </p>
         {activeWorkspace ? (
-          <div style={{ display: "flex", gap: "8px" }}>
+          <div className="flex gap-2">
             <button
               className="primary-button"
               type="button"
@@ -312,9 +312,9 @@ export function App() {
 
   if (!hydrated) {
     return (
-      <div className="boot-screen">
-        <div className="boot-mark">ForgePad</div>
-        <div className="muted">Loading workspace</div>
+      <div className="flex size-full flex-col items-center justify-center gap-3.5 p-8 text-center">
+        <div className="text-[22px] font-bold">ForgePad</div>
+        <div className="text-muted">Loading workspace</div>
       </div>
     );
   }
@@ -322,8 +322,8 @@ export function App() {
   const hasAnyContent = hasTerminalTabs || hasFileTabs;
 
   return (
-    <div className="app-shell">
-      <Allotment proportionalLayout={false} className="app-allotment">
+    <div className="size-full">
+      <Allotment proportionalLayout={false} className="size-full">
         <Allotment.Pane
           preferredSize={sidebarOpen ? 260 : 48}
           minSize={sidebarOpen ? 220 : 48}
@@ -335,7 +335,7 @@ export function App() {
         {!hasAnyContent ? (
           <Allotment.Pane minSize={460}>
             <main
-              className="center-pane"
+              className="flex size-full min-h-0 flex-col bg-bg"
               onMouseDown={() => setFocusedColumn("agent")}
             >
               {renderEmptyState()}
@@ -343,7 +343,7 @@ export function App() {
           </Allotment.Pane>
         ) : hasTerminalTabs && hasFileTabs ? (
           <Allotment.Pane minSize={460}>
-            <div style={{ width: "100%", height: "100%" }}>
+            <div className="size-full">
               <Allotment proportionalLayout={false}>
                 <Allotment.Pane
                   minSize={280}
@@ -386,7 +386,7 @@ export function App() {
           </Allotment.Pane>
         ) : (
           <Allotment.Pane preferredSize={44} minSize={44} maxSize={44}>
-            <aside className="right-panel-collapsed">
+            <aside className="grid min-h-0 justify-start justify-items-center border-l border-border bg-panel pt-2.5">
               <button
                 className="icon-button"
                 type="button"
