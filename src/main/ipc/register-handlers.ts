@@ -1,4 +1,4 @@
-import { BrowserWindow, dialog, ipcMain } from "electron";
+import { BrowserWindow, dialog, ipcMain, shell } from "electron";
 import { watch as watchFs } from "node:fs";
 import type { FSWatcher } from "node:fs";
 import path from "node:path";
@@ -183,4 +183,8 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IPC.CONTEXT_CREATE_BUNDLE, async (_event, input: CreateBundleInput) =>
     ContextService.createBundle(input),
   );
+
+  ipcMain.handle(IPC.SHELL_SHOW_ITEM_IN_FOLDER, async (_event, fullPath: string) => {
+    await shell.showItemInFolder(fullPath);
+  });
 }

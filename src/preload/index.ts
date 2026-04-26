@@ -94,6 +94,10 @@ const api = {
     createBundle: (input: CreateBundleInput) =>
       ipcRenderer.invoke(IPC.CONTEXT_CREATE_BUNDLE, input) as Promise<ContextBundleResult>,
   },
+  shell: {
+    showItemInFolder: (fullPath: string) =>
+      ipcRenderer.invoke(IPC.SHELL_SHOW_ITEM_IN_FOLDER, fullPath) as Promise<void>,
+  },
 };
 
 contextBridge.exposeInMainWorld("forgepad", api);

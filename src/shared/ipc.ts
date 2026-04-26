@@ -25,5 +25,6 @@ export const IPC = {
   PTY_DATA: "pty:data",
   PTY_EXIT: "pty:exit",
   CONTEXT_CREATE_BUNDLE: "context:create-bundle",
+  SHELL_SHOW_ITEM_IN_FOLDER: "shell:show-item-in-folder",
 } as const;
 
