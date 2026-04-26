@@ -5,17 +5,20 @@ import {
   useMemo,
   useRef,
   useState,
+  type ComponentPropsWithoutRef,
 } from "react";
 import ReactMarkdown from "react-markdown";
 import rehypeRaw from "rehype-raw";
 import rehypeSanitize from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
+import mermaid from "mermaid";
 import {
   getSharedHighlighter,
   type BundledLanguage,
   type DiffsHighlighter,
 } from "@pierre/diffs";
 import {
+  Check,
   ChevronDown,
   ChevronUp,
   Code,
@@ -291,6 +294,168 @@ function scrollRangeIntoContainer(range: Range, container: HTMLElement) {
     behavior: "smooth",
   });
 }
+
+mermaid.initialize({ startOnLoad: false, theme: "dark" });
+
+let mermaidCounter = 0;
+
+const MD_LANG_MAP: Record<string, BundledLanguage> = {
+  typescript: "typescript",
+  ts: "typescript",
+  tsx: "tsx",
+  javascript: "javascript",
+  js: "javascript",
+  jsx: "jsx",
+  json: "json",
+  css: "css",
+  scss: "scss",
+  less: "less",
+  html: "html",
+  python: "python",
+  py: "python",
+  go: "go",
+  rust: "rust",
+  rs: "rust",
+  shell: "shellscript",
+  sh: "shellscript",
+  bash: "shellscript",
+  zsh: "shellscript",
+  yaml: "yaml",
+  yml: "yaml",
+  toml: "toml",
+  xml: "xml",
+  sql: "sql",
+  graphql: "graphql",
+  java: "java",
+  c: "c",
+  cpp: "cpp",
+  ruby: "ruby",
+  rb: "ruby",
+  php: "php",
+  swift: "swift",
+  kotlin: "kotlin",
+  kt: "kotlin",
+  scala: "scala",
+  dart: "dart",
+  lua: "lua",
+  r: "r",
+  perl: "perl",
+  elixir: "elixir",
+  dockerfile: "dockerfile",
+  makefile: "makefile",
+  markdown: "markdown",
+  md: "markdown",
+  mdx: "mdx",
+  vue: "html",
+  svelte: "html",
+};
+
+function MarkdownCodeBlock({
+  className,
+  children,
+  ...rest
+}: ComponentPropsWithoutRef<"code">) {
+  const [copied, setCopied] = useState(false);
+  const [highlighted, setHighlighted] = useState("");
+  const [mermaidSvg, setMermaidSvg] = useState("");
+
+  const lang = (className?.replace("language-", "") ?? "").toLowerCase();
+  const code = String(children).replace(/\n$/, "");
+  const isInline = !className;
+
+  const copy = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {}
+  }, [code]);
+
+  useEffect(() => {
+    if (isInline || lang === "mermaid") return;
+    let disposed = false;
+    getHl().then((hl) => {
+      if (disposed) return;
+      const resolved = (hl.getLoadedLanguages() as string[]).includes(
+        MD_LANG_MAP[lang] ?? lang,
+      )
+        ? (MD_LANG_MAP[lang] ?? lang)
+        : "text";
+      const html = hl.codeToHtml(code, {
+        lang: resolved as BundledLanguage,
+        theme: "pierre-dark",
+      });
+      setHighlighted(html);
+    });
+    return () => {
+      disposed = true;
+    };
+  }, [code, lang, isInline]);
+
+  useEffect(() => {
+    if (lang !== "mermaid") return;
+    let disposed = false;
+    const id = `mermaid-${++mermaidCounter}`;
+    mermaid
+      .render(id, code)
+      .then(({ svg }) => {
+        if (!disposed) setMermaidSvg(svg);
+      })
+      .catch(() => {
+        if (!disposed)
+          setMermaidSvg(
+            `<p style="color:#e55;font-size:13px">Mermaid render error</p>`,
+          );
+      });
+    return () => {
+      disposed = true;
+    };
+  }, [code, lang]);
+
+  if (lang === "mermaid" && mermaidSvg) {
+    return (
+      <div
+        className="mermaid-container"
+        dangerouslySetInnerHTML={{ __html: mermaidSvg }}
+      />
+    );
+  }
+
+  if (isInline) {
+    return <code {...rest}>{children}</code>;
+  }
+
+  return (
+    <div className="md-code-block">
+      <div className="md-code-header">
+        <span className="md-code-lang">{lang || "text"}</span>
+        <button
+          type="button"
+          className="md-code-copy"
+          onClick={copy}
+          title="Copy code"
+        >
+          {copied ? <Check size={13} /> : <Copy size={13} />}
+        </button>
+      </div>
+      {highlighted ? (
+        <div dangerouslySetInnerHTML={{ __html: highlighted }} />
+      ) : (
+        <pre>
+          <code {...rest} className={className}>
+            {children}
+          </code>
+        </pre>
+      )}
+    </div>
+  );
+}
+
+const MarkdownComponents = {
+  code(props: ComponentPropsWithoutRef<"code">) {
+    return <MarkdownCodeBlock {...props} />;
+  },
+};
 
 export function FileEditor({ tab, workspace }: FileEditorProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -718,6 +883,7 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
               rehypePlugins={[rehypeRaw, rehypeSanitize]}
+              components={MarkdownComponents}
             >
               {fileText}
             </ReactMarkdown>
