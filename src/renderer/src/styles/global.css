@@ -404,6 +404,40 @@ textarea {
   text-overflow: ellipsis;
 }
 
+.sidebar-workspace-index {
+  position: absolute;
+  bottom: 3px;
+  right: 6px;
+  font-size: 10px;
+  color: var(--subtle);
+  font-variant-numeric: tabular-nums;
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.sidebar-workspace.dragging,
+.sidebar-project-header.dragging {
+  opacity: 0.4;
+  z-index: 10;
+}
+
+.sidebar-project-header .drag-handle {
+  display: flex;
+  align-items: center;
+  color: var(--subtle);
+  opacity: 0;
+  transition: opacity 0.15s;
+  cursor: grab;
+}
+
+.sidebar-project-header:hover .drag-handle {
+  opacity: 0.6;
+}
+
+.sidebar-project-header .drag-handle:active {
+  cursor: grabbing;
+}
+
 /* Sidebar skeleton loading */
 @keyframes skeleton-pulse {
   0%, 100% { opacity: 0.4; }
