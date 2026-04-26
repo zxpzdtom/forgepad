@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type {
+  AgentPreset,
   AppSettings,
   CodeSelectionItem,
   ContextBundleResult,
@@ -20,7 +21,7 @@ import type {
   TaskStatus,
   Workspace,
 } from "@shared/types";
-import { AGENT_PRESETS, DEFAULT_SETTINGS } from "@shared/types";
+import { DEFAULT_SETTINGS } from "@shared/types";
 
 type Toast = {
   id: string;
@@ -35,6 +36,8 @@ type AppState = {
   tabs: Tab[];
   activeWorkspaceId: string | null;
   activeTabId: string | null;
+  activeAgentTabId: string | null;
+  activeFileTabId: string | null;
   rightPanelMode: RightPanelMode;
   rightPanelOpen: boolean;
   sidebarOpen: boolean;
@@ -44,6 +47,9 @@ type AppState = {
   lastBundle: ContextBundleResult | null;
   toasts: Toast[];
   hydrated: boolean;
+  workspaceLoadingIds: Set<string>;
+  focusedColumn: "sidebar" | "agent" | "file" | "rightPanel";
+  branchStats: Record<string, { ahead: number; behind: number; additions: number; deletions: number }>;
   gitRefreshEpoch: number;
   triggerGitRefresh: () => void;
   hydrate: (state: Partial<PersistedAppState> | null) => void;
@@ -107,6 +113,13 @@ type AppState = {
   sendContextToTerminal: () => Promise<void>;
   updateSettings: (partial: Partial<AppSettings>) => void;
   refreshBranch: (workspaceId: string) => Promise<void>;
+  addAgentPreset: (preset: AgentPreset) => void;
+  removeAgentPreset: (presetId: string) => void;
+  updateAgentPreset: (presetId: string, partial: Partial<AgentPreset>) => void;
+  updateTerminalSessionId: (tabId: string, sessionId: string) => void;
+  restoreAgentSessions: () => Promise<void>;
+  setFocusedColumn: (column: AppState["focusedColumn"]) => void;
+  refreshBranchStats: (workspaceId?: string) => Promise<void>;
 };
 
 function id(): string {
@@ -124,13 +137,15 @@ function tabTitle(tab: Tab): string {
   return tab.relPath.split("/").pop() || tab.relPath;
 }
 
-function agentLabelForCommand(command: string): string {
-  const normalized = command.trim();
-  const preset = AGENT_PRESETS.find((item) => item.command === normalized);
-  if (preset?.id === "claude") return "Claude";
-  if (preset?.id === "gemini") return "Gemini";
-  if (preset?.id === "codex") return "Codex";
-  return "Agent";
+function agentLabelForCommand(
+  command: string,
+  presets: AgentPreset[],
+): string {
+  const normalized = command.trim().split(/\s+/)[0];
+  const preset = presets.find(
+    (item) => item.command.trim().split(/\s+/)[0] === normalized,
+  );
+  return preset?.label ?? "Agent";
 }
 
 function serializeForSave(state: AppState): PersistedAppState {
@@ -139,7 +154,11 @@ function serializeForSave(state: AppState): PersistedAppState {
     projects: state.projects,
     workspaces: state.workspaces,
     tasks: state.tasks,
-    tabs: state.tabs.filter((tab) => tab.type !== "terminal"),
+    tabs: state.tabs.filter(
+      (tab) =>
+        tab.type !== "terminal" ||
+        (tab.isAgent && tab.sessionId),
+    ),
     activeWorkspaceId: state.activeWorkspaceId,
     activeTabId:
       state.tabs.find((tab) => tab.id === state.activeTabId)?.type ===
@@ -179,6 +198,8 @@ export const useAppStore = create<AppState>((set, get) => ({
   tabs: [],
   activeWorkspaceId: null,
   activeTabId: null,
+  activeAgentTabId: null,
+  activeFileTabId: null,
   rightPanelMode: "files",
   rightPanelOpen: true,
   sidebarOpen: true,
@@ -188,9 +209,14 @@ export const useAppStore = create<AppState>((set, get) => ({
   lastBundle: null,
   toasts: [],
   hydrated: false,
+  workspaceLoadingIds: new Set<string>(),
+  focusedColumn: "agent",
+  branchStats: {},
   gitRefreshEpoch: 0,
-  triggerGitRefresh: () =>
-    set((state) => ({ gitRefreshEpoch: state.gitRefreshEpoch + 1 })),
+  triggerGitRefresh: () => {
+    set((state) => ({ gitRefreshEpoch: state.gitRefreshEpoch + 1 }));
+    get().refreshBranchStats();
+  },
 
   hydrate: (state) => {
     if (state?.schemaVersion !== undefined && state.schemaVersion !== 1) {
@@ -198,7 +224,11 @@ export const useAppStore = create<AppState>((set, get) => ({
       return;
     }
 
-    const settings = { ...DEFAULT_SETTINGS, ...(state?.settings ?? {}) };
+    const rawSettings = { ...DEFAULT_SETTINGS, ...(state?.settings ?? {}) };
+    if (!rawSettings.agentPresets || rawSettings.agentPresets.length === 0) {
+      rawSettings.agentPresets = [...DEFAULT_SETTINGS.agentPresets];
+    }
+    const settings = rawSettings;
     const projects = state?.projects ?? [];
     const workspaces = state?.workspaces ?? [];
     const tasks = (state?.tasks ?? []).filter((task) => {
@@ -242,6 +272,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       settings,
       hydrated: true,
     });
+
+    get().restoreAgentSessions();
   },
 
   toPersistedState: () => serializeForSave(get()),
@@ -274,6 +306,11 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     const projectId = id();
     const workspaceId = id();
+
+    set((state) => ({
+      workspaceLoadingIds: new Set([...state.workspaceLoadingIds, workspaceId]),
+    }));
+
     const project: Project = {
       id: projectId,
       name: opened.name,
@@ -299,6 +336,12 @@ export const useAppStore = create<AppState>((set, get) => ({
     }));
 
     await get().createTerminal(workspaceId);
+
+    set((state) => {
+      const next = new Set(state.workspaceLoadingIds);
+      next.delete(workspaceId);
+      return { workspaceLoadingIds: next };
+    });
   },
 
   setActiveWorkspace: (workspaceId) => {
@@ -338,7 +381,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
-  createAgentTerminal: async (workspaceId, commandOverride) => {
+  createAgentTerminal: async (workspaceId, commandOverride, presetId) => {
     const workspace = findWorkspace(get(), workspaceId);
     if (!workspace) return null;
     const command =
@@ -364,7 +407,10 @@ export const useAppStore = create<AppState>((set, get) => ({
           tab.type === "terminal" &&
           (tab.isAgent || tab.title.startsWith("Agent")),
       ).length;
-      const agentLabel = agentLabelForCommand(command);
+      const agentLabel = agentLabelForCommand(
+        command,
+        get().settings.agentPresets,
+      );
       const tab: Tab = {
         id: id(),
         workspaceId: workspace.id,
@@ -372,6 +418,8 @@ export const useAppStore = create<AppState>((set, get) => ({
         title: agentCount === 0 ? agentLabel : `${agentLabel} ${agentCount + 1}`,
         ptyId,
         isAgent: true,
+        agentPresetId: presetId,
+        agentCommand: command,
       };
       get().addTab(tab);
       return ptyId;
@@ -387,24 +435,54 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   addTab: (tab) =>
-    set((state) => ({ tabs: [...state.tabs, tab], activeTabId: tab.id })),
+    set((state) => {
+      const patch: Partial<AppState> = {
+        tabs: [...state.tabs, tab],
+        activeTabId: tab.id,
+      };
+      if (tab.type === "terminal") {
+        patch.activeAgentTabId = tab.id;
+      } else {
+        patch.activeFileTabId = tab.id;
+      }
+      return patch;
+    }),
 
   closeTab: (tabId) => {
     const tab = get().tabs.find((item) => item.id === tabId);
     if (tab?.type === "terminal") window.forgepad.pty.destroy(tab.ptyId);
     set((state) => {
       const tabs = state.tabs.filter((item) => item.id !== tabId);
-      const activeTabId =
-        state.activeTabId === tabId
-          ? (tabs
-              .filter((item) => item.workspaceId === state.activeWorkspaceId)
-              .at(-1)?.id ?? null)
-          : state.activeTabId;
-      return { tabs, activeTabId };
+      const wsTabs = tabs.filter(
+        (item) => item.workspaceId === state.activeWorkspaceId,
+      );
+      const patch: Partial<AppState> = { tabs };
+      if (state.activeTabId === tabId) {
+        patch.activeTabId = wsTabs.at(-1)?.id ?? null;
+      }
+      if (tab?.type === "terminal" && state.activeAgentTabId === tabId) {
+        const remaining = wsTabs.filter((t) => t.type === "terminal");
+        patch.activeAgentTabId = remaining.at(-1)?.id ?? null;
+      }
+      if (tab && tab.type !== "terminal" && state.activeFileTabId === tabId) {
+        const remaining = wsTabs.filter((t) => t.type !== "terminal");
+        patch.activeFileTabId = remaining.at(-1)?.id ?? null;
+      }
+      return patch;
     });
   },
 
-  setActiveTab: (tabId) => set({ activeTabId: tabId }),
+  setActiveTab: (tabId) =>
+    set((state) => {
+      const tab = state.tabs.find((t) => t.id === tabId);
+      const patch: Partial<AppState> = { activeTabId: tabId };
+      if (tab?.type === "terminal") {
+        patch.activeAgentTabId = tabId;
+      } else {
+        patch.activeFileTabId = tabId;
+      }
+      return patch;
+    }),
 
   openFileTab: (workspaceId, relPath) => {
     const existing = get().tabs.find(
@@ -822,14 +900,125 @@ export const useAppStore = create<AppState>((set, get) => ({
   refreshBranch: async (workspaceId) => {
     const workspace = get().workspaces.find((item) => item.id === workspaceId);
     if (!workspace) return;
+    set((state) => ({
+      workspaceLoadingIds: new Set([...state.workspaceLoadingIds, workspaceId]),
+    }));
     const branch = await window.forgepad.git.getCurrentBranch(
       workspace.worktreePath,
     );
+    set((state) => {
+      const next = new Set(state.workspaceLoadingIds);
+      next.delete(workspaceId);
+      return {
+        workspaces: state.workspaces.map((item) =>
+          item.id === workspaceId ? { ...item, branch } : item,
+        ),
+        workspaceLoadingIds: next,
+      };
+    });
+  },
+
+  addAgentPreset: (preset) =>
     set((state) => ({
-      workspaces: state.workspaces.map((item) =>
-        item.id === workspaceId ? { ...item, branch } : item,
+      settings: {
+        ...state.settings,
+        agentPresets: [...state.settings.agentPresets, preset],
+      },
+    })),
+
+  removeAgentPreset: (presetId) =>
+    set((state) => ({
+      settings: {
+        ...state.settings,
+        agentPresets: state.settings.agentPresets.filter(
+          (p) => p.id !== presetId,
+        ),
+      },
+    })),
+
+  updateAgentPreset: (presetId, partial) =>
+    set((state) => ({
+      settings: {
+        ...state.settings,
+        agentPresets: state.settings.agentPresets.map((p) =>
+          p.id === presetId ? { ...p, ...partial } : p,
+        ),
+      },
+    })),
+
+  updateTerminalSessionId: (tabId, sessionId) =>
+    set((state) => ({
+      tabs: state.tabs.map((tab) =>
+        tab.id === tabId && tab.type === "terminal"
+          ? { ...tab, sessionId }
+          : tab,
       ),
-    }));
+    })),
+
+  restoreAgentSessions: async () => {
+    const state = get();
+    const agentTabs = state.tabs.filter(
+      (tab): tab is Extract<Tab, { type: "terminal" }> =>
+        tab.type === "terminal" &&
+        tab.isAgent === true &&
+        !!tab.sessionId,
+    );
+    if (agentTabs.length === 0) return;
+
+    for (const tab of agentTabs) {
+      const workspace = state.workspaces.find(
+        (w) => w.id === tab.workspaceId,
+      );
+      if (!workspace) continue;
+
+      const preset = state.settings.agentPresets.find(
+        (p) => p.id === tab.agentPresetId,
+      );
+      const restoreTemplate = preset?.restoreTemplate;
+      if (!restoreTemplate || !tab.sessionId) continue;
+
+      const command = restoreTemplate.replace("{sessionId}", tab.sessionId);
+
+      try {
+        const ptyId = await window.forgepad.pty.create(
+          workspace.worktreePath,
+          state.settings.defaultShell || undefined,
+          command,
+          {
+            FORGEPAD_WORKSPACE_ID: workspace.id,
+            FORGEPAD_AGENT: "1",
+            FORGEPAD_SESSION_ID: tab.sessionId,
+          },
+        );
+        set((s) => ({
+          tabs: s.tabs.map((t) =>
+            t.id === tab.id ? { ...t, ptyId } : t,
+          ),
+        }));
+      } catch {
+        get().addToast("error", `Failed to restore ${tab.title}`);
+      }
+    }
+  },
+
+  setFocusedColumn: (column) => set({ focusedColumn: column }),
+
+  refreshBranchStats: async (workspaceId) => {
+    const state = get();
+    const targets = workspaceId
+      ? state.workspaces.filter((w) => w.id === workspaceId)
+      : state.workspaces;
+    const updates: Record<string, { ahead: number; behind: number; additions: number; deletions: number }> = {};
+    await Promise.all(
+      targets.map(async (w) => {
+        try {
+          updates[w.id] = await window.forgepad.git.getBranchStats(w.worktreePath);
+        } catch {
+          updates[w.id] = { ahead: 0, behind: 0, additions: 0, deletions: 0 };
+        }
+      }),
+    );
+    set((s) => ({ branchStats: { ...s.branchStats, ...updates } }));
   },
 }));
 

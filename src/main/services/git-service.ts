@@ -171,6 +171,34 @@ export class GitService {
     }
   }
 
+  static async getBranchStats(
+    worktreePath: string,
+  ): Promise<{ ahead: number; behind: number; additions: number; deletions: number }> {
+    try {
+      const [abOutput, numstatOutput] = await Promise.all([
+        git(
+          ["rev-list", "--left-right", "--count", "@{upstream}...HEAD"],
+          worktreePath,
+        ).catch(() => "0\t0"),
+        git(["diff", "--numstat", "--staged"], worktreePath).catch(() => ""),
+      ]);
+      const [behindStr, aheadStr] = abOutput.split("\t");
+      const ahead = Number.parseInt(aheadStr ?? "0", 10) || 0;
+      const behind = Number.parseInt(behindStr ?? "0", 10) || 0;
+      let additions = 0;
+      let deletions = 0;
+      for (const line of numstatOutput.split(/\r?\n/)) {
+        if (!line) continue;
+        const [addStr, delStr] = line.split("\t");
+        additions += addStr === "-" ? 0 : Number.parseInt(addStr ?? "0", 10) || 0;
+        deletions += delStr === "-" ? 0 : Number.parseInt(delStr ?? "0", 10) || 0;
+      }
+      return { ahead, behind, additions, deletions };
+    } catch {
+      return { ahead: 0, behind: 0, additions: 0, deletions: 0 };
+    }
+  }
+
   static async getStatus(worktreePath: string): Promise<FileStatus[]> {
     try {
       const output = await git(["status", "--porcelain=v2", "--untracked-files=all"], worktreePath);
