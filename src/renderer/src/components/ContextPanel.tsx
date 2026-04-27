@@ -67,11 +67,16 @@ export function ContextPanel() {
   );
   const enabledPresets = settings.agentPresets.filter((p) => p.enabled);
   const selectedAgentPreset =
-    enabledPresets.find((preset) => preset.command === settings.defaultAgentCommand)
-      ?.id ?? "custom";
+    enabledPresets.find(
+      (preset) => preset.command === settings.defaultAgentCommand,
+    )?.id ?? "custom";
 
   if (!workspace) {
-    return <div className="grid min-h-[90px] place-items-center text-muted">Open a project first</div>;
+    return (
+      <div className="grid min-h-[90px] place-items-center text-muted">
+        Open a project first
+      </div>
+    );
   }
 
   return (
@@ -93,7 +98,8 @@ export function ContextPanel() {
               const preset = enabledPresets.find(
                 (item) => item.id === event.currentTarget.value,
               );
-              if (preset) updateSettings({ defaultAgentCommand: preset.command });
+              if (preset)
+                updateSettings({ defaultAgentCommand: preset.command });
             }}
           >
             {enabledPresets.map((preset) => (
@@ -120,13 +126,18 @@ export function ContextPanel() {
               className="secondary-button"
               type="button"
               onClick={() => {
-                const tab = useAppStore.getState().tabs.find(
-                  (t) =>
-                    t.workspaceId === useAppStore.getState().activeWorkspaceId &&
-                    t.type === "terminal",
-                );
+                const tab = useAppStore
+                  .getState()
+                  .tabs.find(
+                    (t) =>
+                      t.workspaceId ===
+                        useAppStore.getState().activeWorkspaceId &&
+                      t.type === "terminal",
+                  );
                 if (!tab || tab.type !== "terminal") {
-                  useAppStore.getState().addToast("error", "No terminal tab found.");
+                  useAppStore
+                    .getState()
+                    .addToast("error", "No terminal tab found.");
                   return;
                 }
                 const text = "Hello from ForgePad! This is a test message.";
@@ -134,7 +145,9 @@ export function ContextPanel() {
                   tab.ptyId,
                   `\x1b[200~${text}\x1b[201~\r`,
                 );
-                useAppStore.getState().addToast("success", "Test sent to terminal.");
+                useAppStore
+                  .getState()
+                  .addToast("success", "Test sent to terminal.");
               }}
             >
               Send Test
@@ -153,8 +166,12 @@ export function ContextPanel() {
 
       {lastBundle ? (
         <div className="grid gap-[3px] rounded-lg border border-border bg-[#11151c] p-2">
-          <strong className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">{lastBundle.relPath}</strong>
-          <span className="text-xs text-muted">{lastBundle.estimatedTokens.toLocaleString()} tokens est.</span>
+          <strong className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
+            {lastBundle.relPath}
+          </strong>
+          <span className="text-xs text-muted">
+            {lastBundle.estimatedTokens.toLocaleString()} tokens est.
+          </span>
           <button
             className="secondary-button"
             type="button"
@@ -166,17 +183,25 @@ export function ContextPanel() {
         </div>
       ) : null}
 
-      <div className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-auto scrollbar-thin">
+      <div className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-auto scrollbar-thin scroll-mask-y">
         {items.length === 0 ? (
           <div className="grid min-h-[52px] place-items-center text-muted">
             Select files, diffs, or diff ranges to build context
           </div>
         ) : (
           items.map((item) => (
-            <article className="grid gap-2 rounded-lg border border-border bg-[#11151c] p-[9px]" key={item.id}>
+            <article
+              className="grid gap-2 rounded-lg border border-border bg-[#11151c] p-[9px]"
+              key={item.id}
+            >
               <div className="flex items-center gap-2">
                 {itemIcon(item)}
-                <strong className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[13px]" title={itemTitle(item)}>{itemTitle(item)}</strong>
+                <strong
+                  className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[13px]"
+                  title={itemTitle(item)}
+                >
+                  {itemTitle(item)}
+                </strong>
                 <button
                   className="icon-button small"
                   type="button"
@@ -188,14 +213,22 @@ export function ContextPanel() {
               </div>
               {item.type === "selection" ? (
                 <>
-                  <p className="m-0 text-sm leading-relaxed text-muted">{item.text}</p>
-                  <pre className="context-selection-snippet">{item.selectedText}</pre>
+                  <p className="m-0 text-sm leading-relaxed text-muted">
+                    {item.text}
+                  </p>
+                  <pre className="context-selection-snippet">
+                    {item.selectedText}
+                  </pre>
                 </>
               ) : item.type === "comment" ? (
-                <p className="m-0 text-sm leading-relaxed text-muted">{item.text}</p>
+                <p className="m-0 text-sm leading-relaxed text-muted">
+                  {item.text}
+                </p>
               ) : item.type === "task" ? (
                 <>
-                  <p className="m-0 text-sm leading-relaxed text-muted">{item.description || "No task description provided."}</p>
+                  <p className="m-0 text-sm leading-relaxed text-muted">
+                    {item.description || "No task description provided."}
+                  </p>
                   <textarea
                     className="context-textarea"
                     value={item.note ?? ""}

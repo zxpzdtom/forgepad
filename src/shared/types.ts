@@ -184,6 +184,7 @@ export type PersistedAppState = {
   rightPanelMode: RightPanelMode;
   rightPanelOpen: boolean;
   sidebarOpen: boolean;
+  terminalPanelOpen?: boolean;
   contextItems: ContextItem[];
   composerText: string;
   settings: AppSettings;
@@ -243,11 +244,12 @@ export type AppSettings = {
   diffOverflow: DiffOverflow;
   diffDisableBackground: boolean;
   sendAndClearComments: boolean;
+  defaultOpenWith: string;
 };
 
 export const DEFAULT_SETTINGS: AppSettings = {
   defaultShell: "",
-  defaultAgentCommand: "claude",
+  defaultAgentCommand: DEFAULT_AGENT_PRESETS[0].command,
   agentPresets: [...DEFAULT_AGENT_PRESETS],
   terminalFontSize: 14,
   editorFontSize: 13,
@@ -258,6 +260,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   diffOverflow: "scroll",
   diffDisableBackground: false,
   sendAndClearComments: false,
+  defaultOpenWith: "finder",
 };
 
 export type OpenProjectResult = {
