@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
-import { FilePlus2, RefreshCw } from "lucide-react";
 import {
   FileTree,
   useFileTree,
@@ -184,9 +183,6 @@ export function FilesPanel() {
     model.setGitStatus(treeData.gitStatus);
   }, [model, treeData]);
 
-  const selectedFiles = selectedPaths.filter((path) =>
-    treeData.filePaths.has(path),
-  );
   const selectedContextFiles = useMemo(
     () => filesForTreeSelection(treeData, selectedPaths),
     [selectedPaths, treeData],
@@ -261,34 +257,8 @@ export function FilesPanel() {
   }
 
   return (
-    <section className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-hidden p-2.5">
-      <div className="flex min-h-8 items-center gap-2">
-        <button
-          className="secondary-button"
-          type="button"
-          disabled={selectedContextFiles.length === 0}
-          onClick={() => addFilesToContext(selectedContextFiles)}
-        >
-          <FilePlus2 size={15} />
-          Add Selected
-        </button>
-        <button
-          className="icon-button"
-          type="button"
-          title="Refresh tree"
-          onClick={load}
-        >
-          <RefreshCw size={15} />
-        </button>
-      </div>
-      <div className="flex justify-between">
-        <span>{treeData.paths.length.toLocaleString()} files</span>
-        <span>
-          {selectedFiles.length} selected · {selectedContextFiles.length} in
-          context range
-        </span>
-      </div>
-      <div className="relative min-h-0 flex-1 overflow-hidden rounded-lg border border-border bg-[#10131a]">
+    <section className="flex min-h-0 flex-1 flex-col overflow-hidden pt-2.5">
+      <div className="relative min-h-0 flex-1 overflow-hidden">
         {loading ? (
           <div className="absolute insetset-0 z-2 grid min-h-0 place-items-center bg-bg/72">
             Refreshing
