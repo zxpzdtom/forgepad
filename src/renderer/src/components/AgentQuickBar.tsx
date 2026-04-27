@@ -35,8 +35,8 @@ export function AgentQuickBar() {
       <button
         className="icon-button small border-transparent"
         type="button"
-        title="Agent presets"
-        onClick={() => selectRef.current?.focus()}
+        title="设置"
+        onClick={() => useAppStore.setState({ settingsOpen: true })}
       >
         <Settings size={15} />
       </button>
