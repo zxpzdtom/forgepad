@@ -68,12 +68,23 @@ export function TerminalPanel({ tab, workspace, active }: TerminalPanelProps) {
     // keybindings (Cmd+J, Cmd+P, Cmd+T, etc.) still work while
     // the terminal is focused.
     terminal.attachCustomKeyEventHandler((event) => {
-      if ((event.metaKey || event.ctrlKey) && event.type === "keydown") {
-        // Allow copy / paste / select-all to stay inside xterm
-        const key = event.key.toLowerCase();
-        if (key === "c" || key === "v" || key === "a") return true;
-        return false;
-      }
+      if (event.type !== "keydown") return true;
+      if (!event.metaKey && !event.ctrlKey) return true;
+
+      const key = event.key.toLowerCase();
+
+      // Intercept only the app-level shortcuts that need to bubble up.
+      // Everything else (readline shortcuts like Ctrl+U/K/W/A/E, etc.) passes
+      // through to the PTY.
+      if (event.ctrlKey && key === "tab") return false; // cycle tabs
+      if (key === "p" && !event.shiftKey && !event.altKey) return false; // quick search
+      if (key === "t") return false; // new terminal
+      if (key === "w") return false; // close tab
+      if (key === "j") return false; // toggle terminal panel
+      if (event.shiftKey && (key === "e" || key === "g" || key === "c"))
+        return false; // panel switchers
+      if (["1", "2", "3", "4", "5", "6", "7", "8", "9"].includes(key)) return false; // tab/workspace switch
+
       return true;
     });
 
