@@ -47,7 +47,8 @@ export function TerminalPanel({ tab, workspace, active }: TerminalPanelProps) {
 
     const terminal = new Terminal({
       cursorBlink: true,
-      fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace',
+      fontFamily:
+        'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace',
       fontSize,
       lineHeight: 1.18,
       scrollback: 8000,
@@ -62,6 +63,20 @@ export function TerminalPanel({ tab, workspace, active }: TerminalPanelProps) {
     const fitAddon = new FitAddon();
     terminal.loadAddon(fitAddon);
     terminal.loadAddon(new WebLinksAddon());
+
+    // Let Cmd/Ctrl shortcuts bubble to the window so app-level
+    // keybindings (Cmd+J, Cmd+P, Cmd+T, etc.) still work while
+    // the terminal is focused.
+    terminal.attachCustomKeyEventHandler((event) => {
+      if ((event.metaKey || event.ctrlKey) && event.type === "keydown") {
+        // Allow copy / paste / select-all to stay inside xterm
+        const key = event.key.toLowerCase();
+        if (key === "c" || key === "v" || key === "a") return true;
+        return false;
+      }
+      return true;
+    });
+
     terminal.open(host);
     terminalRef.current = terminal;
     fitRef.current = fitAddon;
@@ -75,14 +90,12 @@ export function TerminalPanel({ tab, workspace, active }: TerminalPanelProps) {
     resizeObserver.observe(host);
     window.setTimeout(fitAndResize, 0);
 
-    const dataDisposable = terminal.onData((data) => window.forgepad.pty.write(tab.ptyId, data));
+    const dataDisposable = terminal.onData((data) =>
+      window.forgepad.pty.write(tab.ptyId, data),
+    );
     const removeDataListener = window.forgepad.pty.onData(tab.ptyId, (data) => {
       terminal.write(data);
-      if (
-        tab.isAgent &&
-        !tab.sessionId &&
-        !sessionIdDetectedRef.current
-      ) {
+      if (tab.isAgent && !tab.sessionId && !sessionIdDetectedRef.current) {
         const sessionId = tryExtractSessionId(data);
         if (sessionId) {
           sessionIdDetectedRef.current = true;
@@ -90,10 +103,15 @@ export function TerminalPanel({ tab, workspace, active }: TerminalPanelProps) {
         }
       }
     });
-    const removeExitListener = window.forgepad.pty.onExit(tab.ptyId, (exitCode) => {
-      terminal.writeln("");
-      terminal.writeln(`[process exited with code ${exitCode}]`);
-    });
+    const removeExitListener = window.forgepad.pty.onExit(
+      tab.ptyId,
+      (exitCode) => {
+        terminal.writeln("");
+        terminal.writeln(`[process exited with code ${exitCode}]`);
+        const store = useAppStore.getState();
+        store.markPtyExited(tab.ptyId);
+      },
+    );
 
     window.forgepad.pty
       .reattach(tab.ptyId)
@@ -103,7 +121,12 @@ export function TerminalPanel({ tab, workspace, active }: TerminalPanelProps) {
       .catch((error) => {
         useAppStore
           .getState()
-          .addToast("error", error instanceof Error ? error.message : `Could not reattach ${workspace.name}.`);
+          .addToast(
+            "error",
+            error instanceof Error
+              ? error.message
+              : `Could not reattach ${workspace.name}.`,
+          );
       });
 
     return () => {

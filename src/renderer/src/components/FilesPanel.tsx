@@ -25,6 +25,7 @@ function walk(nodes: FileNode[], rootPath: string, result: TreeData) {
           .replaceAll("\\", "/")
       : node.path;
     if (node.type === "file" && rel) {
+      if (node.gitStatus === "deleted") continue;
       result.paths.push(rel);
       result.filePaths.add(rel);
       if (node.gitStatus) {
@@ -135,7 +136,7 @@ export function FilesPanel() {
     icons: { set: "complete", colored: true },
     renderRowDecoration: ({ item }) =>
       contextFileSet.has(item.path)
-        ? { text: "ctx", title: "In AI context" }
+        ? { text: "", title: "In AI context" }
         : null,
   });
 
@@ -252,7 +253,11 @@ export function FilesPanel() {
   };
 
   if (!workspace) {
-    return <div className="grid min-h-[90px] place-items-center text-muted">Open a project first</div>;
+    return (
+      <div className="grid min-h-[90px] place-items-center text-muted">
+        Open a project first
+      </div>
+    );
   }
 
   return (
@@ -279,11 +284,16 @@ export function FilesPanel() {
       <div className="flex justify-between">
         <span>{treeData.paths.length.toLocaleString()} files</span>
         <span>
-          {selectedFiles.length} selected · {selectedContextFiles.length} in context range
+          {selectedFiles.length} selected · {selectedContextFiles.length} in
+          context range
         </span>
       </div>
       <div className="relative min-h-0 flex-1 overflow-hidden rounded-lg border border-border bg-[#10131a]">
-        {loading ? <div className="absolute insetset-0 z-2 grid min-h-0 place-items-center bg-bg/72">Refreshing</div> : null}
+        {loading ? (
+          <div className="absolute insetset-0 z-2 grid min-h-0 place-items-center bg-bg/72">
+            Refreshing
+          </div>
+        ) : null}
         <FileTree
           model={model}
           style={treeThemeStyle}

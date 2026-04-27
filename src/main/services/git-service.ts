@@ -175,23 +175,26 @@ export class GitService {
     worktreePath: string,
   ): Promise<{ ahead: number; behind: number; additions: number; deletions: number }> {
     try {
-      const [abOutput, numstatOutput] = await Promise.all([
+      const [abOutput, stagedOutput, unstagedOutput] = await Promise.all([
         git(
           ["rev-list", "--left-right", "--count", "@{upstream}...HEAD"],
           worktreePath,
         ).catch(() => "0\t0"),
         git(["diff", "--numstat", "--staged"], worktreePath).catch(() => ""),
+        git(["diff", "--numstat"], worktreePath).catch(() => ""),
       ]);
       const [behindStr, aheadStr] = abOutput.split("\t");
       const ahead = Number.parseInt(aheadStr ?? "0", 10) || 0;
       const behind = Number.parseInt(behindStr ?? "0", 10) || 0;
       let additions = 0;
       let deletions = 0;
-      for (const line of numstatOutput.split(/\r?\n/)) {
-        if (!line) continue;
-        const [addStr, delStr] = line.split("\t");
-        additions += addStr === "-" ? 0 : Number.parseInt(addStr ?? "0", 10) || 0;
-        deletions += delStr === "-" ? 0 : Number.parseInt(delStr ?? "0", 10) || 0;
+      for (const output of [stagedOutput, unstagedOutput]) {
+        for (const line of output.split(/\r?\n/)) {
+          if (!line) continue;
+          const [addStr, delStr] = line.split("\t");
+          additions += addStr === "-" ? 0 : Number.parseInt(addStr ?? "0", 10) || 0;
+          deletions += delStr === "-" ? 0 : Number.parseInt(delStr ?? "0", 10) || 0;
+        }
       }
       return { ahead, behind, additions, deletions };
     } catch {
@@ -318,4 +321,3 @@ export class GitService {
     return existsSync(path.join(worktreePath, relPath));
   }
 }
-

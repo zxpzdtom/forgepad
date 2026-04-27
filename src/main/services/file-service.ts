@@ -143,14 +143,20 @@ function annotateTree(rootPath: string, nodes: FileNode[], statusMap: Map<string
 }
 
 export class FileService {
-  static async getTree(rootPath: string): Promise<FileNode[]> {
+  static async listFiles(rootPath: string): Promise<string[]> {
     let files: string[];
     try {
       files = await gitLsFiles(rootPath);
     } catch {
       files = await manualList(rootPath);
     }
-    return buildTreeFromPaths(rootPath, [...new Set(files)]);
+    return [...new Set(files)].sort((a, b) =>
+      a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }),
+    );
+  }
+
+  static async getTree(rootPath: string): Promise<FileNode[]> {
+    return buildTreeFromPaths(rootPath, await this.listFiles(rootPath));
   }
 
   static async getTreeWithStatus(rootPath: string): Promise<FileNode[]> {
@@ -197,4 +203,3 @@ export class FileService {
     return `data:${mime};base64,${buffer.toString("base64")}`;
   }
 }
-

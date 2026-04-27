@@ -188,7 +188,11 @@ function collectTextNodes(root: HTMLElement): TextNodeRange[] {
 
   while (node) {
     const text = node.textContent ?? "";
-    nodes.push({ node: node as Text, start: offset, end: offset + text.length });
+    nodes.push({
+      node: node as Text,
+      start: offset,
+      end: offset + text.length,
+    });
     offset += text.length;
     node = walker.nextNode();
   }
@@ -218,7 +222,9 @@ function buildSearchRanges(root: HTMLElement, query: string): Range[] {
   const text = root.textContent ?? "";
   const caseSensitive = /[A-Z]/.test(normalizedQuery);
   const haystack = caseSensitive ? text : text.toLowerCase();
-  const needle = caseSensitive ? normalizedQuery : normalizedQuery.toLowerCase();
+  const needle = caseSensitive
+    ? normalizedQuery
+    : normalizedQuery.toLowerCase();
   const nodes = collectTextNodes(root);
   const ranges: Range[] = [];
   let index = haystack.indexOf(needle);
@@ -245,7 +251,10 @@ function addLineMetadata(html: string): string {
   template.innerHTML = html;
   template.content.querySelectorAll("code").forEach((code) => {
     for (const node of [...code.childNodes]) {
-      if (node.nodeType === Node.TEXT_NODE && /^\s+$/.test(node.textContent ?? "")) {
+      if (
+        node.nodeType === Node.TEXT_NODE &&
+        /^\s+$/.test(node.textContent ?? "")
+      ) {
         node.remove();
       }
     }
@@ -481,7 +490,10 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
   const addContextFiles = useAppStore((state) => state.addContextFiles);
   const addCodeSelection = useAppStore((state) => state.addCodeSelection);
   const lang = useMemo(() => langForPath(tab.relPath), [tab.relPath]);
-  const markdownFile = useMemo(() => isMarkdownPath(tab.relPath), [tab.relPath]);
+  const markdownFile = useMemo(
+    () => isMarkdownPath(tab.relPath),
+    [tab.relPath],
+  );
   const isImage = useMemo(() => isImageFile(tab.relPath), [tab.relPath]);
   const showRenderedMarkdown = markdownFile && markdownMode === "rendered";
   const showImagePreview = isImage && imageViewMode === "preview";
@@ -599,7 +611,9 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
 
     const normalizedIndex = activeMatchIndex % searchRanges.length;
     const activeRange = searchRanges[normalizedIndex];
-    const passiveRanges = searchRanges.filter((_, index) => index !== normalizedIndex);
+    const passiveRanges = searchRanges.filter(
+      (_, index) => index !== normalizedIndex,
+    );
 
     if (passiveRanges.length > 0) {
       support.registry.set(
@@ -673,7 +687,10 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
         return;
       }
 
-      if (event.key === "Enter" && document.activeElement === searchInputRef.current) {
+      if (
+        event.key === "Enter" &&
+        document.activeElement === searchInputRef.current
+      ) {
         event.preventDefault();
         goToMatch(event.shiftKey ? -1 : 1);
         return;
@@ -704,7 +721,12 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
 
     const root = previewRef.current;
     const selection = window.getSelection();
-    if (!root || !selection || selection.rangeCount === 0 || selection.isCollapsed) {
+    if (
+      !root ||
+      !selection ||
+      selection.rangeCount === 0 ||
+      selection.isCollapsed
+    ) {
       return;
     }
 
@@ -751,7 +773,10 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
   return (
     <section className="absolute inset-0 flex min-h-0 min-w-0 flex-col bg-bg">
       <div className="flex min-h-[42px] items-center justify-between gap-3 border-b border-border bg-panel px-3">
-        <div className="min-w-0 flex items-center gap-[7px] overflow-hidden text-ellipsis whitespace-nowrap text-[13px] font-[620]" title={tab.relPath}>
+        <div
+          className="min-w-0 flex items-center gap-[7px] overflow-hidden text-ellipsis whitespace-nowrap text-[13px] font-[620]"
+          title={tab.relPath}
+        >
           <FileCode size={14} className="text-muted" />
           {tab.relPath}
           <span className="text-muted">{lineCount} lines</span>
@@ -778,7 +803,11 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
             </div>
           ) : null}
           {markdownFile ? (
-            <div className="segmented-control" role="group" aria-label="Markdown view">
+            <div
+              className="segmented-control"
+              role="group"
+              aria-label="Markdown view"
+            >
               <button
                 type="button"
                 className={markdownMode === "rendered" ? "active" : ""}
@@ -838,7 +867,9 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
               setActiveMatchIndex(0);
             }}
           />
-          <span className="w-[54px] text-center text-xs tabular-nums text-muted">{activeSearchLabel}</span>
+          <span className="w-[54px] text-center text-xs tabular-nums text-muted">
+            {activeSearchLabel}
+          </span>
           <button
             className="icon-button"
             type="button"
@@ -868,9 +899,11 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
         </form>
       ) : null}
       {loading ? (
-        <div className="grid min-h-[90px] place-items-center text-muted">Loading file</div>
+        <div className="grid min-h-[90px] place-items-center text-muted">
+          Loading file
+        </div>
       ) : showImagePreview && imageUrl ? (
-        <div className="flex flex-1 min-h-0 items-center justify-center overflow-auto bg-[#0c0d10] p-6 scrollbar-thin">
+        <div className="flex flex-1 min-h-0 items-center justify-center overflow-auto bg-[#0c0d10] p-6 scrollbar-thin scroll-mask">
           <img
             className="max-h-full max-w-full rounded object-contain"
             src={imageUrl}
@@ -878,7 +911,10 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
           />
         </div>
       ) : showRenderedMarkdown ? (
-        <div className="markdown-viewer-scroll flex-1 min-h-0 overflow-auto scrollbar-thin" ref={scrollRef}>
+        <div
+          className="markdown-viewer-scroll flex-1 min-h-0 overflow-auto scrollbar-thin scroll-mask-y"
+          ref={scrollRef}
+        >
           <div ref={previewRef} className="markdown-preview">
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
@@ -891,7 +927,7 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
         </div>
       ) : (
         <div
-          className="code-viewer-scroll flex-1 min-h-0 overflow-auto bg-[#0c0d10]"
+          className="code-viewer-scroll flex-1 min-h-0 overflow-auto bg-[#0c0d10] scroll-mask"
           ref={scrollRef}
           onMouseUp={captureCodeSelection}
           onKeyUp={captureCodeSelection}
@@ -914,7 +950,10 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
         >
           <div className="flex min-w-0 items-center gap-[7px] text-xs text-muted">
             <MessageSquarePlus size={15} />
-            <span className="overflow-hidden text-ellipsis whitespace-nowrap" title={tab.relPath}>
+            <span
+              className="overflow-hidden text-ellipsis whitespace-nowrap"
+              title={tab.relPath}
+            >
               {tab.relPath} · L{pendingSelection.startLine}
               {pendingSelection.endLine !== pendingSelection.startLine
                 ? `-L${pendingSelection.endLine}`
