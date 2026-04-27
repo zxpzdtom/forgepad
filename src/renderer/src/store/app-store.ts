@@ -45,6 +45,7 @@ type AppState = {
   rightPanelOpen: boolean;
   sidebarOpen: boolean;
   terminalPanelOpen: boolean;
+  settingsOpen: boolean;
   contextItems: ContextItem[];
   composerText: string;
   settings: AppSettings;
@@ -308,6 +309,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   rightPanelOpen: true,
   sidebarOpen: true,
   terminalPanelOpen: false,
+  settingsOpen: false,
   contextItems: [],
   composerText: "",
   settings: { ...DEFAULT_SETTINGS },

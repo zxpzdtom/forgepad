@@ -18,6 +18,7 @@ import { TabBar } from "@renderer/components/TabBar";
 import { TerminalDock } from "@renderer/components/TerminalDock";
 import { TopBar } from "@renderer/components/TopBar";
 import { ToastStack } from "@renderer/components/ToastStack";
+import { SettingsPanel } from "@renderer/components/SettingsPanel";
 import { useAppStore } from "@renderer/store/app-store";
 
 export function App() {
@@ -549,6 +550,7 @@ export function App() {
         onClose={() => setQuickSearchOpen(false)}
       />
       <ToastStack />
+      <SettingsPanel />
     </div>
   );
 }
