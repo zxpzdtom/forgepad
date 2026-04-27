@@ -1,11 +1,4 @@
-import {
-  Files,
-  GitCompare,
-  Maximize2,
-  Minimize2,
-  PanelRightClose,
-  SendHorizontal,
-} from "lucide-react";
+import { Files, GitCompare, SendHorizontal } from "lucide-react";
 import type { RightPanelMode } from "@shared/types";
 import { useAppStore } from "@renderer/store/app-store";
 import { FilesPanel } from "./FilesPanel";
@@ -25,11 +18,10 @@ const modes: Array<{
 export function RightPanel() {
   const mode = useAppStore((state) => state.rightPanelMode);
   const setMode = useAppStore((state) => state.setRightPanelMode);
-  const rightPanelOpen = useAppStore((state) => state.rightPanelOpen);
 
   return (
     <aside className="flex h-full min-h-0 flex-col border-l border-border bg-panel">
-      <div className="flex min-h-10 items-center gap-1 border-b border-border bg-panel pr-1">
+      <div className="flex min-h-10 items-center border-b border-border bg-panel">
         <div className="flex min-w-0 flex-1">
           {modes.map(({ mode: nextMode, label, icon: Icon }) => (
             <button
@@ -43,24 +35,6 @@ export function RightPanel() {
               <span>{label}</span>
             </button>
           ))}
-        </div>
-        <div className="flex items-center gap-0.5 pr-1">
-          <button
-            className="icon-button small"
-            type="button"
-            title={rightPanelOpen ? "Minimize panel" : "Expand panel"}
-            onClick={() => useAppStore.setState({ rightPanelOpen: !rightPanelOpen })}
-          >
-            {rightPanelOpen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
-          </button>
-          <button
-            className="icon-button small"
-            type="button"
-            title="Close panel"
-            onClick={() => useAppStore.setState({ rightPanelOpen: false })}
-          >
-            <PanelRightClose size={14} />
-          </button>
         </div>
       </div>
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">

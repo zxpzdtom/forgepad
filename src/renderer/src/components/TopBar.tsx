@@ -14,6 +14,8 @@ import {
   Folder,
   PanelLeftClose,
   PanelLeftOpen,
+  PanelRightClose,
+  PanelRightOpen,
   Search,
   TerminalSquare,
 } from "lucide-react";
@@ -170,6 +172,7 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
   const [terminals, setTerminals] = useState<DetectedTerminal[]>([]);
   const menuRef = useRef<HTMLDivElement>(null);
   const sidebarOpen = useAppStore((state) => state.sidebarOpen);
+  const rightPanelOpen = useAppStore((state) => state.rightPanelOpen);
   const activeWorkspaceId = useAppStore((state) => state.activeWorkspaceId);
   const workspaces = useAppStore((state) => state.workspaces);
   const defaultOpenWith = useAppStore(
@@ -276,7 +279,7 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
 
   return (
     <header className="app-topbar relative flex h-12 shrink-0 items-center border-b border-border bg-[#141414] px-3">
-      <div className="flex items-center pl-[148px]">
+      <div className="flex items-center pl-[80px]">
         <button
           className="icon-button border-transparent"
           type="button"
@@ -312,6 +315,14 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
 
       {/* ── Open-with split button + dropdown ── */}
       <div className="ml-auto flex items-center gap-2" ref={menuRef}>
+        <button
+          className="icon-button border-transparent"
+          type="button"
+          title={rightPanelOpen ? "Close side panel" : "Open side panel"}
+          onClick={() => useAppStore.setState({ rightPanelOpen: !rightPanelOpen })}
+        >
+          {rightPanelOpen ? <PanelRightClose size={17} /> : <PanelRightOpen size={17} />}
+        </button>
         <div className="relative">
           <div className="flex overflow-hidden rounded-lg border border-border bg-[#1a1a1a]">
             {/* Left: execute default action */}
