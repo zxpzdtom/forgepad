@@ -4,7 +4,6 @@ import {
   Bot,
   FolderOpen,
   GitBranch,
-  PanelRight,
   TerminalSquare,
 } from "lucide-react";
 import { Sidebar } from "@renderer/components/Sidebar";
@@ -25,6 +24,11 @@ export function App() {
   useAgentLifecycle();
   const [quickSearchOpen, setQuickSearchOpen] = useState(false);
   const terminalHeightRef = useRef(240);
+  const sidebarWidthRef = useRef(260);
+  const horizontalSplitRef = useRef<{
+    reset: () => void;
+    resize: (sizes: number[]) => void;
+  } | null>(null);
   const verticalSplitRef = useRef<{
     reset: () => void;
     resize: (sizes: number[]) => void;
@@ -294,6 +298,14 @@ export function App() {
   const hasTerminalTabs = hasAgentTabs || hasShellTabs;
   const hasFileTabs = workspaceTabs.some((tab) => tab.type !== "terminal");
 
+  // Restore remembered sidebar width when sidebar opens
+  useEffect(() => {
+    if (!sidebarOpen) return;
+    requestAnimationFrame(() => {
+      horizontalSplitRef.current?.resize([sidebarWidthRef.current]);
+    });
+  }, [sidebarOpen]);
+
   // Restore remembered terminal height when dock becomes visible
   const shellDockVisibleEarly = terminalPanelOpen && hasShellTabs;
   useEffect(() => {
@@ -502,11 +514,21 @@ export function App() {
     <div className="flex size-full flex-col bg-bg">
       <TopBar onOpenSearch={() => setQuickSearchOpen(true)} />
       <div className="min-h-0 flex-1">
-        <Allotment proportionalLayout={false} className="size-full">
+        <Allotment
+          ref={horizontalSplitRef}
+          proportionalLayout={false}
+          className="size-full"
+          onChange={(sizes) => {
+            if (sidebarOpen && sizes[0] > 0) {
+              sidebarWidthRef.current = sizes[0];
+            }
+          }}
+        >
           <Allotment.Pane
-            preferredSize={sidebarOpen ? 260 : 48}
-            minSize={sidebarOpen ? 220 : 48}
-            maxSize={sidebarOpen ? 360 : 48}
+            preferredSize={sidebarOpen ? sidebarWidthRef.current : 0}
+            minSize={sidebarOpen ? 220 : 0}
+            maxSize={sidebarOpen ? 360 : 0}
+            visible={sidebarOpen}
           >
             <Sidebar />
           </Allotment.Pane>
@@ -515,22 +537,9 @@ export function App() {
             {renderWorkspaceFrame()}
           </Allotment.Pane>
 
-          {rightPanelOpen ? (
+          {rightPanelOpen && (
             <Allotment.Pane preferredSize={390} minSize={320} maxSize={560}>
               <RightPanel />
-            </Allotment.Pane>
-          ) : (
-            <Allotment.Pane preferredSize={44} minSize={44} maxSize={44}>
-              <aside className="grid min-h-0 justify-start justify-items-center border-l border-border bg-panel pt-2.5">
-                <button
-                  className="icon-button"
-                  type="button"
-                  title="Open side panel"
-                  onClick={() => useAppStore.setState({ rightPanelOpen: true })}
-                >
-                  <PanelRight size={17} />
-                </button>
-              </aside>
             </Allotment.Pane>
           )}
         </Allotment>

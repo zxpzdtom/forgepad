@@ -13,7 +13,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { ChevronRight, FolderOpen, FolderPlus, Plus, X } from "lucide-react";
+import { ChevronRight, FolderOpen, FolderPlus, X } from "lucide-react";
 import { useAppStore } from "@renderer/store/app-store";
 import { Spinner } from "./Spinner";
 import type { AgentStatus } from "@shared/agent-lifecycle";
@@ -324,50 +324,7 @@ function SidebarSkeleton() {
   );
 }
 
-/** Collapsed sidebar button for a workspace – shows agent status indicator. */
-function CollapsedWorkspaceButton({
-  workspace,
-  index,
-  isActive,
-  onClick,
-}: {
-  workspace: SidebarWorkspace;
-  index: number;
-  isActive: boolean;
-  onClick: () => void;
-}) {
-  const agentStatus = useWorkspaceAgentStatus(workspace.id);
-  const isWorking = agentStatus === "working";
-  const needsPermission = agentStatus === "permission";
-  const hasReview = agentStatus === "review";
 
-  return (
-    <button
-      className={`relative grid size-7 place-items-center rounded-md text-xs font-semibold cursor-pointer border border-transparent${isActive ? " bg-panel-3 text-accent border-border" : " text-muted bg-transparent hover:bg-panel-2 hover:text-text"}`}
-      type="button"
-      title={`${workspace.name} (⌘${index + 1})`}
-      onClick={onClick}
-    >
-      {isWorking ? (
-        <span className="text-accent text-[10px] leading-none">
-          <Spinner name="braille" />
-        </span>
-      ) : (
-        workspace.name.charAt(0).toUpperCase()
-      )}
-      {/* Status pip in top-right corner */}
-      {needsPermission && (
-        <span className="absolute -right-0.5 -top-0.5 flex size-2">
-          <span className="absolute inline-flex size-full animate-ping rounded-full bg-warn opacity-75" />
-          <span className="relative inline-flex size-2 rounded-full bg-warn" />
-        </span>
-      )}
-      {hasReview && (
-        <span className="absolute -right-0.5 -top-0.5 size-2 rounded-full bg-ok" />
-      )}
-    </button>
-  );
-}
 
 export function Sidebar() {
   const [collapsedProjects, setCollapsedProjects] = useState<Set<string>>(
@@ -467,70 +424,14 @@ export function Sidebar() {
   };
 
   if (!sidebarOpen) {
-    return (
-      <aside
-        className="flex h-full min-h-0 flex-col items-center gap-1.5 border-r border-border bg-panel px-2 py-2.5"
-        onMouseDown={() => setFocusedColumn("sidebar")}
-      >
-        <div className="grid gap-1">
-          {!hydrated ? (
-            <>
-              <div className="size-7 animate-pulse rounded-md bg-border" />
-              <div className="size-7 animate-pulse rounded-md bg-border" />
-            </>
-          ) : (
-            workspaceOrder.slice(0, 9).map((wsId, idx) => {
-              const ws = workspaces.find((w) => w.id === wsId);
-              if (!ws) return null;
-              return (
-                <CollapsedWorkspaceButton
-                  key={wsId}
-                  workspace={ws}
-                  index={idx}
-                  isActive={wsId === activeWorkspaceId}
-                  onClick={() => setActiveWorkspace(wsId)}
-                />
-              );
-            })
-          )}
-        </div>
-
-        <div className="flex-1" />
-
-        <button
-          className="icon-button border-transparent"
-          type="button"
-          title="Open project"
-          onClick={openProject}
-        >
-          <Plus size={16} />
-        </button>
-      </aside>
-    );
+    return null;
   }
 
   return (
     <aside
-      className="flex h-full min-h-0 min-w-0 flex-col border-r border-border bg-panel"
+      className="flex h-full min-h-0 min-w-0 flex-col border-r border-border bg-[oklch(20.5%_0_0)]"
       onMouseDown={() => setFocusedColumn("sidebar")}
     >
-      <div className="flex min-w-0 items-center justify-between gap-2 px-3 py-2.5">
-        <div className="flex items-center gap-2.5">
-          <div className="grid size-6.5 place-items-center rounded-md bg-accent text-[13px] font-extrabold text-[#071110]">
-            F
-          </div>
-          <span className="text-[15px] font-bold tracking-tight">ForgePad</span>
-        </div>
-        <button
-          className="icon-button"
-          type="button"
-          title="Open project"
-          onClick={openProject}
-        >
-          <Plus size={16} />
-        </button>
-      </div>
-
       <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-0.5 overflow-y-auto overflow-x-hidden px-2 py-1.5 scrollbar-thin scroll-mask-y">
         {!hydrated ? (
           <SidebarSkeleton />
