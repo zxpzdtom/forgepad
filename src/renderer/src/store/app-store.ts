@@ -23,6 +23,7 @@ import type {
   Workspace,
 } from "@shared/types";
 import { DEFAULT_SETTINGS } from "@shared/types";
+import type { AgentStatus } from "@shared/agent-lifecycle";
 
 type Toast = {
   id: string;
@@ -38,6 +39,7 @@ type AppState = {
   activeWorkspaceId: string | null;
   activeTabId: string | null;
   activeAgentTabId: string | null;
+  activeShellTabId: string | null;
   activeFileTabId: string | null;
   rightPanelMode: RightPanelMode;
   rightPanelOpen: boolean;
@@ -51,8 +53,18 @@ type AppState = {
   hydrated: boolean;
   workspaceLoadingIds: Set<string>;
   focusedColumn: "sidebar" | "agent" | "file" | "rightPanel";
-  branchStats: Record<string, { ahead: number; behind: number; additions: number; deletions: number }>;
+  branchStats: Record<
+    string,
+    { ahead: number; behind: number; additions: number; deletions: number }
+  >;
   gitRefreshEpoch: number;
+  /** Agent lifecycle statuses keyed by ptyId */
+  agentStatuses: Record<string, AgentStatus>;
+  /** ptyIds whose process has exited */
+  exitedPtyIds: Set<string>;
+  handleAgentStatusUpdate: (ptyId: string, status: AgentStatus) => void;
+  clearAgentStatus: (ptyId: string) => void;
+  markPtyExited: (ptyId: string) => void;
   triggerGitRefresh: () => void;
   hydrate: (state: Partial<PersistedAppState> | null) => void;
   toPersistedState: () => PersistedAppState;
@@ -129,7 +141,11 @@ type AppState = {
   setFocusedColumn: (column: AppState["focusedColumn"]) => void;
   refreshBranchStats: (workspaceId?: string) => Promise<void>;
   reorderProjects: (activeId: string, overId: string) => void;
-  reorderWorkspaces: (projectId: string, activeId: string, overId: string) => void;
+  reorderWorkspaces: (
+    projectId: string,
+    activeId: string,
+    overId: string,
+  ) => void;
   removeProject: (projectId: string) => void;
   removeWorkspace: (workspaceId: string) => void;
 };
@@ -149,10 +165,7 @@ function tabTitle(tab: Tab): string {
   return tab.relPath.split("/").pop() || tab.relPath;
 }
 
-function agentLabelForCommand(
-  command: string,
-  presets: AgentPreset[],
-): string {
+function agentLabelForCommand(command: string, presets: AgentPreset[]): string {
   const normalized = command.trim().split(/\s+/)[0];
   const preset = presets.find(
     (item) => item.command.trim().split(/\s+/)[0] === normalized,
@@ -167,9 +180,7 @@ function serializeForSave(state: AppState): PersistedAppState {
     workspaces: state.workspaces,
     tasks: state.tasks,
     tabs: state.tabs.filter(
-      (tab) =>
-        tab.type !== "terminal" ||
-        (tab.isAgent && tab.sessionId),
+      (tab) => tab.type !== "terminal" || (tab.isAgent && tab.sessionId),
     ),
     activeWorkspaceId: state.activeWorkspaceId,
     activeTabId:
@@ -192,7 +203,8 @@ function contextKey(item: ContextItem): string {
   if (item.type === "diff")
     return `${item.workspaceId}:diff:${item.bucket}:${item.relPath}`;
   if (item.type === "task") return `${item.workspaceId}:task:${item.taskId}`;
-  if (item.type === "selection") return `${item.workspaceId}:selection:${item.id}`;
+  if (item.type === "selection")
+    return `${item.workspaceId}:selection:${item.id}`;
   return `${item.workspaceId}:comment:${item.id}`;
 }
 
@@ -215,7 +227,9 @@ function omitBranchStats(
   workspaceIds: Set<string>,
 ): AppState["branchStats"] {
   return Object.fromEntries(
-    Object.entries(branchStats).filter(([workspaceId]) => !workspaceIds.has(workspaceId)),
+    Object.entries(branchStats).filter(
+      ([workspaceId]) => !workspaceIds.has(workspaceId),
+    ),
   );
 }
 
@@ -225,7 +239,11 @@ function activeIdsAfterRemoval(
   workspaces: Workspace[],
 ): Pick<
   AppState,
-  "activeWorkspaceId" | "activeTabId" | "activeAgentTabId" | "activeFileTabId"
+  | "activeWorkspaceId"
+  | "activeTabId"
+  | "activeAgentTabId"
+  | "activeShellTabId"
+  | "activeFileTabId"
 > {
   const activeWorkspaceId =
     state.activeWorkspaceId &&
@@ -236,13 +254,23 @@ function activeIdsAfterRemoval(
   const workspaceTabs = tabs.filter(
     (tab) => tab.workspaceId === activeWorkspaceId,
   );
-  const agentTabs = workspaceTabs.filter((tab) => tab.type === "terminal");
+  const agentTabs = workspaceTabs.filter(
+    (tab) => tab.type === "terminal" && tab.isAgent,
+  );
+  const shellTabs = workspaceTabs.filter(
+    (tab) => tab.type === "terminal" && !tab.isAgent,
+  );
   const fileTabs = workspaceTabs.filter((tab) => tab.type !== "terminal");
   const activeAgentTabId =
     state.activeAgentTabId &&
     agentTabs.some((tab) => tab.id === state.activeAgentTabId)
       ? state.activeAgentTabId
       : (agentTabs.at(-1)?.id ?? null);
+  const activeShellTabId =
+    state.activeShellTabId &&
+    shellTabs.some((tab) => tab.id === state.activeShellTabId)
+      ? state.activeShellTabId
+      : (shellTabs.at(-1)?.id ?? null);
   const activeFileTabId =
     state.activeFileTabId &&
     fileTabs.some((tab) => tab.id === state.activeFileTabId)
@@ -252,12 +280,16 @@ function activeIdsAfterRemoval(
     state.activeTabId &&
     workspaceTabs.some((tab) => tab.id === state.activeTabId)
       ? state.activeTabId
-      : (activeAgentTabId ?? activeFileTabId ?? workspaceTabs.at(-1)?.id ?? null);
+      : (activeAgentTabId ??
+        activeFileTabId ??
+        workspaceTabs.at(-1)?.id ??
+        null);
 
   return {
     activeWorkspaceId,
     activeTabId,
     activeAgentTabId,
+    activeShellTabId,
     activeFileTabId,
   };
 }
@@ -270,6 +302,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   activeWorkspaceId: null,
   activeTabId: null,
   activeAgentTabId: null,
+  activeShellTabId: null,
   activeFileTabId: null,
   rightPanelMode: "files",
   rightPanelOpen: true,
@@ -285,6 +318,35 @@ export const useAppStore = create<AppState>((set, get) => ({
   focusedColumn: "agent",
   branchStats: {},
   gitRefreshEpoch: 0,
+  agentStatuses: {},
+  exitedPtyIds: new Set<string>(),
+  handleAgentStatusUpdate: (ptyId, status) =>
+    set((state) => {
+      // If the agent finished ("review") and its tab is currently active, mark idle
+      if (status === "review") {
+        const activeTab = state.tabs.find(
+          (t) => t.id === state.activeAgentTabId,
+        );
+        if (activeTab?.type === "terminal" && activeTab.ptyId === ptyId) {
+          return { agentStatuses: { ...state.agentStatuses, [ptyId]: "idle" } };
+        }
+      }
+      return { agentStatuses: { ...state.agentStatuses, [ptyId]: status } };
+    }),
+  clearAgentStatus: (ptyId) =>
+    set((state) => {
+      if (!state.agentStatuses[ptyId]) return state;
+      const { [ptyId]: _, ...rest } = state.agentStatuses;
+      return { agentStatuses: rest };
+    }),
+  markPtyExited: (ptyId) =>
+    set((state) => {
+      const exitedPtyIds = new Set(state.exitedPtyIds);
+      exitedPtyIds.add(ptyId);
+      // Clear agent status on process exit (fallback)
+      const { [ptyId]: _, ...restStatuses } = state.agentStatuses;
+      return { exitedPtyIds, agentStatuses: restStatuses };
+    }),
   triggerGitRefresh: () => {
     set((state) => ({ gitRefreshEpoch: state.gitRefreshEpoch + 1 }));
     get().refreshBranchStats();
@@ -303,7 +365,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     const matchingDefaultPreset = rawSettings.agentPresets.find(
       (preset) =>
         preset.command === rawSettings.defaultAgentCommand ||
-        preset.command.trim().split(/\s+/)[0] === rawSettings.defaultAgentCommand,
+        preset.command.trim().split(/\s+/)[0] ===
+          rawSettings.defaultAgentCommand,
     );
     if (matchingDefaultPreset) {
       rawSettings.defaultAgentCommand = matchingDefaultPreset.command;
@@ -476,14 +539,30 @@ export const useAppStore = create<AppState>((set, get) => ({
       return null;
     }
 
+    // Resolve preset: explicit presetId or match by command's first token
+    const presets = get().settings.agentPresets;
+    const commandToken = command.split(/\s+/)[0];
+    const resolvedPreset = presetId
+      ? presets.find((p) => p.id === presetId)
+      : presets.find((p) => p.command.trim().split(/\s+/)[0] === commandToken);
+
+    // Pre-assign session ID so the tab can be persisted & restored
+    const sessionId = resolvedPreset?.restoreTemplate
+      ? crypto.randomUUID()
+      : undefined;
+    const finalCommand = sessionId
+      ? `${command} --session-id ${sessionId}`
+      : command;
+
     try {
       const ptyId = await window.forgepad.pty.create(
         workspace.worktreePath,
         get().settings.defaultShell || undefined,
-        command,
+        finalCommand,
         {
           FORGEPAD_WORKSPACE_ID: workspace.id,
           FORGEPAD_AGENT: "1",
+          ...(sessionId ? { FORGEPAD_SESSION_ID: sessionId } : {}),
         },
       );
       const agentCount = get().tabs.filter(
@@ -492,22 +571,24 @@ export const useAppStore = create<AppState>((set, get) => ({
           tab.type === "terminal" &&
           (tab.isAgent || tab.title.startsWith("Agent")),
       ).length;
-      const agentLabel = agentLabelForCommand(
-        command,
-        get().settings.agentPresets,
-      );
+      const agentLabel = agentLabelForCommand(command, presets);
       const tab: Tab = {
         id: id(),
         workspaceId: workspace.id,
         type: "terminal",
-        title: agentCount === 0 ? agentLabel : `${agentLabel} ${agentCount + 1}`,
+        title:
+          agentCount === 0 ? agentLabel : `${agentLabel} ${agentCount + 1}`,
         ptyId,
         isAgent: true,
-        agentPresetId: presetId,
+        agentPresetId: resolvedPreset?.id ?? presetId,
         agentCommand: command,
+        sessionId,
       };
       get().addTab(tab);
-      set({ terminalPanelOpen: true });
+      set((state) => ({
+        terminalPanelOpen: true,
+        agentStatuses: { ...state.agentStatuses, [ptyId]: "idle" },
+      }));
       return ptyId;
     } catch (error) {
       get().addToast(
@@ -526,8 +607,10 @@ export const useAppStore = create<AppState>((set, get) => ({
         tabs: [...state.tabs, tab],
         activeTabId: tab.id,
       };
-      if (tab.type === "terminal") {
+      if (tab.type === "terminal" && tab.isAgent) {
         patch.activeAgentTabId = tab.id;
+      } else if (tab.type === "terminal") {
+        patch.activeShellTabId = tab.id;
       } else {
         patch.activeFileTabId = tab.id;
       }
@@ -546,9 +629,25 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (state.activeTabId === tabId) {
         patch.activeTabId = wsTabs.at(-1)?.id ?? null;
       }
-      if (tab?.type === "terminal" && state.activeAgentTabId === tabId) {
-        const remaining = wsTabs.filter((t) => t.type === "terminal");
+      if (
+        tab?.type === "terminal" &&
+        tab.isAgent &&
+        state.activeAgentTabId === tabId
+      ) {
+        const remaining = wsTabs.filter(
+          (t) => t.type === "terminal" && t.isAgent,
+        );
         patch.activeAgentTabId = remaining.at(-1)?.id ?? null;
+      }
+      if (
+        tab?.type === "terminal" &&
+        !tab.isAgent &&
+        state.activeShellTabId === tabId
+      ) {
+        const remaining = wsTabs.filter(
+          (t) => t.type === "terminal" && !t.isAgent,
+        );
+        patch.activeShellTabId = remaining.at(-1)?.id ?? null;
       }
       if (tab && tab.type !== "terminal" && state.activeFileTabId === tabId) {
         const remaining = wsTabs.filter((t) => t.type !== "terminal");
@@ -562,8 +661,15 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((state) => {
       const tab = state.tabs.find((t) => t.id === tabId);
       const patch: Partial<AppState> = { activeTabId: tabId };
-      if (tab?.type === "terminal") {
+      if (tab?.type === "terminal" && tab.isAgent) {
         patch.activeAgentTabId = tabId;
+        // Clear "review" or "permission" when user views the agent tab
+        const agentStatus = state.agentStatuses[tab.ptyId];
+        if (agentStatus === "review" || agentStatus === "permission") {
+          patch.agentStatuses = { ...state.agentStatuses, [tab.ptyId]: "idle" };
+        }
+      } else if (tab?.type === "terminal") {
+        patch.activeShellTabId = tabId;
       } else {
         patch.activeFileTabId = tabId;
       }
@@ -575,7 +681,10 @@ export const useAppStore = create<AppState>((set, get) => ({
     const tab = state.tabs.find((t) => t.id === tabId);
     if (!tab) return;
     const toClose = state.tabs.filter(
-      (t) => t.workspaceId === tab.workspaceId && t.id !== tabId && t.type === tab.type,
+      (t) =>
+        t.workspaceId === tab.workspaceId &&
+        t.id !== tabId &&
+        t.type === tab.type,
     );
     for (const t of toClose) {
       if (t.type === "terminal") window.forgepad.pty.destroy(t.ptyId);
@@ -584,8 +693,10 @@ export const useAppStore = create<AppState>((set, get) => ({
       const closeIds = new Set(toClose.map((t) => t.id));
       const tabs = s.tabs.filter((t) => !closeIds.has(t.id));
       const patch: Partial<AppState> = { tabs };
-      if (tab.type === "terminal") {
+      if (tab.type === "terminal" && tab.isAgent) {
         patch.activeAgentTabId = tabId;
+      } else if (tab.type === "terminal") {
+        patch.activeShellTabId = tabId;
       } else {
         patch.activeFileTabId = tabId;
       }
@@ -607,10 +718,22 @@ export const useAppStore = create<AppState>((set, get) => ({
       const tabs = s.tabs.filter((t) => !closeIds.has(t.id));
       const patch: Partial<AppState> = { tabs };
       if (type === "terminal") {
-        const remaining = tabs.filter((t) => t.workspaceId === workspaceId && t.type === "terminal");
-        patch.activeAgentTabId = remaining.at(-1)?.id ?? null;
+        const remainingAgents = tabs.filter(
+          (t) =>
+            t.workspaceId === workspaceId && t.type === "terminal" && t.isAgent,
+        );
+        const remainingShells = tabs.filter(
+          (t) =>
+            t.workspaceId === workspaceId &&
+            t.type === "terminal" &&
+            !t.isAgent,
+        );
+        patch.activeAgentTabId = remainingAgents.at(-1)?.id ?? null;
+        patch.activeShellTabId = remainingShells.at(-1)?.id ?? null;
       } else {
-        const remaining = tabs.filter((t) => t.workspaceId === workspaceId && t.type !== "terminal");
+        const remaining = tabs.filter(
+          (t) => t.workspaceId === workspaceId && t.type !== "terminal",
+        );
         patch.activeFileTabId = remaining.at(-1)?.id ?? null;
       }
       const wsTabs = tabs.filter((t) => t.workspaceId === workspaceId);
@@ -637,8 +760,10 @@ export const useAppStore = create<AppState>((set, get) => ({
       const wasActiveClosed = closeIds.has(s.activeTabId ?? "");
       if (wasActiveClosed) {
         patch.activeTabId = tabId;
-        if (tab.type === "terminal") {
+        if (tab.type === "terminal" && tab.isAgent) {
           patch.activeAgentTabId = tabId;
+        } else if (tab.type === "terminal") {
+          patch.activeShellTabId = tabId;
         } else {
           patch.activeFileTabId = tabId;
         }
@@ -706,15 +831,18 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   toggleTerminalPanel: async () => {
     const state = get();
-    const hasTerminal = state.tabs.some(
-      (tab) => tab.workspaceId === state.activeWorkspaceId && tab.type === "terminal",
+    const hasShell = state.tabs.some(
+      (tab) =>
+        tab.workspaceId === state.activeWorkspaceId &&
+        tab.type === "terminal" &&
+        !tab.isAgent,
     );
-    if (state.terminalPanelOpen && hasTerminal) {
+    if (state.terminalPanelOpen && hasShell) {
       set({ terminalPanelOpen: false });
       return;
     }
     set({ terminalPanelOpen: true });
-    if (!hasTerminal) {
+    if (!hasShell) {
       await get().createTerminal(state.activeWorkspaceId ?? undefined);
     }
   },
@@ -1139,16 +1267,12 @@ export const useAppStore = create<AppState>((set, get) => ({
     const state = get();
     const agentTabs = state.tabs.filter(
       (tab): tab is Extract<Tab, { type: "terminal" }> =>
-        tab.type === "terminal" &&
-        tab.isAgent === true &&
-        !!tab.sessionId,
+        tab.type === "terminal" && tab.isAgent === true && !!tab.sessionId,
     );
     if (agentTabs.length === 0) return;
 
     for (const tab of agentTabs) {
-      const workspace = state.workspaces.find(
-        (w) => w.id === tab.workspaceId,
-      );
+      const workspace = state.workspaces.find((w) => w.id === tab.workspaceId);
       if (!workspace) continue;
 
       const preset = state.settings.agentPresets.find(
@@ -1171,9 +1295,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           },
         );
         set((s) => ({
-          tabs: s.tabs.map((t) =>
-            t.id === tab.id ? { ...t, ptyId } : t,
-          ),
+          tabs: s.tabs.map((t) => (t.id === tab.id ? { ...t, ptyId } : t)),
         }));
       } catch {
         get().addToast("error", `Failed to restore ${tab.title}`);
@@ -1244,14 +1366,20 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   removeWorkspace: (workspaceId) =>
     set((state) => {
-      const workspace = state.workspaces.find((item) => item.id === workspaceId);
+      const workspace = state.workspaces.find(
+        (item) => item.id === workspaceId,
+      );
       if (!workspace) return state;
 
       const removedWorkspaceIds = new Set([workspaceId]);
-      const removedTabs = state.tabs.filter((tab) => tab.workspaceId === workspaceId);
+      const removedTabs = state.tabs.filter(
+        (tab) => tab.workspaceId === workspaceId,
+      );
       closeTerminalTabs(removedTabs);
 
-      const workspaces = state.workspaces.filter((item) => item.id !== workspaceId);
+      const workspaces = state.workspaces.filter(
+        (item) => item.id !== workspaceId,
+      );
       const projects = state.projects.filter(
         (project) =>
           project.id !== workspace.projectId ||
@@ -1284,11 +1412,16 @@ export const useAppStore = create<AppState>((set, get) => ({
     const targets = workspaceId
       ? state.workspaces.filter((w) => w.id === workspaceId)
       : state.workspaces;
-    const updates: Record<string, { ahead: number; behind: number; additions: number; deletions: number }> = {};
+    const updates: Record<
+      string,
+      { ahead: number; behind: number; additions: number; deletions: number }
+    > = {};
     await Promise.all(
       targets.map(async (w) => {
         try {
-          updates[w.id] = await window.forgepad.git.getBranchStats(w.worktreePath);
+          updates[w.id] = await window.forgepad.git.getBranchStats(
+            w.worktreePath,
+          );
         } catch {
           updates[w.id] = { ahead: 0, behind: 0, additions: 0, deletions: 0 };
         }

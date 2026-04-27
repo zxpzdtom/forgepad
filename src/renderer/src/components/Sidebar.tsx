@@ -13,16 +13,91 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import {
-  ChevronRight,
-  FolderOpen,
-  FolderPlus,
-  Plus,
-  X,
-} from "lucide-react";
+import { ChevronRight, FolderOpen, FolderPlus, Plus, X } from "lucide-react";
 import { useAppStore } from "@renderer/store/app-store";
+import { Spinner } from "./Spinner";
+import type { AgentStatus } from "@shared/agent-lifecycle";
 
 type SidebarWorkspace = { id: string; name: string; branch: string };
+
+/**
+ * Derive the "highest priority" agent status for a workspace.
+ * Priority: permission > working > review > idle > undefined (no agents).
+ */
+function useWorkspaceAgentStatus(workspaceId: string): AgentStatus | undefined {
+  const tabs = useAppStore((state) => state.tabs);
+  const agentStatuses = useAppStore((state) => state.agentStatuses);
+  const exitedPtyIds = useAppStore((state) => state.exitedPtyIds);
+
+  return useMemo(() => {
+    const agentTabs = tabs.filter(
+      (t) =>
+        t.workspaceId === workspaceId &&
+        t.type === "terminal" &&
+        t.isAgent === true,
+    );
+    if (agentTabs.length === 0) return undefined;
+
+    let highest: AgentStatus | undefined;
+    const priority: Record<AgentStatus, number> = {
+      idle: 0,
+      review: 1,
+      working: 2,
+      permission: 3,
+    };
+
+    for (const tab of agentTabs) {
+      if (tab.type !== "terminal") continue;
+      const isExited = exitedPtyIds.has(tab.ptyId);
+      const status: AgentStatus =
+        agentStatuses[tab.ptyId] ?? (isExited ? "idle" : "working");
+      if (!highest || priority[status] > priority[highest]) {
+        highest = status;
+      }
+    }
+    return highest;
+  }, [tabs, agentStatuses, exitedPtyIds, workspaceId]);
+}
+
+/** Animated status indicator for workspace items in the sidebar. */
+function WorkspaceStatusDot({
+  isActive,
+  agentStatus,
+}: {
+  isActive: boolean;
+  agentStatus: AgentStatus | undefined;
+}) {
+  // Working → unicode braille spinner
+  if (agentStatus === "working") {
+    return (
+      <span className="text-accent text-[11px] leading-none">
+        <Spinner name="braille" />
+      </span>
+    );
+  }
+
+  // Permission needed → pulsing amber dot
+  if (agentStatus === "permission") {
+    return (
+      <span className="relative flex size-2">
+        <span className="absolute inline-flex size-full animate-ping rounded-full bg-warn opacity-75" />
+        <span className="relative inline-flex size-2 rounded-full bg-warn" />
+      </span>
+    );
+  }
+
+  // Review (agent finished) → green dot
+  if (agentStatus === "review") {
+    return <span className="block size-2 rounded-full bg-ok" />;
+  }
+
+  // Default static dot
+  return (
+    <span
+      className={`block size-2 rounded-full ${isActive ? "bg-accent" : "bg-muted"}`}
+    />
+  );
+}
 
 function SortableProjectGroup({
   projectId,
@@ -71,7 +146,7 @@ function SortableProjectGroup({
     <div
       ref={setNodeRef}
       style={style}
-      className={`group/sidebar-project flex flex-col rounded-lg${hasActive ? " bg-panel-2/55" : ""}${isDragging ? " shadow-[0_16px_34px_rgba(0,0,0,0.28)] ring-1 ring-accent/25" : ""}`}
+      className={`group/sidebar-project flex min-w-0 flex-col rounded-lg${hasActive ? " bg-panel-2/55" : ""}${isDragging ? " shadow-[0_16px_34px_rgba(0,0,0,0.28)] ring-1 ring-accent/25" : ""}`}
     >
       <div
         className="flex h-8 w-full cursor-grab items-center gap-1 rounded-md bg-transparent px-1.5 text-left text-text transition-colors duration-150 hover:bg-panel-2 active:cursor-grabbing"
@@ -86,8 +161,12 @@ function SortableProjectGroup({
           size={14}
           className={`shrink-0 text-subtle transition-transform duration-150 ease-[ease]${isCollapsed ? "" : " rotate-90"}`}
         />
-        <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[13px] font-[620]">{name}</span>
-        <small className="shrink-0 text-[11px] text-subtle">{workspaceCount}</small>
+        <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[13px] font-[620]">
+          {name}
+        </span>
+        <small className="shrink-0 text-[11px] text-subtle">
+          {workspaceCount}
+        </small>
         <button
           className="grid size-5 shrink-0 place-items-center rounded text-subtle opacity-0 transition-opacity hover:bg-panel-3 hover:text-danger group-hover/sidebar-project:opacity-100 focus:opacity-100"
           type="button"
@@ -120,9 +199,15 @@ function SortableWorkspaceRow({
   onRemove: () => void;
 }) {
   const branchStats = useAppStore((state) => state.branchStats[workspace.id]);
-  const stats = branchStats ?? { ahead: 0, behind: 0, additions: 0, deletions: 0 };
+  const stats = branchStats ?? {
+    ahead: 0,
+    behind: 0,
+    additions: 0,
+    deletions: 0,
+  };
   const hasDiffStats = stats.additions > 0 || stats.deletions > 0;
   const hasRemoteStats = stats.ahead > 0 || stats.behind > 0;
+  const agentStatus = useWorkspaceAgentStatus(workspace.id);
 
   const {
     attributes,
@@ -152,7 +237,7 @@ function SortableWorkspaceRow({
     <div
       ref={setNodeRef}
       style={style}
-      className={`group/sidebar-workspace relative flex w-full cursor-grab items-start gap-2.5 rounded-md bg-transparent px-3 py-2 pr-8 text-left transition-[background,box-shadow] duration-150 active:cursor-grabbing${isActive ? " bg-[#172424]" : " hover:bg-panel-2/45"}${isDragging ? " shadow-[0_14px_28px_rgba(0,0,0,0.26)] ring-1 ring-accent/20" : ""}`}
+      className={`group/sidebar-workspace relative flex w-full min-w-0 cursor-grab items-start gap-2.5 rounded-md bg-transparent px-3 py-2 pr-8 text-left transition-[background,box-shadow] duration-150 active:cursor-grabbing${isActive ? " bg-[#172424]" : " hover:bg-panel-2/45"}${isDragging ? " shadow-[0_14px_28px_rgba(0,0,0,0.26)] ring-1 ring-accent/20" : ""}`}
       role="button"
       tabIndex={0}
       onClick={onClick}
@@ -164,11 +249,13 @@ function SortableWorkspaceRow({
         <span className="absolute bottom-1 left-1 top-1 w-[3px] rounded-full bg-accent" />
       )}
       <div className="mt-px flex size-5 shrink-0 items-center justify-center">
-        <span className={`block size-2 rounded-full ${isActive ? "bg-accent" : "bg-muted"}`} />
+        <WorkspaceStatusDot isActive={isActive} agentStatus={agentStatus} />
       </div>
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[13px] font-medium">{workspace.name}</span>
+          <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[13px] font-medium">
+            {workspace.name}
+          </span>
           {hasDiffStats && (
             <span className="flex shrink-0 items-center gap-1 rounded bg-panel-3 px-1.5 py-0.5 text-[10px] font-mono">
               {stats.additions > 0 && (
@@ -191,7 +278,9 @@ function SortableWorkspaceRow({
               {stats.behind > 0 ? `↓${stats.behind}` : ""}
             </span>
           )}
-          <span className="shrink-0 text-[10px] text-subtle/40 tabular-nums">⌘{globalIndex + 1}</span>
+          <span className="shrink-0 text-[10px] text-subtle/40 tabular-nums">
+            ⌘{globalIndex + 1}
+          </span>
         </div>
       </div>
       <button
@@ -235,6 +324,51 @@ function SidebarSkeleton() {
   );
 }
 
+/** Collapsed sidebar button for a workspace – shows agent status indicator. */
+function CollapsedWorkspaceButton({
+  workspace,
+  index,
+  isActive,
+  onClick,
+}: {
+  workspace: SidebarWorkspace;
+  index: number;
+  isActive: boolean;
+  onClick: () => void;
+}) {
+  const agentStatus = useWorkspaceAgentStatus(workspace.id);
+  const isWorking = agentStatus === "working";
+  const needsPermission = agentStatus === "permission";
+  const hasReview = agentStatus === "review";
+
+  return (
+    <button
+      className={`relative grid size-7 place-items-center rounded-md text-xs font-semibold cursor-pointer border border-transparent${isActive ? " bg-panel-3 text-accent border-border" : " text-muted bg-transparent hover:bg-panel-2 hover:text-text"}`}
+      type="button"
+      title={`${workspace.name} (⌘${index + 1})`}
+      onClick={onClick}
+    >
+      {isWorking ? (
+        <span className="text-accent text-[10px] leading-none">
+          <Spinner name="braille" />
+        </span>
+      ) : (
+        workspace.name.charAt(0).toUpperCase()
+      )}
+      {/* Status pip in top-right corner */}
+      {needsPermission && (
+        <span className="absolute -right-0.5 -top-0.5 flex size-2">
+          <span className="absolute inline-flex size-full animate-ping rounded-full bg-warn opacity-75" />
+          <span className="relative inline-flex size-2 rounded-full bg-warn" />
+        </span>
+      )}
+      {hasReview && (
+        <span className="absolute -right-0.5 -top-0.5 size-2 rounded-full bg-ok" />
+      )}
+    </button>
+  );
+}
+
 export function Sidebar() {
   const [collapsedProjects, setCollapsedProjects] = useState<Set<string>>(
     new Set(),
@@ -247,6 +381,7 @@ export function Sidebar() {
   const hydrated = useAppStore((state) => state.hydrated);
   const openProject = useAppStore((state) => state.openProject);
   const setActiveWorkspace = useAppStore((state) => state.setActiveWorkspace);
+  const setFocusedColumn = useAppStore((state) => state.setFocusedColumn);
   const reorderProjects = useAppStore((state) => state.reorderProjects);
   const reorderWorkspaces = useAppStore((state) => state.reorderWorkspaces);
   const removeProject = useAppStore((state) => state.removeProject);
@@ -298,7 +433,8 @@ export function Sidebar() {
         projects.find((project) => project.id === overId) ??
         projects.find(
           (project) =>
-            project.id === workspaces.find((workspace) => workspace.id === overId)?.projectId,
+            project.id ===
+            workspaces.find((workspace) => workspace.id === overId)?.projectId,
         );
       if (overProject && activeProject.id !== overProject.id) {
         reorderProjects(activeProject.id, overProject.id);
@@ -332,7 +468,10 @@ export function Sidebar() {
 
   if (!sidebarOpen) {
     return (
-      <aside className="flex h-full min-h-0 flex-col items-center gap-1.5 border-r border-border bg-panel px-2 py-2.5">
+      <aside
+        className="flex h-full min-h-0 flex-col items-center gap-1.5 border-r border-border bg-panel px-2 py-2.5"
+        onMouseDown={() => setFocusedColumn("sidebar")}
+      >
         <div className="grid gap-1">
           {!hydrated ? (
             <>
@@ -344,15 +483,13 @@ export function Sidebar() {
               const ws = workspaces.find((w) => w.id === wsId);
               if (!ws) return null;
               return (
-                <button
+                <CollapsedWorkspaceButton
                   key={wsId}
-                  className={`grid size-7 place-items-center rounded-md text-xs font-semibold cursor-pointer border border-transparent${wsId === activeWorkspaceId ? " bg-panel-3 text-accent border-border" : " text-muted bg-transparent hover:bg-panel-2 hover:text-text"}`}
-                  type="button"
-                  title={`${ws.name} (⌘${idx + 1})`}
+                  workspace={ws}
+                  index={idx}
+                  isActive={wsId === activeWorkspaceId}
                   onClick={() => setActiveWorkspace(wsId)}
-                >
-                  {ws.name.charAt(0).toUpperCase()}
-                </button>
+                />
               );
             })
           )}
@@ -373,10 +510,15 @@ export function Sidebar() {
   }
 
   return (
-    <aside className="flex h-full min-h-0 flex-col border-r border-border bg-panel">
-      <div className="flex items-center justify-between gap-2 px-3 py-2.5">
+    <aside
+      className="flex h-full min-h-0 min-w-0 flex-col border-r border-border bg-panel"
+      onMouseDown={() => setFocusedColumn("sidebar")}
+    >
+      <div className="flex min-w-0 items-center justify-between gap-2 px-3 py-2.5">
         <div className="flex items-center gap-2.5">
-          <div className="grid size-6.5 place-items-center rounded-md bg-accent text-[13px] font-extrabold text-[#071110]">F</div>
+          <div className="grid size-6.5 place-items-center rounded-md bg-accent text-[13px] font-extrabold text-[#071110]">
+            F
+          </div>
           <span className="text-[15px] font-bold tracking-tight">ForgePad</span>
         </div>
         <button
@@ -389,7 +531,7 @@ export function Sidebar() {
         </button>
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-2 py-1.5 scrollbar-thin">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-0.5 overflow-y-auto overflow-x-hidden px-2 py-1.5 scrollbar-thin scroll-mask-y">
         {!hydrated ? (
           <SidebarSkeleton />
         ) : projects.length === 0 ? (
@@ -423,7 +565,11 @@ export function Sidebar() {
 
                 return (
                   <div
-                    className={projectIdx > 0 ? "mt-2 border-t border-border/30 pt-2" : ""}
+                    className={
+                      projectIdx > 0
+                        ? "mt-2 border-t border-border/30 pt-2"
+                        : ""
+                    }
                     key={project.id}
                   >
                     <SortableProjectGroup
@@ -433,7 +579,9 @@ export function Sidebar() {
                       isCollapsed={isCollapsed}
                       hasActive={hasActive}
                       onToggle={() => toggleProject(project.id)}
-                      onRemove={() => confirmRemoveProject(project.id, project.name)}
+                      onRemove={() =>
+                        confirmRemoveProject(project.id, project.name)
+                      }
                     >
                       {!isCollapsed && (
                         <SortableContext
@@ -445,7 +593,9 @@ export function Sidebar() {
                               <SortableWorkspaceRow
                                 key={workspace.id}
                                 workspace={workspace}
-                                globalIndex={workspaceIndexMap.get(workspace.id) ?? 0}
+                                globalIndex={
+                                  workspaceIndexMap.get(workspace.id) ?? 0
+                                }
                                 isActive={workspace.id === activeWorkspaceId}
                                 onClick={() => setActiveWorkspace(workspace.id)}
                                 onRemove={() =>

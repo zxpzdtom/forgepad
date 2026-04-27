@@ -1,13 +1,7 @@
 import { useRef } from "react";
-import {
-  Bot,
-  Code2,
-  Play,
-  Settings,
-  Sparkles,
-  TerminalSquare,
-} from "lucide-react";
+import { Bot, Play, Settings, TerminalSquare } from "lucide-react";
 import { useAppStore } from "@renderer/store/app-store";
+import { agentPresetIcon } from "./AgentIcons";
 import type { AgentPreset } from "@shared/types";
 
 function shortPresetLabel(label: string): string {
@@ -15,9 +9,8 @@ function shortPresetLabel(label: string): string {
 }
 
 function presetIcon(preset: AgentPreset) {
-  const label = preset.label.toLowerCase();
-  if (label.includes("codex")) return <Code2 size={15} />;
-  if (label.includes("gemini")) return <Sparkles size={15} />;
+  const icon = agentPresetIcon(preset.id, 15);
+  if (icon) return icon;
   return <Bot size={15} />;
 }
 
@@ -29,7 +22,9 @@ export function AgentQuickBar() {
   const settings = useAppStore((state) => state.settings);
   const updateSettings = useAppStore((state) => state.updateSettings);
 
-  const enabledPresets = settings.agentPresets.filter((preset) => preset.enabled);
+  const enabledPresets = settings.agentPresets.filter(
+    (preset) => preset.enabled,
+  );
   const selectedPreset =
     enabledPresets.find(
       (preset) => preset.command === settings.defaultAgentCommand,
@@ -46,7 +41,7 @@ export function AgentQuickBar() {
         <Settings size={15} />
       </button>
 
-      <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto scrollbar-none">
+      <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto scrollbar-none scroll-mask-x">
         {enabledPresets.map((preset) => (
           <button
             className={`flex h-7 shrink-0 items-center gap-1.5 rounded-md border px-2.5 text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-45${

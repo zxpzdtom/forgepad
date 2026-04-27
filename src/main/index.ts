@@ -1,6 +1,10 @@
 import { app, BrowserWindow, shell } from "electron";
 import { join } from "node:path";
 import { registerIpcHandlers } from "./ipc/register-handlers";
+import { HookServer } from "./services/hook-server";
+import { AgentHooksService } from "./services/agent-hooks-service";
+
+let hookServer: HookServer | null = null;
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
@@ -37,9 +41,27 @@ function createWindow(): void {
   }
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   app.setName("ForgePad");
-  registerIpcHandlers();
+
+  // Start agent hook server
+  hookServer = new HookServer();
+  let hookPort = 0;
+  try {
+    hookPort = await hookServer.start();
+  } catch (error) {
+    console.error("[ForgePad] Failed to start hook server:", error);
+  }
+
+  // Inject hooks into agent configs (idempotent)
+  try {
+    const agentHooks = new AgentHooksService();
+    await agentHooks.install();
+  } catch (error) {
+    console.error("[ForgePad] Failed to install agent hooks:", error);
+  }
+
+  registerIpcHandlers(hookPort);
   createWindow();
 
   app.on("activate", () => {
@@ -49,4 +71,8 @@ app.whenReady().then(() => {
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
+});
+
+app.on("will-quit", () => {
+  hookServer?.stop().catch(() => {});
 });

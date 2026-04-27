@@ -244,6 +244,7 @@ export type AppSettings = {
   diffOverflow: DiffOverflow;
   diffDisableBackground: boolean;
   sendAndClearComments: boolean;
+  defaultOpenWith: string;
 };
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -259,6 +260,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   diffOverflow: "scroll",
   diffDisableBackground: false,
   sendAndClearComments: false,
+  defaultOpenWith: "finder",
 };
 
 export type OpenProjectResult = {
