@@ -52,6 +52,8 @@ const api = {
   fs: {
     getTreeWithStatus: (worktreePath: string) =>
       ipcRenderer.invoke(IPC.FS_TREE_WITH_STATUS, worktreePath) as Promise<FileNode[]>,
+    listFiles: (worktreePath: string) =>
+      ipcRenderer.invoke(IPC.FS_LIST_FILES, worktreePath) as Promise<string[]>,
     readFile: (worktreePath: string, relPath: string) =>
       ipcRenderer.invoke(IPC.FS_READ_FILE, worktreePath, relPath) as Promise<string>,
     readFileAsDataUrl: (worktreePath: string, relPath: string) =>
@@ -95,8 +97,18 @@ const api = {
       ipcRenderer.invoke(IPC.CONTEXT_CREATE_BUNDLE, input) as Promise<ContextBundleResult>,
   },
   shell: {
+    openPath: (fullPath: string) =>
+      ipcRenderer.invoke(IPC.SHELL_OPEN_PATH, fullPath) as Promise<void>,
+    openInIde: (fullPath: string) =>
+      ipcRenderer.invoke(IPC.SHELL_OPEN_IN_IDE, fullPath) as Promise<void>,
+    openInTerminal: (fullPath: string) =>
+      ipcRenderer.invoke(IPC.SHELL_OPEN_IN_TERMINAL, fullPath) as Promise<void>,
     showItemInFolder: (fullPath: string) =>
       ipcRenderer.invoke(IPC.SHELL_SHOW_ITEM_IN_FOLDER, fullPath) as Promise<void>,
+    detectIdes: () =>
+      ipcRenderer.invoke(IPC.SHELL_DETECT_IDES) as Promise<Array<{ id: string; label: string; command: string; appName?: string }>>,
+    openWithIde: (fullPath: string, ideId: string) =>
+      ipcRenderer.invoke(IPC.SHELL_OPEN_WITH_IDE, fullPath, ideId) as Promise<void>,
   },
 };
 

@@ -683,6 +683,7 @@ textarea {
 }
 
 /* Title bar drag region — enables native macOS double-click maximize */
+.app-topbar,
 .sidebar > :first-child,
 .tabbar,
 .right-panel > :first-child,
@@ -693,6 +694,10 @@ textarea {
   -webkit-app-region: drag;
 }
 
+.app-topbar button,
+.app-topbar input,
+.app-topbar select,
+.app-topbar [role="button"],
 .sidebar > :first-child button,
 .sidebar > :first-child .toolbar-actions,
 .tabbar button,

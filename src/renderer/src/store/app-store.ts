@@ -42,6 +42,7 @@ type AppState = {
   rightPanelMode: RightPanelMode;
   rightPanelOpen: boolean;
   sidebarOpen: boolean;
+  terminalPanelOpen: boolean;
   contextItems: ContextItem[];
   composerText: string;
   settings: AppSettings;
@@ -63,6 +64,7 @@ type AppState = {
   createAgentTerminal: (
     workspaceId?: string,
     commandOverride?: string,
+    presetId?: string,
   ) => Promise<string | null>;
   addTab: (tab: Tab) => void;
   closeTab: (tabId: string) => void;
@@ -74,6 +76,8 @@ type AppState = {
   openDiffTab: (workspaceId: string, activePath?: string) => void;
   openContextPreviewTab: (workspaceId?: string) => void;
   setRightPanelMode: (mode: RightPanelMode) => void;
+  setTerminalPanelOpen: (open: boolean) => void;
+  toggleTerminalPanel: () => Promise<void>;
   toggleContextFile: (workspaceId: string, relPath: string) => void;
   addContextFiles: (workspaceId: string, relPaths: string[]) => void;
   addContextDiff: (
@@ -126,6 +130,8 @@ type AppState = {
   refreshBranchStats: (workspaceId?: string) => Promise<void>;
   reorderProjects: (activeId: string, overId: string) => void;
   reorderWorkspaces: (projectId: string, activeId: string, overId: string) => void;
+  removeProject: (projectId: string) => void;
+  removeWorkspace: (workspaceId: string) => void;
 };
 
 function id(): string {
@@ -174,6 +180,7 @@ function serializeForSave(state: AppState): PersistedAppState {
     rightPanelMode: state.rightPanelMode,
     rightPanelOpen: state.rightPanelOpen,
     sidebarOpen: state.sidebarOpen,
+    terminalPanelOpen: state.terminalPanelOpen,
     contextItems: state.contextItems,
     composerText: state.composerText,
     settings: state.settings,
@@ -197,6 +204,64 @@ function findWorkspace(
   return state.workspaces.find((workspace) => workspace.id === idToFind);
 }
 
+function closeTerminalTabs(tabs: Tab[]): void {
+  for (const tab of tabs) {
+    if (tab.type === "terminal") window.forgepad.pty.destroy(tab.ptyId);
+  }
+}
+
+function omitBranchStats(
+  branchStats: AppState["branchStats"],
+  workspaceIds: Set<string>,
+): AppState["branchStats"] {
+  return Object.fromEntries(
+    Object.entries(branchStats).filter(([workspaceId]) => !workspaceIds.has(workspaceId)),
+  );
+}
+
+function activeIdsAfterRemoval(
+  state: AppState,
+  tabs: Tab[],
+  workspaces: Workspace[],
+): Pick<
+  AppState,
+  "activeWorkspaceId" | "activeTabId" | "activeAgentTabId" | "activeFileTabId"
+> {
+  const activeWorkspaceId =
+    state.activeWorkspaceId &&
+    workspaces.some((workspace) => workspace.id === state.activeWorkspaceId)
+      ? state.activeWorkspaceId
+      : (workspaces[0]?.id ?? null);
+
+  const workspaceTabs = tabs.filter(
+    (tab) => tab.workspaceId === activeWorkspaceId,
+  );
+  const agentTabs = workspaceTabs.filter((tab) => tab.type === "terminal");
+  const fileTabs = workspaceTabs.filter((tab) => tab.type !== "terminal");
+  const activeAgentTabId =
+    state.activeAgentTabId &&
+    agentTabs.some((tab) => tab.id === state.activeAgentTabId)
+      ? state.activeAgentTabId
+      : (agentTabs.at(-1)?.id ?? null);
+  const activeFileTabId =
+    state.activeFileTabId &&
+    fileTabs.some((tab) => tab.id === state.activeFileTabId)
+      ? state.activeFileTabId
+      : (fileTabs.at(-1)?.id ?? null);
+  const activeTabId =
+    state.activeTabId &&
+    workspaceTabs.some((tab) => tab.id === state.activeTabId)
+      ? state.activeTabId
+      : (activeAgentTabId ?? activeFileTabId ?? workspaceTabs.at(-1)?.id ?? null);
+
+  return {
+    activeWorkspaceId,
+    activeTabId,
+    activeAgentTabId,
+    activeFileTabId,
+  };
+}
+
 export const useAppStore = create<AppState>((set, get) => ({
   projects: [],
   workspaces: [],
@@ -209,6 +274,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   rightPanelMode: "files",
   rightPanelOpen: true,
   sidebarOpen: true,
+  terminalPanelOpen: false,
   contextItems: [],
   composerText: "",
   settings: { ...DEFAULT_SETTINGS },
@@ -233,6 +299,14 @@ export const useAppStore = create<AppState>((set, get) => ({
     const rawSettings = { ...DEFAULT_SETTINGS, ...(state?.settings ?? {}) };
     if (!rawSettings.agentPresets || rawSettings.agentPresets.length === 0) {
       rawSettings.agentPresets = [...DEFAULT_SETTINGS.agentPresets];
+    }
+    const matchingDefaultPreset = rawSettings.agentPresets.find(
+      (preset) =>
+        preset.command === rawSettings.defaultAgentCommand ||
+        preset.command.trim().split(/\s+/)[0] === rawSettings.defaultAgentCommand,
+    );
+    if (matchingDefaultPreset) {
+      rawSettings.defaultAgentCommand = matchingDefaultPreset.command;
     }
     const settings = rawSettings;
     const projects = state?.projects ?? [];
@@ -273,6 +347,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       rightPanelMode: state?.rightPanelMode ?? "files",
       rightPanelOpen: state?.rightPanelOpen ?? true,
       sidebarOpen: state?.sidebarOpen ?? true,
+      terminalPanelOpen: state?.terminalPanelOpen ?? false,
       contextItems,
       composerText: state?.composerText ?? "",
       settings,
@@ -280,6 +355,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     });
 
     get().restoreAgentSessions();
+    get().refreshBranchStats();
   },
 
   toPersistedState: () => serializeForSave(get()),
@@ -342,6 +418,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     }));
 
     await get().createTerminal(workspaceId);
+    await get().refreshBranchStats(workspaceId);
 
     set((state) => {
       const next = new Set(state.workspaceLoadingIds);
@@ -353,6 +430,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   setActiveWorkspace: (workspaceId) => {
     const tabs = get().tabs.filter((tab) => tab.workspaceId === workspaceId);
     set({ activeWorkspaceId: workspaceId, activeTabId: tabs[0]?.id ?? null });
+    if (workspaceId) void get().refreshBranchStats(workspaceId);
   },
 
   createTerminal: async (workspaceId) => {
@@ -377,6 +455,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         ptyId,
       };
       get().addTab(tab);
+      set({ terminalPanelOpen: true });
       return ptyId;
     } catch (error) {
       get().addToast(
@@ -428,6 +507,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         agentCommand: command,
       };
       get().addTab(tab);
+      set({ terminalPanelOpen: true });
       return ptyId;
     } catch (error) {
       get().addToast(
@@ -621,6 +701,23 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   setRightPanelMode: (mode) =>
     set({ rightPanelMode: mode, rightPanelOpen: true }),
+
+  setTerminalPanelOpen: (open) => set({ terminalPanelOpen: open }),
+
+  toggleTerminalPanel: async () => {
+    const state = get();
+    const hasTerminal = state.tabs.some(
+      (tab) => tab.workspaceId === state.activeWorkspaceId && tab.type === "terminal",
+    );
+    if (state.terminalPanelOpen && hasTerminal) {
+      set({ terminalPanelOpen: false });
+      return;
+    }
+    set({ terminalPanelOpen: true });
+    if (!hasTerminal) {
+      await get().createTerminal(state.activeWorkspaceId ?? undefined);
+    }
+  },
 
   toggleContextFile: (workspaceId, relPath) => {
     const key = `${workspaceId}:file:${relPath}`;
@@ -1103,11 +1200,82 @@ export const useAppStore = create<AppState>((set, get) => ({
       const newIdx = projectWorkspaces.findIndex((w) => w.id === overId);
       if (oldIdx === -1 || newIdx === -1) return state;
       const reordered = arrayMove(projectWorkspaces, oldIdx, newIdx);
-      const reorderedMap = new Map(reordered.map((w) => [w.id, w]));
+      let nextProjectIndex = 0;
       return {
-        workspaces: state.workspaces.map(
-          (w) => reorderedMap.get(w.id) ?? w,
+        workspaces: state.workspaces.map((w) =>
+          w.projectId === projectId ? reordered[nextProjectIndex++] : w,
         ),
+      };
+    }),
+
+  removeProject: (projectId) =>
+    set((state) => {
+      const removedWorkspaceIds = new Set(
+        state.workspaces
+          .filter((workspace) => workspace.projectId === projectId)
+          .map((workspace) => workspace.id),
+      );
+      if (removedWorkspaceIds.size === 0) return state;
+
+      const removedTabs = state.tabs.filter((tab) =>
+        removedWorkspaceIds.has(tab.workspaceId),
+      );
+      closeTerminalTabs(removedTabs);
+
+      const workspaces = state.workspaces.filter(
+        (workspace) => !removedWorkspaceIds.has(workspace.id),
+      );
+      const tabs = state.tabs.filter(
+        (tab) => !removedWorkspaceIds.has(tab.workspaceId),
+      );
+
+      return {
+        projects: state.projects.filter((project) => project.id !== projectId),
+        workspaces,
+        tabs,
+        tasks: state.tasks.filter((task) => task.projectId !== projectId),
+        contextItems: state.contextItems.filter(
+          (item) => !removedWorkspaceIds.has(item.workspaceId),
+        ),
+        branchStats: omitBranchStats(state.branchStats, removedWorkspaceIds),
+        ...activeIdsAfterRemoval(state, tabs, workspaces),
+      };
+    }),
+
+  removeWorkspace: (workspaceId) =>
+    set((state) => {
+      const workspace = state.workspaces.find((item) => item.id === workspaceId);
+      if (!workspace) return state;
+
+      const removedWorkspaceIds = new Set([workspaceId]);
+      const removedTabs = state.tabs.filter((tab) => tab.workspaceId === workspaceId);
+      closeTerminalTabs(removedTabs);
+
+      const workspaces = state.workspaces.filter((item) => item.id !== workspaceId);
+      const projects = state.projects.filter(
+        (project) =>
+          project.id !== workspace.projectId ||
+          workspaces.some((item) => item.projectId === project.id),
+      );
+      const projectIds = new Set(projects.map((project) => project.id));
+      const tabs = state.tabs.filter((tab) => tab.workspaceId !== workspaceId);
+
+      return {
+        projects,
+        workspaces,
+        tabs,
+        tasks: state.tasks
+          .filter((task) => projectIds.has(task.projectId))
+          .map((task) =>
+            task.workspaceId === workspaceId
+              ? { ...task, workspaceId: undefined, updatedAt: now() }
+              : task,
+          ),
+        contextItems: state.contextItems.filter(
+          (item) => item.workspaceId !== workspaceId,
+        ),
+        branchStats: omitBranchStats(state.branchStats, removedWorkspaceIds),
+        ...activeIdsAfterRemoval(state, tabs, workspaces),
       };
     }),
 

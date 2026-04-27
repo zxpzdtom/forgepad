@@ -1,3 +1,4 @@
+import { useCallback, useState, type MouseEvent } from "react";
 import {
   Bot,
   ClipboardList,
@@ -7,6 +8,7 @@ import {
   X,
 } from "lucide-react";
 import { getTabTitle, useAppStore } from "@renderer/store/app-store";
+import { TabContextMenu } from "./TabContextMenu";
 import type { Tab } from "@shared/types";
 
 function tabIcon(tab: Tab) {
@@ -21,36 +23,46 @@ export function TabBar() {
   const tabs = useAppStore((state) => state.tabs);
   const activeWorkspaceId = useAppStore((state) => state.activeWorkspaceId);
   const activeTabId = useAppStore((state) => state.activeTabId);
+  const workspaces = useAppStore((state) => state.workspaces);
   const setActiveTab = useAppStore((state) => state.setActiveTab);
   const closeTab = useAppStore((state) => state.closeTab);
-  const openDiffTab = useAppStore((state) => state.openDiffTab);
-  const createTerminal = useAppStore((state) => state.createTerminal);
-  const createAgentTerminal = useAppStore((state) => state.createAgentTerminal);
-  const settings = useAppStore((state) => state.settings);
-  const updateSettings = useAppStore((state) => state.updateSettings);
+  const closeOtherTabs = useAppStore((state) => state.closeOtherTabs);
+  const closeAllTabs = useAppStore((state) => state.closeAllTabs);
+  const closeTabsToRight = useAppStore((state) => state.closeTabsToRight);
 
-  const workspaceTabs = tabs.filter((tab) => tab.workspaceId === activeWorkspaceId);
-  const enabledPresets = settings.agentPresets.filter((p) => p.enabled);
-  const selectedAgentPreset =
-    enabledPresets.find(
-      (preset) => preset.command === settings.defaultAgentCommand,
-    )?.id ?? "custom";
+  const workspaceTabs = tabs.filter(
+    (tab) => tab.workspaceId === activeWorkspaceId && tab.type !== "terminal",
+  );
+  const activeWorkspace = workspaces.find(
+    (workspace) => workspace.id === activeWorkspaceId,
+  );
+  const [contextMenu, setContextMenu] = useState<{
+    tab: Tab;
+    x: number;
+    y: number;
+  } | null>(null);
+
+  const handleContextMenu = useCallback((event: MouseEvent, tab: Tab) => {
+    event.preventDefault();
+    setContextMenu({ tab, x: event.clientX, y: event.clientY });
+  }, []);
 
   return (
-    <div className="flex min-h-[42px] items-center border-b border-border bg-[#12151b]">
+    <div className="workspace-tabbar tabbar relative flex h-9 shrink-0 items-center border-b border-border bg-[#111111]">
       <div className="flex min-w-0 flex-1 overflow-x-auto scrollbar-none">
         {workspaceTabs.map((tab) => (
           <button
-            className={`grid min-w-[118px] max-w-[220px] grid-cols-[16px_minmax(0,1fr)_18px] items-center gap-2 px-2 border-r border-border-soft${tab.id === activeTabId ? " bg-panel text-text" : " bg-transparent text-muted"}`}
+            className={`group grid h-9 min-w-[128px] max-w-[240px] grid-cols-[16px_minmax(0,1fr)_18px] items-center gap-2 border-r border-border-soft px-2 text-sm transition-colors${tab.id === activeTabId ? " bg-panel text-text" : " bg-transparent text-muted hover:bg-panel-2 hover:text-text"}`}
             key={tab.id}
             type="button"
             title={getTabTitle(tab)}
             onClick={() => setActiveTab(tab.id)}
+            onContextMenu={(event) => handleContextMenu(event, tab)}
           >
             {tabIcon(tab)}
             <span className="overflow-hidden text-ellipsis whitespace-nowrap">{getTabTitle(tab)}</span>
             <span
-              className="grid size-[18px] place-items-center rounded hover:bg-panel-3"
+              className="grid size-[18px] place-items-center rounded opacity-0 transition-opacity hover:bg-panel-3 group-hover:opacity-100 focus:opacity-100"
               role="button"
               tabIndex={0}
               title="Close tab"
@@ -71,64 +83,19 @@ export function TabBar() {
           </button>
         ))}
       </div>
-      <div className="flex items-center gap-1.5 px-2 max-[900px]:hidden">
-        <select
-          className="toolbar-select agent-preset-select compact"
-          value={selectedAgentPreset}
-          disabled={!activeWorkspaceId}
-          title="Agent preset"
-          onChange={(event) => {
-            const preset = enabledPresets.find(
-              (item) => item.id === event.currentTarget.value,
-            );
-            if (preset) updateSettings({ defaultAgentCommand: preset.command });
-          }}
-        >
-          {enabledPresets.map((preset) => (
-            <option key={preset.id} value={preset.id}>
-              {preset.label}
-            </option>
-          ))}
-          <option value="custom">Custom</option>
-        </select>
-        <button
-          className="icon-button"
-          type="button"
-          title="Open changes"
-          disabled={!activeWorkspaceId}
-          onClick={() => activeWorkspaceId && openDiffTab(activeWorkspaceId)}
-        >
-          <GitCompare size={16} />
-        </button>
-        <button
-          className="secondary-button min-h-[30px]"
-          type="button"
-          title={`New ${settings.defaultAgentCommand || "agent"} agent`}
-          disabled={!activeWorkspaceId}
-          onClick={() => {
-            const preset = enabledPresets.find(
-              (p) => p.command === settings.defaultAgentCommand,
-            );
-            createAgentTerminal(
-              activeWorkspaceId ?? undefined,
-              undefined,
-              preset?.id,
-            );
-          }}
-        >
-          <Bot size={16} />
-          Agent
-        </button>
-        <button
-          className="icon-button"
-          type="button"
-          title="New terminal"
-          disabled={!activeWorkspaceId}
-          onClick={() => createTerminal(activeWorkspaceId ?? undefined)}
-        >
-          <TerminalSquare size={16} />
-        </button>
-      </div>
+      {contextMenu && (
+        <TabContextMenu
+          tab={contextMenu.tab}
+          workspacePath={activeWorkspace?.worktreePath}
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onClose={() => setContextMenu(null)}
+          onCloseTab={closeTab}
+          onCloseOthers={closeOtherTabs}
+          onCloseAll={closeAllTabs}
+          onCloseToRight={closeTabsToRight}
+        />
+      )}
     </div>
   );
 }

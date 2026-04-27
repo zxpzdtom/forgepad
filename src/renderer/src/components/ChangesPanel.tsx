@@ -36,7 +36,6 @@ export function ChangesPanel() {
   const [loading, setLoading] = useState(false);
   const addToast = useAppStore((state) => state.addToast);
   const openDiffTab = useAppStore((state) => state.openDiffTab);
-  const addContextDiff = useAppStore((state) => state.addContextDiff);
   const triggerGitRefresh = useAppStore((state) => state.triggerGitRefresh);
   const gitRefreshEpoch = useAppStore((state) => state.gitRefreshEpoch);
 
@@ -154,7 +153,7 @@ export function ChangesPanel() {
                 const checked = selectedKeys.has(key);
                 return (
                   <div
-                    className={`grid w-full grid-cols-[20px_minmax(0,1fr)_34px] items-center gap-2 rounded-md border border-transparent px-[7px] py-1.5${checked ? " bg-[#22323a]" : " bg-transparent"}`}
+                    className={`grid w-full grid-cols-[20px_minmax(0,1fr)] items-center gap-2 rounded-md border border-transparent px-[7px] py-1.5${checked ? " bg-[#22323a]" : " bg-transparent"}`}
                     key={key}
                     role="button"
                     tabIndex={0}
@@ -189,14 +188,6 @@ export function ChangesPanel() {
                         )}
                         <StatusDot status={status.status} />
                       </span>
-                    </button>
-                    <button
-                      className="mini-button"
-                      type="button"
-                      title="Add diff to context"
-                      onClick={() => addContextDiff(workspace.id, status.path, status.bucket, status.status)}
-                    >
-                      ctx
                     </button>
                   </div>
                 );
