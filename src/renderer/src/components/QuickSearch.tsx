@@ -101,16 +101,17 @@ export function QuickSearch({ open, onClose }: QuickSearchProps) {
     }
 
     for (const tab of tabs) {
-      const workspace = workspaces.find(
-        (item) => item.id === tab.workspaceId,
-      );
+      const workspace = workspaces.find((item) => item.id === tab.workspaceId);
       next.push({
         id: `tab:${tab.id}`,
         label: getTabTitle(tab),
-        detail: workspace
-          ? `${workspace.name} · ${tab.type}`
-          : tab.type,
-        icon: tab.type === "terminal" ? <TerminalSquare size={16} /> : <FileCode2 size={16} />,
+        detail: workspace ? `${workspace.name} · ${tab.type}` : tab.type,
+        icon:
+          tab.type === "terminal" ? (
+            <TerminalSquare size={16} />
+          ) : (
+            <FileCode2 size={16} />
+          ),
         run: () => {
           setActiveWorkspace(tab.workspaceId);
           setActiveTab(tab.id);
@@ -150,7 +151,9 @@ export function QuickSearch({ open, onClose }: QuickSearchProps) {
         },
       );
 
-      for (const preset of settings.agentPresets.filter((preset) => preset.enabled)) {
+      for (const preset of settings.agentPresets.filter(
+        (preset) => preset.enabled,
+      )) {
         next.push({
           id: `agent:${preset.id}`,
           label: `New ${preset.label}`,
@@ -273,21 +276,21 @@ export function QuickSearch({ open, onClose }: QuickSearchProps) {
       onMouseDown={onClose}
     >
       <div
-        className="w-[min(920px,calc(100vw-32px))] overflow-hidden rounded-xl border border-border bg-[#181715] shadow-[0_28px_70px_rgba(0,0,0,0.46)]"
+        className="w-[min(680px,calc(100vw-32px))] overflow-hidden rounded-xl border border-border bg-[#181715] shadow-[0_28px_70px_rgba(0,0,0,0.46)]"
         onMouseDown={(event) => event.stopPropagation()}
       >
         <div className="flex h-12 items-center gap-3 border-b border-border px-4">
           <Search size={18} className="text-muted" />
           <input
             ref={inputRef}
-            className="h-full min-w-0 flex-1 bg-transparent text-[15px] text-text outline-none placeholder:text-subtle"
+            className="min-w-0 flex-1 bg-transparent text-[15px] text-text outline-none placeholder:text-subtle"
             value={query}
             placeholder="Search workspaces, tabs, and agents"
             onChange={(event) => setQuery(event.currentTarget.value)}
             onKeyDown={handleKeyDown}
           />
         </div>
-        <div className="max-h-[360px] overflow-y-auto p-2">
+        <div className="max-h-[360px] overflow-y-auto p-2 scrollbar-thin scroll-mask-y">
           {filteredItems.length === 0 ? (
             <div className="grid h-24 place-items-center text-sm text-muted">
               No results
@@ -295,7 +298,7 @@ export function QuickSearch({ open, onClose }: QuickSearchProps) {
           ) : (
             filteredItems.map((item, index) => (
               <button
-                className={`grid h-12 w-full grid-cols-[24px_minmax(120px,auto)_minmax(0,1fr)_18px] items-center gap-3 rounded-lg px-3 text-left transition-colors${
+                className={`grid h-9 w-full grid-cols-[24px_minmax(120px,auto)_minmax(0,1fr)_18px] items-center gap-3 rounded-lg px-3 text-left transition-colors${
                   index === selectedIndex
                     ? " bg-panel-3 text-text"
                     : " text-muted hover:bg-panel-2 hover:text-text"
@@ -308,7 +311,9 @@ export function QuickSearch({ open, onClose }: QuickSearchProps) {
                   onClose();
                 }}
               >
-                <span className="grid size-6 place-items-center">{item.icon}</span>
+                <span className="grid size-6 place-items-center">
+                  {item.icon}
+                </span>
                 <span className="overflow-hidden text-ellipsis whitespace-nowrap text-[15px] font-medium">
                   {item.label}
                 </span>

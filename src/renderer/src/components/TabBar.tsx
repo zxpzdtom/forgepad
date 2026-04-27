@@ -49,7 +49,7 @@ export function TabBar() {
 
   return (
     <div className="workspace-tabbar tabbar relative flex h-9 shrink-0 items-center border-b border-border bg-[#111111]">
-      <div className="flex min-w-0 flex-1 overflow-x-auto scrollbar-none">
+      <div className="flex min-w-0 flex-1 overflow-x-auto scrollbar-none scroll-mask-x">
         {workspaceTabs.map((tab) => (
           <button
             className={`group grid h-9 min-w-[128px] max-w-[240px] grid-cols-[16px_minmax(0,1fr)_18px] items-center gap-2 border-r border-border-soft px-2 text-sm transition-colors${tab.id === activeTabId ? " bg-panel text-text" : " bg-transparent text-muted hover:bg-panel-2 hover:text-text"}`}
@@ -60,7 +60,9 @@ export function TabBar() {
             onContextMenu={(event) => handleContextMenu(event, tab)}
           >
             {tabIcon(tab)}
-            <span className="overflow-hidden text-ellipsis whitespace-nowrap">{getTabTitle(tab)}</span>
+            <span className="overflow-hidden text-ellipsis whitespace-nowrap">
+              {getTabTitle(tab)}
+            </span>
             <span
               className="grid size-[18px] place-items-center rounded opacity-0 transition-opacity hover:bg-panel-3 group-hover:opacity-100 focus:opacity-100"
               role="button"

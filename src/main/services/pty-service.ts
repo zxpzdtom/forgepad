@@ -1,7 +1,11 @@
 import { WebContents } from "electron";
-import { existsSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync, unlinkSync } from "node:fs";
+import { join } from "node:path";
+import { homedir } from "node:os";
 import * as pty from "node-pty";
 import { IPC } from "@shared/ipc";
+
+const SESSIONS_DIR = join(homedir(), ".forgepad", "sessions");
 
 type PtyInstance = {
   process: pty.IPty;
@@ -13,28 +17,37 @@ type PtyInstance = {
 };
 
 const MAX_REPLAY_CHARS = 8_000_000;
-const FALLBACK_PATH = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin";
+const FALLBACK_PATH =
+  "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin";
 
 function appendReplay(instance: PtyInstance, data: string): void {
   if (!data) return;
   instance.replayChunks.push(data);
   instance.replayChars += data.length;
-  while (instance.replayChars > MAX_REPLAY_CHARS && instance.replayChunks.length > 0) {
+  while (
+    instance.replayChars > MAX_REPLAY_CHARS &&
+    instance.replayChunks.length > 0
+  ) {
     const removed = instance.replayChunks.shift();
     instance.replayChars -= removed?.length ?? 0;
   }
 }
 
 function splitCommand(input: string): string[] {
-  return input.match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g)?.map((part) =>
-    part.replace(/^(['"])(.*)\1$/, "$2"),
-  ) ?? [];
+  return (
+    input
+      .match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g)
+      ?.map((part) => part.replace(/^(['"])(.*)\1$/, "$2")) ?? []
+  );
 }
 
 function defaultShellPath(): string {
-  const candidates = [process.env.SHELL, "/bin/zsh", "/bin/bash", "/bin/sh"].filter(
-    Boolean,
-  ) as string[];
+  const candidates = [
+    process.env.SHELL,
+    "/bin/zsh",
+    "/bin/bash",
+    "/bin/sh",
+  ].filter(Boolean) as string[];
   return candidates.find((candidate) => existsSync(candidate)) ?? "/bin/sh";
 }
 
@@ -47,6 +60,11 @@ function resolveShell(shell?: string): { file: string; args: string[] } {
 export class PtyService {
   private ptys = new Map<string, PtyInstance>();
   private nextId = 0;
+  private hookPort = 0;
+
+  setHookPort(port: number): void {
+    this.hookPort = port;
+  }
 
   create(
     worktreePath: string,
@@ -63,12 +81,15 @@ export class PtyService {
       : shellConfig.args;
     const env = {
       ...process.env,
-      PATH: process.env.PATH ? `${process.env.PATH}:${FALLBACK_PATH}` : FALLBACK_PATH,
+      PATH: process.env.PATH
+        ? `${process.env.PATH}:${FALLBACK_PATH}`
+        : FALLBACK_PATH,
       TERM: "xterm-256color",
       COLORTERM: "truecolor",
       FORGEPAD_PTY_ID: id,
       FORGEPAD_CONTEXT_DIR: ".forgepad/context",
       FORGEPAD_AGENT_COMMAND: commandText ?? "",
+      ...(this.hookPort > 0 ? { FORGEPAD_PORT: String(this.hookPort) } : {}),
       ...extraEnv,
     } as Record<string, string>;
 
@@ -83,7 +104,9 @@ export class PtyService {
       });
     } catch (error) {
       const detail = error instanceof Error ? error.message : "unknown error";
-      throw new Error(`Failed to start terminal with ${shellConfig.file}: ${detail}`);
+      throw new Error(
+        `Failed to start terminal with ${shellConfig.file}: ${detail}`,
+      );
     }
 
     const instance: PtyInstance = {
@@ -95,6 +118,22 @@ export class PtyService {
       replayChars: 0,
     };
 
+    // Write session mapping file so hook scripts can resolve port + ptyId
+    const sessionId = extraEnv?.FORGEPAD_SESSION_ID;
+    let sessionFile: string | null = null;
+    if (sessionId && this.hookPort > 0) {
+      try {
+        mkdirSync(SESSIONS_DIR, { recursive: true });
+        sessionFile = join(SESSIONS_DIR, `${sessionId}.json`);
+        writeFileSync(
+          sessionFile,
+          JSON.stringify({ port: this.hookPort, ptyId: id }),
+        );
+      } catch {
+        // Non-critical — hooks won't fire but PTY still works
+      }
+    }
+
     proc.onData((data) => {
       appendReplay(instance, data);
       if (!instance.webContents.isDestroyed()) {
@@ -104,8 +143,20 @@ export class PtyService {
 
     proc.onExit((event) => {
       this.ptys.delete(id);
+      // Clean up session mapping file
+      if (sessionFile) {
+        try {
+          unlinkSync(sessionFile);
+        } catch {
+          /* ignore */
+        }
+      }
       if (!instance.webContents.isDestroyed()) {
-        instance.webContents.send(`${IPC.PTY_EXIT}:${id}`, event.exitCode, event.signal);
+        instance.webContents.send(
+          `${IPC.PTY_EXIT}:${id}`,
+          event.exitCode,
+          event.signal,
+        );
       }
     });
 
@@ -132,7 +183,10 @@ export class PtyService {
     this.ptys.delete(id);
   }
 
-  reattach(id: string, webContents: WebContents): { replay: string; alive: boolean } {
+  reattach(
+    id: string,
+    webContents: WebContents,
+  ): { replay: string; alive: boolean } {
     const instance = this.ptys.get(id);
     if (!instance) return { replay: "", alive: false };
     instance.webContents = webContents;

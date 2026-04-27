@@ -14,7 +14,7 @@ function terminalIcon(tab: TerminalTab) {
 export function TerminalDock() {
   const tabs = useAppStore((state) => state.tabs);
   const activeWorkspaceId = useAppStore((state) => state.activeWorkspaceId);
-  const activeAgentTabId = useAppStore((state) => state.activeAgentTabId);
+  const activeShellTabId = useAppStore((state) => state.activeShellTabId);
   const workspaces = useAppStore((state) => state.workspaces);
   const setActiveTab = useAppStore((state) => state.setActiveTab);
   const closeTab = useAppStore((state) => state.closeTab);
@@ -22,7 +22,9 @@ export function TerminalDock() {
   const closeAllTabs = useAppStore((state) => state.closeAllTabs);
   const closeTabsToRight = useAppStore((state) => state.closeTabsToRight);
   const createTerminal = useAppStore((state) => state.createTerminal);
-  const setTerminalPanelOpen = useAppStore((state) => state.setTerminalPanelOpen);
+  const setTerminalPanelOpen = useAppStore(
+    (state) => state.setTerminalPanelOpen,
+  );
   const setFocusedColumn = useAppStore((state) => state.setFocusedColumn);
 
   const [contextMenu, setContextMenu] = useState<{
@@ -33,9 +35,11 @@ export function TerminalDock() {
 
   const terminalTabs = tabs.filter(
     (tab): tab is TerminalTab =>
-      tab.workspaceId === activeWorkspaceId && tab.type === "terminal",
+      tab.workspaceId === activeWorkspaceId &&
+      tab.type === "terminal" &&
+      !tab.isAgent,
   );
-  const activeId = activeAgentTabId ?? terminalTabs[0]?.id;
+  const activeId = activeShellTabId ?? terminalTabs[0]?.id;
   const activeWorkspace = workspaces.find(
     (workspace) => workspace.id === activeWorkspaceId,
   ) as Workspace | undefined;
@@ -53,7 +57,7 @@ export function TerminalDock() {
       onMouseDown={() => setFocusedColumn("agent")}
     >
       <div className="column-tabbar flex h-9 shrink-0 items-center gap-1 border-b border-border bg-[#141414] px-2">
-        <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto scrollbar-none">
+        <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto scrollbar-none scroll-mask-x">
           {terminalTabs.map((tab) => (
             <button
               className={`group flex h-8 shrink-0 items-center gap-1.5 rounded-t-md px-2.5 text-xs transition-colors${

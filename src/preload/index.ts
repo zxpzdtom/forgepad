@@ -11,18 +11,29 @@ import type {
   PersistedAppState,
   WorkspaceChangeEvent,
 } from "@shared/types";
+import type { AgentStatusUpdate } from "@shared/agent-lifecycle";
 
 const api = {
   app: {
-    openProject: () => ipcRenderer.invoke(IPC.APP_OPEN_PROJECT) as Promise<OpenProjectResult | null>,
+    openProject: () =>
+      ipcRenderer.invoke(
+        IPC.APP_OPEN_PROJECT,
+      ) as Promise<OpenProjectResult | null>,
   },
   state: {
-    load: () => ipcRenderer.invoke(IPC.STATE_LOAD) as Promise<Partial<PersistedAppState> | null>,
-    save: (state: PersistedAppState) => ipcRenderer.invoke(IPC.STATE_SAVE, state) as Promise<void>,
+    load: () =>
+      ipcRenderer.invoke(
+        IPC.STATE_LOAD,
+      ) as Promise<Partial<PersistedAppState> | null>,
+    save: (state: PersistedAppState) =>
+      ipcRenderer.invoke(IPC.STATE_SAVE, state) as Promise<void>,
   },
   git: {
     getCurrentBranch: (worktreePath: string) =>
-      ipcRenderer.invoke(IPC.GIT_CURRENT_BRANCH, worktreePath) as Promise<string>,
+      ipcRenderer.invoke(
+        IPC.GIT_CURRENT_BRANCH,
+        worktreePath,
+      ) as Promise<string>,
     getBranchStats: (worktreePath: string) =>
       ipcRenderer.invoke(IPC.GIT_BRANCH_STATS, worktreePath) as Promise<{
         ahead: number;
@@ -39,62 +50,148 @@ const api = {
       status: GitStatusKind,
       oldPath?: string,
     ) =>
-      ipcRenderer.invoke(IPC.GIT_FILE_DIFF, worktreePath, relPath, bucket, status, oldPath),
+      ipcRenderer.invoke(
+        IPC.GIT_FILE_DIFF,
+        worktreePath,
+        relPath,
+        bucket,
+        status,
+        oldPath,
+      ),
     stage: (worktreePath: string, paths: string[]) =>
       ipcRenderer.invoke(IPC.GIT_STAGE, worktreePath, paths) as Promise<void>,
     unstage: (worktreePath: string, paths: string[]) =>
       ipcRenderer.invoke(IPC.GIT_UNSTAGE, worktreePath, paths) as Promise<void>,
-    discard: (worktreePath: string, entries: Array<{ path: string; bucket: GitBucket }>) =>
-      ipcRenderer.invoke(IPC.GIT_DISCARD, worktreePath, entries) as Promise<void>,
+    discard: (
+      worktreePath: string,
+      entries: Array<{ path: string; bucket: GitBucket }>,
+    ) =>
+      ipcRenderer.invoke(
+        IPC.GIT_DISCARD,
+        worktreePath,
+        entries,
+      ) as Promise<void>,
     commit: (worktreePath: string, message: string) =>
-      ipcRenderer.invoke(IPC.GIT_COMMIT, worktreePath, message) as Promise<void>,
+      ipcRenderer.invoke(
+        IPC.GIT_COMMIT,
+        worktreePath,
+        message,
+      ) as Promise<void>,
   },
   fs: {
     getTreeWithStatus: (worktreePath: string) =>
-      ipcRenderer.invoke(IPC.FS_TREE_WITH_STATUS, worktreePath) as Promise<FileNode[]>,
+      ipcRenderer.invoke(IPC.FS_TREE_WITH_STATUS, worktreePath) as Promise<
+        FileNode[]
+      >,
     listFiles: (worktreePath: string) =>
       ipcRenderer.invoke(IPC.FS_LIST_FILES, worktreePath) as Promise<string[]>,
     readFile: (worktreePath: string, relPath: string) =>
-      ipcRenderer.invoke(IPC.FS_READ_FILE, worktreePath, relPath) as Promise<string>,
+      ipcRenderer.invoke(
+        IPC.FS_READ_FILE,
+        worktreePath,
+        relPath,
+      ) as Promise<string>,
     readFileAsDataUrl: (worktreePath: string, relPath: string) =>
-      ipcRenderer.invoke(IPC.FS_READ_FILE_DATA_URL, worktreePath, relPath) as Promise<string>,
+      ipcRenderer.invoke(
+        IPC.FS_READ_FILE_DATA_URL,
+        worktreePath,
+        relPath,
+      ) as Promise<string>,
     writeFile: (worktreePath: string, relPath: string, content: string) =>
-      ipcRenderer.invoke(IPC.FS_WRITE_FILE, worktreePath, relPath, content) as Promise<void>,
+      ipcRenderer.invoke(
+        IPC.FS_WRITE_FILE,
+        worktreePath,
+        relPath,
+        content,
+      ) as Promise<void>,
     watchWorkspace: (worktreePath: string) =>
       ipcRenderer.invoke(IPC.FS_WATCH, worktreePath) as Promise<string>,
-    unwatchWorkspace: (watchId: string) => ipcRenderer.send(IPC.FS_UNWATCH, watchId),
-    onChanged: (watchId: string, callback: (event: WorkspaceChangeEvent) => void) => {
+    unwatchWorkspace: (watchId: string) =>
+      ipcRenderer.send(IPC.FS_UNWATCH, watchId),
+    onChanged: (
+      watchId: string,
+      callback: (event: WorkspaceChangeEvent) => void,
+    ) => {
       const channel = `${IPC.FS_CHANGED}:${watchId}`;
-      const listener = (_event: Electron.IpcRendererEvent, payload: WorkspaceChangeEvent) => callback(payload);
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        payload: WorkspaceChangeEvent,
+      ) => callback(payload);
       ipcRenderer.on(channel, listener);
       return () => ipcRenderer.removeListener(channel, listener);
     },
   },
   pty: {
-    create: (worktreePath: string, shell?: string, command?: string, extraEnv?: Record<string, string>) =>
-      ipcRenderer.invoke(IPC.PTY_CREATE, worktreePath, shell, command, extraEnv) as Promise<string>,
-    write: (id: string, data: string) => ipcRenderer.send(IPC.PTY_WRITE, id, data),
-    resize: (id: string, cols: number, rows: number) => ipcRenderer.send(IPC.PTY_RESIZE, id, cols, rows),
+    create: (
+      worktreePath: string,
+      shell?: string,
+      command?: string,
+      extraEnv?: Record<string, string>,
+    ) =>
+      ipcRenderer.invoke(
+        IPC.PTY_CREATE,
+        worktreePath,
+        shell,
+        command,
+        extraEnv,
+      ) as Promise<string>,
+    write: (id: string, data: string) =>
+      ipcRenderer.send(IPC.PTY_WRITE, id, data),
+    resize: (id: string, cols: number, rows: number) =>
+      ipcRenderer.send(IPC.PTY_RESIZE, id, cols, rows),
     destroy: (id: string) => ipcRenderer.send(IPC.PTY_DESTROY, id),
     reattach: (id: string) =>
-      ipcRenderer.invoke(IPC.PTY_REATTACH, id) as Promise<{ replay: string; alive: boolean }>,
+      ipcRenderer.invoke(IPC.PTY_REATTACH, id) as Promise<{
+        replay: string;
+        alive: boolean;
+      }>,
     onData: (id: string, callback: (data: string) => void) => {
       const channel = `${IPC.PTY_DATA}:${id}`;
-      const listener = (_event: Electron.IpcRendererEvent, data: string) => callback(data);
+      const listener = (_event: Electron.IpcRendererEvent, data: string) =>
+        callback(data);
       ipcRenderer.on(channel, listener);
       return () => ipcRenderer.removeListener(channel, listener);
     },
-    onExit: (id: string, callback: (exitCode: number, signal?: number) => void) => {
+    onExit: (
+      id: string,
+      callback: (exitCode: number, signal?: number) => void,
+    ) => {
       const channel = `${IPC.PTY_EXIT}:${id}`;
-      const listener = (_event: Electron.IpcRendererEvent, exitCode: number, signal?: number) =>
-        callback(exitCode, signal);
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        exitCode: number,
+        signal?: number,
+      ) => callback(exitCode, signal);
       ipcRenderer.on(channel, listener);
       return () => ipcRenderer.removeListener(channel, listener);
     },
   },
   context: {
     createBundle: (input: CreateBundleInput) =>
-      ipcRenderer.invoke(IPC.CONTEXT_CREATE_BUNDLE, input) as Promise<ContextBundleResult>,
+      ipcRenderer.invoke(
+        IPC.CONTEXT_CREATE_BUNDLE,
+        input,
+      ) as Promise<ContextBundleResult>,
+  },
+  agent: {
+    onStatusUpdate: (callback: (update: AgentStatusUpdate) => void) => {
+      const handler = (
+        _event: Electron.IpcRendererEvent,
+        update: AgentStatusUpdate,
+      ) => callback(update);
+      ipcRenderer.on(IPC.AGENT_STATUS_UPDATE, handler);
+      return () => {
+        ipcRenderer.removeListener(IPC.AGENT_STATUS_UPDATE, handler);
+      };
+    },
+    onFocusTab: (callback: (ptyId: string) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, ptyId: string) =>
+        callback(ptyId);
+      ipcRenderer.on(IPC.AGENT_FOCUS_TAB, handler);
+      return () => {
+        ipcRenderer.removeListener(IPC.AGENT_FOCUS_TAB, handler);
+      };
+    },
   },
   shell: {
     openPath: (fullPath: string) =>
@@ -104,11 +201,30 @@ const api = {
     openInTerminal: (fullPath: string) =>
       ipcRenderer.invoke(IPC.SHELL_OPEN_IN_TERMINAL, fullPath) as Promise<void>,
     showItemInFolder: (fullPath: string) =>
-      ipcRenderer.invoke(IPC.SHELL_SHOW_ITEM_IN_FOLDER, fullPath) as Promise<void>,
+      ipcRenderer.invoke(
+        IPC.SHELL_SHOW_ITEM_IN_FOLDER,
+        fullPath,
+      ) as Promise<void>,
     detectIdes: () =>
-      ipcRenderer.invoke(IPC.SHELL_DETECT_IDES) as Promise<Array<{ id: string; label: string; command: string; appName?: string }>>,
+      ipcRenderer.invoke(IPC.SHELL_DETECT_IDES) as Promise<
+        Array<{ id: string; label: string; command: string; appName?: string }>
+      >,
     openWithIde: (fullPath: string, ideId: string) =>
-      ipcRenderer.invoke(IPC.SHELL_OPEN_WITH_IDE, fullPath, ideId) as Promise<void>,
+      ipcRenderer.invoke(
+        IPC.SHELL_OPEN_WITH_IDE,
+        fullPath,
+        ideId,
+      ) as Promise<void>,
+    detectTerminals: () =>
+      ipcRenderer.invoke(IPC.SHELL_DETECT_TERMINALS) as Promise<
+        Array<{ id: string; label: string; appName: string }>
+      >,
+    openWithTerminal: (fullPath: string, terminalId: string) =>
+      ipcRenderer.invoke(
+        IPC.SHELL_OPEN_WITH_TERMINAL,
+        fullPath,
+        terminalId,
+      ) as Promise<void>,
   },
 };
 

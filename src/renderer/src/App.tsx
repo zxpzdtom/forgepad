@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Allotment } from "allotment";
 import {
   Bot,
@@ -8,7 +8,10 @@ import {
   TerminalSquare,
 } from "lucide-react";
 import { Sidebar } from "@renderer/components/Sidebar";
+import { AgentColumn } from "@renderer/components/AgentColumn";
 import { AgentQuickBar } from "@renderer/components/AgentQuickBar";
+import { AgentTabBar } from "@renderer/components/AgentTabBar";
+import { useAgentLifecycle } from "@renderer/hooks/useAgentLifecycle";
 import { FileColumn } from "@renderer/components/FileColumn";
 import { QuickSearch } from "@renderer/components/QuickSearch";
 import { RightPanel } from "@renderer/components/RightPanel";
@@ -19,7 +22,14 @@ import { ToastStack } from "@renderer/components/ToastStack";
 import { useAppStore } from "@renderer/store/app-store";
 
 export function App() {
+  useAgentLifecycle();
   const [quickSearchOpen, setQuickSearchOpen] = useState(false);
+  const terminalHeightRef = useRef(240);
+  const verticalSplitRef = useRef<{
+    reset: () => void;
+    resize: (sizes: number[]) => void;
+  } | null>(null);
+  const prevShellDockVisibleRef = useRef(false);
   const hydrated = useAppStore((state) => state.hydrated);
   const projects = useAppStore((state) => state.projects);
   const workspaces = useAppStore((state) => state.workspaces);
@@ -126,7 +136,7 @@ export function App() {
         return;
       }
 
-      // Cmd+1~9: switch workspace by global sidebar order
+      // Cmd+1~9: context-sensitive switch based on focused panel
       if (
         !event.shiftKey &&
         !event.altKey &&
@@ -134,17 +144,42 @@ export function App() {
       ) {
         event.preventDefault();
         const state = useAppStore.getState();
-        const orderedIds: string[] = [];
-        for (const project of state.projects) {
-          for (const ws of state.workspaces.filter(
-            (w) => w.projectId === project.id,
-          )) {
-            orderedIds.push(ws.id);
-          }
-        }
         const idx = parseInt(key, 10) - 1;
-        if (idx < orderedIds.length) {
-          state.setActiveWorkspace(orderedIds[idx]);
+
+        if (focusedColumn === "agent") {
+          // Switch agent tabs by index
+          const agentTabs = state.tabs.filter(
+            (t) =>
+              t.workspaceId === state.activeWorkspaceId &&
+              t.type === "terminal" &&
+              t.isAgent,
+          );
+          if (idx < agentTabs.length) {
+            setActiveTab(agentTabs[idx].id);
+          }
+        } else if (focusedColumn === "file") {
+          // Switch file tabs by index
+          const fileTabs = state.tabs.filter(
+            (t) =>
+              t.workspaceId === state.activeWorkspaceId &&
+              t.type !== "terminal",
+          );
+          if (idx < fileTabs.length) {
+            setActiveTab(fileTabs[idx].id);
+          }
+        } else {
+          // Switch workspace by global sidebar order
+          const orderedIds: string[] = [];
+          for (const project of state.projects) {
+            for (const ws of state.workspaces.filter(
+              (w) => w.projectId === project.id,
+            )) {
+              orderedIds.push(ws.id);
+            }
+          }
+          if (idx < orderedIds.length) {
+            state.setActiveWorkspace(orderedIds[idx]);
+          }
         }
         return;
       }
@@ -250,10 +285,33 @@ export function App() {
   const workspaceTabs = tabs.filter(
     (tab) => tab.workspaceId === activeWorkspaceId,
   );
-  const hasTerminalTabs = workspaceTabs.some(
-    (tab) => tab.type === "terminal",
+  const hasAgentTabs = workspaceTabs.some(
+    (tab) => tab.type === "terminal" && tab.isAgent,
   );
+  const hasShellTabs = workspaceTabs.some(
+    (tab) => tab.type === "terminal" && !tab.isAgent,
+  );
+  const hasTerminalTabs = hasAgentTabs || hasShellTabs;
   const hasFileTabs = workspaceTabs.some((tab) => tab.type !== "terminal");
+
+  // Restore remembered terminal height when dock becomes visible
+  const shellDockVisibleEarly = terminalPanelOpen && hasShellTabs;
+  useEffect(() => {
+    if (shellDockVisibleEarly && !prevShellDockVisibleRef.current) {
+      requestAnimationFrame(() => {
+        const handle = verticalSplitRef.current;
+        if (!handle) return;
+        const container = document.querySelector<HTMLElement>(
+          ".terminal-vertical-split",
+        );
+        if (!container) return;
+        const total = container.clientHeight;
+        const termH = terminalHeightRef.current;
+        handle.resize([total - termH, termH]);
+      });
+    }
+    prevShellDockVisibleRef.current = shellDockVisibleEarly;
+  }, [shellDockVisibleEarly]);
 
   const renderEmptyState = () => {
     if (projects.length === 0) {
@@ -262,7 +320,9 @@ export function App() {
           <div className="grid size-14 place-items-center rounded-lg border border-border bg-panel-2 text-accent">
             <FolderOpen size={32} />
           </div>
-          <h1 className="m-0 text-[22px] font-semibold">Open a repository to start</h1>
+          <h1 className="m-0 text-[22px] font-semibold">
+            Open a repository to start
+          </h1>
           <p className="m-0 max-w-[460px] leading-relaxed text-muted">
             ForgePad keeps the agent loop terminal-first, with file context and
             git diffs close at hand.
@@ -282,7 +342,9 @@ export function App() {
     return (
       <section className="flex size-full flex-col items-center justify-center gap-3.5 p-8 text-center">
         <TerminalSquare size={30} />
-        <h1 className="m-0 text-[22px] font-semibold">{activeWorkspace?.name ?? "No workspace selected"}</h1>
+        <h1 className="m-0 text-[22px] font-semibold">
+          {activeWorkspace?.name ?? "No workspace selected"}
+        </h1>
         <p className="m-0 max-w-[460px] leading-relaxed text-muted flex items-center gap-[7px]">
           {activeWorkspace ? (
             <>
@@ -326,7 +388,7 @@ export function App() {
   }
 
   const hasAnyContent = hasFileTabs || hasTerminalTabs;
-  const terminalDockVisible = terminalPanelOpen && hasTerminalTabs;
+  const shellDockVisible = terminalPanelOpen && hasShellTabs;
 
   const renderWorkspaceArea = () => {
     if (!hasFileTabs) {
@@ -343,31 +405,95 @@ export function App() {
     return <FileColumn />;
   };
 
+  const renderMiddleContent = () => {
+    // Horizontal split: Agent (left) | File (right)
+    if (hasAgentTabs && hasFileTabs) {
+      return (
+        <Allotment proportionalLayout={false} className="columns-split">
+          <Allotment.Pane
+            preferredSize="50%"
+            minSize={280}
+            className={focusedColumn === "agent" ? "pane-focused" : ""}
+          >
+            <div className="flex size-full min-h-0 flex-col">
+              <AgentTabBar />
+              <AgentQuickBar />
+              <div className="relative min-h-0 flex-1 overflow-hidden">
+                <AgentColumn />
+              </div>
+            </div>
+          </Allotment.Pane>
+          <Allotment.Pane
+            minSize={280}
+            className={focusedColumn === "file" ? "pane-focused" : ""}
+          >
+            <div className="flex size-full min-h-0 flex-col">
+              <TabBar />
+              <div className="relative min-h-0 flex-1 overflow-hidden">
+                <FileColumn />
+              </div>
+            </div>
+          </Allotment.Pane>
+        </Allotment>
+      );
+    }
+
+    // Agent only (no file tabs)
+    if (hasAgentTabs) {
+      return (
+        <div
+          className={`flex size-full min-h-0 flex-col${focusedColumn === "agent" ? " pane-focused" : ""}`}
+        >
+          <AgentTabBar />
+          <AgentQuickBar />
+          <div className="relative min-h-0 flex-1 overflow-hidden">
+            <AgentColumn />
+          </div>
+        </div>
+      );
+    }
+
+    // File only or empty state
+    if (hasFileTabs) {
+      return (
+        <div className="flex size-full min-h-0 flex-col">
+          <AgentQuickBar />
+          <TabBar />
+          <div className="relative min-h-0 flex-1 overflow-hidden">
+            <FileColumn />
+          </div>
+        </div>
+      );
+    }
+
+    return renderWorkspaceArea();
+  };
+
   const renderWorkspaceFrame = () => (
     <main className="flex size-full min-h-0 flex-col bg-bg">
-      <TabBar />
-      <AgentQuickBar />
+      {!hasAgentTabs && !hasFileTabs && <AgentQuickBar />}
       <div className="min-h-0 flex-1 overflow-hidden">
-        {terminalDockVisible ? (
-          <Allotment vertical proportionalLayout={false}>
-            <Allotment.Pane
-              minSize={220}
-              className={focusedColumn === "file" ? "pane-focused" : ""}
-            >
-              {renderWorkspaceArea()}
-            </Allotment.Pane>
-            <Allotment.Pane
-              preferredSize={300}
-              minSize={160}
-              maxSize={560}
-              className={focusedColumn === "agent" ? "pane-focused" : ""}
-            >
-              <TerminalDock />
-            </Allotment.Pane>
-          </Allotment>
-        ) : (
-          renderWorkspaceArea()
-        )}
+        <Allotment
+          ref={verticalSplitRef}
+          className="terminal-vertical-split"
+          vertical
+          proportionalLayout={false}
+          onChange={(sizes) => {
+            if (shellDockVisible && sizes.length === 2 && sizes[1] > 0) {
+              terminalHeightRef.current = sizes[1];
+            }
+          }}
+        >
+          <Allotment.Pane minSize={220}>{renderMiddleContent()}</Allotment.Pane>
+          <Allotment.Pane
+            key="terminal-dock"
+            preferredSize={shellDockVisible ? terminalHeightRef.current : 0}
+            minSize={shellDockVisible ? 120 : 0}
+            visible={shellDockVisible}
+          >
+            <TerminalDock />
+          </Allotment.Pane>
+        </Allotment>
       </div>
     </main>
   );

@@ -222,7 +222,7 @@ export function DiffViewer({ tab, workspace }: DiffViewerProps) {
           Select a changed file from the Changes panel
         </div>
       ) : null}
-      <div className="flex min-h-0 flex-1 overflow-auto p-3 scrollbar-thin">
+      <div className="flex min-h-0 flex-1 overflow-auto p-3 scrollbar-thin scroll-mask">
         {diffs.map((file) => {
           const selectedStatus = statuses.find(
             (status) => keyForStatus(status) === `${file.bucket}:${file.path}`,
