@@ -135,7 +135,7 @@ export function FilesPanel() {
     icons: { set: "complete", colored: true },
     renderRowDecoration: ({ item }) =>
       contextFileSet.has(item.path)
-        ? { text: "ctx", title: "In AI context" }
+        ? { text: "", title: "In AI context" }
         : null,
   });
 

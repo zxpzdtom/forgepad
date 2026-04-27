@@ -1,5 +1,6 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type KeyboardEvent, type ReactNode } from "react";
 import {
+  closestCenter,
   DndContext,
   PointerSensor,
   useSensor,
@@ -16,24 +17,31 @@ import {
   ChevronRight,
   FolderOpen,
   FolderPlus,
-  PanelLeftClose,
-  PanelLeftOpen,
   Plus,
+  X,
 } from "lucide-react";
 import { useAppStore } from "@renderer/store/app-store";
 
-function SortableProjectHeader({
+type SidebarWorkspace = { id: string; name: string; branch: string };
+
+function SortableProjectGroup({
   projectId,
   name,
   workspaceCount,
   isCollapsed,
+  hasActive,
+  children,
   onToggle,
+  onRemove,
 }: {
   projectId: string;
   name: string;
   workspaceCount: number;
   isCollapsed: boolean;
+  hasActive: boolean;
+  children: ReactNode;
   onToggle: () => void;
+  onRemove: () => void;
 }) {
   const {
     attributes,
@@ -42,31 +50,59 @@ function SortableProjectHeader({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: projectId });
+  } = useSortable({ id: projectId, data: { type: "project" } });
 
   const style = {
     transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
+    transition: transition ?? "transform 180ms cubic-bezier(0.2, 0, 0, 1)",
+    opacity: isDragging ? 0.74 : 1,
+    zIndex: isDragging ? 20 : undefined,
+    willChange: "transform",
+  };
+
+  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      onToggle();
+    }
   };
 
   return (
-    <button
+    <div
       ref={setNodeRef}
       style={style}
-      className={`flex h-8 w-full cursor-grab items-center gap-1 rounded-md bg-transparent px-1.5 text-left text-text${isDragging ? " opacity-40 z-10" : ""}`}
-      type="button"
-      onClick={onToggle}
-      {...attributes}
-      {...listeners}
+      className={`group/sidebar-project flex flex-col rounded-lg${hasActive ? " bg-panel-2/55" : ""}${isDragging ? " shadow-[0_16px_34px_rgba(0,0,0,0.28)] ring-1 ring-accent/25" : ""}`}
     >
-      <ChevronRight
-        size={14}
-        className={`text-subtle shrink-0 transition-transform duration-150 ease-[ease]${isCollapsed ? "" : " rotate-90"}`}
-      />
-      <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[13px] font-[620]">{name}</span>
-      <small className="shrink-0 text-[11px] text-subtle">{workspaceCount}</small>
-    </button>
+      <div
+        className="flex h-8 w-full cursor-grab items-center gap-1 rounded-md bg-transparent px-1.5 text-left text-text transition-colors duration-150 hover:bg-panel-2 active:cursor-grabbing"
+        role="button"
+        tabIndex={0}
+        onClick={onToggle}
+        onKeyDown={handleKeyDown}
+        {...attributes}
+        {...listeners}
+      >
+        <ChevronRight
+          size={14}
+          className={`shrink-0 text-subtle transition-transform duration-150 ease-[ease]${isCollapsed ? "" : " rotate-90"}`}
+        />
+        <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[13px] font-[620]">{name}</span>
+        <small className="shrink-0 text-[11px] text-subtle">{workspaceCount}</small>
+        <button
+          className="grid size-5 shrink-0 place-items-center rounded text-subtle opacity-0 transition-opacity hover:bg-panel-3 hover:text-danger group-hover/sidebar-project:opacity-100 focus:opacity-100"
+          type="button"
+          title="Remove project"
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={(event) => {
+            event.stopPropagation();
+            onRemove();
+          }}
+        >
+          <X size={12} />
+        </button>
+      </div>
+      {children}
+    </div>
   );
 }
 
@@ -75,14 +111,18 @@ function SortableWorkspaceRow({
   globalIndex,
   isActive,
   onClick,
+  onRemove,
 }: {
-  workspace: { id: string; name: string; branch: string };
+  workspace: SidebarWorkspace;
   globalIndex: number;
   isActive: boolean;
   onClick: () => void;
+  onRemove: () => void;
 }) {
   const branchStats = useAppStore((state) => state.branchStats[workspace.id]);
   const stats = branchStats ?? { ahead: 0, behind: 0, additions: 0, deletions: 0 };
+  const hasDiffStats = stats.additions > 0 || stats.deletions > 0;
+  const hasRemoteStats = stats.ahead > 0 || stats.behind > 0;
 
   const {
     attributes,
@@ -91,21 +131,32 @@ function SortableWorkspaceRow({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: workspace.id });
+  } = useSortable({ id: workspace.id, data: { type: "workspace" } });
 
   const style = {
     transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
+    transition: transition ?? "transform 180ms cubic-bezier(0.2, 0, 0, 1)",
+    opacity: isDragging ? 0.68 : 1,
+    zIndex: isDragging ? 30 : undefined,
+    willChange: "transform",
+  };
+
+  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      onClick();
+    }
   };
 
   return (
-    <button
+    <div
       ref={setNodeRef}
       style={style}
-      className={`relative flex w-full items-start gap-2.5 rounded-md bg-transparent px-3 py-2 text-left${isActive ? " bg-[#172424]" : " hover:bg-panel-2/40"}${isDragging ? " opacity-40 z-10" : ""}`}
-      type="button"
+      className={`group/sidebar-workspace relative flex w-full cursor-grab items-start gap-2.5 rounded-md bg-transparent px-3 py-2 pr-8 text-left transition-[background,box-shadow] duration-150 active:cursor-grabbing${isActive ? " bg-[#172424]" : " hover:bg-panel-2/45"}${isDragging ? " shadow-[0_14px_28px_rgba(0,0,0,0.26)] ring-1 ring-accent/20" : ""}`}
+      role="button"
+      tabIndex={0}
       onClick={onClick}
+      onKeyDown={handleKeyDown}
       {...attributes}
       {...listeners}
     >
@@ -116,13 +167,10 @@ function SortableWorkspaceRow({
         <span className={`block size-2 rounded-full ${isActive ? "bg-accent" : "bg-muted"}`} />
       </div>
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <div className="flex items-center gap-1.5">
-          <span className="overflow-hidden text-ellipsis whitespace-nowrap text-[13px] font-medium">{workspace.name}</span>
-          {stats.ahead > 0 && (
-            <span className="shrink-0 text-[10px] font-mono text-[#34d399]">↑{stats.ahead}</span>
-          )}
-          {(stats.additions > 0 || stats.deletions > 0) && (
-            <span className="flex shrink-0 items-center gap-1 text-[10px] font-mono">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[13px] font-medium">{workspace.name}</span>
+          {hasDiffStats && (
+            <span className="flex shrink-0 items-center gap-1 rounded bg-panel-3 px-1.5 py-0.5 text-[10px] font-mono">
               {stats.additions > 0 && (
                 <span className="text-[#34d399]">+{stats.additions}</span>
               )}
@@ -132,12 +180,33 @@ function SortableWorkspaceRow({
             </span>
           )}
         </div>
-        <span className="overflow-hidden text-ellipsis whitespace-nowrap font-mono text-[11px] text-subtle">
-          {workspace.branch || "detached"}
-        </span>
+        <div className="flex min-w-0 items-center gap-2">
+          <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap font-mono text-[11px] text-subtle">
+            {workspace.branch || "detached"}
+          </span>
+          {hasRemoteStats && (
+            <span className="shrink-0 font-mono text-[10px] text-subtle">
+              {stats.ahead > 0 ? `↑${stats.ahead}` : ""}
+              {stats.ahead > 0 && stats.behind > 0 ? " " : ""}
+              {stats.behind > 0 ? `↓${stats.behind}` : ""}
+            </span>
+          )}
+          <span className="shrink-0 text-[10px] text-subtle/40 tabular-nums">⌘{globalIndex + 1}</span>
+        </div>
       </div>
-      <span className="absolute bottom-[3px] right-1.5 pointer-events-none text-[10px] text-subtle/40 tabular-nums">⌘{globalIndex + 1}</span>
-    </button>
+      <button
+        className="absolute right-1.5 top-1.5 grid size-5 place-items-center rounded text-subtle opacity-0 transition-opacity hover:bg-panel-3 hover:text-danger group-hover/sidebar-workspace:opacity-100 focus:opacity-100"
+        type="button"
+        title="Remove branch"
+        onPointerDown={(event) => event.stopPropagation()}
+        onClick={(event) => {
+          event.stopPropagation();
+          onRemove();
+        }}
+      >
+        <X size={12} />
+      </button>
+    </div>
   );
 }
 
@@ -180,6 +249,8 @@ export function Sidebar() {
   const setActiveWorkspace = useAppStore((state) => state.setActiveWorkspace);
   const reorderProjects = useAppStore((state) => state.reorderProjects);
   const reorderWorkspaces = useAppStore((state) => state.reorderWorkspaces);
+  const removeProject = useAppStore((state) => state.removeProject);
+  const removeWorkspace = useAppStore((state) => state.removeWorkspace);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -221,13 +292,20 @@ export function Sidebar() {
     const activeId = String(active.id);
     const overId = String(over.id);
 
-    // Check if it's a project-level drag
-    if (projects.some((p) => p.id === activeId) && projects.some((p) => p.id === overId)) {
-      reorderProjects(activeId, overId);
+    const activeProject = projects.find((project) => project.id === activeId);
+    if (activeProject) {
+      const overProject =
+        projects.find((project) => project.id === overId) ??
+        projects.find(
+          (project) =>
+            project.id === workspaces.find((workspace) => workspace.id === overId)?.projectId,
+        );
+      if (overProject && activeProject.id !== overProject.id) {
+        reorderProjects(activeProject.id, overProject.id);
+      }
       return;
     }
 
-    // Check if it's a workspace-level drag (same project)
     const activeWs = workspaces.find((w) => w.id === activeId);
     const overWs = workspaces.find((w) => w.id === overId);
     if (activeWs && overWs && activeWs.projectId === overWs.projectId) {
@@ -235,18 +313,26 @@ export function Sidebar() {
     }
   };
 
+  const confirmRemoveProject = (projectId: string, projectName: string) => {
+    const confirmed = window.confirm(
+      `Remove ${projectName} from ForgePad? Files stay on disk.`,
+    );
+    if (confirmed) removeProject(projectId);
+  };
+
+  const confirmRemoveWorkspace = (
+    workspaceId: string,
+    workspaceName: string,
+  ) => {
+    const confirmed = window.confirm(
+      `Remove ${workspaceName} from ForgePad? Files stay on disk.`,
+    );
+    if (confirmed) removeWorkspace(workspaceId);
+  };
+
   if (!sidebarOpen) {
     return (
       <aside className="flex h-full min-h-0 flex-col items-center gap-1.5 border-r border-border bg-panel px-2 py-2.5">
-        <button
-          className="icon-button border-transparent"
-          type="button"
-          title="Expand sidebar"
-          onClick={() => useAppStore.setState({ sidebarOpen: true })}
-        >
-          <PanelLeftOpen size={16} />
-        </button>
-
         <div className="grid gap-1">
           {!hydrated ? (
             <>
@@ -288,29 +374,19 @@ export function Sidebar() {
 
   return (
     <aside className="flex h-full min-h-0 flex-col border-r border-border bg-panel">
-      <div className="flex items-center justify-between gap-2 px-3 pb-2.5 pt-[38px]">
+      <div className="flex items-center justify-between gap-2 px-3 py-2.5">
         <div className="flex items-center gap-2.5">
           <div className="grid size-6.5 place-items-center rounded-md bg-accent text-[13px] font-extrabold text-[#071110]">F</div>
           <span className="text-[15px] font-bold tracking-tight">ForgePad</span>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            className="icon-button"
-            type="button"
-            title="Open project"
-            onClick={openProject}
-          >
-            <Plus size={16} />
-          </button>
-          <button
-            className="icon-button"
-            type="button"
-            title="Collapse sidebar"
-            onClick={() => useAppStore.setState({ sidebarOpen: false })}
-          >
-            <PanelLeftClose size={16} />
-          </button>
-        </div>
+        <button
+          className="icon-button"
+          type="button"
+          title="Open project"
+          onClick={openProject}
+        >
+          <Plus size={16} />
+        </button>
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto px-2 py-1.5 scrollbar-thin">
@@ -326,7 +402,11 @@ export function Sidebar() {
             <span>Open a project to get started</span>
           </button>
         ) : (
-          <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragEnd={handleDragEnd}
+          >
             <SortableContext
               items={projectIds}
               strategy={verticalListSortingStrategy}
@@ -343,33 +423,43 @@ export function Sidebar() {
 
                 return (
                   <div
-                    className={`flex flex-col${projectIdx > 0 ? " mt-2 border-t border-border/30 pt-2" : ""}${hasActive ? " has-active" : ""}`}
+                    className={projectIdx > 0 ? "mt-2 border-t border-border/30 pt-2" : ""}
                     key={project.id}
                   >
-                    <SortableProjectHeader
+                    <SortableProjectGroup
                       projectId={project.id}
                       name={project.name}
                       workspaceCount={projectWorkspaces.length}
                       isCollapsed={isCollapsed}
+                      hasActive={hasActive}
                       onToggle={() => toggleProject(project.id)}
-                    />
-
-                    {!isCollapsed && (
-                      <SortableContext
-                        items={wsIds}
-                        strategy={verticalListSortingStrategy}
-                      >
-                        {projectWorkspaces.map((workspace) => (
-                          <SortableWorkspaceRow
-                            key={workspace.id}
-                            workspace={workspace}
-                            globalIndex={workspaceIndexMap.get(workspace.id) ?? 0}
-                            isActive={workspace.id === activeWorkspaceId}
-                            onClick={() => setActiveWorkspace(workspace.id)}
-                          />
-                        ))}
-                      </SortableContext>
-                    )}
+                      onRemove={() => confirmRemoveProject(project.id, project.name)}
+                    >
+                      {!isCollapsed && (
+                        <SortableContext
+                          items={wsIds}
+                          strategy={verticalListSortingStrategy}
+                        >
+                          <div className="grid gap-0.5 pb-1">
+                            {projectWorkspaces.map((workspace) => (
+                              <SortableWorkspaceRow
+                                key={workspace.id}
+                                workspace={workspace}
+                                globalIndex={workspaceIndexMap.get(workspace.id) ?? 0}
+                                isActive={workspace.id === activeWorkspaceId}
+                                onClick={() => setActiveWorkspace(workspace.id)}
+                                onRemove={() =>
+                                  confirmRemoveWorkspace(
+                                    workspace.id,
+                                    workspace.branch || workspace.name,
+                                  )
+                                }
+                              />
+                            ))}
+                          </div>
+                        </SortableContext>
+                      )}
+                    </SortableProjectGroup>
                   </div>
                 );
               })}

@@ -1,7 +1,9 @@
 import { BrowserWindow, dialog, ipcMain, shell } from "electron";
+import { execFile } from "node:child_process";
 import { watch as watchFs } from "node:fs";
 import type { FSWatcher } from "node:fs";
 import path from "node:path";
+import { promisify } from "node:util";
 import { IPC } from "@shared/ipc";
 import type { CreateBundleInput, PersistedAppState, WorkspaceChangeEvent } from "@shared/types";
 import { ContextService } from "@main/services/context-service";
@@ -12,6 +14,7 @@ import { PtyService } from "@main/services/pty-service";
 import { StateService } from "@main/services/state-service";
 
 const ptyService = new PtyService();
+const execFileAsync = promisify(execFile);
 
 type FileWatch = {
   watcher: FSWatcher;
@@ -91,6 +94,111 @@ function createFileWatch(rootPath: string, webContentsId: number): string {
   return id;
 }
 
+async function openInTerminal(fullPath: string): Promise<void> {
+  if (process.platform === "darwin") {
+    await execFileAsync("open", ["-a", "Terminal", fullPath]);
+    return;
+  }
+
+  if (process.platform === "win32") {
+    await execFileAsync("cmd", ["/c", "start", "wt", "-d", fullPath]);
+    return;
+  }
+
+  await execFileAsync("x-terminal-emulator", ["--working-directory", fullPath]);
+}
+
+async function openInIde(fullPath: string): Promise<void> {
+  const commands =
+    process.env.FORGEPAD_IDE_COMMAND?.split(",").map((item) => item.trim()).filter(Boolean) ??
+    [];
+  const candidates =
+    commands.length > 0
+      ? commands
+      : ["code", "cursor", "windsurf", "zed"];
+
+  for (const command of candidates) {
+    try {
+      await execFileAsync(command, [fullPath]);
+      return;
+    } catch {
+      // Try the next common editor command.
+    }
+  }
+
+  if (process.platform === "darwin") {
+    for (const appName of ["Cursor", "Visual Studio Code", "Windsurf", "Zed"]) {
+      try {
+        await execFileAsync("open", ["-a", appName, fullPath]);
+        return;
+      } catch {
+        // Try the next installed editor app.
+      }
+    }
+  }
+
+  throw new Error("No supported IDE command found.");
+}
+
+type DetectedIde = {
+  id: string;
+  label: string;
+  command: string;
+  appName?: string;
+};
+
+const IDE_CANDIDATES: Array<{ id: string; label: string; command: string; appName: string }> = [
+  { id: "zed", label: "Zed", command: "zed", appName: "Zed" },
+  { id: "vscode", label: "VS Code", command: "code", appName: "Visual Studio Code" },
+  { id: "cursor", label: "Cursor", command: "cursor", appName: "Cursor" },
+  { id: "windsurf", label: "Windsurf", command: "windsurf", appName: "Windsurf" },
+];
+
+async function detectIdes(): Promise<DetectedIde[]> {
+  const results: DetectedIde[] = [];
+  for (const ide of IDE_CANDIDATES) {
+    if (process.platform === "darwin") {
+      try {
+        await execFileAsync("mdfind", [`kMDItemCFBundleIdentifier == '*${ide.id}*' || kMDItemFSName == '${ide.appName}.app'`], { timeout: 3000 });
+        // Check if CLI command exists
+        try {
+          await execFileAsync("which", [ide.command], { timeout: 2000 });
+          results.push({ id: ide.id, label: ide.label, command: ide.command, appName: ide.appName });
+          continue;
+        } catch {
+          // CLI not found, try app path
+        }
+        // Check if app exists via open -a
+        try {
+          await execFileAsync("open", ["-a", ide.appName, "--args", "--version"], { timeout: 3000 });
+          results.push({ id: ide.id, label: ide.label, command: ide.command, appName: ide.appName });
+        } catch {
+          // App not found either
+        }
+      } catch {
+        // Not found
+      }
+    }
+  }
+  return results;
+}
+
+async function openWithIde(fullPath: string, ideId: string): Promise<void> {
+  const ide = IDE_CANDIDATES.find((c) => c.id === ideId);
+  if (!ide) throw new Error(`Unknown IDE: ${ideId}`);
+  try {
+    await execFileAsync(ide.command, [fullPath]);
+    return;
+  } catch {
+    // CLI failed, try app
+  }
+  if (process.platform === "darwin" && ide.appName) {
+    await execFileAsync("open", ["-a", ide.appName, fullPath]);
+    return;
+  }
+  throw new Error(`Failed to open with ${ide.label}.`);
+}
+
 export function registerIpcHandlers(): void {
   ipcMain.handle(IPC.APP_OPEN_PROJECT, async () => {
     const result = await dialog.showOpenDialog({
@@ -142,6 +250,9 @@ export function registerIpcHandlers(): void {
   ipcMain.handle(IPC.FS_TREE_WITH_STATUS, async (_event, worktreePath: string) =>
     FileService.getTreeWithStatus(worktreePath),
   );
+  ipcMain.handle(IPC.FS_LIST_FILES, async (_event, worktreePath: string) =>
+    FileService.listFiles(worktreePath),
+  );
   ipcMain.handle(IPC.FS_READ_FILE, async (_event, worktreePath: string, relPath: string) =>
     FileService.readFile(worktreePath, relPath),
   );
@@ -184,7 +295,26 @@ export function registerIpcHandlers(): void {
     ContextService.createBundle(input),
   );
 
+  ipcMain.handle(IPC.SHELL_OPEN_PATH, async (_event, fullPath: string) => {
+    const error = await shell.openPath(fullPath);
+    if (error) throw new Error(error);
+  });
+
+  ipcMain.handle(IPC.SHELL_OPEN_IN_IDE, async (_event, fullPath: string) => {
+    await openInIde(fullPath);
+  });
+
+  ipcMain.handle(IPC.SHELL_OPEN_IN_TERMINAL, async (_event, fullPath: string) => {
+    await openInTerminal(fullPath);
+  });
+
   ipcMain.handle(IPC.SHELL_SHOW_ITEM_IN_FOLDER, async (_event, fullPath: string) => {
     await shell.showItemInFolder(fullPath);
+  });
+
+  ipcMain.handle(IPC.SHELL_DETECT_IDES, async () => detectIdes());
+
+  ipcMain.handle(IPC.SHELL_OPEN_WITH_IDE, async (_event, fullPath: string, ideId: string) => {
+    await openWithIde(fullPath, ideId);
   });
 }

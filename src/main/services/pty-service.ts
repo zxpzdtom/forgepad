@@ -1,4 +1,5 @@
 import { WebContents } from "electron";
+import { existsSync } from "node:fs";
 import * as pty from "node-pty";
 import { IPC } from "@shared/ipc";
 
@@ -12,6 +13,7 @@ type PtyInstance = {
 };
 
 const MAX_REPLAY_CHARS = 8_000_000;
+const FALLBACK_PATH = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin";
 
 function appendReplay(instance: PtyInstance, data: string): void {
   if (!data) return;
@@ -21,6 +23,25 @@ function appendReplay(instance: PtyInstance, data: string): void {
     const removed = instance.replayChunks.shift();
     instance.replayChars -= removed?.length ?? 0;
   }
+}
+
+function splitCommand(input: string): string[] {
+  return input.match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g)?.map((part) =>
+    part.replace(/^(['"])(.*)\1$/, "$2"),
+  ) ?? [];
+}
+
+function defaultShellPath(): string {
+  const candidates = [process.env.SHELL, "/bin/zsh", "/bin/bash", "/bin/sh"].filter(
+    Boolean,
+  ) as string[];
+  return candidates.find((candidate) => existsSync(candidate)) ?? "/bin/sh";
+}
+
+function resolveShell(shell?: string): { file: string; args: string[] } {
+  const parts = shell?.trim() ? splitCommand(shell.trim()) : [];
+  const [file, ...args] = parts.length > 0 ? parts : [defaultShellPath()];
+  return { file, args };
 }
 
 export class PtyService {
@@ -35,25 +56,35 @@ export class PtyService {
     extraEnv?: Record<string, string>,
   ): string {
     const id = `pty-${++this.nextId}`;
-    const shellPath = shell?.trim() || process.env.SHELL || "/bin/zsh";
+    const shellConfig = resolveShell(shell);
     const commandText = command?.trim();
-    const file = shellPath;
-    const args = commandText ? ["-lc", commandText] : [];
-    const proc = pty.spawn(file, args, {
-      name: "xterm-256color",
-      cols: 100,
-      rows: 30,
-      cwd: worktreePath,
-      env: {
-        ...process.env,
-        TERM: "xterm-256color",
-        COLORTERM: "truecolor",
-        FORGEPAD_PTY_ID: id,
-        FORGEPAD_CONTEXT_DIR: ".forgepad/context",
-        FORGEPAD_AGENT_COMMAND: commandText ?? "",
-        ...extraEnv,
-      } as Record<string, string>,
-    });
+    const args = commandText
+      ? [...shellConfig.args, "-lc", commandText]
+      : shellConfig.args;
+    const env = {
+      ...process.env,
+      PATH: process.env.PATH ? `${process.env.PATH}:${FALLBACK_PATH}` : FALLBACK_PATH,
+      TERM: "xterm-256color",
+      COLORTERM: "truecolor",
+      FORGEPAD_PTY_ID: id,
+      FORGEPAD_CONTEXT_DIR: ".forgepad/context",
+      FORGEPAD_AGENT_COMMAND: commandText ?? "",
+      ...extraEnv,
+    } as Record<string, string>;
+
+    let proc: pty.IPty;
+    try {
+      proc = pty.spawn(shellConfig.file, args, {
+        name: "xterm-256color",
+        cols: 100,
+        rows: 30,
+        cwd: worktreePath,
+        env,
+      });
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : "unknown error";
+      throw new Error(`Failed to start terminal with ${shellConfig.file}: ${detail}`);
+    }
 
     const instance: PtyInstance = {
       process: proc,

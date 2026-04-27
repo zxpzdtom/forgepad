@@ -9,6 +9,7 @@
     "dev": "electron-vite dev",
     "build": "tsc --noEmit && electron-vite build",
     "preview": "electron-vite preview",
+    "postinstall": "electron-rebuild -f -w node-pty",
     "typecheck": "tsc --noEmit",
     "rebuild": "electron-rebuild -f -w node-pty"
   },

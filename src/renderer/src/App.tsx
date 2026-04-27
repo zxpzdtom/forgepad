@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Allotment } from "allotment";
 import {
   Bot,
@@ -8,13 +8,18 @@ import {
   TerminalSquare,
 } from "lucide-react";
 import { Sidebar } from "@renderer/components/Sidebar";
-import { AgentColumn } from "@renderer/components/AgentColumn";
+import { AgentQuickBar } from "@renderer/components/AgentQuickBar";
 import { FileColumn } from "@renderer/components/FileColumn";
+import { QuickSearch } from "@renderer/components/QuickSearch";
 import { RightPanel } from "@renderer/components/RightPanel";
+import { TabBar } from "@renderer/components/TabBar";
+import { TerminalDock } from "@renderer/components/TerminalDock";
+import { TopBar } from "@renderer/components/TopBar";
 import { ToastStack } from "@renderer/components/ToastStack";
 import { useAppStore } from "@renderer/store/app-store";
 
 export function App() {
+  const [quickSearchOpen, setQuickSearchOpen] = useState(false);
   const hydrated = useAppStore((state) => state.hydrated);
   const projects = useAppStore((state) => state.projects);
   const workspaces = useAppStore((state) => state.workspaces);
@@ -24,6 +29,7 @@ export function App() {
   const focusedColumn = useAppStore((state) => state.focusedColumn);
   const rightPanelOpen = useAppStore((state) => state.rightPanelOpen);
   const sidebarOpen = useAppStore((state) => state.sidebarOpen);
+  const terminalPanelOpen = useAppStore((state) => state.terminalPanelOpen);
   const openProject = useAppStore((state) => state.openProject);
   const createTerminal = useAppStore((state) => state.createTerminal);
   const createAgentTerminal = useAppStore((state) => state.createAgentTerminal);
@@ -32,6 +38,7 @@ export function App() {
   const setActiveWorkspace = useAppStore((state) => state.setActiveWorkspace);
   const setRightPanelMode = useAppStore((state) => state.setRightPanelMode);
   const setFocusedColumn = useAppStore((state) => state.setFocusedColumn);
+  const toggleTerminalPanel = useAppStore((state) => state.toggleTerminalPanel);
   const triggerGitRefresh = useAppStore((state) => state.triggerGitRefresh);
   const addToast = useAppStore((state) => state.addToast);
 
@@ -86,6 +93,12 @@ export function App() {
       if (!isModifierShortcut) return;
 
       const key = event.key.toLowerCase();
+
+      if (!event.shiftKey && !event.altKey && key === "p") {
+        event.preventDefault();
+        setQuickSearchOpen(true);
+        return;
+      }
 
       // Ctrl+Tab / Ctrl+Shift+Tab: cycle tabs in focused column
       if (event.ctrlKey && key === "tab") {
@@ -154,15 +167,7 @@ export function App() {
 
       if (key === "j") {
         event.preventDefault();
-        const terminalTab = tabs.find(
-          (tab) =>
-            tab.workspaceId === activeWorkspaceId && tab.type === "terminal",
-        );
-        if (terminalTab) {
-          setActiveTab(terminalTab.id);
-        } else {
-          void createTerminal(activeWorkspaceId ?? undefined);
-        }
+        void toggleTerminalPanel();
         return;
       }
 
@@ -192,6 +197,7 @@ export function App() {
     setActiveTab,
     setActiveWorkspace,
     setRightPanelMode,
+    toggleTerminalPanel,
     tabs,
   ]);
 
@@ -319,86 +325,94 @@ export function App() {
     );
   }
 
-  const hasAnyContent = hasTerminalTabs || hasFileTabs;
+  const hasAnyContent = hasFileTabs || hasTerminalTabs;
+  const terminalDockVisible = terminalPanelOpen && hasTerminalTabs;
+
+  const renderWorkspaceArea = () => {
+    if (!hasFileTabs) {
+      return (
+        <main
+          className="flex size-full min-h-0 flex-col bg-bg"
+          onMouseDown={() => setFocusedColumn("agent")}
+        >
+          {renderEmptyState()}
+        </main>
+      );
+    }
+
+    return <FileColumn />;
+  };
+
+  const renderWorkspaceFrame = () => (
+    <main className="flex size-full min-h-0 flex-col bg-bg">
+      <TabBar />
+      <AgentQuickBar />
+      <div className="min-h-0 flex-1 overflow-hidden">
+        {terminalDockVisible ? (
+          <Allotment vertical proportionalLayout={false}>
+            <Allotment.Pane
+              minSize={220}
+              className={focusedColumn === "file" ? "pane-focused" : ""}
+            >
+              {renderWorkspaceArea()}
+            </Allotment.Pane>
+            <Allotment.Pane
+              preferredSize={300}
+              minSize={160}
+              maxSize={560}
+              className={focusedColumn === "agent" ? "pane-focused" : ""}
+            >
+              <TerminalDock />
+            </Allotment.Pane>
+          </Allotment>
+        ) : (
+          renderWorkspaceArea()
+        )}
+      </div>
+    </main>
+  );
 
   return (
-    <div className="size-full">
-      <Allotment proportionalLayout={false} className="size-full">
-        <Allotment.Pane
-          preferredSize={sidebarOpen ? 260 : 48}
-          minSize={sidebarOpen ? 220 : 48}
-          maxSize={sidebarOpen ? 360 : 48}
-        >
-          <Sidebar />
-        </Allotment.Pane>
-
-        {!hasAnyContent ? (
-          <Allotment.Pane minSize={460}>
-            <main
-              className="flex size-full min-h-0 flex-col bg-bg"
-              onMouseDown={() => setFocusedColumn("agent")}
-            >
-              {renderEmptyState()}
-            </main>
-          </Allotment.Pane>
-        ) : hasTerminalTabs && hasFileTabs ? (
-          <Allotment.Pane minSize={460}>
-            <div className="size-full">
-              <Allotment proportionalLayout={false}>
-                <Allotment.Pane
-                  minSize={280}
-                  preferredSize={440}
-                  className={focusedColumn === "agent" ? "pane-focused" : ""}
-                >
-                  <AgentColumn />
-                </Allotment.Pane>
-                <Allotment.Pane
-                  minSize={280}
-                  preferredSize={500}
-                  className={focusedColumn === "file" ? "pane-focused" : ""}
-                >
-                  <FileColumn />
-                </Allotment.Pane>
-              </Allotment>
-            </div>
-          </Allotment.Pane>
-        ) : hasTerminalTabs ? (
+    <div className="flex size-full flex-col bg-bg">
+      <TopBar onOpenSearch={() => setQuickSearchOpen(true)} />
+      <div className="min-h-0 flex-1">
+        <Allotment proportionalLayout={false} className="size-full">
           <Allotment.Pane
-            minSize={320}
-            preferredSize={540}
-            className={focusedColumn === "agent" ? "pane-focused" : ""}
+            preferredSize={sidebarOpen ? 260 : 48}
+            minSize={sidebarOpen ? 220 : 48}
+            maxSize={sidebarOpen ? 360 : 48}
           >
-            <AgentColumn />
+            <Sidebar />
           </Allotment.Pane>
-        ) : (
-          <Allotment.Pane
-            minSize={320}
-            preferredSize={620}
-            className={focusedColumn === "file" ? "pane-focused" : ""}
-          >
-            <FileColumn />
-          </Allotment.Pane>
-        )}
 
-        {rightPanelOpen ? (
-          <Allotment.Pane preferredSize={390} minSize={320} maxSize={560}>
-            <RightPanel />
+          <Allotment.Pane minSize={hasAnyContent ? 460 : 420}>
+            {renderWorkspaceFrame()}
           </Allotment.Pane>
-        ) : (
-          <Allotment.Pane preferredSize={44} minSize={44} maxSize={44}>
-            <aside className="grid min-h-0 justify-start justify-items-center border-l border-border bg-panel pt-2.5">
-              <button
-                className="icon-button"
-                type="button"
-                title="Open side panel"
-                onClick={() => useAppStore.setState({ rightPanelOpen: true })}
-              >
-                <PanelRight size={17} />
-              </button>
-            </aside>
-          </Allotment.Pane>
-        )}
-      </Allotment>
+
+          {rightPanelOpen ? (
+            <Allotment.Pane preferredSize={390} minSize={320} maxSize={560}>
+              <RightPanel />
+            </Allotment.Pane>
+          ) : (
+            <Allotment.Pane preferredSize={44} minSize={44} maxSize={44}>
+              <aside className="grid min-h-0 justify-start justify-items-center border-l border-border bg-panel pt-2.5">
+                <button
+                  className="icon-button"
+                  type="button"
+                  title="Open side panel"
+                  onClick={() => useAppStore.setState({ rightPanelOpen: true })}
+                >
+                  <PanelRight size={17} />
+                </button>
+              </aside>
+            </Allotment.Pane>
+          )}
+        </Allotment>
+      </div>
+      <QuickSearch
+        open={quickSearchOpen}
+        onClose={() => setQuickSearchOpen(false)}
+      />
       <ToastStack />
     </div>
   );

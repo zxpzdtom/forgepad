@@ -184,6 +184,7 @@ export type PersistedAppState = {
   rightPanelMode: RightPanelMode;
   rightPanelOpen: boolean;
   sidebarOpen: boolean;
+  terminalPanelOpen?: boolean;
   contextItems: ContextItem[];
   composerText: string;
   settings: AppSettings;
@@ -247,7 +248,7 @@ export type AppSettings = {
 
 export const DEFAULT_SETTINGS: AppSettings = {
   defaultShell: "",
-  defaultAgentCommand: "claude",
+  defaultAgentCommand: DEFAULT_AGENT_PRESETS[0].command,
   agentPresets: [...DEFAULT_AGENT_PRESETS],
   terminalFontSize: 14,
   editorFontSize: 13,

@@ -11,6 +11,7 @@ export const IPC = {
   GIT_DISCARD: "git:discard",
   GIT_COMMIT: "git:commit",
   FS_TREE_WITH_STATUS: "fs:tree-with-status",
+  FS_LIST_FILES: "fs:list-files",
   FS_READ_FILE: "fs:read-file",
   FS_READ_FILE_DATA_URL: "fs:read-file-data-url",
   FS_WRITE_FILE: "fs:write-file",
@@ -25,6 +26,10 @@ export const IPC = {
   PTY_DATA: "pty:data",
   PTY_EXIT: "pty:exit",
   CONTEXT_CREATE_BUNDLE: "context:create-bundle",
+  SHELL_OPEN_PATH: "shell:open-path",
+  SHELL_OPEN_IN_IDE: "shell:open-in-ide",
+  SHELL_OPEN_IN_TERMINAL: "shell:open-in-terminal",
   SHELL_SHOW_ITEM_IN_FOLDER: "shell:show-item-in-folder",
+  SHELL_DETECT_IDES: "shell:detect-ides",
+  SHELL_OPEN_WITH_IDE: "shell:open-with-ide",
 } as const;
-
