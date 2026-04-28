@@ -11,6 +11,7 @@ type TabContextMenuProps = {
   onCloseOthers: (id: string) => void;
   onCloseAll: (workspaceId: string, type: "terminal" | "file") => void;
   onCloseToRight: (id: string) => void;
+  onRename?: (id: string) => void;
 };
 
 export function TabContextMenu({
@@ -23,6 +24,7 @@ export function TabContextMenu({
   onCloseOthers,
   onCloseAll,
   onCloseToRight,
+  onRename,
 }: TabContextMenuProps) {
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -79,6 +81,21 @@ export function TabContextMenu({
       className="fixed z-50 min-w-[180px] grid gap-[2px] rounded-[7px] border border-border bg-panel-2 p-[5px] shadow-[0_14px_32px_rgba(0,0,0,0.3)]"
       style={{ left: x, top: y }}
     >
+      {tab.type === "terminal" && tab.isAgent && onRename && (
+        <>
+          <button
+            type="button"
+            className="h-7 rounded-[5px] px-[9px] text-left text-[13px] bg-transparent text-text hover:bg-panel-3 cursor-pointer border-none"
+            onClick={() => {
+              onRename(tab.id);
+              onClose();
+            }}
+          >
+            Rename
+          </button>
+          <div className="mx-[5px] my-[3px] h-px bg-border" />
+        </>
+      )}
       <button
         type="button"
         className="h-7 rounded-[5px] px-[9px] text-left text-[13px] bg-transparent text-text hover:bg-panel-3 cursor-pointer border-none"

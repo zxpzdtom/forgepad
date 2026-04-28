@@ -16,7 +16,7 @@ export class HookServer {
   async start(): Promise<number> {
     return new Promise((resolve, reject) => {
       this.server = http.createServer((req, res) => {
-        this.handleRequest(req, res);
+        void this.handleRequest(req, res);
       });
 
       this.server.listen(0, "127.0.0.1", () => {
@@ -40,10 +40,10 @@ export class HookServer {
     });
   }
 
-  private handleRequest(
+  private async handleRequest(
     req: http.IncomingMessage,
     res: http.ServerResponse,
-  ): void {
+  ): Promise<void> {
     try {
       const url = new URL(req.url ?? "/", "http://127.0.0.1");
 
@@ -60,6 +60,33 @@ export class HookServer {
         const status = mapEventToStatus(eventType);
         if (status) {
           this.broadcastStatusUpdate({ ptyId, status });
+        }
+
+        // For UserPromptSubmit: read prompt from POST body, generate tab title
+        if (eventType === "UserPromptSubmit" && req.method === "POST") {
+          const body = await this.readBody(req);
+          let prompt = "";
+          try {
+            const json = JSON.parse(body) as Record<string, unknown>;
+            if (typeof json.prompt === "string") prompt = json.prompt;
+          } catch {
+            // ignore parse errors
+          }
+
+          if (prompt) {
+            const title = this.generateTitle(prompt);
+            this.broadcastRenameTab(ptyId, title);
+            res.writeHead(200, { "Content-Type": "application/json" });
+            res.end(
+              JSON.stringify({
+                hookSpecificOutput: {
+                  hookEventName: "UserPromptSubmit",
+                  sessionTitle: title,
+                },
+              }),
+            );
+            return;
+          }
         }
 
         res.writeHead(200);
@@ -79,6 +106,31 @@ export class HookServer {
       console.error("[HookServer] error:", error);
       res.writeHead(500);
       res.end("error");
+    }
+  }
+
+  private readBody(req: http.IncomingMessage): Promise<string> {
+    return new Promise((resolve) => {
+      const chunks: Buffer[] = [];
+      req.on("data", (chunk: Buffer) => chunks.push(chunk));
+      req.on("end", () => resolve(Buffer.concat(chunks).toString("utf-8")));
+      req.on("error", () => resolve(""));
+    });
+  }
+
+  private generateTitle(prompt: string): string {
+    const cleaned = prompt.trim().replace(/\s+/g, " ");
+    if (cleaned.length <= 30) return cleaned;
+    const truncated = cleaned.slice(0, 30);
+    const lastSpace = truncated.lastIndexOf(" ");
+    return (lastSpace > 10 ? truncated.slice(0, lastSpace) : truncated) + "…";
+  }
+
+  private broadcastRenameTab(ptyId: string, title: string): void {
+    for (const win of BrowserWindow.getAllWindows()) {
+      if (!win.webContents.isDestroyed()) {
+        win.webContents.send(IPC.AGENT_RENAME_TAB, { ptyId, title });
+      }
     }
   }
 
