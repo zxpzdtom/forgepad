@@ -44,10 +44,20 @@ PTY_ID=$(grep -oE '"ptyId"[[:space:]]*:[[:space:]]*"[^"]*"' "$SESSION_FILE" | gr
 
 [ -z "$PORT" ] || [ -z "$PTY_ID" ] && exit 0
 
-# Fire-and-forget callback to ForgePad hook server
-curl -s -m 2 \\
-  "http://127.0.0.1:\${PORT}/hook/notify?eventType=\${EVENT_TYPE}&ptyId=\${PTY_ID}" \\
-  >/dev/null 2>&1 || true
+# Callback to ForgePad hook server
+if [ "\${EVENT_TYPE}" = "UserPromptSubmit" ]; then
+  # POST full JSON body and output response so Claude Code can read sessionTitle
+  curl -s -m 5 -X POST \\
+    -H "Content-Type: application/json" \\
+    -d "\${INPUT}" \\
+    "http://127.0.0.1:\${PORT}/hook/notify?eventType=\${EVENT_TYPE}&ptyId=\${PTY_ID}" \\
+    || true
+else
+  # Fire-and-forget GET for other events
+  curl -s -m 2 \\
+    "http://127.0.0.1:\${PORT}/hook/notify?eventType=\${EVENT_TYPE}&ptyId=\${PTY_ID}" \\
+    >/dev/null 2>&1 || true
+fi
 
 exit 0
 `;

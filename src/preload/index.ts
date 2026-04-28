@@ -192,6 +192,18 @@ const api = {
         ipcRenderer.removeListener(IPC.AGENT_FOCUS_TAB, handler);
       };
     },
+    onRenameTab: (
+      callback: (data: { ptyId: string; title: string }) => void,
+    ) => {
+      const handler = (
+        _event: Electron.IpcRendererEvent,
+        data: { ptyId: string; title: string },
+      ) => callback(data);
+      ipcRenderer.on(IPC.AGENT_RENAME_TAB, handler);
+      return () => {
+        ipcRenderer.removeListener(IPC.AGENT_RENAME_TAB, handler);
+      };
+    },
   },
   shell: {
     openPath: (fullPath: string) =>
