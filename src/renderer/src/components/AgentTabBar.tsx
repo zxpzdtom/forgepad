@@ -1,4 +1,4 @@
-import { useCallback, useState, type MouseEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type MouseEvent } from "react";
 import { Bot, Plus, X } from "lucide-react";
 import { useAppStore } from "@renderer/store/app-store";
 import { TabContextMenu } from "./TabContextMenu";
@@ -49,12 +49,15 @@ export function AgentTabBar() {
   const closeAllTabs = useAppStore((state) => state.closeAllTabs);
   const closeTabsToRight = useAppStore((state) => state.closeTabsToRight);
   const createAgentTerminal = useAppStore((state) => state.createAgentTerminal);
+  const renameTab = useAppStore((state) => state.renameTab);
 
   const [contextMenu, setContextMenu] = useState<{
     tab: Tab;
     x: number;
     y: number;
   } | null>(null);
+  const [renameTabId, setRenameTabId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
 
   const agentTabs = tabs.filter(
     (tab): tab is TerminalTab =>
@@ -156,8 +159,84 @@ export function AgentTabBar() {
           onCloseOthers={closeOtherTabs}
           onCloseAll={closeAllTabs}
           onCloseToRight={closeTabsToRight}
+          onRename={(id) => {
+            const tab = agentTabs.find((t) => t.id === id);
+            setRenameValue(tab?.title ?? "");
+            setRenameTabId(id);
+          }}
         />
       )}
+
+      {renameTabId && (
+        <RenameModal
+          value={renameValue}
+          onChange={setRenameValue}
+          onConfirm={() => {
+            const trimmed = renameValue.trim();
+            if (trimmed) renameTab(renameTabId, trimmed);
+            setRenameTabId(null);
+          }}
+          onCancel={() => setRenameTabId(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+function RenameModal({
+  value,
+  onChange,
+  onConfirm,
+  onCancel,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    inputRef.current?.select();
+  }, []);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) onCancel();
+      }}
+    >
+      <div className="flex w-72 flex-col gap-3 rounded-lg border border-border bg-panel-2 p-4 shadow-[0_14px_32px_rgba(0,0,0,0.4)]">
+        <p className="text-sm font-medium text-text">Rename Tab</p>
+        <input
+          ref={inputRef}
+          className="h-8 rounded-md border border-border bg-bg px-2.5 text-sm text-text outline-none focus:border-accent"
+          value={value}
+          onChange={(e) => onChange(e.currentTarget.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") onConfirm();
+            if (e.key === "Escape") onCancel();
+          }}
+          autoFocus
+        />
+        <div className="flex justify-end gap-2">
+          <button
+            type="button"
+            className="h-7 rounded-md border border-border bg-transparent px-3 text-sm text-muted hover:bg-panel-3 hover:text-text"
+            onClick={onCancel}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="h-7 rounded-md bg-accent px-3 text-sm text-white hover:opacity-90"
+            onClick={onConfirm}
+          >
+            Rename
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

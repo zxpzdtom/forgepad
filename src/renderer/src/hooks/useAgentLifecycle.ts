@@ -28,9 +28,16 @@ export function useAgentLifecycle(): void {
       }
     });
 
+    const removeRenameListener = window.forgepad.agent.onRenameTab(
+      ({ ptyId, title }) => {
+        useAppStore.getState().renameTab(ptyId, title);
+      },
+    );
+
     return () => {
       removeStatusListener();
       removeFocusListener();
+      removeRenameListener();
     };
   }, []);
 }

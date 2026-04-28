@@ -40,4 +40,5 @@ export const IPC = {
   SHELL_OPEN_WITH_TERMINAL: "shell:open-with-terminal",
   AGENT_STATUS_UPDATE: "agent:status-update",
   AGENT_FOCUS_TAB: "agent:focus-tab",
+  AGENT_RENAME_TAB: "agent:rename-tab",
 } as const;
