@@ -143,6 +143,7 @@ type AppState = {
   removeAgentPreset: (presetId: string) => void;
   updateAgentPreset: (presetId: string, partial: Partial<AgentPreset>) => void;
   updateTerminalSessionId: (tabId: string, sessionId: string) => void;
+  renameTab: (tabIdOrPtyId: string, title: string) => void;
   restoreAgentSessions: () => Promise<void>;
   setFocusedColumn: (column: AppState["focusedColumn"]) => void;
   refreshBranchStats: (workspaceId?: string) => Promise<void>;
@@ -1377,6 +1378,16 @@ export const useAppStore = create<AppState>((set, get) => ({
       tabs: state.tabs.map((tab) =>
         tab.id === tabId && tab.type === "terminal"
           ? { ...tab, sessionId, sessionConfirmed: true }
+          : tab,
+      ),
+    })),
+
+  renameTab: (tabIdOrPtyId, title) =>
+    set((state) => ({
+      tabs: state.tabs.map((tab) =>
+        tab.type === "terminal" &&
+        (tab.id === tabIdOrPtyId || tab.ptyId === tabIdOrPtyId)
+          ? { ...tab, title }
           : tab,
       ),
     })),
