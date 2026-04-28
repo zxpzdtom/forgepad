@@ -21,6 +21,9 @@ export type Tab =
       agentPresetId?: string;
       agentCommand?: string;
       sessionId?: string;
+      /** True once the agent CLI has actually used the session (first hook event received).
+       *  Only confirmed sessions are persisted and eligible for restore. */
+      sessionConfirmed?: boolean;
     }
   | {
       id: string;
@@ -181,6 +184,8 @@ export type PersistedAppState = {
   tabs: Tab[];
   activeWorkspaceId: string | null;
   activeTabId: string | null;
+  /** Per-workspace last-selected agent tab id, so switching workspaces remembers the agent tab */
+  workspaceActiveAgentTabIds?: Record<string, string>;
   rightPanelMode: RightPanelMode;
   rightPanelOpen: boolean;
   sidebarOpen: boolean;
@@ -189,6 +194,8 @@ export type PersistedAppState = {
   composerText: string;
   settings: AppSettings;
 };
+
+export type ThemePreference = "dark" | "light" | "system";
 
 export type DiffViewStyle = "split" | "unified";
 export type DiffIndicators = "classic" | "bars" | "none";
@@ -201,6 +208,9 @@ export type AgentPreset = {
   command: string;
   enabled: boolean;
   builtIn?: boolean;
+  /** Appended to command on first launch to assign a session ID (e.g. "--session-id {sessionId}"). */
+  sessionTemplate?: string;
+  /** Full command used to restore/resume a previous session (e.g. "claude --resume {sessionId}"). */
   restoreTemplate?: string;
 };
 
@@ -211,6 +221,7 @@ export const DEFAULT_AGENT_PRESETS: AgentPreset[] = [
     command: "claude --permission-mode acceptEdits",
     enabled: true,
     builtIn: true,
+    sessionTemplate: "--session-id {sessionId}",
     restoreTemplate: "claude --resume {sessionId}",
   },
   {
@@ -219,7 +230,7 @@ export const DEFAULT_AGENT_PRESETS: AgentPreset[] = [
     command: "codex",
     enabled: true,
     builtIn: true,
-    restoreTemplate: "codex --resume {sessionId}",
+    restoreTemplate: "codex resume {sessionId}",
   },
   {
     id: "gemini",
@@ -232,9 +243,11 @@ export const DEFAULT_AGENT_PRESETS: AgentPreset[] = [
 ];
 
 export type AppSettings = {
+  theme: ThemePreference;
   defaultShell: string;
   defaultAgentCommand: string;
   agentPresets: AgentPreset[];
+  runCommand?: string;
   terminalFontSize: number;
   editorFontSize: number;
   diffInline: boolean;
@@ -248,6 +261,7 @@ export type AppSettings = {
 };
 
 export const DEFAULT_SETTINGS: AppSettings = {
+  theme: "dark",
   defaultShell: "",
   defaultAgentCommand: DEFAULT_AGENT_PRESETS[0].command,
   agentPresets: [...DEFAULT_AGENT_PRESETS],

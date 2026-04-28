@@ -15,6 +15,28 @@
     --color-warn: var(--warn);
     --color-danger: var(--danger);
     --color-ok: var(--ok);
+    --color-surface-inset: var(--surface-inset);
+    --color-surface-input: var(--surface-input);
+    --color-surface-toolbar: var(--surface-toolbar);
+    --color-surface-search: var(--surface-search);
+    --color-surface-dialog: var(--surface-dialog);
+    --color-surface-card: var(--surface-card);
+    --color-surface-footer: var(--surface-footer);
+    --color-surface-terminal: var(--surface-terminal);
+    --color-surface-markdown: var(--surface-markdown);
+    --color-accent-surface: var(--accent-surface);
+    --color-focus-border: var(--focus-border);
+    --color-accent-contrast: var(--accent-contrast);
+    --color-text-addition: var(--text-addition);
+    --color-text-deletion: var(--text-deletion);
+    --color-text-warning-status: var(--text-warning-status);
+    --color-text-code-inline: var(--text-code-inline);
+    --color-text-code-block: var(--text-code-block);
+    --color-text-heading: var(--text-heading);
+    --color-toast-border-success: var(--toast-border-success);
+    --color-toast-border-error: var(--toast-border-error);
+    --color-sidebar-bg: var(--sidebar-bg);
+    --color-workspace-card-bg: var(--workspace-card-bg);
     --animate-breathe: breathe 1s ease-in-out infinite;
 }
 
@@ -47,6 +69,37 @@
     --danger: #ff7777;
     --ok: #89d985;
     --shadow: rgba(0, 0, 0, 0.22);
+    /* Semantic surface tokens */
+    --surface-inset: #0c0d10;
+    --surface-input: #10131a;
+    --surface-toolbar: #141414;
+    --surface-search: #1a1a1a;
+    --surface-dialog: #181715;
+    --surface-card: #11151c;
+    --surface-footer: #12161d;
+    --surface-terminal: #0d0f13;
+    --surface-markdown: #101218;
+    --accent-surface: #172424;
+    --focus-border: #3f756f;
+    --accent-contrast: #071110;
+    /* Semantic text tokens */
+    --text-addition: #34d399;
+    --text-deletion: #f87171;
+    --text-warning-status: #f59e0b;
+    --text-code-inline: #f1d897;
+    --text-code-block: #d7deeb;
+    --text-heading: #f1f5fb;
+    /* Semantic border tokens */
+    --toast-border-success: #2f6f58;
+    --toast-border-error: #783d45;
+    --blockquote-border: #3a5362;
+    --checkbox-bg: #11151c;
+    --checkbox-border: #566070;
+    --code-header-bg: #14171e;
+    --code-copy-hover: rgba(255, 255, 255, 0.06);
+    --checkbox-check-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23071110' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'%3E%3C/polyline%3E%3C/svg%3E");
+    --sidebar-bg: oklch(23.5% 0 0);
+    --workspace-card-bg: oklch(21.5% 0 0);
     font-family:
         Inter,
         ui-sans-serif,
@@ -57,6 +110,56 @@
         sans-serif;
     font-synthesis: none;
     text-rendering: optimizeLegibility;
+}
+
+[data-theme="light"] {
+    color-scheme: light;
+    --bg: #f5f5f7;
+    --panel: #ecedf0;
+    --panel-2: #e3e4e8;
+    --panel-3: #d8d9de;
+    --border: #c8c9ce;
+    --border-soft: #d4d5da;
+    --text: #1a1c20;
+    --muted: #6b7080;
+    --subtle: #8e93a3;
+    --accent: #0e8a6d;
+    --accent-2: #2563eb;
+    --warn: #b45309;
+    --danger: #dc2626;
+    --ok: #16a34a;
+    --shadow: rgba(0, 0, 0, 0.08);
+    /* Semantic surface tokens */
+    --surface-inset: #f0f1f3;
+    --surface-input: #ffffff;
+    --surface-toolbar: #e8e9ec;
+    --surface-search: #ffffff;
+    --surface-dialog: #ffffff;
+    --surface-card: #f7f8fa;
+    --surface-footer: #f0f1f4;
+    --surface-terminal: #f8f9fa;
+    --surface-markdown: #fafbfc;
+    --accent-surface: #e6f5f0;
+    --focus-border: #0e8a6d;
+    --accent-contrast: #ffffff;
+    /* Semantic text tokens */
+    --text-addition: #16a34a;
+    --text-deletion: #dc2626;
+    --text-warning-status: #b45309;
+    --text-code-inline: #9a3412;
+    --text-code-block: #1e293b;
+    --text-heading: #0f172a;
+    /* Semantic border tokens */
+    --toast-border-success: #86efac;
+    --toast-border-error: #fca5a5;
+    --blockquote-border: #94a3b8;
+    --checkbox-bg: #ffffff;
+    --checkbox-border: #94a3b8;
+    --code-header-bg: #eaebed;
+    --code-copy-hover: rgba(0, 0, 0, 0.06);
+    --checkbox-check-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'%3E%3C/polyline%3E%3C/svg%3E");
+    --sidebar-bg: #e5e6ea;
+    --workspace-card-bg: #f0f1f4;
 }
 
 * {
@@ -191,13 +294,13 @@ textarea {
 
 /* Markdown preview — deeply nested selectors */
 .markdown-viewer-scroll {
-    background: #101218;
+    background: var(--surface-markdown);
 }
 
 .markdown-preview {
     width: min(860px, 100%);
     padding: 24px 28px 40px;
-    color: #dce3ed;
+    color: var(--text);
     font-size: 14px;
     line-height: 1.68;
 }
@@ -209,7 +312,7 @@ textarea {
 .markdown-preview h5,
 .markdown-preview h6 {
     margin: 1.45em 0 0.55em;
-    color: #f1f5fb;
+    color: var(--text-heading);
     line-height: 1.25;
 }
 
@@ -275,16 +378,16 @@ textarea {
     width: 15px;
     height: 15px;
     margin-top: 4px;
-    border: 1px solid #566070;
+    border: 1px solid var(--checkbox-border);
     border-radius: 4px;
-    background: #11151c;
+    background: var(--checkbox-bg);
     flex: 0 0 auto;
 }
 
 .markdown-preview .task-list-item input[type="checkbox"]:checked {
     border-color: var(--accent);
     background-color: var(--accent);
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23071110' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'%3E%3C/polyline%3E%3C/svg%3E");
+    background-image: var(--checkbox-check-icon);
     background-repeat: no-repeat;
     background-position: center;
     background-size: 11px;
@@ -293,7 +396,7 @@ textarea {
 .markdown-preview blockquote {
     padding: 2px 0 2px 14px;
     color: var(--muted);
-    border-left: 3px solid #3a5362;
+    border-left: 3px solid var(--blockquote-border);
 }
 
 .markdown-preview blockquote p:last-child {
@@ -304,8 +407,8 @@ textarea {
     border: 1px solid var(--border-soft);
     border-radius: 5px;
     padding: 1px 5px;
-    color: #f1d897;
-    background: #171b23;
+    color: var(--text-code-inline);
+    background: var(--surface-card);
     font-family:
         ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
         "Liberation Mono", monospace;
@@ -317,14 +420,14 @@ textarea {
     border: 1px solid var(--border-soft);
     border-radius: 8px;
     padding: 12px 14px;
-    background: #0c0d10;
+    background: var(--surface-inset);
     @apply scroll-mask-x;
 }
 
 .markdown-preview pre code {
     border: 0;
     padding: 0;
-    color: #d7deeb;
+    color: var(--text-code-block);
     background: transparent;
 }
 
@@ -335,7 +438,7 @@ textarea {
     border: 1px solid var(--border-soft);
     border-radius: 8px;
     overflow: hidden;
-    background: #0c0d10;
+    background: var(--surface-inset);
 }
 
 .md-code-block pre {
@@ -352,7 +455,7 @@ textarea {
     align-items: center;
     justify-content: space-between;
     padding: 4px 10px;
-    background: #14171e;
+    background: var(--code-header-bg);
     border-bottom: 1px solid var(--border-soft);
 }
 
@@ -376,7 +479,7 @@ textarea {
 }
 
 .md-code-copy:hover {
-    background: rgba(255, 255, 255, 0.06);
+    background: var(--code-copy-hover);
     color: var(--text);
 }
 
@@ -386,7 +489,7 @@ textarea {
     padding: 16px;
     border: 1px solid var(--border-soft);
     border-radius: 8px;
-    background: #0c0d10;
+    background: var(--surface-inset);
     overflow: auto;
     text-align: center;
     @apply scroll-mask;
@@ -418,8 +521,8 @@ textarea {
 }
 
 ::highlight(forgepad-file-search-active) {
-    color: #071110;
-    background: #67d5b5;
+    color: var(--accent-contrast);
+    background: var(--accent);
 }
 
 /* View mode toggle */
@@ -452,7 +555,7 @@ textarea {
 
 .view-mode-btn.active {
     color: var(--accent);
-    background: #172424;
+    background: var(--accent-surface);
 }
 
 /* Shared buttons */
@@ -472,7 +575,7 @@ textarea {
 .primary-button {
     min-height: 32px;
     padding: 0 12px;
-    color: #071110;
+    color: var(--accent-contrast);
     background: var(--accent);
     font-weight: 650;
 }
@@ -526,7 +629,7 @@ textarea {
     padding: 2px;
     border: 1px solid var(--border);
     border-radius: 6px;
-    background: #10131a;
+    background: var(--surface-input);
 }
 
 .segmented-control button {
@@ -563,7 +666,7 @@ textarea {
     border: 1px solid var(--border);
     border-radius: 6px;
     color: var(--text);
-    background: #10131a;
+    background: var(--surface-input);
     outline: none;
     font-size: 12px;
 }
@@ -616,7 +719,7 @@ textarea {
     height: 23px;
     border-radius: 5px;
     color: var(--accent);
-    background: #172424;
+    background: var(--accent-surface);
     font-size: 11px;
 }
 
@@ -628,8 +731,8 @@ textarea {
     border: 1px solid var(--border-soft);
     border-radius: 6px;
     padding: 8px;
-    color: #d7deeb;
-    background: #0d1016;
+    color: var(--text-code-block);
+    background: var(--surface-inset);
     font:
         11px/1.45 ui-monospace,
         SFMono-Regular,
@@ -651,7 +754,7 @@ textarea {
     border-radius: 6px;
     padding: 9px;
     color: var(--text);
-    background: #10131a;
+    background: var(--surface-input);
     outline: none;
 }
 
@@ -666,7 +769,7 @@ textarea {
 .composer textarea:focus,
 .context-textarea:focus,
 .commit-textarea:focus {
-    border-color: #3f756f;
+    border-color: var(--focus-border);
 }
 
 /* Agent command row input */
@@ -677,12 +780,12 @@ textarea {
     border-radius: 6px;
     padding: 0 9px;
     color: var(--text);
-    background: #10131a;
+    background: var(--surface-input);
     outline: none;
 }
 
 .agent-command-row input:focus {
-    border-color: #3f756f;
+    border-color: var(--focus-border);
 }
 
 /* File search input */
@@ -694,12 +797,12 @@ textarea {
     border-radius: 6px;
     padding: 0 9px;
     color: var(--text);
-    background: #0d1016;
+    background: var(--surface-inset);
     outline: none;
 }
 
 .file-search-bar input:focus {
-    border-color: #3f756f;
+    border-color: var(--focus-border);
 }
 
 /* Dirty dot */

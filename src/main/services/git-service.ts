@@ -1,9 +1,14 @@
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
-import { readFile, rm } from "node:fs/promises";
+import { mkdir, readFile, rm } from "node:fs/promises";
 import path from "node:path";
 import { promisify } from "node:util";
-import type { DiffFileData, FileStatus, GitBucket, GitStatusKind } from "@shared/types";
+import type {
+  DiffFileData,
+  FileStatus,
+  GitBucket,
+  GitStatusKind,
+} from "@shared/types";
 import { normalizeRelPath, resolveInsideRoot } from "./path-guard";
 
 const execFileAsync = promisify(execFile);
@@ -78,7 +83,9 @@ function parseStatusOutput(stdout: string): FileStatus[] {
     const xy = spaceParts[1] ?? "..";
     const indexStatus = xy[0] ?? ".";
     const worktreeStatus = xy[1] ?? ".";
-    const filePath = isRename ? spaceParts.at(-1) ?? "" : spaceParts.slice(8).join(" ");
+    const filePath = isRename
+      ? (spaceParts.at(-1) ?? "")
+      : spaceParts.slice(8).join(" ");
     const oldPath = isRename ? tabParts[1] : undefined;
 
     if (!filePath) continue;
@@ -118,15 +125,19 @@ async function getNumstat(
     if (!line) continue;
     const [addStr, delStr, filePath] = line.split("\t");
     if (!filePath) continue;
-    const additions = addStr === "-" ? 0 : Number.parseInt(addStr ?? "0", 10) || 0;
-    const deletions = delStr === "-" ? 0 : Number.parseInt(delStr ?? "0", 10) || 0;
+    const additions =
+      addStr === "-" ? 0 : Number.parseInt(addStr ?? "0", 10) || 0;
+    const deletions =
+      delStr === "-" ? 0 : Number.parseInt(delStr ?? "0", 10) || 0;
     map.set(filePath, { additions, deletions });
   }
   return map;
 }
 
 function patchIndicatesBinary(patch: string): boolean {
-  return /^\s*Binary files /m.test(patch) || /^\s*GIT binary patch\b/m.test(patch);
+  return (
+    /^\s*Binary files /m.test(patch) || /^\s*GIT binary patch\b/m.test(patch)
+  );
 }
 
 function bufferIsBinary(buffer: Buffer): boolean {
@@ -173,7 +184,12 @@ export class GitService {
 
   static async getBranchStats(
     worktreePath: string,
-  ): Promise<{ ahead: number; behind: number; additions: number; deletions: number }> {
+  ): Promise<{
+    ahead: number;
+    behind: number;
+    additions: number;
+    deletions: number;
+  }> {
     try {
       const [abOutput, stagedOutput, unstagedOutput] = await Promise.all([
         git(
@@ -192,8 +208,10 @@ export class GitService {
         for (const line of output.split(/\r?\n/)) {
           if (!line) continue;
           const [addStr, delStr] = line.split("\t");
-          additions += addStr === "-" ? 0 : Number.parseInt(addStr ?? "0", 10) || 0;
-          deletions += delStr === "-" ? 0 : Number.parseInt(delStr ?? "0", 10) || 0;
+          additions +=
+            addStr === "-" ? 0 : Number.parseInt(addStr ?? "0", 10) || 0;
+          deletions +=
+            delStr === "-" ? 0 : Number.parseInt(delStr ?? "0", 10) || 0;
         }
       }
       return { ahead, behind, additions, deletions };
@@ -204,7 +222,10 @@ export class GitService {
 
   static async getStatus(worktreePath: string): Promise<FileStatus[]> {
     try {
-      const output = await git(["status", "--porcelain=v2", "--untracked-files=all"], worktreePath);
+      const output = await git(
+        ["status", "--porcelain=v2", "--untracked-files=all"],
+        worktreePath,
+      );
       if (!output) return [];
       const entries = parseStatusOutput(output);
       const [stagedStats, unstagedStats] = await Promise.all([
@@ -212,11 +233,14 @@ export class GitService {
         getNumstat(worktreePath, false),
       ]);
       for (const entry of entries) {
-        const stats = entry.bucket === "staged"
-          ? stagedStats.get(entry.path) ?? stagedStats.get(entry.oldPath ?? "")
-          : entry.bucket === "unstaged"
-            ? unstagedStats.get(entry.path) ?? unstagedStats.get(entry.oldPath ?? "")
-            : undefined;
+        const stats =
+          entry.bucket === "staged"
+            ? (stagedStats.get(entry.path) ??
+              stagedStats.get(entry.oldPath ?? ""))
+            : entry.bucket === "unstaged"
+              ? (unstagedStats.get(entry.path) ??
+                unstagedStats.get(entry.oldPath ?? ""))
+              : undefined;
         if (stats) {
           entry.additions = stats.additions;
           entry.deletions = stats.deletions;
@@ -245,7 +269,14 @@ export class GitService {
       const abs = await resolveInsideRoot(worktreePath, relPath);
       const buffer = await readFile(abs);
       if (bufferIsBinary(buffer)) {
-        return { path: relPath, oldPath, patch: "", status, bucket, isBinary: true };
+        return {
+          path: relPath,
+          oldPath,
+          patch: "",
+          status,
+          bucket,
+          isBinary: true,
+        };
       }
       return {
         path: relPath,
@@ -287,11 +318,15 @@ export class GitService {
   static async unstage(worktreePath: string, paths: string[]): Promise<void> {
     for (let i = 0; i < paths.length; i += 100) {
       const chunk = paths.slice(i, i + 100).map(normalizeRelPath);
-      if (chunk.length > 0) await git(["restore", "--staged", "--", ...chunk], worktreePath);
+      if (chunk.length > 0)
+        await git(["restore", "--staged", "--", ...chunk], worktreePath);
     }
   }
 
-  static async discard(worktreePath: string, entries: Array<{ path: string; bucket: GitBucket }>): Promise<void> {
+  static async discard(
+    worktreePath: string,
+    entries: Array<{ path: string; bucket: GitBucket }>,
+  ): Promise<void> {
     for (const entry of entries) {
       const relPath = normalizeRelPath(entry.path);
       const abs = path.resolve(worktreePath, relPath);
@@ -306,7 +341,9 @@ export class GitService {
       } else {
         await git(["restore", "--worktree", "--", relPath], worktreePath);
         if (entry.bucket === "staged") {
-          await git(["restore", "--staged", "--", relPath], worktreePath).catch(() => "");
+          await git(["restore", "--staged", "--", relPath], worktreePath).catch(
+            () => "",
+          );
         }
       }
     }
@@ -315,6 +352,71 @@ export class GitService {
   static async commit(worktreePath: string, message: string): Promise<void> {
     if (!message.trim()) throw new Error("Commit message is empty.");
     await git(["commit", "-m", message.trim()], worktreePath);
+  }
+
+  static async fetch(repoPath: string): Promise<void> {
+    await git(["fetch", "--prune"], repoPath).catch(() => "");
+  }
+
+  static async listRemoteBranches(repoPath: string): Promise<string[]> {
+    const output = await git(
+      ["branch", "-r", "--format=%(refname:short)"],
+      repoPath,
+    ).catch(() => "");
+    if (!output) return [];
+    return output
+      .split(/\r?\n/)
+      .filter((b) => b && !b.includes("HEAD"))
+      .map((b) => b.trim());
+  }
+
+  static async addWorktree(
+    repoPath: string,
+    branch: string,
+    trackRemote?: boolean,
+  ): Promise<{ worktreePath: string; branch: string }> {
+    const homeDir = process.env.HOME || process.env.USERPROFILE || "";
+    const repoName = path.basename(repoPath);
+    const worktreesDir = path.join(homeDir, ".forgepad", "worktrees", repoName);
+    const worktreePath = path.join(worktreesDir, branch);
+    await mkdir(path.dirname(worktreePath), { recursive: true });
+
+    if (trackRemote) {
+      // Check if remote branch exists
+      const remoteBranch = `origin/${branch}`;
+      const exists = await git(
+        ["rev-parse", "--verify", remoteBranch],
+        repoPath,
+      )
+        .then(() => true)
+        .catch(() => false);
+      if (exists) {
+        await git(
+          ["worktree", "add", "-b", branch, worktreePath, remoteBranch],
+          repoPath,
+        );
+      } else {
+        // Remote doesn't exist — create local branch and push
+        await git(["worktree", "add", "-b", branch, worktreePath], repoPath);
+        await git(["push", "-u", "origin", branch], repoPath).catch(() => "");
+      }
+    } else {
+      await git(["worktree", "add", "-b", branch, worktreePath], repoPath);
+    }
+
+    return { worktreePath, branch };
+  }
+
+  static async removeWorktree(
+    repoPath: string,
+    worktreePath: string,
+    branch: string,
+  ): Promise<void> {
+    await git(["worktree", "remove", "--force", worktreePath], repoPath);
+    // Prune stale worktree refs so git no longer considers the branch checked-out
+    await git(["worktree", "prune"], repoPath).catch(() => "");
+    // Delete the branch
+    await git(["branch", "-D", branch], repoPath).catch(() => "");
   }
 
   static hasPath(worktreePath: string, relPath: string): boolean {

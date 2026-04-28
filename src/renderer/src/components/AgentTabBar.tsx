@@ -80,20 +80,20 @@ export function AgentTabBar() {
   if (agentTabs.length === 0) return null;
 
   return (
-    <div className="column-tabbar flex h-9 shrink-0 items-center gap-1 border-b border-border bg-[#141414] px-2">
+    <div className="column-tabbar flex h-9 shrink-0 items-center gap-1 border-b border-border bg-surface-toolbar px-2">
       <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto scrollbar-none scroll-mask-x">
         {agentTabs.map((tab) => {
           const isExited = exitedPtyIds.has(tab.ptyId);
-          // If no hook status received yet and process is alive, default to "working"
+          // Only show "working" when explicitly reported by the agent hook.
           const status: AgentStatus | undefined =
-            agentStatuses[tab.ptyId] ?? (isExited ? undefined : "working");
+            agentStatuses[tab.ptyId] ?? (isExited ? undefined : "idle");
           const isWorking = status === "working";
 
           return (
             <button
               className={`group flex h-8 shrink-0 items-center gap-1.5 rounded-t-md px-2.5 text-xs transition-colors${
                 tab.id === activeId
-                  ? " bg-bg text-text"
+                  ? " bg-panel-3 text-text shadow-[inset_0_-2px_0_0_theme(colors.accent)]"
                   : " text-muted hover:bg-panel-2 hover:text-text"
               }`}
               key={tab.id}

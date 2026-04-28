@@ -22,7 +22,7 @@ import type {
   TaskStatus,
   Workspace,
 } from "@shared/types";
-import { DEFAULT_SETTINGS } from "@shared/types";
+import { DEFAULT_AGENT_PRESETS, DEFAULT_SETTINGS } from "@shared/types";
 import type { AgentStatus } from "@shared/agent-lifecycle";
 
 type Toast = {
@@ -41,6 +41,8 @@ type AppState = {
   activeAgentTabId: string | null;
   activeShellTabId: string | null;
   activeFileTabId: string | null;
+  /** Per-workspace last-selected agent tab – survives workspace switching */
+  workspaceActiveAgentTabIds: Record<string, string>;
   rightPanelMode: RightPanelMode;
   rightPanelOpen: boolean;
   sidebarOpen: boolean;
@@ -73,7 +75,10 @@ type AppState = {
   dismissToast: (id: string) => void;
   openProject: () => Promise<void>;
   setActiveWorkspace: (workspaceId: string | null) => void;
-  createTerminal: (workspaceId?: string) => Promise<string | null>;
+  createTerminal: (
+    workspaceId?: string,
+    initialCommand?: string,
+  ) => Promise<string | null>;
   createAgentTerminal: (
     workspaceId?: string,
     commandOverride?: string,
@@ -149,6 +154,12 @@ type AppState = {
   ) => void;
   removeProject: (projectId: string) => void;
   removeWorkspace: (workspaceId: string) => void;
+  deleteWorktree: (workspaceId: string) => Promise<void>;
+  createWorktree: (
+    projectId: string,
+    branch: string,
+    trackRemote?: boolean,
+  ) => Promise<void>;
 };
 
 function id(): string {
@@ -175,13 +186,22 @@ function agentLabelForCommand(command: string, presets: AgentPreset[]): string {
 }
 
 function serializeForSave(state: AppState): PersistedAppState {
+  // Snapshot per-workspace agent tab map, including the current workspace's active agent tab
+  const workspaceActiveAgentTabIds = { ...state.workspaceActiveAgentTabIds };
+  if (state.activeWorkspaceId && state.activeAgentTabId) {
+    workspaceActiveAgentTabIds[state.activeWorkspaceId] =
+      state.activeAgentTabId;
+  }
+
   return {
     schemaVersion: 1,
     projects: state.projects,
     workspaces: state.workspaces,
     tasks: state.tasks,
     tabs: state.tabs.filter(
-      (tab) => tab.type !== "terminal" || (tab.isAgent && tab.sessionId),
+      (tab) =>
+        tab.type !== "terminal" ||
+        (tab.isAgent && tab.sessionId && tab.sessionConfirmed),
     ),
     activeWorkspaceId: state.activeWorkspaceId,
     activeTabId:
@@ -189,6 +209,7 @@ function serializeForSave(state: AppState): PersistedAppState {
       "terminal"
         ? null
         : state.activeTabId,
+    workspaceActiveAgentTabIds,
     rightPanelMode: state.rightPanelMode,
     rightPanelOpen: state.rightPanelOpen,
     sidebarOpen: state.sidebarOpen,
@@ -262,11 +283,24 @@ function activeIdsAfterRemoval(
     (tab) => tab.type === "terminal" && !tab.isAgent,
   );
   const fileTabs = workspaceTabs.filter((tab) => tab.type !== "terminal");
+
+  // Try to restore the remembered agent tab for this workspace first
+  const rememberedAgentTabId = activeWorkspaceId
+    ? state.workspaceActiveAgentTabIds[activeWorkspaceId]
+    : undefined;
+
   const activeAgentTabId =
-    state.activeAgentTabId &&
-    agentTabs.some((tab) => tab.id === state.activeAgentTabId)
-      ? state.activeAgentTabId
-      : (agentTabs.at(-1)?.id ?? null);
+    // 1. Check the remembered per-workspace agent tab
+    rememberedAgentTabId &&
+    agentTabs.some((tab) => tab.id === rememberedAgentTabId)
+      ? rememberedAgentTabId
+      : // 2. Fall back to current global active agent tab (if it belongs to this workspace)
+        state.activeAgentTabId &&
+          agentTabs.some((tab) => tab.id === state.activeAgentTabId)
+        ? state.activeAgentTabId
+        : // 3. Fall back to last agent tab
+          (agentTabs.at(-1)?.id ?? null);
+
   const activeShellTabId =
     state.activeShellTabId &&
     shellTabs.some((tab) => tab.id === state.activeShellTabId)
@@ -305,6 +339,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   activeAgentTabId: null,
   activeShellTabId: null,
   activeFileTabId: null,
+  workspaceActiveAgentTabIds: {},
   rightPanelMode: "files",
   rightPanelOpen: true,
   sidebarOpen: true,
@@ -324,16 +359,38 @@ export const useAppStore = create<AppState>((set, get) => ({
   exitedPtyIds: new Set<string>(),
   handleAgentStatusUpdate: (ptyId, status) =>
     set((state) => {
+      const patch: Partial<AppState> = {
+        agentStatuses: { ...state.agentStatuses, [ptyId]: status },
+      };
+
       // If the agent finished ("review") and its tab is currently active, mark idle
       if (status === "review") {
         const activeTab = state.tabs.find(
           (t) => t.id === state.activeAgentTabId,
         );
         if (activeTab?.type === "terminal" && activeTab.ptyId === ptyId) {
-          return { agentStatuses: { ...state.agentStatuses, [ptyId]: "idle" } };
+          patch.agentStatuses = { ...state.agentStatuses, [ptyId]: "idle" };
         }
       }
-      return { agentStatuses: { ...state.agentStatuses, [ptyId]: status } };
+
+      // Mark session as confirmed on first hook event — proves the agent CLI
+      // actually used the session, so it's safe to persist & restore later.
+      const agentTab = state.tabs.find(
+        (t) => t.type === "terminal" && t.isAgent && t.ptyId === ptyId,
+      );
+      if (
+        agentTab?.type === "terminal" &&
+        agentTab.sessionId &&
+        !agentTab.sessionConfirmed
+      ) {
+        patch.tabs = (patch.tabs ?? state.tabs).map((t) =>
+          t.id === agentTab.id && t.type === "terminal"
+            ? { ...t, sessionConfirmed: true }
+            : t,
+        );
+      }
+
+      return patch;
     }),
   clearAgentStatus: (ptyId) =>
     set((state) => {
@@ -363,6 +420,18 @@ export const useAppStore = create<AppState>((set, get) => ({
     const rawSettings = { ...DEFAULT_SETTINGS, ...(state?.settings ?? {}) };
     if (!rawSettings.agentPresets || rawSettings.agentPresets.length === 0) {
       rawSettings.agentPresets = [...DEFAULT_SETTINGS.agentPresets];
+    } else {
+      // Merge new fields (sessionTemplate, restoreTemplate) from built-in defaults
+      // into persisted presets so upgrades take effect automatically.
+      rawSettings.agentPresets = rawSettings.agentPresets.map((preset) => {
+        const builtIn = DEFAULT_AGENT_PRESETS.find((d) => d.id === preset.id);
+        if (!builtIn) return preset;
+        return {
+          ...preset,
+          sessionTemplate: preset.sessionTemplate ?? builtIn.sessionTemplate,
+          restoreTemplate: preset.restoreTemplate ?? builtIn.restoreTemplate,
+        };
+      });
     }
     const matchingDefaultPreset = rawSettings.agentPresets.find(
       (preset) =>
@@ -400,6 +469,19 @@ export const useAppStore = create<AppState>((set, get) => ({
         return tasks.some((task) => task.id === item.taskId);
       return true;
     });
+    // Restore per-workspace agent tab map, filtering out stale tab IDs
+    const tabIdSet = new Set(tabs.map((tab) => tab.id));
+    const workspaceActiveAgentTabIds: Record<string, string> = {};
+    if (state?.workspaceActiveAgentTabIds) {
+      for (const [wsId, tabId] of Object.entries(
+        state.workspaceActiveAgentTabIds,
+      )) {
+        if (tabIdSet.has(tabId)) {
+          workspaceActiveAgentTabIds[wsId] = tabId;
+        }
+      }
+    }
+
     set({
       projects,
       workspaces,
@@ -409,6 +491,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       activeTabId: tabs.some((tab) => tab.id === state?.activeTabId)
         ? (state?.activeTabId ?? null)
         : null,
+      workspaceActiveAgentTabIds,
       rightPanelMode: state?.rightPanelMode ?? "files",
       rightPanelOpen: state?.rightPanelOpen ?? true,
       sidebarOpen: state?.sidebarOpen ?? true,
@@ -493,30 +576,49 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   setActiveWorkspace: (workspaceId) => {
-    const tabs = get().tabs.filter((tab) => tab.workspaceId === workspaceId);
-    set({ activeWorkspaceId: workspaceId, activeTabId: tabs[0]?.id ?? null });
+    const state = get();
+
+    // Save the departing workspace's active agent tab before switching
+    const updatedMap = { ...state.workspaceActiveAgentTabIds };
+    if (state.activeWorkspaceId && state.activeAgentTabId) {
+      updatedMap[state.activeWorkspaceId] = state.activeAgentTabId;
+    }
+
+    const derived = activeIdsAfterRemoval(
+      {
+        ...state,
+        activeWorkspaceId: workspaceId,
+        workspaceActiveAgentTabIds: updatedMap,
+      },
+      state.tabs,
+      state.workspaces,
+    );
+    set({ ...derived, workspaceActiveAgentTabIds: updatedMap });
     if (workspaceId) void get().refreshBranchStats(workspaceId);
   },
 
-  createTerminal: async (workspaceId) => {
+  createTerminal: async (workspaceId, initialCommand) => {
     const workspace = findWorkspace(get(), workspaceId);
     if (!workspace) return null;
     try {
       const ptyId = await window.forgepad.pty.create(
         workspace.worktreePath,
         get().settings.defaultShell || undefined,
-        undefined,
+        initialCommand || undefined,
         { FORGEPAD_WORKSPACE_ID: workspace.id },
       );
       const terminalCount = get().tabs.filter(
         (tab) => tab.workspaceId === workspace.id && tab.type === "terminal",
       ).length;
+      const defaultTitle =
+        terminalCount === 0 ? "Terminal" : `Terminal ${terminalCount + 1}`;
       const tab: Tab = {
         id: id(),
         workspaceId: workspace.id,
         type: "terminal",
-        title:
-          terminalCount === 0 ? "Terminal" : `Terminal ${terminalCount + 1}`,
+        title: initialCommand
+          ? `Run: ${initialCommand.split("&&")[0].trim()}`
+          : defaultTitle,
         ptyId,
       };
       get().addTab(tab);
@@ -548,13 +650,17 @@ export const useAppStore = create<AppState>((set, get) => ({
       ? presets.find((p) => p.id === presetId)
       : presets.find((p) => p.command.trim().split(/\s+/)[0] === commandToken);
 
-    // Pre-assign session ID so the tab can be persisted & restored
-    const sessionId = resolvedPreset?.restoreTemplate
-      ? crypto.randomUUID()
-      : undefined;
-    const finalCommand = sessionId
-      ? `${command} --session-id ${sessionId}`
-      : command;
+    // If the preset defines a sessionTemplate (e.g. Claude's "--session-id {sessionId}"),
+    // pre-assign a UUID so the CLI creates a session we can resume later.
+    // For CLIs without sessionTemplate, session ID is detected from output.
+    const sessionId =
+      resolvedPreset?.sessionTemplate && resolvedPreset?.restoreTemplate
+        ? crypto.randomUUID()
+        : undefined;
+    const finalCommand =
+      sessionId && resolvedPreset?.sessionTemplate
+        ? `${command} ${resolvedPreset.sessionTemplate.replace("{sessionId}", sessionId)}`
+        : command;
 
     try {
       const ptyId = await window.forgepad.pty.create(
@@ -611,6 +717,11 @@ export const useAppStore = create<AppState>((set, get) => ({
       };
       if (tab.type === "terminal" && tab.isAgent) {
         patch.activeAgentTabId = tab.id;
+        // Remember per-workspace agent tab selection
+        patch.workspaceActiveAgentTabIds = {
+          ...state.workspaceActiveAgentTabIds,
+          [tab.workspaceId]: tab.id,
+        };
       } else if (tab.type === "terminal") {
         patch.activeShellTabId = tab.id;
       } else {
@@ -665,6 +776,11 @@ export const useAppStore = create<AppState>((set, get) => ({
       const patch: Partial<AppState> = { activeTabId: tabId };
       if (tab?.type === "terminal" && tab.isAgent) {
         patch.activeAgentTabId = tabId;
+        // Remember per-workspace agent tab selection
+        patch.workspaceActiveAgentTabIds = {
+          ...state.workspaceActiveAgentTabIds,
+          [tab.workspaceId]: tabId!,
+        };
         // Clear "review" or "permission" when user views the agent tab
         const agentStatus = state.agentStatuses[tab.ptyId];
         if (agentStatus === "review" || agentStatus === "permission") {
@@ -1260,7 +1376,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((state) => ({
       tabs: state.tabs.map((tab) =>
         tab.id === tabId && tab.type === "terminal"
-          ? { ...tab, sessionId }
+          ? { ...tab, sessionId, sessionConfirmed: true }
           : tab,
       ),
     })),
@@ -1408,6 +1524,78 @@ export const useAppStore = create<AppState>((set, get) => ({
         ...activeIdsAfterRemoval(state, tabs, workspaces),
       };
     }),
+
+  deleteWorktree: async (workspaceId) => {
+    const state = get();
+    const workspace = state.workspaces.find((w) => w.id === workspaceId);
+    if (!workspace || workspace.isRoot) return;
+    const project = state.projects.find((p) => p.id === workspace.projectId);
+    if (!project) return;
+
+    try {
+      await window.forgepad.git.removeWorktree(
+        project.repoPath,
+        workspace.worktreePath,
+        workspace.branch,
+      );
+    } catch (error) {
+      get().addToast(
+        "error",
+        `Failed to remove worktree: ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return;
+    }
+    get().removeWorkspace(workspaceId);
+  },
+
+  createWorktree: async (projectId, branch, trackRemote) => {
+    const project = get().projects.find((p) => p.id === projectId);
+    if (!project) return;
+
+    const workspaceId = id();
+
+    set((state) => ({
+      workspaceLoadingIds: new Set([...state.workspaceLoadingIds, workspaceId]),
+    }));
+
+    try {
+      const result = await window.forgepad.git.addWorktree(
+        project.repoPath,
+        branch,
+        trackRemote,
+      );
+
+      const workspace: Workspace = {
+        id: workspaceId,
+        projectId,
+        name: branch,
+        branch: result.branch,
+        worktreePath: result.worktreePath,
+        isRoot: false,
+        createdAt: now(),
+      };
+
+      set((state) => ({
+        workspaces: [...state.workspaces, workspace],
+        activeWorkspaceId: workspaceId,
+        activeTabId: null,
+      }));
+
+      await get().createTerminal(workspaceId);
+      await get().refreshBranchStats(workspaceId);
+    } catch (error) {
+      get().addToast(
+        "error",
+        `Failed to create worktree: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    } finally {
+      set((state) => {
+        const next = new Set(state.workspaceLoadingIds);
+        next.delete(workspaceId);
+        return { workspaceLoadingIds: next };
+      });
+    }
+  },
 
   refreshBranchStats: async (workspaceId) => {
     const state = get();

@@ -165,7 +165,7 @@ export function ContextPanel() {
       </div>
 
       {lastBundle ? (
-        <div className="grid gap-[3px] rounded-lg border border-border bg-[#11151c] p-2">
+        <div className="grid gap-[3px] rounded-lg border border-border bg-surface-card p-2">
           <strong className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap">
             {lastBundle.relPath}
           </strong>
@@ -191,7 +191,7 @@ export function ContextPanel() {
         ) : (
           items.map((item) => (
             <article
-              className="grid gap-2 rounded-lg border border-border bg-[#11151c] p-[9px]"
+              className="grid gap-2 rounded-lg border border-border bg-surface-card p-[9px]"
               key={item.id}
             >
               <div className="flex items-center gap-2">

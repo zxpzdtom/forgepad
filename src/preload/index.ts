@@ -77,6 +77,26 @@ const api = {
         worktreePath,
         message,
       ) as Promise<void>,
+    addWorktree: (repoPath: string, branch: string, trackRemote?: boolean) =>
+      ipcRenderer.invoke(
+        IPC.GIT_WORKTREE_ADD,
+        repoPath,
+        branch,
+        trackRemote,
+      ) as Promise<{ worktreePath: string; branch: string }>,
+    removeWorktree: (repoPath: string, worktreePath: string, branch: string) =>
+      ipcRenderer.invoke(
+        IPC.GIT_WORKTREE_REMOVE,
+        repoPath,
+        worktreePath,
+        branch,
+      ) as Promise<void>,
+    fetch: (repoPath: string) =>
+      ipcRenderer.invoke(IPC.GIT_FETCH, repoPath) as Promise<void>,
+    listRemoteBranches: (repoPath: string) =>
+      ipcRenderer.invoke(IPC.GIT_REMOTE_BRANCHES, repoPath) as Promise<
+        string[]
+      >,
   },
   fs: {
     getTreeWithStatus: (worktreePath: string) =>

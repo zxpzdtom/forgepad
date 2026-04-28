@@ -53,10 +53,10 @@ export function TerminalDock() {
 
   return (
     <section
-      className="flex size-full min-h-0 flex-col border-t border-border bg-[#0d0f13]"
+      className="flex size-full min-h-0 flex-col border-t border-border bg-surface-terminal"
       onMouseDown={() => setFocusedColumn("agent")}
     >
-      <div className="column-tabbar flex h-9 shrink-0 items-center gap-1 border-b border-border bg-[#141414] px-2">
+      <div className="column-tabbar flex h-9 shrink-0 items-center gap-1 border-b border-border bg-surface-toolbar px-2">
         <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto scrollbar-none scroll-mask-x">
           {terminalTabs.map((tab) => (
             <button

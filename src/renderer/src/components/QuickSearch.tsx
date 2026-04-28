@@ -276,7 +276,7 @@ export function QuickSearch({ open, onClose }: QuickSearchProps) {
       onMouseDown={onClose}
     >
       <div
-        className="w-[min(680px,calc(100vw-32px))] overflow-hidden rounded-xl border border-border bg-[#181715] shadow-[0_28px_70px_rgba(0,0,0,0.46)]"
+        className="w-[min(680px,calc(100vw-32px))] overflow-hidden rounded-xl border border-border bg-surface-dialog shadow-[0_28px_70px_rgba(0,0,0,0.46)]"
         onMouseDown={(event) => event.stopPropagation()}
       >
         <div className="flex h-12 items-center gap-3 border-b border-border px-4">
