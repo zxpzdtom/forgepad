@@ -15,6 +15,7 @@ import type {
   Workspace,
 } from "@shared/types";
 import { useAppStore } from "@renderer/store/app-store";
+import { Spinner } from "./Spinner";
 
 function useActiveWorkspace(): Workspace | undefined {
   const workspaces = useAppStore((state) => state.workspaces);
@@ -49,7 +50,15 @@ function StatusIndicator({ status }: { status: GitStatusKind }) {
   if (status === "added" || status === "untracked") {
     return (
       <span className={`${base} border-ok text-ok`}>
-        <svg width="7" height="7" viewBox="0 0 7 7" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+        <svg
+          width="7"
+          height="7"
+          viewBox="0 0 7 7"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+        >
           <line x1="3.5" y1="1" x2="3.5" y2="6" />
           <line x1="1" y1="3.5" x2="6" y2="3.5" />
         </svg>
@@ -59,7 +68,15 @@ function StatusIndicator({ status }: { status: GitStatusKind }) {
   if (status === "deleted") {
     return (
       <span className={`${base} border-danger text-danger`}>
-        <svg width="7" height="7" viewBox="0 0 7 7" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+        <svg
+          width="7"
+          height="7"
+          viewBox="0 0 7 7"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+        >
           <line x1="1" y1="3.5" x2="6" y2="3.5" />
         </svg>
       </span>
@@ -67,12 +84,18 @@ function StatusIndicator({ status }: { status: GitStatusKind }) {
   }
   if (status === "renamed") {
     return (
-      <span className={`${base} border-accent-2 text-accent-2 text-[7px] font-extrabold`}>R</span>
+      <span
+        className={`${base} border-accent-2 text-accent-2 text-[7px] font-extrabold`}
+      >
+        R
+      </span>
     );
   }
   // conflicted
   return (
-    <span className={`${base} border-warn text-warn text-[7px] font-extrabold`}>!</span>
+    <span className={`${base} border-warn text-warn text-[7px] font-extrabold`}>
+      !
+    </span>
   );
 }
 
@@ -564,7 +587,9 @@ export function ChangesPanel() {
       <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-auto scrollbar-thin scroll-mask-y">
         {loading && (
           <div className="grid min-h-[52px] place-items-center text-muted">
-            Refreshing changes
+            <span className="flex items-center gap-1.5 text-xs">
+              <Spinner name="braille" />
+            </span>
           </div>
         )}
         {!loading && statuses.length === 0 && (

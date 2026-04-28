@@ -48,7 +48,7 @@ export function TabBar() {
   }, []);
 
   return (
-    <div className="workspace-tabbar tabbar relative flex h-9 shrink-0 items-center border-b border-border bg-[#111111]">
+    <div className="workspace-tabbar tabbar relative flex h-9 shrink-0 items-center border-b border-border bg-surface-toolbar">
       <div className="flex min-w-0 flex-1 overflow-x-auto scrollbar-none scroll-mask-x">
         {workspaceTabs.map((tab) => (
           <button

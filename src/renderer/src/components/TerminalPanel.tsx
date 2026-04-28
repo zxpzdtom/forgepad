@@ -2,8 +2,61 @@ import { useEffect, useRef } from "react";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
+import type { ITheme } from "@xterm/xterm";
 import type { Tab, Workspace } from "@shared/types";
 import { useAppStore } from "@renderer/store/app-store";
+import { useResolvedTheme } from "@renderer/App";
+
+const TERMINAL_THEMES: Record<"dark" | "light", ITheme> = {
+  dark: {
+    background: "#0d0f13",
+    foreground: "#d8dee9",
+    cursor: "#67d5b5",
+    cursorAccent: "#0d0f13",
+    selectionBackground: "#31545b",
+    selectionForeground: "#d8dee9",
+    black: "#3b4252",
+    red: "#bf616a",
+    green: "#a3be8c",
+    yellow: "#ebcb8b",
+    blue: "#81a1c1",
+    magenta: "#b48ead",
+    cyan: "#88c0d0",
+    white: "#e5e9f0",
+    brightBlack: "#4c566a",
+    brightRed: "#bf616a",
+    brightGreen: "#a3be8c",
+    brightYellow: "#ebcb8b",
+    brightBlue: "#81a1c1",
+    brightMagenta: "#b48ead",
+    brightCyan: "#8fbcbb",
+    brightWhite: "#eceff4",
+  },
+  light: {
+    background: "#f8f9fa",
+    foreground: "#1e293b",
+    cursor: "#0e8a6d",
+    cursorAccent: "#f8f9fa",
+    selectionBackground: "#bae6fd",
+    selectionForeground: "#1e293b",
+    black: "#1e293b",
+    red: "#dc2626",
+    green: "#16a34a",
+    yellow: "#b45309",
+    blue: "#2563eb",
+    magenta: "#9333ea",
+    cyan: "#0891b2",
+    white: "#e2e8f0",
+    brightBlack: "#64748b",
+    brightRed: "#ef4444",
+    brightGreen: "#22c55e",
+    brightYellow: "#d97706",
+    brightBlue: "#3b82f6",
+    brightMagenta: "#a855f7",
+    brightCyan: "#06b6d4",
+    brightWhite: "#f8fafc",
+  },
+};
 
 type TerminalTab = Extract<Tab, { type: "terminal" }>;
 
@@ -14,8 +67,14 @@ type TerminalPanelProps = {
 };
 
 const SESSION_ID_PATTERNS = [
+  // Claude: "Session: abc12345-..." or "session id: abc..."
   /session\s*(?:id)?[:\s]+([a-f0-9-]{36})/i,
+  // Claude: "Resuming conversation abc12345-..."
   /resuming\s+(?:conversation|session)\s+([a-f0-9-]{36})/i,
+  // Codex: "Session ID: <any-id>"
+  /session\s+id[:\s]+(\S+)/i,
+  // Gemini: "Session: <name>" or similar
+  /session[:\s]+([a-zA-Z0-9_-]+)/i,
 ];
 
 function tryExtractSessionId(data: string): string | null {
@@ -33,6 +92,7 @@ export function TerminalPanel({ tab, workspace, active }: TerminalPanelProps) {
   const activeRef = useRef(active);
   const sessionIdDetectedRef = useRef(false);
   const fontSize = useAppStore((state) => state.settings.terminalFontSize);
+  const resolvedTheme = useResolvedTheme();
 
   useEffect(() => {
     activeRef.current = active;
@@ -52,12 +112,7 @@ export function TerminalPanel({ tab, workspace, active }: TerminalPanelProps) {
       fontSize,
       lineHeight: 1.18,
       scrollback: 8000,
-      theme: {
-        background: "#0d0f13",
-        foreground: "#d8dee9",
-        cursor: "#67d5b5",
-        selectionBackground: "#31545b",
-      },
+      theme: TERMINAL_THEMES[resolvedTheme],
       allowProposedApi: false,
     });
     const fitAddon = new FitAddon();
@@ -83,7 +138,8 @@ export function TerminalPanel({ tab, workspace, active }: TerminalPanelProps) {
       if (key === "j") return false; // toggle terminal panel
       if (event.shiftKey && (key === "e" || key === "g" || key === "c"))
         return false; // panel switchers
-      if (["1", "2", "3", "4", "5", "6", "7", "8", "9"].includes(key)) return false; // tab/workspace switch
+      if (["1", "2", "3", "4", "5", "6", "7", "8", "9"].includes(key))
+        return false; // tab/workspace switch
 
       return true;
     });
@@ -149,7 +205,14 @@ export function TerminalPanel({ tab, workspace, active }: TerminalPanelProps) {
       terminalRef.current = null;
       fitRef.current = null;
     };
-  }, [fontSize, tab.ptyId, workspace.name]);
+  }, [fontSize, tab.ptyId, workspace.name, resolvedTheme]);
+
+  // Live-update terminal theme when resolved theme changes
+  useEffect(() => {
+    const terminal = terminalRef.current;
+    if (!terminal) return;
+    terminal.options.theme = TERMINAL_THEMES[resolvedTheme];
+  }, [resolvedTheme]);
 
   return (
     <section

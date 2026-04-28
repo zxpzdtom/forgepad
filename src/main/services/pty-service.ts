@@ -1,9 +1,10 @@
-import { WebContents } from "electron";
-import { existsSync, mkdirSync, writeFileSync, unlinkSync } from "node:fs";
-import { join } from "node:path";
+import { execSync } from "node:child_process";
+import { existsSync, mkdirSync, unlinkSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
-import * as pty from "node-pty";
+import { join } from "node:path";
 import { IPC } from "@shared/ipc";
+import type { WebContents } from "electron";
+import * as pty from "node-pty";
 
 const SESSIONS_DIR = join(homedir(), ".forgepad", "sessions");
 
@@ -19,6 +20,36 @@ type PtyInstance = {
 const MAX_REPLAY_CHARS = 8_000_000;
 const FALLBACK_PATH =
   "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin";
+
+/**
+ * Resolve the user's login shell PATH by spawning a login shell.
+ * On macOS, GUI apps (Electron) inherit launchd's minimal PATH which
+ * doesn't include nvm/fnm/volta managed Node.js paths. This function
+ * captures the real PATH the user would have in an interactive terminal.
+ */
+let _resolvedUserPath: string | null = null;
+function getUserPath(): string {
+  if (_resolvedUserPath !== null) return _resolvedUserPath;
+  try {
+    const loginShell = process.env.SHELL || "/bin/zsh";
+    const result = execSync(`${loginShell} -ilc 'echo "___PATH___:$PATH"'`, {
+      encoding: "utf-8",
+      timeout: 5000,
+      env: { ...process.env, HOME: homedir() },
+    });
+    const match = result.match(/___PATH___:(.+)/);
+    if (match?.[1]) {
+      _resolvedUserPath = match[1].trim();
+      return _resolvedUserPath;
+    }
+  } catch {
+    // Fall through to process.env.PATH
+  }
+  _resolvedUserPath = process.env.PATH
+    ? `${process.env.PATH}:${FALLBACK_PATH}`
+    : FALLBACK_PATH;
+  return _resolvedUserPath;
+}
 
 function appendReplay(instance: PtyInstance, data: string): void {
   if (!data) return;
@@ -77,13 +108,11 @@ export class PtyService {
     const shellConfig = resolveShell(shell);
     const commandText = command?.trim();
     const args = commandText
-      ? [...shellConfig.args, "-lc", commandText]
+      ? [...shellConfig.args, "-ilc", commandText]
       : shellConfig.args;
     const env = {
       ...process.env,
-      PATH: process.env.PATH
-        ? `${process.env.PATH}:${FALLBACK_PATH}`
-        : FALLBACK_PATH,
+      PATH: getUserPath(),
       TERM: "xterm-256color",
       COLORTERM: "truecolor",
       FORGEPAD_PTY_ID: id,

@@ -301,6 +301,22 @@ export function registerIpcHandlers(hookPort?: number): void {
     async (_event, worktreePath: string, message: string) =>
       GitService.commit(worktreePath, message),
   );
+  ipcMain.handle(
+    IPC.GIT_WORKTREE_ADD,
+    async (_event, repoPath: string, branch: string, trackRemote?: boolean) =>
+      GitService.addWorktree(repoPath, branch, trackRemote),
+  );
+  ipcMain.handle(
+    IPC.GIT_WORKTREE_REMOVE,
+    async (_event, repoPath: string, worktreePath: string, branch: string) =>
+      GitService.removeWorktree(repoPath, worktreePath, branch),
+  );
+  ipcMain.handle(IPC.GIT_FETCH, async (_event, repoPath: string) =>
+    GitService.fetch(repoPath),
+  );
+  ipcMain.handle(IPC.GIT_REMOTE_BRANCHES, async (_event, repoPath: string) =>
+    GitService.listRemoteBranches(repoPath),
+  );
 
   ipcMain.handle(
     IPC.FS_TREE_WITH_STATUS,

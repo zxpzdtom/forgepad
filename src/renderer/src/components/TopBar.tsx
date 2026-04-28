@@ -278,7 +278,7 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
   };
 
   return (
-    <header className="app-topbar relative flex h-12 shrink-0 items-center border-b border-border bg-[#141414] px-3">
+    <header className="app-topbar relative flex h-12 shrink-0 items-center border-b border-border bg-surface-toolbar px-3">
       <div className="flex items-center pl-[80px]">
         <button
           className="icon-button border-transparent"
@@ -295,7 +295,7 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
       </div>
 
       <button
-        className="absolute left-1/2 flex h-8 w-[min(460px,40vw)] -translate-x-1/2 items-center gap-2 rounded-lg border border-border bg-[#1a1a1a] px-3 text-left text-muted shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] transition-colors hover:border-subtle hover:text-text"
+        className="absolute left-1/2 flex h-8 w-[min(460px,40vw)] -translate-x-1/2 items-center gap-2 rounded-lg border border-border bg-surface-search px-3 text-left text-muted shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] transition-colors hover:border-subtle hover:text-text"
         type="button"
         title="Search ForgePad"
         onClick={onOpenSearch}
@@ -319,12 +319,18 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
           className="icon-button border-transparent"
           type="button"
           title={rightPanelOpen ? "Close side panel" : "Open side panel"}
-          onClick={() => useAppStore.setState({ rightPanelOpen: !rightPanelOpen })}
+          onClick={() =>
+            useAppStore.setState({ rightPanelOpen: !rightPanelOpen })
+          }
         >
-          {rightPanelOpen ? <PanelRightClose size={17} /> : <PanelRightOpen size={17} />}
+          {rightPanelOpen ? (
+            <PanelRightClose size={17} />
+          ) : (
+            <PanelRightOpen size={17} />
+          )}
         </button>
         <div className="relative">
-          <div className="flex overflow-hidden rounded-lg border border-border bg-[#1a1a1a]">
+          <div className="flex overflow-hidden rounded-lg border border-border bg-surface-search">
             {/* Left: execute default action */}
             <button
               className="flex h-8 items-center gap-2 px-2.5 text-sm text-text disabled:cursor-not-allowed disabled:text-subtle"

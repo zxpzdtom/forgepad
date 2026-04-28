@@ -1,10 +1,29 @@
 import { useEffect, useRef, useState } from "react";
-import { Bot, Check, ChevronDown, ChevronUp, GripVertical, Plus, Settings, Trash2, X } from "lucide-react";
+import {
+  Bot,
+  Check,
+  ChevronDown,
+  ChevronUp,
+  GripVertical,
+  Monitor,
+  Moon,
+  Plus,
+  Settings,
+  Sun,
+  Trash2,
+  X,
+} from "lucide-react";
 import { useAppStore } from "@renderer/store/app-store";
 import { agentPresetIcon } from "./AgentIcons";
 import type { AgentPreset } from "@shared/types";
 
-function PresetIcon({ preset, size = 16 }: { preset: AgentPreset; size?: number }) {
+function PresetIcon({
+  preset,
+  size = 16,
+}: {
+  preset: AgentPreset;
+  size?: number;
+}) {
   const icon = agentPresetIcon(preset.id, size);
   return icon ?? <Bot size={size} />;
 }
@@ -29,7 +48,7 @@ function AgentPresetRow({
       className={`group flex items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors ${
         preset.enabled
           ? isDefault
-            ? "border-accent/40 bg-[#172424]"
+            ? "border-accent/40 bg-accent-surface"
             : "border-border bg-panel-2"
           : "border-border/50 bg-panel opacity-60"
       }`}
@@ -46,7 +65,9 @@ function AgentPresetRow({
       {/* Label + command */}
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
-          <span className="text-[13px] font-medium text-text">{preset.label}</span>
+          <span className="text-[13px] font-medium text-text">
+            {preset.label}
+          </span>
           {isDefault && (
             <span className="rounded-full bg-accent/20 px-1.5 py-0.5 text-[10px] text-accent">
               默认
@@ -122,12 +143,18 @@ function EditPresetDialog({
   onClose,
 }: {
   preset: AgentPreset | null; // null = create new
-  onSave: (data: { label: string; command: string; restoreTemplate?: string }) => void;
+  onSave: (data: {
+    label: string;
+    command: string;
+    restoreTemplate?: string;
+  }) => void;
   onClose: () => void;
 }) {
   const [label, setLabel] = useState(preset?.label ?? "");
   const [command, setCommand] = useState(preset?.command ?? "");
-  const [restoreTemplate, setRestoreTemplate] = useState(preset?.restoreTemplate ?? "");
+  const [restoreTemplate, setRestoreTemplate] = useState(
+    preset?.restoreTemplate ?? "",
+  );
   const [showAdvanced, setShowAdvanced] = useState(false);
   const labelRef = useRef<HTMLInputElement>(null);
 
@@ -143,21 +170,28 @@ function EditPresetDialog({
       onMouseDown={onClose}
     >
       <div
-        className="w-[min(480px,calc(100vw-32px))] overflow-hidden rounded-xl border border-border bg-[#181715] shadow-[0_28px_70px_rgba(0,0,0,0.46)]"
+        className="w-[min(480px,calc(100vw-32px))] overflow-hidden rounded-xl border border-border bg-surface-dialog shadow-[0_28px_70px_rgba(0,0,0,0.46)]"
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="flex h-12 items-center justify-between border-b border-border px-4">
           <span className="text-[15px] font-semibold text-text">
             {preset ? "编辑预设" : "添加预设"}
           </span>
-          <button className="icon-button border-transparent" type="button" onClick={onClose}>
+          <button
+            className="icon-button border-transparent"
+            type="button"
+            onClick={onClose}
+          >
             <X size={16} />
           </button>
         </div>
 
         <div className="space-y-4 p-4">
           <div className="space-y-1.5">
-            <label className="text-[12px] font-medium text-subtle" htmlFor="preset-label">
+            <label
+              className="text-[12px] font-medium text-subtle"
+              htmlFor="preset-label"
+            >
               名称
             </label>
             <input
@@ -171,7 +205,10 @@ function EditPresetDialog({
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[12px] font-medium text-subtle" htmlFor="preset-command">
+            <label
+              className="text-[12px] font-medium text-subtle"
+              htmlFor="preset-command"
+            >
               启动命令
             </label>
             <input
@@ -190,14 +227,23 @@ function EditPresetDialog({
               type="button"
               onClick={() => setShowAdvanced((v) => !v)}
             >
-              {showAdvanced ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+              {showAdvanced ? (
+                <ChevronUp size={13} />
+              ) : (
+                <ChevronDown size={13} />
+              )}
               高级选项
             </button>
             {showAdvanced && (
               <div className="mt-3 space-y-1.5">
-                <label className="text-[12px] font-medium text-subtle" htmlFor="preset-restore">
+                <label
+                  className="text-[12px] font-medium text-subtle"
+                  htmlFor="preset-restore"
+                >
                   恢复命令模板{" "}
-                  <span className="text-subtle/60">（可选，使用 {"{sessionId}"}）</span>
+                  <span className="text-subtle/60">
+                    （可选，使用 {"{sessionId}"}）
+                  </span>
                 </label>
                 <input
                   id="preset-restore"
@@ -244,7 +290,9 @@ export function SettingsPanel() {
   const removeAgentPreset = useAppStore((state) => state.removeAgentPreset);
   const updateAgentPreset = useAppStore((state) => state.updateAgentPreset);
 
-  const [editingPreset, setEditingPreset] = useState<AgentPreset | null | "new">(null);
+  const [editingPreset, setEditingPreset] = useState<
+    AgentPreset | null | "new"
+  >(null);
 
   const close = () => useAppStore.setState({ settingsOpen: false });
 
@@ -271,7 +319,11 @@ export function SettingsPanel() {
     updateSettings({ defaultAgentCommand: preset.command });
   };
 
-  const handleSaveEdit = (data: { label: string; command: string; restoreTemplate?: string }) => {
+  const handleSaveEdit = (data: {
+    label: string;
+    command: string;
+    restoreTemplate?: string;
+  }) => {
     if (editingPreset === "new") {
       addAgentPreset({
         id: `custom-${Date.now()}`,
@@ -305,7 +357,7 @@ export function SettingsPanel() {
         onMouseDown={close}
       >
         <div
-          className="flex max-h-[calc(100vh-80px)] w-[min(560px,calc(100vw-32px))] flex-col overflow-hidden rounded-xl border border-border bg-[#181715] shadow-[0_28px_70px_rgba(0,0,0,0.46)]"
+          className="flex max-h-[calc(100vh-80px)] w-[min(560px,calc(100vw-32px))] flex-col overflow-hidden rounded-xl border border-border bg-surface-dialog shadow-[0_28px_70px_rgba(0,0,0,0.46)]"
           onMouseDown={(e) => e.stopPropagation()}
         >
           {/* Header */}
@@ -314,17 +366,57 @@ export function SettingsPanel() {
               <Settings size={16} className="text-muted" />
               <span className="text-[15px] font-semibold text-text">设置</span>
             </div>
-            <button className="icon-button border-transparent" type="button" onClick={close}>
+            <button
+              className="icon-button border-transparent"
+              type="button"
+              onClick={close}
+            >
               <X size={16} />
             </button>
           </div>
 
           {/* Content */}
           <div className="min-h-0 flex-1 overflow-y-auto p-4 scrollbar-thin">
+            {/* Section: 外观 */}
+            <div className="mb-6">
+              <h3 className="mb-3 text-[13px] font-semibold text-text">外观</h3>
+              <div className="flex items-center justify-between">
+                <span className="text-[13px] text-text">主题</span>
+                <div className="segmented-control">
+                  <button
+                    type="button"
+                    className={`flex items-center gap-1.5 ${settings.theme === "dark" ? "active" : ""}`}
+                    onClick={() => updateSettings({ theme: "dark" })}
+                  >
+                    <Moon size={12} />
+                    Dark
+                  </button>
+                  <button
+                    type="button"
+                    className={`flex items-center gap-1.5 ${settings.theme === "light" ? "active" : ""}`}
+                    onClick={() => updateSettings({ theme: "light" })}
+                  >
+                    <Sun size={12} />
+                    Light
+                  </button>
+                  <button
+                    type="button"
+                    className={`flex items-center gap-1.5 ${settings.theme === "system" ? "active" : ""}`}
+                    onClick={() => updateSettings({ theme: "system" })}
+                  >
+                    <Monitor size={12} />
+                    System
+                  </button>
+                </div>
+              </div>
+            </div>
+
             {/* Section: Agent 预设 */}
             <div className="mb-2 flex items-center justify-between">
               <div>
-                <h3 className="text-[13px] font-semibold text-text">Agent 预设</h3>
+                <h3 className="text-[13px] font-semibold text-text">
+                  Agent 预设
+                </h3>
                 <p className="text-[11px] text-subtle">
                   配置并排序 AI 编程助手，点击切换启用/禁用
                 </p>
@@ -364,7 +456,9 @@ export function SettingsPanel() {
                     type="button"
                     disabled={settings.terminalFontSize <= 10}
                     onClick={() =>
-                      updateSettings({ terminalFontSize: settings.terminalFontSize - 1 })
+                      updateSettings({
+                        terminalFontSize: settings.terminalFontSize - 1,
+                      })
                     }
                   >
                     <ChevronDown size={14} />
@@ -377,7 +471,9 @@ export function SettingsPanel() {
                     type="button"
                     disabled={settings.terminalFontSize >= 24}
                     onClick={() =>
-                      updateSettings({ terminalFontSize: settings.terminalFontSize + 1 })
+                      updateSettings({
+                        terminalFontSize: settings.terminalFontSize + 1,
+                      })
                     }
                   >
                     <ChevronUp size={14} />

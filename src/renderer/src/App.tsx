@@ -1,11 +1,13 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Allotment } from "allotment";
 import {
-  Bot,
-  FolderOpen,
-  GitBranch,
-  TerminalSquare,
-} from "lucide-react";
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { Allotment } from "allotment";
+import { Bot, FolderOpen, GitBranch, TerminalSquare } from "lucide-react";
 import { Sidebar } from "@renderer/components/Sidebar";
 import { AgentColumn } from "@renderer/components/AgentColumn";
 import { AgentQuickBar } from "@renderer/components/AgentQuickBar";
@@ -20,8 +22,13 @@ import { TopBar } from "@renderer/components/TopBar";
 import { ToastStack } from "@renderer/components/ToastStack";
 import { SettingsPanel } from "@renderer/components/SettingsPanel";
 import { useAppStore } from "@renderer/store/app-store";
+import { useTheme, type ResolvedTheme } from "@renderer/hooks/useTheme";
+
+export const ThemeContext = createContext<ResolvedTheme>("dark");
+export const useResolvedTheme = () => useContext(ThemeContext);
 
 export function App() {
+  const resolvedTheme = useTheme();
   useAgentLifecycle();
   const [quickSearchOpen, setQuickSearchOpen] = useState(false);
   const terminalHeightRef = useRef(240);
@@ -512,45 +519,47 @@ export function App() {
   );
 
   return (
-    <div className="flex size-full flex-col bg-bg">
-      <TopBar onOpenSearch={() => setQuickSearchOpen(true)} />
-      <div className="min-h-0 flex-1">
-        <Allotment
-          ref={horizontalSplitRef}
-          proportionalLayout={false}
-          className="size-full"
-          onChange={(sizes) => {
-            if (sidebarOpen && sizes[0] > 0) {
-              sidebarWidthRef.current = sizes[0];
-            }
-          }}
-        >
-          <Allotment.Pane
-            preferredSize={sidebarOpen ? sidebarWidthRef.current : 0}
-            minSize={sidebarOpen ? 220 : 0}
-            maxSize={sidebarOpen ? 360 : 0}
-            visible={sidebarOpen}
+    <ThemeContext.Provider value={resolvedTheme}>
+      <div className="flex size-full flex-col bg-bg">
+        <TopBar onOpenSearch={() => setQuickSearchOpen(true)} />
+        <div className="min-h-0 flex-1">
+          <Allotment
+            ref={horizontalSplitRef}
+            proportionalLayout={false}
+            className="size-full"
+            onChange={(sizes) => {
+              if (sidebarOpen && sizes[0] > 0) {
+                sidebarWidthRef.current = sizes[0];
+              }
+            }}
           >
-            <Sidebar />
-          </Allotment.Pane>
-
-          <Allotment.Pane minSize={hasAnyContent ? 460 : 420}>
-            {renderWorkspaceFrame()}
-          </Allotment.Pane>
-
-          {rightPanelOpen && (
-            <Allotment.Pane preferredSize={390} minSize={320} maxSize={560}>
-              <RightPanel />
+            <Allotment.Pane
+              preferredSize={sidebarOpen ? sidebarWidthRef.current : 0}
+              minSize={sidebarOpen ? 220 : 0}
+              maxSize={sidebarOpen ? 360 : 0}
+              visible={sidebarOpen}
+            >
+              <Sidebar />
             </Allotment.Pane>
-          )}
-        </Allotment>
+
+            <Allotment.Pane minSize={hasAnyContent ? 460 : 420}>
+              {renderWorkspaceFrame()}
+            </Allotment.Pane>
+
+            {rightPanelOpen && (
+              <Allotment.Pane preferredSize={390} minSize={320} maxSize={560}>
+                <RightPanel />
+              </Allotment.Pane>
+            )}
+          </Allotment>
+        </div>
+        <QuickSearch
+          open={quickSearchOpen}
+          onClose={() => setQuickSearchOpen(false)}
+        />
+        <ToastStack />
+        <SettingsPanel />
       </div>
-      <QuickSearch
-        open={quickSearchOpen}
-        onClose={() => setQuickSearchOpen(false)}
-      />
-      <ToastStack />
-      <SettingsPanel />
-    </div>
+    </ThemeContext.Provider>
   );
 }

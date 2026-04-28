@@ -8,6 +8,8 @@ import {
 import type { FileTreeContextMenuItem, GitStatusEntry } from "@pierre/trees";
 import type { FileNode, Workspace } from "@shared/types";
 import { useAppStore } from "@renderer/store/app-store";
+import { useResolvedTheme } from "@renderer/App";
+import { Spinner } from "./Spinner";
 
 type TreeData = {
   paths: string[];
@@ -78,28 +80,52 @@ function useActiveWorkspace(): Workspace | undefined {
   return workspaces.find((workspace) => workspace.id === activeWorkspaceId);
 }
 
-const treeThemeStyle = {
-  colorScheme: "dark",
-  "--trees-bg-override": "oklch(20.5% 0 0)",
-  "--trees-fg-override": "oklch(98.5% 0 0)",
-  "--trees-fg-muted-override": "oklch(75% 0 0)",
-  "--trees-bg-muted-override": "oklch(26.9% 0 0)",
-  "--trees-search-fg-override": "oklch(85% 0 0)",
-  "--trees-search-bg-override": "oklch(20% 0 0)",
-  "--trees-border-color-override": "oklch(100% 0 0 / 0.12)",
-  "--trees-selected-fg-override": "oklch(97% 0.04 250)",
-  "--trees-selected-bg-override": "oklch(35% 0.08 250)",
-  "--trees-selected-border-color-override": "oklch(65% 0.2 250)",
-  "--trees-selected-focused-border-color-override": "oklch(75% 0.2 250)",
-  "--trees-focus-ring-color-override": "oklch(70% 0.15 250)",
+const TREE_THEME_SHARED = {
   "--trees-font-family-override":
     'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
   "--trees-font-size-override": "13px",
   "--trees-padding-inline-override": "10px",
   "--trees-border-radius-override": "6px",
-} as CSSProperties;
+};
+
+const TREE_THEMES: Record<"dark" | "light", CSSProperties> = {
+  dark: {
+    colorScheme: "dark",
+    "--trees-bg-override": "oklch(20.5% 0 0)",
+    "--trees-fg-override": "oklch(98.5% 0 0)",
+    "--trees-fg-muted-override": "oklch(75% 0 0)",
+    "--trees-bg-muted-override": "oklch(26.9% 0 0)",
+    "--trees-search-fg-override": "oklch(85% 0 0)",
+    "--trees-search-bg-override": "oklch(20% 0 0)",
+    "--trees-border-color-override": "oklch(100% 0 0 / 0.12)",
+    "--trees-selected-fg-override": "oklch(97% 0.04 250)",
+    "--trees-selected-bg-override": "oklch(35% 0.08 250)",
+    "--trees-selected-border-color-override": "oklch(65% 0.2 250)",
+    "--trees-selected-focused-border-color-override": "oklch(75% 0.2 250)",
+    "--trees-focus-ring-color-override": "oklch(70% 0.15 250)",
+    ...TREE_THEME_SHARED,
+  } as CSSProperties,
+  light: {
+    colorScheme: "light",
+    "--trees-bg-override": "oklch(97% 0 0)",
+    "--trees-fg-override": "oklch(15% 0 0)",
+    "--trees-fg-muted-override": "oklch(45% 0 0)",
+    "--trees-bg-muted-override": "oklch(93% 0 0)",
+    "--trees-search-fg-override": "oklch(20% 0 0)",
+    "--trees-search-bg-override": "oklch(97% 0 0)",
+    "--trees-border-color-override": "oklch(0% 0 0 / 0.10)",
+    "--trees-selected-fg-override": "oklch(15% 0.04 250)",
+    "--trees-selected-bg-override": "oklch(90% 0.04 250)",
+    "--trees-selected-border-color-override": "oklch(60% 0.15 250)",
+    "--trees-selected-focused-border-color-override": "oklch(55% 0.2 250)",
+    "--trees-focus-ring-color-override": "oklch(55% 0.15 250)",
+    ...TREE_THEME_SHARED,
+  } as CSSProperties,
+};
 
 export function FilesPanel() {
+  const resolvedTheme = useResolvedTheme();
+  const treeThemeStyle = TREE_THEMES[resolvedTheme];
   const workspace = useActiveWorkspace();
   const [treeData, setTreeData] = useState<TreeData>({
     paths: [],
@@ -260,8 +286,10 @@ export function FilesPanel() {
     <section className="flex min-h-0 flex-1 flex-col overflow-hidden pt-2.5">
       <div className="relative min-h-0 flex-1 overflow-hidden">
         {loading ? (
-          <div className="absolute insetset-0 z-2 grid min-h-0 place-items-center bg-bg/72">
-            Refreshing
+          <div className="absolute inset-0 z-2 grid min-h-0 place-items-center bg-bg/72">
+            <span className="flex items-center gap-1.5 text-xs text-muted">
+              <Spinner name="braille" />
+            </span>
           </div>
         ) : null}
         <FileTree

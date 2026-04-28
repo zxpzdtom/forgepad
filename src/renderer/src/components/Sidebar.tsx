@@ -1,4 +1,13 @@
-import { useMemo, useState, type KeyboardEvent, type ReactNode } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react";
+import type { Project } from "@shared/types";
 import {
   closestCenter,
   DndContext,
@@ -13,12 +22,245 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { ChevronRight, FolderOpen, FolderPlus, X } from "lucide-react";
+import { FolderOpen, FolderPlus } from "lucide-react";
 import { useAppStore } from "@renderer/store/app-store";
 import { Spinner } from "./Spinner";
 import type { AgentStatus } from "@shared/agent-lifecycle";
 
-type SidebarWorkspace = { id: string; name: string; branch: string };
+type SidebarWorkspace = {
+  id: string;
+  name: string;
+  branch: string;
+  createdAt: number;
+  isRoot: boolean;
+};
+
+/* ── Inline SVG icons ─────────────────────────────────────────── */
+
+function ArrowDownIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      className={className}
+    >
+      <path
+        d="M6 9l6 6 6-6"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeMiterlimit="16"
+      />
+    </svg>
+  );
+}
+
+function AddIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      className={className}
+    >
+      <path
+        d="M12.001 5v14.002M19.002 12.002H5"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function GitMergeIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="14"
+      height="14"
+      viewBox="0 0 24 24"
+      fill="none"
+      className={className}
+    >
+      <path
+        d="M7 20a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM7 8a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM17 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+      />
+      <path
+        d="M7.021 8.28v7.127m7.39-3.402H10.02c-1.097 0-3.157-.88-3-3.225"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function FolderIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      className={className}
+    >
+      <path
+        d="M2 19V7.549c0-1.444 0-2.166.243-2.733a3 3 0 0 1 1.573-1.573C4.383 3 5.098 3 6.55 3h.494a2 2 0 0 1 1.557.745L10.418 6m0 0H16c1.4 0 2.1 0 2.635.272a2.5 2.5 0 0 1 1.092 1.093C20 7.9 20 8.6 20 10v1m-9.582-5H7"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M3.158 15.514l.298-.742c.734-1.827 1.101-2.74 1.866-3.256C6.088 11 7.076 11 9.052 11h8.06c2.688 0 4.033 0 4.63.879.598.879.098 2.121-.9 4.607l-.298.742c-.734 1.827-1.101 2.74-1.866 3.256-.766.516-1.754.516-3.73.516h-8.06c-2.688 0-4.033 0-4.63-.879-.598-.878-.098-2.121.9-4.607z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function ClipboardCopyIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      className={className}
+    >
+      <path
+        d="M11.502 13h9M13.502 10s-3 2.21-3 3 3 3 3 3M13.998 2h-5a1.5 1.5 0 0 0 0 3h5a1.5 1.5 0 1 0 0-3z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M15.498 3.5c1.554.047 2.48.22 3.121.862.828.827.876 2.129.879 4.638m-12-5.5c-1.553.047-2.48.22-3.121.862-.879.878-.879 2.293-.879 5.121V16c0 2.828 0 4.242.879 5.121C5.255 22 6.67 22 9.498 22h4c2.829 0 4.243 0 5.121-.879.769-.768.865-1.946.877-4.12"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function FolderTreeIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      className={className}
+    >
+      <path
+        d="M12 7V5.333c0-.777 0-1.166.14-1.467a1.5 1.5 0 0 1 .726-.725C13.168 3 13.556 3 14.333 3c.408 0 .611 0 .8.05.2.052.386.146.548.274.152.12.275.284.519.61L17 5h1.5c.935 0 1.402 0 1.75.201a1.5 1.5 0 0 1 .549.549C21 6.098 21 6.565 21 7.5s0 1.402-.201 1.75a1.5 1.5 0 0 1-.549.549c-.348.201-.815.201-1.75.201H15c-1.414 0-2.121 0-2.56-.44C12 9.122 12 8.415 12 7zM12 18v-1.667c0-.777 0-1.165.14-1.467a1.5 1.5 0 0 1 .726-.726c.302-.14.69-.14 1.467-.14.408 0 .611 0 .8.05.2.052.386.146.548.274.152.12.275.284.519.61L17 16h1.5c.935 0 1.402 0 1.75.201a1.5 1.5 0 0 1 .549.549c.201.348.201.815.201 1.75s0 1.402-.201 1.75a1.5 1.5 0 0 1-.549.549c-.348.201-.815.201-1.75.201H15c-1.414 0-2.121 0-2.56-.44C12 20.122 12 19.415 12 18zM8 7H7c-.93 0-1.395 0-1.776-.102a3 3 0 0 1-2.122-2.122C3 4.395 3 3.93 3 3"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M3 3v10c0 1.87 0 2.804.402 3.5A3 3 0 0 0 4.5 17.598C5.196 18 6.13 18 8 18"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function CancelIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      className={className}
+    >
+      <path
+        d="M18 6L6 18m12 0L6 6"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+/* ── Project avatar (colored square + first letter) ───────────── */
+
+const AVATAR_COLORS = [
+  "bg-[#6366f1]", // indigo
+  "bg-[#8b5cf6]", // violet
+  "bg-[#ec4899]", // pink
+  "bg-[#f43f5e]", // rose
+  "bg-[#f97316]", // orange
+  "bg-[#eab308]", // yellow
+  "bg-[#22c55e]", // green
+  "bg-[#14b8a6]", // teal
+  "bg-[#06b6d4]", // cyan
+  "bg-[#3b82f6]", // blue
+];
+
+function ProjectAvatar({ name }: { name: string }) {
+  const letter = (name[0] ?? "?").toUpperCase();
+  // Deterministic color from name
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const colorClass = AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+  return (
+    <span
+      className={`flex size-5 shrink-0 items-center justify-center rounded text-[11px] font-bold text-white ${colorClass}`}
+    >
+      {letter}
+    </span>
+  );
+}
+
+/* ── Relative time formatter ──────────────────────────────────── */
+
+function formatRelativeTime(timestamp: number): string {
+  const now = Date.now();
+  const diff = now - timestamp;
+  const seconds = Math.floor(diff / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+  const weeks = Math.floor(days / 7);
+  const months = Math.floor(days / 30);
+  const years = Math.floor(days / 365);
+
+  if (seconds < 60) return "just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  if (hours < 24) return `${hours}h ago`;
+  if (days < 7) return `${days}d ago`;
+  if (weeks < 5) return `${weeks}w ago`;
+  if (months < 12) return `${months}mo ago`;
+  return `${years}y ago`;
+}
 
 /**
  * Derive the "highest priority" agent status for a workspace.
@@ -49,8 +291,7 @@ function useWorkspaceAgentStatus(workspaceId: string): AgentStatus | undefined {
     for (const tab of agentTabs) {
       if (tab.type !== "terminal") continue;
       const isExited = exitedPtyIds.has(tab.ptyId);
-      const status: AgentStatus =
-        agentStatuses[tab.ptyId] ?? (isExited ? "idle" : "working");
+      const status: AgentStatus = agentStatuses[tab.ptyId] ?? "idle";
       if (!highest || priority[status] > priority[highest]) {
         highest = status;
       }
@@ -70,7 +311,7 @@ function WorkspaceStatusDot({
   // Working → unicode braille spinner
   if (agentStatus === "working") {
     return (
-      <span className="text-accent text-[11px] leading-none">
+      <span className="text-[14px] text-accent leading-none">
         <Spinner name="braille" />
       </span>
     );
@@ -91,32 +332,28 @@ function WorkspaceStatusDot({
     return <span className="block size-2 rounded-full bg-ok" />;
   }
 
-  // Default static dot
-  return (
-    <span
-      className={`block size-2 rounded-full ${isActive ? "bg-accent" : "bg-muted"}`}
-    />
-  );
+  // Default → nothing
+  return null;
 }
 
 function SortableProjectGroup({
   projectId,
   name,
-  workspaceCount,
   isCollapsed,
   hasActive,
   children,
   onToggle,
-  onRemove,
+  onAddWorktree,
+  onContextMenu,
 }: {
   projectId: string;
   name: string;
-  workspaceCount: number;
   isCollapsed: boolean;
   hasActive: boolean;
   children: ReactNode;
   onToggle: () => void;
-  onRemove: () => void;
+  onAddWorktree: () => void;
+  onContextMenu: (e: React.MouseEvent) => void;
 }) {
   const {
     attributes,
@@ -146,39 +383,37 @@ function SortableProjectGroup({
     <div
       ref={setNodeRef}
       style={style}
-      className={`group/sidebar-project flex min-w-0 flex-col rounded-lg${hasActive ? " bg-panel-2/55" : ""}${isDragging ? " shadow-[0_16px_34px_rgba(0,0,0,0.28)] ring-1 ring-accent/25" : ""}`}
+      className={`group/sidebar-project flex min-w-0 flex-col rounded-lg${hasActive ? " bg-panel/60" : ""}${isDragging ? " shadow-[0_16px_34px_rgba(0,0,0,0.28)] ring-1 ring-accent/25" : ""}`}
     >
       <div
-        className="flex h-8 w-full cursor-grab items-center gap-1 rounded-md bg-transparent px-1.5 text-left text-text transition-colors duration-150 hover:bg-panel-2 active:cursor-grabbing"
+        className="flex h-8 w-full cursor-grab items-center gap-1.5 rounded-md bg-transparent px-1.5 text-left text-text transition-colors duration-150 hover:bg-panel-2 active:cursor-grabbing"
         role="button"
         tabIndex={0}
         onClick={onToggle}
         onKeyDown={handleKeyDown}
+        onContextMenu={onContextMenu}
         {...attributes}
         {...listeners}
       >
-        <ChevronRight
-          size={14}
-          className={`shrink-0 text-subtle transition-transform duration-150 ease-[ease]${isCollapsed ? "" : " rotate-90"}`}
-        />
+        <ProjectAvatar name={name} />
         <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[13px] font-[620]">
           {name}
         </span>
-        <small className="shrink-0 text-[11px] text-subtle">
-          {workspaceCount}
-        </small>
         <button
-          className="grid size-5 shrink-0 place-items-center rounded text-subtle opacity-0 transition-opacity hover:bg-panel-3 hover:text-danger group-hover/sidebar-project:opacity-100 focus:opacity-100"
+          className="grid size-5 shrink-0 cursor-pointer place-items-center rounded text-subtle opacity-0 transition-opacity hover:bg-panel-3 hover:text-text group-hover/sidebar-project:opacity-100 focus:opacity-100"
           type="button"
-          title="Remove project"
+          title="New worktree"
           onPointerDown={(event) => event.stopPropagation()}
           onClick={(event) => {
             event.stopPropagation();
-            onRemove();
+            onAddWorktree();
           }}
         >
-          <X size={12} />
+          <AddIcon />
         </button>
+        <ArrowDownIcon
+          className={`shrink-0 cursor-pointer text-subtle transition-transform duration-200 ease-[ease]${isCollapsed ? " -rotate-90" : ""}`}
+        />
       </div>
       {children}
     </div>
@@ -190,13 +425,13 @@ function SortableWorkspaceRow({
   globalIndex,
   isActive,
   onClick,
-  onRemove,
+  onDelete,
 }: {
   workspace: SidebarWorkspace;
   globalIndex: number;
   isActive: boolean;
   onClick: () => void;
-  onRemove: () => void;
+  onDelete?: () => void;
 }) {
   const branchStats = useAppStore((state) => state.branchStats[workspace.id]);
   const stats = branchStats ?? {
@@ -237,7 +472,7 @@ function SortableWorkspaceRow({
     <div
       ref={setNodeRef}
       style={style}
-      className={`group/sidebar-workspace relative flex w-full min-w-0 cursor-grab items-start gap-2.5 rounded-md bg-transparent px-3 py-2 pr-8 text-left transition-[background,box-shadow] duration-150 active:cursor-grabbing${isActive ? " bg-[#172424]" : " hover:bg-panel-2/45"}${isDragging ? " shadow-[0_14px_28px_rgba(0,0,0,0.26)] ring-1 ring-accent/20" : ""}`}
+      className={`group/sidebar-workspace relative flex w-full min-w-0 cursor-grab items-start gap-2 rounded-md border border-border/60 bg-workspace-card-bg px-3 py-2 text-left transition-[background,box-shadow,border-color] duration-150 active:cursor-grabbing${isActive ? " border-accent/30 !bg-accent-surface" : " hover:bg-panel-2 hover:border-border/80"}${isDragging ? " shadow-[0_14px_28px_rgba(0,0,0,0.26)] ring-1 ring-accent/20" : ""}`}
       role="button"
       tabIndex={0}
       onClick={onClick}
@@ -248,28 +483,43 @@ function SortableWorkspaceRow({
       {isActive && (
         <span className="absolute bottom-1 left-1 top-1 w-[3px] rounded-full bg-accent" />
       )}
-      <div className="mt-px flex size-5 shrink-0 items-center justify-center">
-        <WorkspaceStatusDot isActive={isActive} agentStatus={agentStatus} />
+      {onDelete && (
+        <div
+          className="absolute right-1.5 top-1.5 hidden size-5 items-center justify-center rounded text-subtle hover:text-danger hover:bg-panel-3 group-hover/sidebar-workspace:flex cursor-pointer"
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete();
+          }}
+        >
+          <CancelIcon />
+        </div>
+      )}
+      <div className="mt-[3px] flex size-[14px] shrink-0 items-center justify-center">
+        {agentStatus && agentStatus !== "idle" ? (
+          <WorkspaceStatusDot isActive={isActive} agentStatus={agentStatus} />
+        ) : (
+          <GitMergeIcon className="text-subtle" />
+        )}
       </div>
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[13px] font-medium">
-            {workspace.name}
+          <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap font-mono text-[13px] font-medium">
+            {workspace.branch || "detached"}
           </span>
           {hasDiffStats && (
-            <span className="flex shrink-0 items-center gap-1 rounded bg-panel-3 px-1.5 py-0.5 text-[10px] font-mono">
+            <span className="flex shrink-0 items-center gap-1 text-[10px] font-mono">
               {stats.additions > 0 && (
-                <span className="text-[#34d399]">+{stats.additions}</span>
+                <span className="text-text-addition">+{stats.additions}</span>
               )}
               {stats.deletions > 0 && (
-                <span className="text-[#f87171]">−{stats.deletions}</span>
+                <span className="text-text-deletion">−{stats.deletions}</span>
               )}
             </span>
           )}
         </div>
         <div className="flex min-w-0 items-center gap-2">
-          <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap font-mono text-[11px] text-subtle">
-            {workspace.branch || "detached"}
+          <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[11px] text-subtle">
+            {formatRelativeTime(workspace.createdAt)}
           </span>
           {hasRemoteStats && (
             <span className="shrink-0 font-mono text-[10px] text-subtle">
@@ -283,18 +533,6 @@ function SortableWorkspaceRow({
           </span>
         </div>
       </div>
-      <button
-        className="absolute right-1.5 top-1.5 grid size-5 place-items-center rounded text-subtle opacity-0 transition-opacity hover:bg-panel-3 hover:text-danger group-hover/sidebar-workspace:opacity-100 focus:opacity-100"
-        type="button"
-        title="Remove branch"
-        onPointerDown={(event) => event.stopPropagation()}
-        onClick={(event) => {
-          event.stopPropagation();
-          onRemove();
-        }}
-      >
-        <X size={12} />
-      </button>
     </div>
   );
 }
@@ -322,14 +560,335 @@ function SidebarSkeleton() {
       </div>
     </div>
   );
+} /* ── Project context menu ──────────────────────────────────────── */
+
+function ProjectContextMenu({
+  project,
+  x,
+  y,
+  onClose,
+  onNewWorktree,
+  onCloseProject,
+}: {
+  project: Project;
+  x: number;
+  y: number;
+  onClose: () => void;
+  onNewWorktree: () => void;
+  onCloseProject: () => void;
+}) {
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  const handleClickOutside = useCallback(
+    (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        onClose();
+      }
+    },
+    [onClose],
+  );
+
+  useEffect(() => {
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [handleClickOutside]);
+
+  useEffect(() => {
+    const handleKey = (e: globalThis.KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [onClose]);
+
+  const itemClass =
+    "flex items-center gap-2 h-7 rounded-[5px] px-[9px] text-[12px] bg-transparent text-text hover:bg-panel-3 cursor-pointer w-full";
+
+  return (
+    <div
+      ref={menuRef}
+      className="fixed z-50 w-max min-w-[140px] grid gap-[2px] rounded-[7px] border border-border bg-panel-2 p-[5px] shadow-[0_14px_32px_rgba(0,0,0,0.3)]"
+      style={{ left: x, top: y }}
+    >
+      <div
+        className={itemClass}
+        onClick={() => {
+          void window.forgepad.shell.openPath(project.repoPath);
+          onClose();
+        }}
+      >
+        <FolderIcon className="shrink-0 text-subtle" />
+        Open in Finder
+      </div>
+      <div
+        className={itemClass}
+        onClick={() => {
+          void navigator.clipboard.writeText(project.repoPath);
+          onClose();
+        }}
+      >
+        <ClipboardCopyIcon className="shrink-0 text-subtle" />
+        Copy Path
+      </div>
+      <div
+        className={itemClass}
+        onClick={() => {
+          onClose();
+          onNewWorktree();
+        }}
+      >
+        <FolderTreeIcon className="shrink-0 text-subtle" />
+        New Worktree
+      </div>
+      <div className="mx-[5px] my-[3px] h-px bg-border" />
+      <div
+        className="flex items-center gap-2 h-7 rounded-[5px] px-[9px] text-[12px] bg-transparent text-danger hover:bg-panel-3 cursor-pointer w-full"
+        onClick={() => {
+          onClose();
+          onCloseProject();
+        }}
+      >
+        <CancelIcon className="shrink-0 text-subtle" />
+        Close Project
+      </div>
+    </div>
+  );
 }
 
+/* ── New worktree dialog ──────────────────────────────────────── */
 
+function NewWorktreeDialog({
+  projectName,
+  repoPath,
+  onClose,
+  onCreate,
+}: {
+  projectName: string;
+  repoPath: string;
+  onClose: () => void;
+  onCreate: (branch: string, trackRemote: boolean) => void;
+}) {
+  const [branch, setBranch] = useState("");
+  const [trackRemote, setTrackRemote] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [remoteStatus, setRemoteStatus] = useState<
+    "idle" | "checking" | "exists" | "not-found"
+  >("idle");
+  const inputRef = useRef<HTMLInputElement>(null);
+  const checkTimerRef = useRef<ReturnType<typeof setTimeout>>();
+
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  useEffect(() => {
+    const handleKey = (e: globalThis.KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [onClose]);
+
+  // Debounced remote branch check
+  useEffect(() => {
+    if (!trackRemote || !branch.trim()) {
+      setRemoteStatus("idle");
+      return;
+    }
+    setRemoteStatus("checking");
+    clearTimeout(checkTimerRef.current);
+    checkTimerRef.current = setTimeout(async () => {
+      try {
+        const branches = await window.forgepad.git.listRemoteBranches(repoPath);
+        const trimmed = branch.trim();
+        const found = branches.some(
+          (b) => b === `origin/${trimmed}` || b === trimmed,
+        );
+        setRemoteStatus(found ? "exists" : "not-found");
+      } catch {
+        setRemoteStatus("not-found");
+      }
+    }, 400);
+    return () => clearTimeout(checkTimerRef.current);
+  }, [branch, trackRemote, repoPath]);
+
+  const handleSubmit = async () => {
+    const trimmed = branch.trim();
+    if (!trimmed || loading) return;
+    setLoading(true);
+    try {
+      onCreate(trimmed, trackRemote);
+    } finally {
+      onClose();
+    }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-[60] grid place-items-center bg-black/40"
+      onMouseDown={onClose}
+    >
+      <div
+        className="w-[min(400px,90vw)] rounded-xl border border-border bg-panel-2 shadow-[0_20px_40px_rgba(0,0,0,0.4)]"
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-border px-4 py-3">
+          <span className="text-[14px] font-semibold text-text">
+            New Worktree — {projectName}
+          </span>
+        </div>
+        <div className="flex flex-col gap-3 px-4 py-4">
+          <label className="flex flex-col gap-1.5">
+            <span className="text-[12px] text-subtle">Branch name</span>
+            <input
+              ref={inputRef}
+              type="text"
+              className="h-8 rounded-md border border-border bg-panel-3 px-2.5 text-[13px] text-text outline-none focus:border-accent"
+              placeholder="feature/my-branch"
+              value={branch}
+              onChange={(e) => setBranch(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void handleSubmit();
+              }}
+            />
+          </label>
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              className="size-3.5 cursor-pointer accent-accent"
+              checked={trackRemote}
+              onChange={(e) => setTrackRemote(e.target.checked)}
+            />
+            <span className="text-[12px] text-subtle">Track remote branch</span>
+          </label>
+          {trackRemote && branch.trim() && (
+            <div className="text-[11px]">
+              {remoteStatus === "checking" && (
+                <span className="text-subtle">
+                  Checking origin/{branch.trim()}…
+                </span>
+              )}
+              {remoteStatus === "exists" && (
+                <span className="text-text-addition">
+                  ✓ origin/{branch.trim()} found — will create tracking branch
+                </span>
+              )}
+              {remoteStatus === "not-found" && (
+                <span className="text-text-warning-status">
+                  ✗ origin/{branch.trim()} not found — will create new branch
+                  and push
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+        <div className="flex justify-end gap-2 border-t border-border px-4 py-3">
+          <button
+            type="button"
+            className="h-8 rounded-md border border-border bg-transparent px-3 text-[13px] text-text hover:bg-panel-3 cursor-pointer"
+            onClick={onClose}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="h-8 rounded-md border border-transparent bg-accent px-3 text-[13px] text-accent-contrast hover:brightness-110 cursor-pointer disabled:opacity-50"
+            disabled={!branch.trim() || loading}
+            onClick={() => void handleSubmit()}
+          >
+            {loading ? "Creating…" : "Create"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Delete worktree confirmation dialog ─────────────────────── */
+
+function DeleteWorktreeDialog({
+  branch,
+  onClose,
+  onConfirm,
+}: {
+  branch: string;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const handleKey = (e: globalThis.KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [onClose]);
+
+  const handleDelete = () => {
+    setLoading(true);
+    onConfirm();
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-[60] grid place-items-center bg-black/40"
+      onMouseDown={onClose}
+    >
+      <div
+        className="w-[min(380px,90vw)] rounded-xl border border-border bg-panel-2 shadow-[0_20px_40px_rgba(0,0,0,0.4)]"
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-border px-4 py-3">
+          <span className="text-[14px] font-semibold text-text">
+            Delete Worktree
+          </span>
+        </div>
+        <div className="px-4 py-4 text-[13px] text-subtle leading-relaxed">
+          Are you sure you want to delete worktree{" "}
+          <span className="font-mono font-semibold text-text">{branch}</span>?
+          This will remove the worktree directory and delete the local branch.
+        </div>
+        <div className="flex justify-end gap-2 border-t border-border px-4 py-3">
+          <button
+            type="button"
+            className="h-8 rounded-md border border-border bg-transparent px-3 text-[13px] text-text hover:bg-panel-3 cursor-pointer"
+            onClick={onClose}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="h-8 rounded-md border border-transparent bg-danger px-3 text-[13px] text-accent-contrast hover:brightness-110 cursor-pointer disabled:opacity-50"
+            disabled={loading}
+            onClick={handleDelete}
+          >
+            {loading ? "Deleting…" : "Delete"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export function Sidebar() {
   const [collapsedProjects, setCollapsedProjects] = useState<Set<string>>(
     new Set(),
   );
+  const [contextMenu, setContextMenu] = useState<{
+    project: Project;
+    x: number;
+    y: number;
+  } | null>(null);
+  const [worktreeDialog, setWorktreeDialog] = useState<{
+    projectId: string;
+    projectName: string;
+    repoPath: string;
+  } | null>(null);
+  const [deleteDialog, setDeleteDialog] = useState<{
+    workspaceId: string;
+    branch: string;
+  } | null>(null);
 
   const projects = useAppStore((state) => state.projects);
   const workspaces = useAppStore((state) => state.workspaces);
@@ -342,8 +901,8 @@ export function Sidebar() {
   const reorderProjects = useAppStore((state) => state.reorderProjects);
   const reorderWorkspaces = useAppStore((state) => state.reorderWorkspaces);
   const removeProject = useAppStore((state) => state.removeProject);
-  const removeWorkspace = useAppStore((state) => state.removeWorkspace);
-
+  const deleteWorktree = useAppStore((state) => state.deleteWorktree);
+  const createWorktree = useAppStore((state) => state.createWorktree);
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: { distance: 5 },
@@ -406,30 +965,13 @@ export function Sidebar() {
     }
   };
 
-  const confirmRemoveProject = (projectId: string, projectName: string) => {
-    const confirmed = window.confirm(
-      `Remove ${projectName} from ForgePad? Files stay on disk.`,
-    );
-    if (confirmed) removeProject(projectId);
-  };
-
-  const confirmRemoveWorkspace = (
-    workspaceId: string,
-    workspaceName: string,
-  ) => {
-    const confirmed = window.confirm(
-      `Remove ${workspaceName} from ForgePad? Files stay on disk.`,
-    );
-    if (confirmed) removeWorkspace(workspaceId);
-  };
-
   if (!sidebarOpen) {
     return null;
   }
 
   return (
     <aside
-      className="flex h-full min-h-0 min-w-0 flex-col border-r border-border bg-[oklch(20.5%_0_0)]"
+      className="flex h-full min-h-0 min-w-0 flex-col border-r border-border bg-sidebar-bg"
       onMouseDown={() => setFocusedColumn("sidebar")}
     >
       <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-0.5 overflow-y-auto overflow-x-hidden px-2 py-1.5 scrollbar-thin scroll-mask-y">
@@ -467,49 +1009,67 @@ export function Sidebar() {
                 return (
                   <div
                     className={
-                      projectIdx > 0
-                        ? "mt-2 border-t border-border/30 pt-2"
-                        : ""
+                      projectIdx > 0 ? "mt-2 border-t border-border pt-2" : ""
                     }
                     key={project.id}
                   >
                     <SortableProjectGroup
                       projectId={project.id}
                       name={project.name}
-                      workspaceCount={projectWorkspaces.length}
                       isCollapsed={isCollapsed}
                       hasActive={hasActive}
                       onToggle={() => toggleProject(project.id)}
-                      onRemove={() =>
-                        confirmRemoveProject(project.id, project.name)
+                      onAddWorktree={() =>
+                        setWorktreeDialog({
+                          projectId: project.id,
+                          projectName: project.name,
+                          repoPath: project.repoPath,
+                        })
                       }
+                      onContextMenu={(e) => {
+                        e.preventDefault();
+                        setContextMenu({
+                          project,
+                          x: e.clientX,
+                          y: e.clientY,
+                        });
+                      }}
                     >
-                      {!isCollapsed && (
-                        <SortableContext
-                          items={wsIds}
-                          strategy={verticalListSortingStrategy}
-                        >
-                          <div className="grid gap-0.5 pb-1">
-                            {projectWorkspaces.map((workspace) => (
-                              <SortableWorkspaceRow
-                                key={workspace.id}
-                                workspace={workspace}
-                                globalIndex={
-                                  workspaceIndexMap.get(workspace.id) ?? 0
-                                }
-                                isActive={workspace.id === activeWorkspaceId}
-                                onClick={() => setActiveWorkspace(workspace.id)}
-                                onRemove={() =>
-                                  confirmRemoveWorkspace(
-                                    workspace.id,
-                                    workspace.branch || workspace.name,
-                                  )
-                                }
-                              />
-                            ))}
-                          </div>
-                        </SortableContext>
-                      )}
+                      <div
+                        className={`grid transition-[grid-template-rows] duration-300 ease-in-out${isCollapsed ? " grid-rows-[0fr]" : " grid-rows-[1fr]"}`}
+                      >
+                        <div className="overflow-hidden">
+                          <SortableContext
+                            items={wsIds}
+                            strategy={verticalListSortingStrategy}
+                          >
+                            <div className="grid gap-0.5 pb-1">
+                              {projectWorkspaces.map((workspace) => (
+                                <SortableWorkspaceRow
+                                  key={workspace.id}
+                                  workspace={workspace}
+                                  globalIndex={
+                                    workspaceIndexMap.get(workspace.id) ?? 0
+                                  }
+                                  isActive={workspace.id === activeWorkspaceId}
+                                  onClick={() =>
+                                    setActiveWorkspace(workspace.id)
+                                  }
+                                  onDelete={
+                                    workspace.isRoot
+                                      ? undefined
+                                      : () =>
+                                          setDeleteDialog({
+                                            workspaceId: workspace.id,
+                                            branch: workspace.branch,
+                                          })
+                                  }
+                                />
+                              ))}
+                            </div>
+                          </SortableContext>
+                        </div>
+                      </div>
                     </SortableProjectGroup>
                   </div>
                 );
@@ -529,6 +1089,50 @@ export function Sidebar() {
           <span>Add repository</span>
         </button>
       </div>
+
+      {contextMenu && (
+        <ProjectContextMenu
+          project={contextMenu.project}
+          x={contextMenu.x}
+          y={contextMenu.y}
+          onClose={() => setContextMenu(null)}
+          onNewWorktree={() =>
+            setWorktreeDialog({
+              projectId: contextMenu.project.id,
+              projectName: contextMenu.project.name,
+              repoPath: contextMenu.project.repoPath,
+            })
+          }
+          onCloseProject={() => {
+            const confirmed = window.confirm(
+              `Remove ${contextMenu.project.name} from ForgePad? Files stay on disk.`,
+            );
+            if (confirmed) removeProject(contextMenu.project.id);
+          }}
+        />
+      )}
+
+      {worktreeDialog && (
+        <NewWorktreeDialog
+          projectName={worktreeDialog.projectName}
+          repoPath={worktreeDialog.repoPath}
+          onClose={() => setWorktreeDialog(null)}
+          onCreate={(branch, trackRemote) =>
+            void createWorktree(worktreeDialog.projectId, branch, trackRemote)
+          }
+        />
+      )}
+
+      {deleteDialog && (
+        <DeleteWorktreeDialog
+          branch={deleteDialog.branch}
+          onClose={() => setDeleteDialog(null)}
+          onConfirm={() => {
+            void deleteWorktree(deleteDialog.workspaceId);
+            setDeleteDialog(null);
+          }}
+        />
+      )}
     </aside>
   );
 }

@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import type { Tab, Workspace } from "@shared/types";
 import { useAppStore } from "@renderer/store/app-store";
+import { useResolvedTheme } from "@renderer/App";
 
 type FileTab = Extract<Tab, { type: "file" }>;
 
@@ -149,7 +150,7 @@ let hlPromise: Promise<DiffsHighlighter> | null = null;
 function getHl(): Promise<DiffsHighlighter> {
   if (!hlPromise) {
     hlPromise = getSharedHighlighter({
-      themes: ["pierre-dark"],
+      themes: ["pierre-dark", "pierre-light"],
       langs: ALL_LANGS,
     });
   }
@@ -306,6 +307,14 @@ function scrollRangeIntoContainer(range: Range, container: HTMLElement) {
 
 mermaid.initialize({ startOnLoad: false, theme: "dark" });
 
+function getMermaidTheme(resolvedTheme: "dark" | "light"): string {
+  return resolvedTheme === "dark" ? "dark" : "default";
+}
+
+function getShikiTheme(resolvedTheme: "dark" | "light"): string {
+  return resolvedTheme === "dark" ? "pierre-dark" : "pierre-light";
+}
+
 let mermaidCounter = 0;
 
 const MD_LANG_MAP: Record<string, BundledLanguage> = {
@@ -367,6 +376,7 @@ function MarkdownCodeBlock({
   const [copied, setCopied] = useState(false);
   const [highlighted, setHighlighted] = useState("");
   const [mermaidSvg, setMermaidSvg] = useState("");
+  const resolvedTheme = useResolvedTheme();
 
   const lang = (className?.replace("language-", "") ?? "").toLowerCase();
   const code = String(children).replace(/\n$/, "");
@@ -392,18 +402,22 @@ function MarkdownCodeBlock({
         : "text";
       const html = hl.codeToHtml(code, {
         lang: resolved as BundledLanguage,
-        theme: "pierre-dark",
+        theme: getShikiTheme(resolvedTheme),
       });
       setHighlighted(html);
     });
     return () => {
       disposed = true;
     };
-  }, [code, lang, isInline]);
+  }, [code, lang, isInline, resolvedTheme]);
 
   useEffect(() => {
     if (lang !== "mermaid") return;
     let disposed = false;
+    mermaid.initialize({
+      startOnLoad: false,
+      theme: getMermaidTheme(resolvedTheme),
+    });
     const id = `mermaid-${++mermaidCounter}`;
     mermaid
       .render(id, code)
@@ -419,7 +433,7 @@ function MarkdownCodeBlock({
     return () => {
       disposed = true;
     };
-  }, [code, lang]);
+  }, [code, lang, resolvedTheme]);
 
   if (lang === "mermaid" && mermaidSvg) {
     return (
@@ -486,6 +500,7 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
   const [imageViewMode, setImageViewMode] = useState<"preview" | "raw">(
     "preview",
   );
+  const resolvedTheme = useResolvedTheme();
   const addToast = useAppStore((state) => state.addToast);
   const addContextFiles = useAppStore((state) => state.addContextFiles);
   const addCodeSelection = useAppStore((state) => state.addCodeSelection);
@@ -546,7 +561,10 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
         const loaded = (hl.getLoadedLanguages() as string[]).includes(lang)
           ? lang
           : "text";
-        return hl.codeToHtml(fileText, { lang: loaded, theme: "pierre-dark" });
+        return hl.codeToHtml(fileText, {
+          lang: loaded,
+          theme: getShikiTheme(resolvedTheme),
+        });
       })
       .then((html) => {
         if (!disposed && html) setHighlighted(addLineMetadata(html));
@@ -565,7 +583,14 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
     return () => {
       disposed = true;
     };
-  }, [addToast, tab.relPath, workspace.worktreePath, lang, isImage]);
+  }, [
+    addToast,
+    tab.relPath,
+    workspace.worktreePath,
+    lang,
+    isImage,
+    resolvedTheme,
+  ]);
 
   useEffect(() => {
     setMarkdownMode("rendered");
@@ -851,7 +876,7 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
       </div>
       {searchOpen ? (
         <form
-          className="flex min-h-[38px] items-center gap-2 border-b border-border bg-[#11151c] px-2.5 py-1"
+          className="flex min-h-[38px] items-center gap-2 border-b border-border bg-surface-card px-2.5 py-1"
           onSubmit={(event) => {
             event.preventDefault();
             goToMatch(1);
@@ -903,7 +928,7 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
           Loading file
         </div>
       ) : showImagePreview && imageUrl ? (
-        <div className="flex flex-1 min-h-0 items-center justify-center overflow-auto bg-[#0c0d10] p-6 scrollbar-thin scroll-mask">
+        <div className="flex flex-1 min-h-0 items-center justify-center overflow-auto bg-surface-inset p-6 scrollbar-thin scroll-mask">
           <img
             className="max-h-full max-w-full rounded object-contain"
             src={imageUrl}
@@ -927,7 +952,7 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
         </div>
       ) : (
         <div
-          className="code-viewer-scroll flex-1 min-h-0 overflow-auto bg-[#0c0d10] scroll-mask"
+          className="code-viewer-scroll flex-1 min-h-0 overflow-auto bg-surface-inset scroll-mask"
           ref={scrollRef}
           onMouseUp={captureCodeSelection}
           onKeyUp={captureCodeSelection}
@@ -942,7 +967,7 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
       {pendingSelection ? (
         <form
           ref={selectionFormRef}
-          className="grid grid-cols-[minmax(160px,240px)_minmax(0,1fr)_auto] items-center gap-2.5 border-t border-border bg-[#12161d] px-2.5 py-2 shadow-[0_-12px_28px_rgba(0,0,0,0.18)]"
+          className="grid grid-cols-[minmax(160px,240px)_minmax(0,1fr)_auto] items-center gap-2.5 border-t border-border bg-surface-footer px-2.5 py-2 shadow-[0_-12px_28px_rgba(0,0,0,0.18)]"
           onSubmit={(event) => {
             event.preventDefault();
             submitCodeSelection();

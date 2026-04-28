@@ -27,7 +27,7 @@ export function ContextPreview() {
           {bundle.estimatedTokens.toLocaleString()} tokens est.
         </div>
       </div>
-      <pre className="flex min-h-0 flex-1 overflow-auto p-4 font-mono text-xs leading-relaxed text-[#d7deeb] scroll-mask">
+      <pre className="flex min-h-0 flex-1 overflow-auto p-4 font-mono text-xs leading-relaxed text-text-code-block scroll-mask">
         {bundle.markdown}
       </pre>
     </section>

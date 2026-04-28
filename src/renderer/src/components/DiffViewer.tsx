@@ -10,6 +10,7 @@ import type {
   Workspace,
 } from "@shared/types";
 import { useAppStore } from "@renderer/store/app-store";
+import { useResolvedTheme } from "@renderer/App";
 
 type DiffTab = Extract<Tab, { type: "diff" }>;
 
@@ -40,6 +41,7 @@ export function DiffViewer({ tab, workspace }: DiffViewerProps) {
   const [loading, setLoading] = useState(false);
   const [pending, setPending] = useState<PendingComment | null>(null);
   const settings = useAppStore((state) => state.settings);
+  const resolvedTheme = useResolvedTheme();
   const gitRefreshEpoch = useAppStore((state) => state.gitRefreshEpoch);
   const addToast = useAppStore((state) => state.addToast);
   const addContextDiff = useAppStore((state) => state.addContextDiff);
@@ -97,8 +99,8 @@ export function DiffViewer({ tab, workspace }: DiffViewerProps) {
   }, [load, gitRefreshEpoch]);
 
   const diffOptions: FileDiffOptions<undefined> = {
-    theme: "pierre-dark",
-    themeType: "dark",
+    theme: resolvedTheme === "dark" ? "pierre-dark" : "pierre-light",
+    themeType: resolvedTheme,
     diffStyle: settings.diffStyle,
     diffIndicators: settings.diffIndicators,
     lineDiffType: settings.diffLineDiffType,
@@ -236,7 +238,7 @@ export function DiffViewer({ tab, workspace }: DiffViewerProps) {
           };
           return (
             <article
-              className="w-full mb-3.5 rounded-lg border border-border bg-[#11141a]"
+              className="w-full mb-3.5 rounded-lg border border-border bg-surface-card"
               key={`${file.bucket}:${file.path}`}
             >
               <header className="flex min-h-11 items-center justify-between gap-3 border-b border-border bg-panel-2 px-2.5 py-2">
@@ -325,7 +327,7 @@ export function DiffViewer({ tab, workspace }: DiffViewerProps) {
                 <div className="grid gap-2 border-t border-border p-2.5">
                   {fileComments.map((comment) => (
                     <div
-                      className="grid gap-2 rounded-lg border border-border bg-[#11151c] p-[9px]"
+                      className="grid gap-2 rounded-lg border border-border bg-surface-card p-[9px]"
                       key={comment.id}
                     >
                       <strong className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[13px]">

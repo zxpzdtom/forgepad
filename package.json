@@ -11,7 +11,39 @@
     "preview": "electron-vite preview",
     "postinstall": "electron-rebuild -f -w node-pty",
     "typecheck": "tsc --noEmit",
-    "rebuild": "electron-rebuild -f -w node-pty"
+    "rebuild": "electron-rebuild -f -w node-pty",
+    "dist": "pnpm build && electron-builder --mac dmg",
+    "dist:dir": "pnpm build && electron-builder --mac dir"
+  },
+  "build": {
+    "appId": "com.forgepad.app",
+    "productName": "ForgePad",
+    "mac": {
+      "target": "dmg",
+      "category": "public.app-category.developer-tools",
+      "identity": null
+    },
+    "dmg": {
+      "contents": [
+        {
+          "x": 130,
+          "y": 220
+        },
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ]
+    },
+    "files": [
+      "out/**/*"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "asar": true
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -44,9 +76,11 @@
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.2",
     "electron": "^40.2.1",
+    "electron-builder": "^26.8.1",
     "electron-vite": "^5.0.0",
     "tailwindcss": "^4.2.4",
     "typescript": "^5.9.3",
     "vite": "^7.2.7"
-  }
+  },
+  "repository": "git@github.com:zxpzdtom/forgepad.git"
 }
