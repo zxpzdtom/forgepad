@@ -107,9 +107,10 @@ export class PtyService {
     const id = `pty-${++this.nextId}`;
     const shellConfig = resolveShell(shell);
     const commandText = command?.trim();
-    const args = commandText
-      ? [...shellConfig.args, "-ilc", commandText]
-      : shellConfig.args;
+    // Always spawn an interactive shell — if a command is given, we write it
+    // as stdin input after the shell starts so the shell stays alive after the
+    // command exits (just like a normal terminal where you type a command).
+    const args = shellConfig.args;
     const env = {
       ...process.env,
       PATH: getUserPath(),
@@ -190,6 +191,15 @@ export class PtyService {
     });
 
     this.ptys.set(id, instance);
+
+    // If a command was requested, feed it as stdin input so the shell
+    // executes it as if the user typed it. The shell remains interactive
+    // after the command finishes — Ctrl+C only kills the foreground
+    // process, not the shell itself.
+    if (commandText) {
+      proc.write(`${commandText}\n`);
+    }
+
     return id;
   }
 
@@ -210,6 +220,18 @@ export class PtyService {
     if (!instance) return;
     instance.process.kill();
     this.ptys.delete(id);
+  }
+
+  /** Kill all remaining PTY processes (called on app quit). */
+  destroyAll(): void {
+    for (const [id, instance] of this.ptys) {
+      try {
+        instance.process.kill();
+      } catch {
+        /* already dead */
+      }
+      this.ptys.delete(id);
+    }
   }
 
   reattach(

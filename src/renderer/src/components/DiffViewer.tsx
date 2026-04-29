@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { MessageSquarePlus, RefreshCw } from "lucide-react";
-import { PatchDiff } from "@pierre/diffs/react";
-import type { FileDiffOptions, SelectedLineRange } from "@pierre/diffs/react";
+import { processFile } from "@pierre/diffs";
+import type { FileDiffOptions, SelectedLineRange } from "@pierre/diffs";
+import { FileDiff, PatchDiff } from "@pierre/diffs/react";
+import type { DiffLineAnnotation } from "@pierre/diffs/react";
+import { useResolvedTheme } from "@renderer/App";
+import { useAppStore } from "@renderer/store/app-store";
 import type {
   DiffCommentItem,
   DiffFileData,
@@ -9,8 +11,8 @@ import type {
   Tab,
   Workspace,
 } from "@shared/types";
-import { useAppStore } from "@renderer/store/app-store";
-import { useResolvedTheme } from "@renderer/App";
+import { MessageSquarePlus, RefreshCw } from "lucide-react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 type DiffTab = Extract<Tab, { type: "diff" }>;
 
@@ -25,14 +27,255 @@ type PendingComment = {
   text: string;
 };
 
-function keyForStatus(status: Pick<FileStatus, "bucket" | "path">): string {
-  return `${status.bucket}:${status.path}`;
+type AnnotationMeta =
+  | { kind: "pending" }
+  | { kind: "comment"; comment: DiffCommentItem };
+
+function DiffContent({
+  file,
+  options,
+  lineAnnotations,
+  renderAnnotation,
+}: {
+  file: DiffFileData;
+  options: FileDiffOptions<AnnotationMeta>;
+  lineAnnotations?: DiffLineAnnotation<AnnotationMeta>[];
+  renderAnnotation?: (
+    annotation: DiffLineAnnotation<AnnotationMeta>,
+  ) => React.ReactNode;
+}) {
+  const fileDiffMetadata = useMemo(() => {
+    if (file.oldContent == null && file.newContent == null) {
+      console.warn(
+        "[DiffContent] no oldContent/newContent, falling back to PatchDiff",
+      );
+      return undefined;
+    }
+    const result = processFile(file.patch, {
+      oldFile: {
+        name: file.oldPath ?? file.path,
+        contents: file.oldContent ?? "",
+      },
+      newFile: { name: file.path, contents: file.newContent ?? "" },
+    });
+    console.log("[DiffContent] processFile result:", {
+      isPartial: result?.isPartial,
+      hunks: result?.hunks.length,
+      hasResult: result != null,
+    });
+    return result;
+  }, [file.patch, file.path, file.oldPath, file.oldContent, file.newContent]);
+
+  if (fileDiffMetadata) {
+    return (
+      <FileDiff
+        fileDiff={fileDiffMetadata}
+        options={options}
+        lineAnnotations={lineAnnotations}
+        renderAnnotation={renderAnnotation}
+        disableWorkerPool
+      />
+    );
+  }
+  return (
+    <PatchDiff
+      patch={file.patch}
+      options={options}
+      lineAnnotations={lineAnnotations}
+      renderAnnotation={renderAnnotation}
+      disableWorkerPool
+    />
+  );
 }
 
 function formatRange(range: SelectedLineRange): string {
   const side = range.side === "deletions" ? "-" : "+";
   if (range.start === range.end) return `${side}${range.start}`;
   return `${side}${range.start}-${range.endSide === "deletions" ? "-" : "+"}${range.end}`;
+}
+
+function DiffFileEntry({
+  file,
+  diffOptions,
+  tab,
+  workspace,
+  pending,
+  setPending,
+  fileComments,
+  addDiffComment,
+}: {
+  file: DiffFileData;
+  diffOptions: FileDiffOptions<AnnotationMeta>;
+  tab: DiffTab;
+  workspace: Workspace;
+  pending: PendingComment | null;
+  setPending: (p: PendingComment | null) => void;
+  fileComments: DiffCommentItem[];
+  addDiffComment: (
+    workspaceId: string,
+    relPath: string,
+    bucket: DiffFileData["bucket"],
+    range: SelectedLineRange,
+    text: string,
+  ) => void;
+}) {
+  const isThisFilePending =
+    pending?.file.path === file.path && pending.file.bucket === file.bucket;
+
+  const options: FileDiffOptions<AnnotationMeta> = useMemo(
+    () => ({
+      ...diffOptions,
+      onLineSelectionEnd: (range: SelectedLineRange | null) => {
+        if (range) setPending({ file, range, text: "" });
+      },
+    }),
+    [diffOptions, file, setPending],
+  );
+
+  const lineAnnotations = useMemo(() => {
+    const annotations: DiffLineAnnotation<AnnotationMeta>[] = [];
+    // Existing saved comments
+    for (const comment of fileComments) {
+      annotations.push({
+        side: comment.endSide ?? comment.side,
+        lineNumber: comment.endLine,
+        metadata: { kind: "comment", comment },
+      });
+    }
+    // Pending comment form
+    if (isThisFilePending && pending) {
+      annotations.push({
+        side: pending.range.endSide ?? pending.range.side,
+        lineNumber: pending.range.end,
+        metadata: { kind: "pending" },
+      });
+    }
+    return annotations;
+  }, [fileComments, isThisFilePending, pending]);
+
+  const renderAnnotation = useCallback(
+    (annotation: DiffLineAnnotation<AnnotationMeta>) => {
+      const meta = annotation.metadata!;
+      if (meta.kind === "pending" && isThisFilePending && pending) {
+        return (
+          <div className="m-2.5 rounded-lg border border-border bg-panel p-2.5">
+            <div className="mb-2 flex items-center gap-2 text-xs text-accent">
+              <MessageSquarePlus size={15} />
+              Comment on {formatRange(pending.range)}
+            </div>
+            <textarea
+              className="w-full"
+              value={pending.text}
+              onChange={(event) =>
+                setPending({
+                  ...pending,
+                  text: event.currentTarget.value,
+                })
+              }
+              placeholder="Add a note for the agent"
+              onKeyDown={(event) => {
+                if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+                  event.preventDefault();
+                  addDiffComment(
+                    workspace.id,
+                    file.path,
+                    file.bucket,
+                    pending.range,
+                    pending.text,
+                  );
+                  setPending(null);
+                }
+              }}
+            />
+            <div className="mt-2 flex justify-end gap-2">
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={() => setPending(null)}
+              >
+                Cancel
+              </button>
+              <button
+                className="primary-button"
+                type="button"
+                onClick={() => {
+                  addDiffComment(
+                    workspace.id,
+                    file.path,
+                    file.bucket,
+                    pending.range,
+                    pending.text,
+                  );
+                  setPending(null);
+                }}
+              >
+                Add Comment
+              </button>
+            </div>
+          </div>
+        );
+      }
+      if (meta.kind === "comment") {
+        const { comment } = meta;
+        return (
+          <div className="mx-2.5 my-1 grid gap-2 rounded-lg border border-border bg-surface-card p-[9px]">
+            <strong className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[13px]">
+              L{comment.startLine}
+              {comment.endLine !== comment.startLine
+                ? `-L${comment.endLine}`
+                : ""}{" "}
+              {comment.side}
+            </strong>
+            <p className="m-0 text-sm leading-relaxed text-muted">
+              {comment.text}
+            </p>
+          </div>
+        );
+      }
+      return null;
+    },
+    [
+      isThisFilePending,
+      pending,
+      setPending,
+      addDiffComment,
+      workspace.id,
+      file.path,
+      file.bucket,
+    ],
+  );
+
+  return (
+    <article className="w-full mb-3.5 rounded-lg bg-surface-card">
+      {!tab.activePath && (
+        <header className="flex min-h-11 items-center gap-3 border-b border-border bg-panel-2 px-2.5 py-2">
+          <div className="grid min-w-0 gap-0.5">
+            <strong title={file.path}>{file.path}</strong>
+            <span className="text-xs text-muted">
+              {file.bucket} · {file.status}
+              {file.oldPath ? ` · from ${file.oldPath}` : ""}
+            </span>
+          </div>
+        </header>
+      )}
+      {file.isBinary ? (
+        <div className="grid min-h-[90px] place-items-center text-muted">
+          Binary diff omitted
+        </div>
+      ) : file.patch.trim() ? (
+        <DiffContent
+          file={file}
+          options={options}
+          lineAnnotations={lineAnnotations}
+          renderAnnotation={renderAnnotation}
+        />
+      ) : (
+        <div className="grid min-h-[90px] place-items-center text-muted">
+          No textual diff available
+        </div>
+      )}
+    </article>
+  );
 }
 
 export function DiffViewer({ tab, workspace }: DiffViewerProps) {
@@ -44,10 +287,8 @@ export function DiffViewer({ tab, workspace }: DiffViewerProps) {
   const resolvedTheme = useResolvedTheme();
   const gitRefreshEpoch = useAppStore((state) => state.gitRefreshEpoch);
   const addToast = useAppStore((state) => state.addToast);
-  const addContextDiff = useAppStore((state) => state.addContextDiff);
   const addDiffComment = useAppStore((state) => state.addDiffComment);
   const contextItems = useAppStore((state) => state.contextItems);
-  const updateSettings = useAppStore((state) => state.updateSettings);
 
   const commentsByPath = useMemo(() => {
     const map = new Map<string, DiffCommentItem[]>();
@@ -98,7 +339,18 @@ export function DiffViewer({ tab, workspace }: DiffViewerProps) {
     void load();
   }, [load, gitRefreshEpoch]);
 
-  const diffOptions: FileDiffOptions<undefined> = {
+  // Escape key to dismiss pending comment
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && pending) {
+        setPending(null);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown, true);
+    return () => window.removeEventListener("keydown", handleKeyDown, true);
+  }, [pending]);
+
+  const diffOptions: FileDiffOptions<AnnotationMeta> = {
     theme: resolvedTheme === "dark" ? "pierre-dark" : "pierre-light",
     themeType: resolvedTheme,
     diffStyle: settings.diffStyle,
@@ -114,91 +366,11 @@ export function DiffViewer({ tab, workspace }: DiffViewerProps) {
 
   return (
     <section className="absolute inset-0 flex min-h-0 min-w-0 flex-col bg-bg">
-      <div className="flex min-h-12 items-start justify-between gap-3 border-b border-border bg-panel px-3 py-2">
-        <div className="min-w-0 flex items-center gap-[7px] overflow-hidden text-ellipsis whitespace-nowrap text-[13px] font-[620]">
+      <div className="flex min-h-12 items-center justify-between gap-3 border-b border-border bg-panel px-3 py-2">
+        <div className="min-w-0 flex items-center gap-[7px] overflow-hidden text-ellipsis whitespace-nowrap text-[13px] font-[510]">
           {tab.activePath ? `Changes: ${tab.activePath}` : "Workspace Changes"}
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
-          <label className="switch-row compact-switch">
-            Layout
-            <select
-              className="toolbar-select"
-              value={settings.diffStyle}
-              onChange={(event) =>
-                updateSettings({
-                  diffStyle: event.currentTarget
-                    .value as typeof settings.diffStyle,
-                  diffInline: event.currentTarget.value === "unified",
-                })
-              }
-            >
-              <option value="split">Split</option>
-              <option value="unified">Unified</option>
-            </select>
-          </label>
-          <label className="switch-row compact-switch">
-            Indicators
-            <select
-              className="toolbar-select"
-              value={settings.diffIndicators}
-              onChange={(event) =>
-                updateSettings({
-                  diffIndicators: event.currentTarget
-                    .value as typeof settings.diffIndicators,
-                })
-              }
-            >
-              <option value="bars">Bars</option>
-              <option value="classic">+/-</option>
-              <option value="none">None</option>
-            </select>
-          </label>
-          <label className="switch-row compact-switch">
-            Inline
-            <select
-              className="toolbar-select"
-              value={settings.diffLineDiffType}
-              onChange={(event) =>
-                updateSettings({
-                  diffLineDiffType: event.currentTarget
-                    .value as typeof settings.diffLineDiffType,
-                })
-              }
-            >
-              <option value="word-alt">Word alt</option>
-              <option value="word">Word</option>
-              <option value="char">Character</option>
-              <option value="none">None</option>
-            </select>
-          </label>
-          <label className="switch-row compact-switch">
-            Overflow
-            <select
-              className="toolbar-select"
-              value={settings.diffOverflow}
-              onChange={(event) =>
-                updateSettings({
-                  diffOverflow: event.currentTarget
-                    .value as typeof settings.diffOverflow,
-                })
-              }
-            >
-              <option value="scroll">Scroll</option>
-              <option value="wrap">Wrap</option>
-            </select>
-          </label>
-          <label className="switch-row compact-switch">
-            <input
-              type="checkbox"
-              checked={!settings.diffDisableBackground}
-              onChange={(event) =>
-                updateSettings({
-                  diffDisableBackground: !event.currentTarget.checked,
-                })
-              }
-            />
-            Background
-          </label>
           <button
             className="icon-button"
             type="button"
@@ -224,129 +396,20 @@ export function DiffViewer({ tab, workspace }: DiffViewerProps) {
           Select a changed file from the Changes panel
         </div>
       ) : null}
-      <div className="flex min-h-0 flex-1 overflow-auto p-3 scrollbar-thin scroll-mask">
-        {diffs.map((file) => {
-          const selectedStatus = statuses.find(
-            (status) => keyForStatus(status) === `${file.bucket}:${file.path}`,
-          );
-          const fileComments = commentsByPath.get(file.path) ?? [];
-          const options: FileDiffOptions<undefined> = {
-            ...diffOptions,
-            onLineSelectionEnd: (range) => {
-              if (range) setPending({ file, range, text: "" });
-            },
-          };
-          return (
-            <article
-              className="w-full mb-3.5 rounded-lg border border-border bg-surface-card"
-              key={`${file.bucket}:${file.path}`}
-            >
-              <header className="flex min-h-11 items-center justify-between gap-3 border-b border-border bg-panel-2 px-2.5 py-2">
-                <div className="grid min-w-0 gap-0.5">
-                  <strong title={file.path}>{file.path}</strong>
-                  <span className="text-xs text-muted">
-                    {file.bucket} · {file.status}
-                    {file.oldPath ? ` · from ${file.oldPath}` : ""}
-                  </span>
-                </div>
-                <button
-                  className="secondary-button"
-                  type="button"
-                  onClick={() =>
-                    addContextDiff(
-                      workspace.id,
-                      file.path,
-                      file.bucket,
-                      selectedStatus?.status ?? file.status,
-                    )
-                  }
-                >
-                  Add Diff
-                </button>
-              </header>
-              {file.isBinary ? (
-                <div className="grid min-h-[90px] place-items-center text-muted">
-                  Binary diff omitted
-                </div>
-              ) : file.patch.trim() ? (
-                <PatchDiff
-                  patch={file.patch}
-                  options={options}
-                  disableWorkerPool
-                />
-              ) : (
-                <div className="grid min-h-[90px] place-items-center text-muted">
-                  No textual diff available
-                </div>
-              )}
-              {pending?.file.path === file.path &&
-              pending.file.bucket === file.bucket ? (
-                <div className="m-2.5 rounded-lg border border-border bg-panel p-2.5">
-                  <div className="mb-2 flex items-center gap-2 text-xs text-accent">
-                    <MessageSquarePlus size={15} />
-                    Comment on {formatRange(pending.range)}
-                  </div>
-                  <textarea
-                    value={pending.text}
-                    onChange={(event) =>
-                      setPending({
-                        ...pending,
-                        text: event.currentTarget.value,
-                      })
-                    }
-                    placeholder="Add a note for the agent"
-                  />
-                  <div className="mt-2 flex justify-end gap-2">
-                    <button
-                      className="secondary-button"
-                      type="button"
-                      onClick={() => setPending(null)}
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      className="primary-button"
-                      type="button"
-                      onClick={() => {
-                        addDiffComment(
-                          workspace.id,
-                          file.path,
-                          file.bucket,
-                          pending.range,
-                          pending.text,
-                        );
-                        setPending(null);
-                      }}
-                    >
-                      Add Comment
-                    </button>
-                  </div>
-                </div>
-              ) : null}
-              {fileComments.length > 0 ? (
-                <div className="grid gap-2 border-t border-border p-2.5">
-                  {fileComments.map((comment) => (
-                    <div
-                      className="grid gap-2 rounded-lg border border-border bg-surface-card p-[9px]"
-                      key={comment.id}
-                    >
-                      <strong className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[13px]">
-                        L{comment.startLine}
-                        {comment.endLine !== comment.startLine
-                          ? `-L${comment.endLine}`
-                          : ""}{" "}
-                        {comment.side}
-                      </strong>
-                      <p className="m-0 text-sm leading-relaxed text-muted">
-                        {comment.text}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              ) : null}
-            </article>
-          );
-        })}
+      <div className="flex min-h-0 flex-1 overflow-auto scrollbar-thin scroll-mask">
+        {diffs.map((file) => (
+          <DiffFileEntry
+            key={`${file.bucket}:${file.path}`}
+            file={file}
+            diffOptions={diffOptions}
+            tab={tab}
+            workspace={workspace}
+            pending={pending}
+            setPending={setPending}
+            fileComments={commentsByPath.get(file.path) ?? []}
+            addDiffComment={addDiffComment}
+          />
+        ))}
       </div>
     </section>
   );

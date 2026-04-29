@@ -1,24 +1,45 @@
-import { useCallback, useEffect, useRef, useState, type MouseEvent } from "react";
-import { Bot, Plus, X } from "lucide-react";
+import { useCallback, useMemo, useState, type MouseEvent } from "react";
+import { Bot, Plus } from "lucide-react";
+import {
+  closestCenter,
+  DndContext,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  horizontalListSortingStrategy,
+} from "@dnd-kit/sortable";
 import { useAppStore } from "@renderer/store/app-store";
+import { SortableTabItem } from "./SortableTabItem";
 import { TabContextMenu } from "./TabContextMenu";
+import { RenameModal } from "./RenameModal";
 import { agentPresetIcon } from "./AgentIcons";
 import type { Tab } from "@shared/types";
 import type { AgentStatus } from "@shared/agent-lifecycle";
 
 type TerminalTab = Extract<Tab, { type: "terminal" }>;
 
-function agentTabIcon(tab: TerminalTab) {
-  if (tab.agentPresetId) {
-    const icon = agentPresetIcon(tab.agentPresetId, 13);
-    if (icon) return icon;
-  }
-  return <Bot size={13} />;
+function agentTabIcon(tab: TerminalTab, isWorking: boolean) {
+  const inner = (() => {
+    if (tab.agentPresetId) {
+      const icon = agentPresetIcon(tab.agentPresetId, 13);
+      if (icon) return icon;
+    }
+    return <Bot size={13} />;
+  })();
+
+  return (
+    <span className={`inline-flex${isWorking ? " animate-breathe" : ""}`}>
+      {inner}
+    </span>
+  );
 }
 
 function StatusDot({ status }: { status: AgentStatus | undefined }) {
   if (status === "review") {
-    // Green unread dot
     return (
       <span className="relative flex size-2 shrink-0">
         <span className="relative inline-flex size-2 rounded-full bg-ok" />
@@ -26,7 +47,6 @@ function StatusDot({ status }: { status: AgentStatus | undefined }) {
     );
   }
   if (status === "permission") {
-    // Amber pulsing dot — needs user input
     return (
       <span className="relative flex size-2 shrink-0">
         <span className="absolute inline-flex size-full animate-ping rounded-full bg-warn opacity-75" />
@@ -49,7 +69,12 @@ export function AgentTabBar() {
   const closeAllTabs = useAppStore((state) => state.closeAllTabs);
   const closeTabsToRight = useAppStore((state) => state.closeTabsToRight);
   const createAgentTerminal = useAppStore((state) => state.createAgentTerminal);
+  const reorderTabs = useAppStore((state) => state.reorderTabs);
   const renameTab = useAppStore((state) => state.renameTab);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+  );
 
   const [contextMenu, setContextMenu] = useState<{
     tab: Tab;
@@ -67,78 +92,64 @@ export function AgentTabBar() {
   );
 
   const activeId = activeAgentTabId ?? agentTabs[0]?.id;
+  const tabIds = useMemo(() => agentTabs.map((t) => t.id), [agentTabs]);
+
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const { active, over } = event;
+      if (!over || active.id === over.id) return;
+      reorderTabs(String(active.id), String(over.id));
+    },
+    [reorderTabs],
+  );
 
   const handleContextMenu = useCallback((event: MouseEvent, tab: Tab) => {
     event.preventDefault();
     setContextMenu({ tab, x: event.clientX, y: event.clientY });
   }, []);
 
-  const handleTabClick = useCallback(
-    (tab: TerminalTab) => {
-      setActiveTab(tab.id);
-    },
-    [setActiveTab],
-  );
-
   if (agentTabs.length === 0) return null;
 
   return (
-    <div className="column-tabbar flex h-9 shrink-0 items-center gap-1 border-b border-border bg-surface-toolbar px-2">
-      <div className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto scrollbar-none scroll-mask-x">
-        {agentTabs.map((tab) => {
-          const isExited = exitedPtyIds.has(tab.ptyId);
-          // Only show "working" when explicitly reported by the agent hook.
-          const status: AgentStatus | undefined =
-            agentStatuses[tab.ptyId] ?? (isExited ? undefined : "idle");
-          const isWorking = status === "working";
+    <div className="column-tabbar flex h-9 shrink-0 items-center gap-1 border-b border-border bg-bg px-2">
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={handleDragEnd}
+      >
+        <SortableContext
+          items={tabIds}
+          strategy={horizontalListSortingStrategy}
+        >
+          <div
+            className="tabs-scroll flex min-w-0 flex-1 items-center overflow-x-auto scrollbar-none scroll-mask-x"
+            role="tablist"
+          >
+            {agentTabs.map((tab) => {
+              const isExited = exitedPtyIds.has(tab.ptyId);
+              const status: AgentStatus | undefined =
+                agentStatuses[tab.ptyId] ?? (isExited ? undefined : "idle");
+              const isWorking = status === "working";
 
-          return (
-            <button
-              className={`group flex h-8 shrink-0 items-center gap-1.5 rounded-t-md px-2.5 text-xs transition-colors${
-                tab.id === activeId
-                  ? " bg-panel-3 text-text shadow-[inset_0_-2px_0_0_theme(colors.accent)]"
-                  : " text-muted hover:bg-panel-2 hover:text-text"
-              }`}
-              key={tab.id}
-              type="button"
-              title={tab.title}
-              onClick={() => handleTabClick(tab)}
-              onContextMenu={(event) => handleContextMenu(event, tab)}
-            >
-              {/* Icon with working breathe animation */}
-              <span
-                className={`inline-flex${isWorking ? " animate-breathe" : ""}`}
-              >
-                {agentTabIcon(tab)}
-              </span>
-              <span className="max-w-[180px] overflow-hidden text-ellipsis whitespace-nowrap">
-                {tab.title}
-              </span>
-              {/* Status indicator dot */}
-              <StatusDot status={status} />
-              <span
-                className="grid size-4 place-items-center rounded text-subtle opacity-0 transition-opacity hover:bg-panel-3 hover:text-text group-hover:opacity-100 focus:opacity-100"
-                role="button"
-                tabIndex={0}
-                title="Close agent"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  closeTab(tab.id);
-                }}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" || event.key === " ") {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    closeTab(tab.id);
-                  }
-                }}
-              >
-                <X size={11} />
-              </span>
-            </button>
-          );
-        })}
-      </div>
+              return (
+                <SortableTabItem
+                  className="min-w-[80px] max-w-[240px]"
+                  key={tab.id}
+                  id={tab.id}
+                  active={tab.id === activeId}
+                  icon={agentTabIcon(tab, isWorking)}
+                  title={tab.title}
+                  onSelect={() => setActiveTab(tab.id)}
+                  onClose={() => closeTab(tab.id)}
+                  closeTitle="Close agent"
+                  onContextMenu={(event) => handleContextMenu(event, tab)}
+                  suffix={<StatusDot status={status} />}
+                />
+              );
+            })}
+          </div>
+        </SortableContext>
+      </DndContext>
 
       <button
         className="icon-button small"
@@ -179,64 +190,6 @@ export function AgentTabBar() {
           onCancel={() => setRenameTabId(null)}
         />
       )}
-    </div>
-  );
-}
-
-function RenameModal({
-  value,
-  onChange,
-  onConfirm,
-  onCancel,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  onConfirm: () => void;
-  onCancel: () => void;
-}) {
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    inputRef.current?.select();
-  }, []);
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) onCancel();
-      }}
-    >
-      <div className="flex w-72 flex-col gap-3 rounded-lg border border-border bg-panel-2 p-4 shadow-[0_14px_32px_rgba(0,0,0,0.4)]">
-        <p className="text-sm font-medium text-text">Rename Tab</p>
-        <input
-          ref={inputRef}
-          className="h-8 rounded-md border border-border bg-bg px-2.5 text-sm text-text outline-none focus:border-accent"
-          value={value}
-          onChange={(e) => onChange(e.currentTarget.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") onConfirm();
-            if (e.key === "Escape") onCancel();
-          }}
-          autoFocus
-        />
-        <div className="flex justify-end gap-2">
-          <button
-            type="button"
-            className="h-7 rounded-md border border-border bg-transparent px-3 text-sm text-muted hover:bg-panel-3 hover:text-text"
-            onClick={onCancel}
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            className="h-7 rounded-md bg-accent px-3 text-sm text-white hover:opacity-90"
-            onClick={onConfirm}
-          >
-            Rename
-          </button>
-        </div>
-      </div>
     </div>
   );
 }

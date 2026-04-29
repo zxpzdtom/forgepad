@@ -139,6 +139,9 @@ export function FilesPanel() {
   const contextItems = useAppStore((state) => state.contextItems);
   const addToast = useAppStore((state) => state.addToast);
   const gitRefreshEpoch = useAppStore((state) => state.gitRefreshEpoch);
+  const revealFileInTree = useAppStore((state) => state.revealFileInTree);
+  const rightPanelMode = useAppStore((state) => state.rightPanelMode);
+  const spinnerStyle = useAppStore((state) => state.settings.spinnerStyle);
 
   const contextFileSet = useMemo(() => {
     return new Set(
@@ -167,6 +170,11 @@ export function FilesPanel() {
 
   const selectedTreePaths = useFileTreeSelection(model);
   const prevSelectedRef = useRef<readonly string[]>([]);
+  /** Counter-based guard against circular sync: programmatic deselect + select
+   *  may each trigger a separate selection change event. Every programmatic
+   *  mutation increments the counter; every selection-change effect that fires
+   *  while the counter is positive decrements it instead of calling openFileTab. */
+  const suppressCountRef = useRef(0);
 
   useEffect(() => {
     const prev = prevSelectedRef.current;
@@ -176,11 +184,41 @@ export function FilesPanel() {
 
     setSelectedPaths([...next]);
 
+    if (suppressCountRef.current > 0) {
+      suppressCountRef.current--;
+      return;
+    }
+
     const added = next.filter((p) => !prev.includes(p));
     const last = added.at(-1) ?? next.at(-1);
     if (workspace && last && treeData.filePaths.has(last))
       openFileTab(workspace.id, last);
   }, [selectedTreePaths, openFileTab, treeData.filePaths, workspace]);
+
+  // Reveal and select a file in the tree when triggered by a tab click
+  const lastRevealEpochRef = useRef(0);
+  useEffect(() => {
+    if (!revealFileInTree || rightPanelMode !== "files") return;
+    if (revealFileInTree.epoch === lastRevealEpochRef.current) return;
+    lastRevealEpochRef.current = revealFileInTree.epoch;
+
+    const { relPath } = revealFileInTree;
+    // Deselect all previously selected paths first so only the target is highlighted
+    const currentlySelected = model.getSelectedPaths();
+    for (const p of currentlySelected) {
+      if (p !== relPath) {
+        model.getItem(p)?.deselect();
+        suppressCountRef.current++;
+      }
+    }
+    // focusPath expands parent directories and scrolls the item into view
+    model.focusPath(relPath);
+    const item = model.getItem(relPath);
+    if (item && !item.isSelected()) {
+      suppressCountRef.current++;
+      item.select();
+    }
+  }, [revealFileInTree, rightPanelMode, model]);
 
   const load = useCallback(async () => {
     if (!workspace) return;
@@ -264,6 +302,19 @@ export function FilesPanel() {
           className="h-7 rounded-[5px] px-[9px] text-left bg-transparent text-text hover:bg-panel-3"
           onClick={() =>
             closeAfter(() => {
+              void navigator.clipboard.writeText(
+                `${workspace.worktreePath}/${item.path}`,
+              );
+            })
+          }
+        >
+          Copy Path
+        </button>
+        <button
+          type="button"
+          className="h-7 rounded-[5px] px-[9px] text-left bg-transparent text-text hover:bg-panel-3"
+          onClick={() =>
+            closeAfter(() => {
               void navigator.clipboard.writeText(item.path);
             })
           }
@@ -282,13 +333,120 @@ export function FilesPanel() {
     );
   }
 
+  // ── Drag-to-terminal: drag file rows to paste relative path ──
+  //
+  // Strategy: We do NOT pre-set `draggable="true"` on Shadow DOM rows because
+  // that causes every click to start a native drag, blocking all pointer events
+  // and freezing the UI. Instead we:
+  //  1. Listen for mousedown (capture) on the container to record the target row
+  //  2. On mousemove, once movement exceeds a threshold, set `draggable="true"`
+  //     on THAT SPECIFIC ROW only, then immediately re-dispatch the mousemove
+  //     so the browser picks up the draggable state and fires dragstart
+  //  3. On dragstart (bubbles out of Shadow DOM), populate dataTransfer
+  //  4. On dragend / mouseup, remove `draggable` from the row
+  const treeContainerRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const container = treeContainerRef.current;
+    if (!container) return;
+
+    let pending: {
+      row: HTMLElement;
+      path: string;
+      x: number;
+      y: number;
+    } | null = null;
+    let activeDragRow: HTMLElement | null = null;
+
+    const THRESHOLD = 6;
+
+    const findItemRow = (
+      composedPath: EventTarget[],
+    ): { row: HTMLElement; path: string } | null => {
+      for (const node of composedPath) {
+        if (node instanceof HTMLElement) {
+          const p = node.getAttribute("data-item-path");
+          if (p) return { row: node, path: p };
+        }
+      }
+      return null;
+    };
+
+    // (1) Capture mousedown — record which row and position
+    const onMouseDown = (e: MouseEvent) => {
+      if (e.button !== 0) return;
+      const hit = findItemRow(e.composedPath());
+      if (hit) {
+        pending = { row: hit.row, path: hit.path, x: e.clientX, y: e.clientY };
+      }
+    };
+
+    // (2) On mousemove past threshold, enable draggable on the single row
+    const onMouseMove = (e: MouseEvent) => {
+      if (!pending) return;
+      const dx = e.clientX - pending.x;
+      const dy = e.clientY - pending.y;
+      if (dx * dx + dy * dy < THRESHOLD * THRESHOLD) return;
+
+      // Promote this row to draggable — the browser will fire dragstart
+      // on the next pointer move because the element under the cursor is
+      // now draggable.
+      pending.row.setAttribute("draggable", "true");
+      activeDragRow = pending.row;
+      pending = null;
+    };
+
+    // (3) dragstart bubbles out of Shadow DOM — set the transfer data
+    const onDragStart = (e: DragEvent) => {
+      if (!activeDragRow || !e.dataTransfer) return;
+      const path = activeDragRow.getAttribute("data-item-path");
+      if (!path) {
+        e.preventDefault();
+        return;
+      }
+      e.dataTransfer.setData("text/plain", path);
+      e.dataTransfer.setData("application/x-forgepad-path", path);
+      e.dataTransfer.effectAllowed = "copy";
+    };
+
+    // (4) Cleanup: remove draggable from the row
+    const cleanup = () => {
+      pending = null;
+      if (activeDragRow) {
+        activeDragRow.removeAttribute("draggable");
+        activeDragRow = null;
+      }
+    };
+
+    container.addEventListener("mousedown", onMouseDown, true);
+    container.addEventListener("mousemove", onMouseMove, true);
+    container.addEventListener("dragstart", onDragStart);
+    container.addEventListener("dragend", cleanup);
+    container.addEventListener("mouseup", cleanup, true);
+    return () => {
+      container.removeEventListener("mousedown", onMouseDown, true);
+      container.removeEventListener("mousemove", onMouseMove, true);
+      container.removeEventListener("dragstart", onDragStart);
+      container.removeEventListener("dragend", cleanup);
+      container.removeEventListener("mouseup", cleanup, true);
+      cleanup();
+    };
+  }, []);
+
   return (
     <section className="flex min-h-0 flex-1 flex-col overflow-hidden pt-2.5">
-      <div className="relative min-h-0 flex-1 overflow-hidden">
+      <div
+        ref={treeContainerRef}
+        className="relative min-h-0 flex-1 overflow-hidden"
+      >
         {loading ? (
           <div className="absolute inset-0 z-2 grid min-h-0 place-items-center bg-bg/72">
             <span className="flex items-center gap-1.5 text-xs text-muted">
-              <Spinner name="braille" />
+              <Spinner
+                name={
+                  spinnerStyle as import("unicode-animations").BrailleSpinnerName
+                }
+              />
             </span>
           </div>
         ) : null}

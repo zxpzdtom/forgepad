@@ -1,11 +1,13 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import { WebLinksAddon } from "@xterm/addon-web-links";
 import type { ITheme } from "@xterm/xterm";
-import type { Tab, Workspace } from "@shared/types";
+import type { ShortcutCombo, Tab, Workspace } from "@shared/types";
+import { DEFAULT_SHORTCUTS } from "@shared/types";
 import { useAppStore } from "@renderer/store/app-store";
 import { useResolvedTheme } from "@renderer/App";
+import { eventMatchesCombo } from "@renderer/lib/shortcut-utils";
 
 const TERMINAL_THEMES: Record<"dark" | "light", ITheme> = {
   dark: {
@@ -23,12 +25,12 @@ const TERMINAL_THEMES: Record<"dark" | "light", ITheme> = {
     magenta: "#b48ead",
     cyan: "#88c0d0",
     white: "#e5e9f0",
-    brightBlack: "#4c566a",
-    brightRed: "#bf616a",
-    brightGreen: "#a3be8c",
-    brightYellow: "#ebcb8b",
-    brightBlue: "#81a1c1",
-    brightMagenta: "#b48ead",
+    brightBlack: "#697393",
+    brightRed: "#d08770",
+    brightGreen: "#b4d195",
+    brightYellow: "#f0d8a8",
+    brightBlue: "#8caece",
+    brightMagenta: "#c7a4c0",
     brightCyan: "#8fbcbb",
     brightWhite: "#eceff4",
   },
@@ -41,19 +43,19 @@ const TERMINAL_THEMES: Record<"dark" | "light", ITheme> = {
     selectionForeground: "#1e293b",
     black: "#1e293b",
     red: "#dc2626",
-    green: "#16a34a",
+    green: "#15803d",
     yellow: "#b45309",
     blue: "#2563eb",
     magenta: "#9333ea",
-    cyan: "#0891b2",
+    cyan: "#0e7490",
     white: "#e2e8f0",
     brightBlack: "#64748b",
-    brightRed: "#ef4444",
-    brightGreen: "#22c55e",
-    brightYellow: "#d97706",
-    brightBlue: "#3b82f6",
-    brightMagenta: "#a855f7",
-    brightCyan: "#06b6d4",
+    brightRed: "#dc2626",
+    brightGreen: "#15803d",
+    brightYellow: "#b45309",
+    brightBlue: "#2563eb",
+    brightMagenta: "#7c3aed",
+    brightCyan: "#0e7490",
     brightWhite: "#f8fafc",
   },
 };
@@ -91,8 +93,23 @@ export function TerminalPanel({ tab, workspace, active }: TerminalPanelProps) {
   const fitRef = useRef<FitAddon | null>(null);
   const activeRef = useRef(active);
   const sessionIdDetectedRef = useRef(false);
+  const keyboardShortcuts = useAppStore((s) => s.settings.keyboardShortcuts);
+  const appShortcuts = useMemo(
+    () => ({ ...DEFAULT_SHORTCUTS, ...(keyboardShortcuts ?? {}) }),
+    [keyboardShortcuts],
+  );
+  const shortcutsRef = useRef<Record<string, ShortcutCombo>>(appShortcuts);
+  shortcutsRef.current = appShortcuts;
   const fontSize = useAppStore((state) => state.settings.terminalFontSize);
+  const terminalThemeMode = useAppStore(
+    (state) => state.settings.terminalThemeMode,
+  );
+  const agentThemeMode = useAppStore((state) => state.settings.agentThemeMode);
   const resolvedTheme = useResolvedTheme();
+  // Compute the effective terminal theme: agent and shell can have independent overrides
+  const themeMode = tab.isAgent ? agentThemeMode : terminalThemeMode;
+  const effectiveTerminalTheme: "dark" | "light" =
+    themeMode === "follow" ? resolvedTheme : themeMode;
 
   useEffect(() => {
     activeRef.current = active;
@@ -112,7 +129,7 @@ export function TerminalPanel({ tab, workspace, active }: TerminalPanelProps) {
       fontSize,
       lineHeight: 1.18,
       scrollback: 8000,
-      theme: TERMINAL_THEMES[resolvedTheme],
+      theme: TERMINAL_THEMES[effectiveTerminalTheme],
       allowProposedApi: false,
     });
     const fitAddon = new FitAddon();
@@ -120,26 +137,24 @@ export function TerminalPanel({ tab, workspace, active }: TerminalPanelProps) {
     terminal.loadAddon(new WebLinksAddon());
 
     // Let Cmd/Ctrl shortcuts bubble to the window so app-level
-    // keybindings (Cmd+J, Cmd+P, Cmd+T, etc.) still work while
-    // the terminal is focused.
+    // keybindings still work while the terminal is focused.
+    // Uses the live shortcuts ref so user-customised bindings are respected
+    // without needing to recreate the terminal instance.
     terminal.attachCustomKeyEventHandler((event) => {
       if (event.type !== "keydown") return true;
       if (!event.metaKey && !event.ctrlKey) return true;
 
-      const key = event.key.toLowerCase();
+      // Cmd+K — clear terminal scrollback (macOS Terminal / iTerm2 convention)
+      if (event.metaKey && event.key.toLowerCase() === "k") {
+        terminal.clear();
+        return false;
+      }
 
-      // Intercept only the app-level shortcuts that need to bubble up.
-      // Everything else (readline shortcuts like Ctrl+U/K/W/A/E, etc.) passes
-      // through to the PTY.
-      if (event.ctrlKey && key === "tab") return false; // cycle tabs
-      if (key === "p" && !event.shiftKey && !event.altKey) return false; // quick search
-      if (key === "t") return false; // new terminal
-      if (key === "w") return false; // close tab
-      if (key === "j") return false; // toggle terminal panel
-      if (event.shiftKey && (key === "e" || key === "g" || key === "c"))
-        return false; // panel switchers
-      if (["1", "2", "3", "4", "5", "6", "7", "8", "9"].includes(key))
-        return false; // tab/workspace switch
+      // Let all registered app-level shortcuts bubble up.
+      // Everything else (readline Ctrl+U/K/W/A/E, etc.) passes through to the PTY.
+      for (const combo of Object.values(shortcutsRef.current)) {
+        if (eventMatchesCombo(event, combo)) return false;
+      }
 
       return true;
     });
@@ -175,8 +190,7 @@ export function TerminalPanel({ tab, workspace, active }: TerminalPanelProps) {
       (exitCode) => {
         terminal.writeln("");
         terminal.writeln(`[process exited with code ${exitCode}]`);
-        const store = useAppStore.getState();
-        store.markPtyExited(tab.ptyId);
+        useAppStore.getState().markPtyExited(tab.ptyId);
       },
     );
 
@@ -205,14 +219,18 @@ export function TerminalPanel({ tab, workspace, active }: TerminalPanelProps) {
       terminalRef.current = null;
       fitRef.current = null;
     };
-  }, [fontSize, tab.ptyId, workspace.name, resolvedTheme]);
+    // NOTE: effectiveTerminalTheme is intentionally excluded — theme changes
+    // are handled by the live-update effect below without recreating the
+    // terminal instance (which would trigger an expensive 8MB history replay).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fontSize, tab.ptyId, workspace.name]);
 
-  // Live-update terminal theme when resolved theme changes
+  // Live-update terminal theme when effective theme changes
   useEffect(() => {
     const terminal = terminalRef.current;
     if (!terminal) return;
-    terminal.options.theme = TERMINAL_THEMES[resolvedTheme];
-  }, [resolvedTheme]);
+    terminal.options.theme = TERMINAL_THEMES[effectiveTerminalTheme];
+  }, [effectiveTerminalTheme]);
 
   return (
     <section

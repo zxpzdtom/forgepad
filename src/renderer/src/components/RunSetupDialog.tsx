@@ -25,7 +25,7 @@ export function RunSetupDialog({
 
   return (
     <div
-      className="fixed inset-0 z-[60] grid place-items-center bg-black/40"
+      className="fixed inset-0 z-[60] grid place-items-center bg-black/85"
       onMouseDown={onClose}
     >
       <div
@@ -33,9 +33,7 @@ export function RunSetupDialog({
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="flex h-12 items-center justify-between border-b border-border px-4">
-          <span className="text-[15px] font-semibold text-text">
-            配置启动命令
-          </span>
+          <span className="text-[15px] font-[590] text-text">配置启动命令</span>
           <button
             className="icon-button border-transparent"
             type="button"
@@ -48,7 +46,7 @@ export function RunSetupDialog({
         <div className="space-y-4 p-4">
           <div className="space-y-1.5">
             <label
-              className="text-[12px] font-medium text-subtle"
+              className="text-[12px] font-[510] text-subtle"
               htmlFor="run-command"
             >
               启动命令

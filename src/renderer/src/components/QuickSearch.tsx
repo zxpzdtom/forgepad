@@ -1,23 +1,30 @@
 import {
+  getTabTitle,
+  useAppStore,
+  type SettingsSection,
+} from "@renderer/store/app-store";
+import {
   Bot,
   CornerDownLeft,
   FileCode2,
   FolderOpen,
   GitCompare,
+  Paintbrush,
   PanelRight,
   Search,
   SendHorizontal,
+  Settings,
+  Terminal,
   TerminalSquare,
 } from "lucide-react";
 import {
+  type KeyboardEvent,
+  type ReactNode,
   useEffect,
   useMemo,
   useRef,
   useState,
-  type KeyboardEvent,
-  type ReactNode,
 } from "react";
-import { getTabTitle, useAppStore } from "@renderer/store/app-store";
 
 type QuickSearchProps = {
   open: boolean;
@@ -41,6 +48,7 @@ export function QuickSearch({ open, onClose }: QuickSearchProps) {
   const [query, setQuery] = useState("");
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [filePaths, setFilePaths] = useState<string[]>([]);
+  const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const projects = useAppStore((state) => state.projects);
@@ -169,6 +177,54 @@ export function QuickSearch({ open, onClose }: QuickSearchProps) {
       }
     }
 
+    // Settings sections
+    const settingsItems: {
+      id: string;
+      section: SettingsSection;
+      label: string;
+      icon: ReactNode;
+    }[] = [
+      {
+        id: "settings:general",
+        section: "general",
+        label: "General",
+        icon: <Paintbrush size={16} />,
+      },
+      {
+        id: "settings:agent",
+        section: "agent",
+        label: "Agent",
+        icon: <Bot size={16} />,
+      },
+      {
+        id: "settings:terminal",
+        section: "terminal",
+        label: "Terminal",
+        icon: <Terminal size={16} />,
+      },
+      {
+        id: "settings:changes",
+        section: "changes",
+        label: "Changes",
+        icon: <GitCompare size={16} />,
+      },
+      {
+        id: "settings:advanced",
+        section: "advanced",
+        label: "Advanced",
+        icon: <Settings size={16} />,
+      },
+    ];
+    for (const item of settingsItems) {
+      next.push({
+        id: item.id,
+        label: `Settings: ${item.label}`,
+        detail: "Settings",
+        icon: item.icon,
+        run: () => useAppStore.setState({ settingsOpen: item.section }),
+      });
+    }
+
     return next;
   }, [
     activeWorkspaceId,
@@ -233,6 +289,14 @@ export function QuickSearch({ open, onClose }: QuickSearchProps) {
     setSelectedIndex(0);
   }, [query]);
 
+  // Scroll selected item into view
+  useEffect(() => {
+    const container = listRef.current;
+    if (!container) return;
+    const child = container.children[selectedIndex] as HTMLElement | undefined;
+    child?.scrollIntoView({ block: "nearest" });
+  }, [selectedIndex]);
+
   if (!open) return null;
 
   const runSelected = () => {
@@ -272,7 +336,7 @@ export function QuickSearch({ open, onClose }: QuickSearchProps) {
 
   return (
     <div
-      className="fixed inset-0 z-50 grid place-items-start justify-center bg-black/32 pt-[58px]"
+      className="fixed inset-0 z-50 grid place-items-start justify-center pt-[58px]"
       onMouseDown={onClose}
     >
       <div
@@ -290,7 +354,10 @@ export function QuickSearch({ open, onClose }: QuickSearchProps) {
             onKeyDown={handleKeyDown}
           />
         </div>
-        <div className="max-h-[360px] overflow-y-auto p-2 scrollbar-thin scroll-mask-y">
+        <div
+          ref={listRef}
+          className="max-h-[360px] overflow-y-auto p-2 scrollbar-thin scroll-mask-y"
+        >
           {filteredItems.length === 0 ? (
             <div className="grid h-24 place-items-center text-sm text-muted">
               No results
@@ -314,7 +381,7 @@ export function QuickSearch({ open, onClose }: QuickSearchProps) {
                 <span className="grid size-6 place-items-center">
                   {item.icon}
                 </span>
-                <span className="overflow-hidden text-ellipsis whitespace-nowrap text-[15px] font-medium">
+                <span className="overflow-hidden text-ellipsis whitespace-nowrap text-[15px] font-[510]">
                   {item.label}
                 </span>
                 <span className="max-w-[400px] overflow-hidden text-ellipsis whitespace-nowrap text-sm text-muted">

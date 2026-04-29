@@ -374,6 +374,7 @@ export function ChangesPanel() {
   const openDiffTab = useAppStore((state) => state.openDiffTab);
   const triggerGitRefresh = useAppStore((state) => state.triggerGitRefresh);
   const gitRefreshEpoch = useAppStore((state) => state.gitRefreshEpoch);
+  const spinnerStyle = useAppStore((state) => state.settings.spinnerStyle);
 
   const prevSignature = useRef("");
 
@@ -588,7 +589,11 @@ export function ChangesPanel() {
         {loading && (
           <div className="grid min-h-[52px] place-items-center text-muted">
             <span className="flex items-center gap-1.5 text-xs">
-              <Spinner name="braille" />
+              <Spinner
+                name={
+                  spinnerStyle as import("unicode-animations").BrailleSpinnerName
+                }
+              />
             </span>
           </div>
         )}
@@ -604,7 +609,7 @@ export function ChangesPanel() {
           return (
             <div key={bucket} className="mb-1">
               <div className="flex items-center justify-between px-1 py-1 text-xs text-muted">
-                <span className="font-medium">{bucketTitle(bucket)}</span>
+                <span className="font-[510]">{bucketTitle(bucket)}</span>
                 <span>{bucketFiles.length}</span>
               </div>
               <TreeSection

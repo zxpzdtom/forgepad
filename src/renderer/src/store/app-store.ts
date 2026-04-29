@@ -14,16 +14,31 @@ import type {
   FileStatus,
   GitBucket,
   GitStatusKind,
+  KeyboardShortcuts,
   PersistedAppState,
   Project,
   RightPanelMode,
+  ShortcutActionId,
+  ShortcutCombo,
   Tab,
   Task,
   TaskStatus,
   Workspace,
 } from "@shared/types";
-import { DEFAULT_AGENT_PRESETS, DEFAULT_SETTINGS } from "@shared/types";
+import {
+  DEFAULT_AGENT_PRESETS,
+  DEFAULT_SETTINGS,
+  DEFAULT_SHORTCUTS,
+} from "@shared/types";
 import type { AgentStatus } from "@shared/agent-lifecycle";
+
+export type SettingsSection =
+  | "general"
+  | "agent"
+  | "terminal"
+  | "changes"
+  | "advanced"
+  | "shortcuts";
 
 type Toast = {
   id: string;
@@ -43,11 +58,13 @@ type AppState = {
   activeFileTabId: string | null;
   /** Per-workspace last-selected agent tab – survives workspace switching */
   workspaceActiveAgentTabIds: Record<string, string>;
+  /** File path to reveal in the file tree (set when clicking a file tab). */
+  revealFileInTree: { relPath: string; epoch: number } | null;
   rightPanelMode: RightPanelMode;
   rightPanelOpen: boolean;
   sidebarOpen: boolean;
   terminalPanelOpen: boolean;
-  settingsOpen: boolean;
+  settingsOpen: boolean | SettingsSection;
   contextItems: ContextItem[];
   composerText: string;
   settings: AppSettings;
@@ -138,6 +155,11 @@ type AppState = {
   updateFileIncludeContent: (id: string, includeContent: boolean) => void;
   sendContextToTerminal: () => Promise<void>;
   updateSettings: (partial: Partial<AppSettings>) => void;
+  updateShortcut: (actionId: ShortcutActionId, combo: ShortcutCombo) => void;
+  resetShortcut: (actionId: ShortcutActionId) => void;
+  resetAllShortcuts: () => void;
+  toggleSidebar: () => void;
+  toggleRightPanel: () => void;
   refreshBranch: (workspaceId: string) => Promise<void>;
   addAgentPreset: (preset: AgentPreset) => void;
   removeAgentPreset: (presetId: string) => void;
@@ -153,6 +175,7 @@ type AppState = {
     activeId: string,
     overId: string,
   ) => void;
+  reorderTabs: (activeId: string, overId: string) => void;
   removeProject: (projectId: string) => void;
   removeWorkspace: (workspaceId: string) => void;
   deleteWorktree: (workspaceId: string) => Promise<void>;
@@ -245,6 +268,15 @@ function closeTerminalTabs(tabs: Tab[]): void {
   }
 }
 
+export function resolveShortcuts(
+  settings: AppSettings,
+): Record<ShortcutActionId, ShortcutCombo> {
+  return {
+    ...DEFAULT_SHORTCUTS,
+    ...(settings.keyboardShortcuts ?? {}),
+  } as Record<ShortcutActionId, ShortcutCombo>;
+}
+
 function omitBranchStats(
   branchStats: AppState["branchStats"],
   workspaceIds: Set<string>,
@@ -330,6 +362,9 @@ function activeIdsAfterRemoval(
   };
 }
 
+/** Per-pty timeout handles for auto-clearing stale "working" status. */
+const agentWorkingTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
 export const useAppStore = create<AppState>((set, get) => ({
   projects: [],
   workspaces: [],
@@ -341,6 +376,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   activeShellTabId: null,
   activeFileTabId: null,
   workspaceActiveAgentTabIds: {},
+  revealFileInTree: null,
   rightPanelMode: "files",
   rightPanelOpen: true,
   sidebarOpen: true,
@@ -358,7 +394,33 @@ export const useAppStore = create<AppState>((set, get) => ({
   gitRefreshEpoch: 0,
   agentStatuses: {},
   exitedPtyIds: new Set<string>(),
-  handleAgentStatusUpdate: (ptyId, status) =>
+  handleAgentStatusUpdate: (ptyId, status) => {
+    // Reset the working-timeout whenever we receive any hook event.
+    // If status is "working", start a timeout that auto-clears to "idle"
+    // after 10s of silence (handles ESC cancel / unexpected interruptions).
+    // Normal work continuously fires PreToolUse/PostToolUse hooks which
+    // reset this timer, so 10s is safe — only ESC/interrupts go silent.
+    const prev = agentWorkingTimers.get(ptyId);
+    if (prev) clearTimeout(prev);
+
+    if (status === "working") {
+      agentWorkingTimers.set(
+        ptyId,
+        setTimeout(() => {
+          agentWorkingTimers.delete(ptyId);
+          const current = get().agentStatuses[ptyId];
+          if (current === "working") {
+            set((s) => {
+              const { [ptyId]: _, ...rest } = s.agentStatuses;
+              return { agentStatuses: rest };
+            });
+          }
+        }, 10_000),
+      );
+    } else {
+      agentWorkingTimers.delete(ptyId);
+    }
+
     set((state) => {
       const patch: Partial<AppState> = {
         agentStatuses: { ...state.agentStatuses, [ptyId]: status },
@@ -392,24 +454,41 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
 
       return patch;
-    }),
-  clearAgentStatus: (ptyId) =>
+    });
+  },
+  clearAgentStatus: (ptyId) => {
+    const t = agentWorkingTimers.get(ptyId);
+    if (t) {
+      clearTimeout(t);
+      agentWorkingTimers.delete(ptyId);
+    }
     set((state) => {
       if (!state.agentStatuses[ptyId]) return state;
       const { [ptyId]: _, ...rest } = state.agentStatuses;
       return { agentStatuses: rest };
-    }),
-  markPtyExited: (ptyId) =>
+    });
+  },
+  markPtyExited: (ptyId) => {
+    const t = agentWorkingTimers.get(ptyId);
+    if (t) {
+      clearTimeout(t);
+      agentWorkingTimers.delete(ptyId);
+    }
     set((state) => {
       const exitedPtyIds = new Set(state.exitedPtyIds);
       exitedPtyIds.add(ptyId);
       // Clear agent status on process exit (fallback)
       const { [ptyId]: _, ...restStatuses } = state.agentStatuses;
       return { exitedPtyIds, agentStatuses: restStatuses };
-    }),
+    });
+  },
   triggerGitRefresh: () => {
     set((state) => ({ gitRefreshEpoch: state.gitRefreshEpoch + 1 }));
     get().refreshBranchStats();
+    // Also refresh branch names for all workspaces
+    for (const w of get().workspaces) {
+      get().refreshBranch(w.id);
+    }
   },
 
   hydrate: (state) => {
@@ -505,6 +584,10 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     get().restoreAgentSessions();
     get().refreshBranchStats();
+    // Refresh branch names in case they changed since last session
+    for (const w of get().workspaces) {
+      get().refreshBranch(w.id);
+    }
   },
 
   toPersistedState: () => serializeForSave(get()),
@@ -595,7 +678,10 @@ export const useAppStore = create<AppState>((set, get) => ({
       state.workspaces,
     );
     set({ ...derived, workspaceActiveAgentTabIds: updatedMap });
-    if (workspaceId) void get().refreshBranchStats(workspaceId);
+    if (workspaceId) {
+      void get().refreshBranchStats(workspaceId);
+      void get().refreshBranch(workspaceId);
+    }
   },
 
   createTerminal: async (workspaceId, initialCommand) => {
@@ -767,6 +853,14 @@ export const useAppStore = create<AppState>((set, get) => ({
         const remaining = wsTabs.filter((t) => t.type !== "terminal");
         patch.activeFileTabId = remaining.at(-1)?.id ?? null;
       }
+      // Clean up PTY-related state for closed terminal tabs
+      if (tab?.type === "terminal") {
+        const nextExited = new Set(state.exitedPtyIds);
+        nextExited.delete(tab.ptyId);
+        patch.exitedPtyIds = nextExited;
+        const { [tab.ptyId]: _, ...restStatuses } = state.agentStatuses;
+        patch.agentStatuses = restStatuses;
+      }
       return patch;
     });
   },
@@ -791,6 +885,13 @@ export const useAppStore = create<AppState>((set, get) => ({
         patch.activeShellTabId = tabId;
       } else {
         patch.activeFileTabId = tabId;
+        // Signal file tree to reveal the file when it's a file tab
+        if (tab?.type === "file") {
+          patch.revealFileInTree = {
+            relPath: tab.relPath,
+            epoch: (state.revealFileInTree?.epoch ?? 0) + 1,
+          };
+        }
       }
       return patch;
     }),
@@ -899,7 +1000,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         tab.relPath === relPath,
     );
     if (existing) {
-      set({ activeTabId: existing.id });
+      get().setActiveTab(existing.id);
       return;
     }
     get().addTab({ id: id(), workspaceId, type: "file", relPath });
@@ -911,13 +1012,13 @@ export const useAppStore = create<AppState>((set, get) => ({
     );
     if (existing) {
       set({
-        activeTabId: existing.id,
         tabs: get().tabs.map((tab) =>
           tab.id === existing.id && tab.type === "diff"
             ? { ...tab, activePath }
             : tab,
         ),
       });
+      get().setActiveTab(existing.id);
       return;
     }
     get().addTab({ id: id(), workspaceId, type: "diff", activePath });
@@ -932,7 +1033,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         tab.workspaceId === workspace.id && tab.type === "context-preview",
     );
     if (existing) {
-      set({ activeTabId: existing.id });
+      get().setActiveTab(existing.id);
       return;
     }
 
@@ -1324,6 +1425,43 @@ export const useAppStore = create<AppState>((set, get) => ({
   updateSettings: (partial) =>
     set((state) => ({ settings: { ...state.settings, ...partial } })),
 
+  updateShortcut: (actionId, combo) =>
+    set((state) => ({
+      settings: {
+        ...state.settings,
+        keyboardShortcuts: {
+          ...(state.settings.keyboardShortcuts ?? {}),
+          [actionId]: combo,
+        },
+      },
+    })),
+
+  resetShortcut: (actionId) =>
+    set((state) => {
+      const current = { ...(state.settings.keyboardShortcuts ?? {}) };
+      delete current[actionId as keyof typeof current];
+      return {
+        settings: {
+          ...state.settings,
+          keyboardShortcuts:
+            Object.keys(current).length > 0 ? current : undefined,
+        },
+      };
+    }),
+
+  resetAllShortcuts: () =>
+    set((state) => ({
+      settings: {
+        ...state.settings,
+        keyboardShortcuts: undefined,
+      },
+    })),
+
+  toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
+
+  toggleRightPanel: () =>
+    set((state) => ({ rightPanelOpen: !state.rightPanelOpen })),
+
   refreshBranch: async (workspaceId) => {
     const workspace = get().workspaces.find((item) => item.id === workspaceId);
     if (!workspace) return;
@@ -1459,6 +1597,14 @@ export const useAppStore = create<AppState>((set, get) => ({
       };
     }),
 
+  reorderTabs: (activeId, overId) =>
+    set((state) => {
+      const oldIdx = state.tabs.findIndex((t) => t.id === activeId);
+      const newIdx = state.tabs.findIndex((t) => t.id === overId);
+      if (oldIdx === -1 || newIdx === -1) return state;
+      return { tabs: arrayMove(state.tabs, oldIdx, newIdx) };
+    }),
+
   removeProject: (projectId) =>
     set((state) => {
       const removedWorkspaceIds = new Set(
@@ -1473,12 +1619,29 @@ export const useAppStore = create<AppState>((set, get) => ({
       );
       closeTerminalTabs(removedTabs);
 
+      // Collect ptyIds from removed tabs for cleanup
+      const removedPtyIds = new Set(
+        removedTabs.filter((t) => t.type === "terminal").map((t) => t.ptyId),
+      );
+
       const workspaces = state.workspaces.filter(
         (workspace) => !removedWorkspaceIds.has(workspace.id),
       );
       const tabs = state.tabs.filter(
         (tab) => !removedWorkspaceIds.has(tab.workspaceId),
       );
+
+      // Clean exitedPtyIds
+      const nextExited = new Set(state.exitedPtyIds);
+      for (const id of removedPtyIds) nextExited.delete(id);
+
+      // Clean agentStatuses
+      const nextAgentStatuses = { ...state.agentStatuses };
+      for (const id of removedPtyIds) delete nextAgentStatuses[id];
+
+      // Clean workspaceActiveAgentTabIds
+      const nextWsAgentTabs = { ...state.workspaceActiveAgentTabIds };
+      for (const id of removedWorkspaceIds) delete nextWsAgentTabs[id];
 
       return {
         projects: state.projects.filter((project) => project.id !== projectId),
@@ -1489,6 +1652,9 @@ export const useAppStore = create<AppState>((set, get) => ({
           (item) => !removedWorkspaceIds.has(item.workspaceId),
         ),
         branchStats: omitBranchStats(state.branchStats, removedWorkspaceIds),
+        exitedPtyIds: nextExited,
+        agentStatuses: nextAgentStatuses,
+        workspaceActiveAgentTabIds: nextWsAgentTabs,
         ...activeIdsAfterRemoval(state, tabs, workspaces),
       };
     }),
@@ -1506,6 +1672,11 @@ export const useAppStore = create<AppState>((set, get) => ({
       );
       closeTerminalTabs(removedTabs);
 
+      // Collect ptyIds from removed tabs for cleanup
+      const removedPtyIds = new Set(
+        removedTabs.filter((t) => t.type === "terminal").map((t) => t.ptyId),
+      );
+
       const workspaces = state.workspaces.filter(
         (item) => item.id !== workspaceId,
       );
@@ -1516,6 +1687,18 @@ export const useAppStore = create<AppState>((set, get) => ({
       );
       const projectIds = new Set(projects.map((project) => project.id));
       const tabs = state.tabs.filter((tab) => tab.workspaceId !== workspaceId);
+
+      // Clean exitedPtyIds
+      const nextExited = new Set(state.exitedPtyIds);
+      for (const id of removedPtyIds) nextExited.delete(id);
+
+      // Clean agentStatuses
+      const nextAgentStatuses = { ...state.agentStatuses };
+      for (const id of removedPtyIds) delete nextAgentStatuses[id];
+
+      // Clean workspaceActiveAgentTabIds
+      const { [workspaceId]: _, ...nextWsAgentTabs } =
+        state.workspaceActiveAgentTabIds;
 
       return {
         projects,
@@ -1532,6 +1715,9 @@ export const useAppStore = create<AppState>((set, get) => ({
           (item) => item.workspaceId !== workspaceId,
         ),
         branchStats: omitBranchStats(state.branchStats, removedWorkspaceIds),
+        exitedPtyIds: nextExited,
+        agentStatuses: nextAgentStatuses,
+        workspaceActiveAgentTabIds: nextWsAgentTabs,
         ...activeIdsAfterRemoval(state, tabs, workspaces),
       };
     }),
