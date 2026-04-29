@@ -18,6 +18,7 @@ import {
   RotateCcw,
   Rows2,
   Settings,
+  SwatchBook,
   Terminal,
   Trash2,
   X,
@@ -25,6 +26,7 @@ import {
 import { type BrailleSpinnerName, spinners } from 'unicode-animations';
 
 import { agentPresetIcon } from './AgentIcons';
+import { AppearancePanel } from './AppearancePanel';
 import { SegmentedControl } from './SegmentedControl';
 import { ShortcutRecorder } from './ShortcutRecorder';
 import { Spinner } from './Spinner';
@@ -58,6 +60,7 @@ type SectionId = SettingsSection;
 
 const NAV_ITEMS: { id: SectionId; label: string; icon: React.ReactNode }[] = [
   { id: 'general', label: 'General', icon: <Paintbrush size={15} /> },
+  { id: 'appearance', label: 'Appearance', icon: <SwatchBook size={15} /> },
   { id: 'agent', label: 'Agent', icon: <Bot size={15} /> },
   { id: 'terminal', label: 'Terminal', icon: <Terminal size={15} /> },
   { id: 'changes', label: 'Changes', icon: <Rows2 size={15} /> },
@@ -769,6 +772,7 @@ function ShortcutsSection() {
 
 const SECTIONS: Record<SectionId, React.ComponentType> = {
   general: GeneralSection,
+  appearance: AppearancePanel,
   agent: AgentSection,
   terminal: TerminalSection,
   changes: ChangesSection,
