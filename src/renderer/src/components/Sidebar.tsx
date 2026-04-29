@@ -1,31 +1,13 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type KeyboardEvent,
-  type ReactNode,
-} from "react";
-import type { Project } from "@shared/types";
-import {
-  closestCenter,
-  DndContext,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-} from "@dnd-kit/core";
-import {
-  SortableContext,
-  useSortable,
-  verticalListSortingStrategy,
-} from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
-import { FolderOpen, FolderPlus, Settings } from "lucide-react";
-import { useAppStore } from "@renderer/store/app-store";
-import { Spinner } from "./Spinner";
-import type { AgentStatus } from "@shared/agent-lifecycle";
+import { type KeyboardEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { closestCenter, DndContext, type DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { useAppStore } from '@renderer/store/app-store';
+import type { AgentStatus } from '@shared/agent-lifecycle';
+import type { Project } from '@shared/types';
+import { FolderOpen, FolderPlus, Settings } from 'lucide-react';
+
+import { Spinner } from './Spinner';
 
 type SidebarWorkspace = {
   id: string;
@@ -39,34 +21,15 @@ type SidebarWorkspace = {
 
 function ArrowDownIcon({ className }: { className?: string }) {
   return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      className={className}
-    >
-      <path
-        d="M6 9l6 6 6-6"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeMiterlimit="16"
-      />
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" className={className}>
+      <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="1.5" strokeMiterlimit="16" />
     </svg>
   );
 }
 
 function AddIcon({ className }: { className?: string }) {
   return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      className={className}
-    >
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" className={className}>
       <path
         d="M12.001 5v14.002M19.002 12.002H5"
         stroke="currentColor"
@@ -80,14 +43,7 @@ function AddIcon({ className }: { className?: string }) {
 
 function GitMergeIcon({ className }: { className?: string }) {
   return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      className={className}
-    >
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" className={className}>
       <path
         d="M7 20a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM7 8a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM17 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4z"
         stroke="currentColor"
@@ -106,14 +62,7 @@ function GitMergeIcon({ className }: { className?: string }) {
 
 function FolderIcon({ className }: { className?: string }) {
   return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      className={className}
-    >
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" className={className}>
       <path
         d="M2 19V7.549c0-1.444 0-2.166.243-2.733a3 3 0 0 1 1.573-1.573C4.383 3 5.098 3 6.55 3h.494a2 2 0 0 1 1.557.745L10.418 6m0 0H16c1.4 0 2.1 0 2.635.272a2.5 2.5 0 0 1 1.092 1.093C20 7.9 20 8.6 20 10v1m-9.582-5H7"
         stroke="currentColor"
@@ -133,14 +82,7 @@ function FolderIcon({ className }: { className?: string }) {
 
 function ClipboardCopyIcon({ className }: { className?: string }) {
   return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      className={className}
-    >
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" className={className}>
       <path
         d="M11.502 13h9M13.502 10s-3 2.21-3 3 3 3 3 3M13.998 2h-5a1.5 1.5 0 0 0 0 3h5a1.5 1.5 0 1 0 0-3z"
         stroke="currentColor"
@@ -161,14 +103,7 @@ function ClipboardCopyIcon({ className }: { className?: string }) {
 
 function FolderTreeIcon({ className }: { className?: string }) {
   return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      className={className}
-    >
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" className={className}>
       <path
         d="M12 7V5.333c0-.777 0-1.166.14-1.467a1.5 1.5 0 0 1 .726-.725C13.168 3 13.556 3 14.333 3c.408 0 .611 0 .8.05.2.052.386.146.548.274.152.12.275.284.519.61L17 5h1.5c.935 0 1.402 0 1.75.201a1.5 1.5 0 0 1 .549.549C21 6.098 21 6.565 21 7.5s0 1.402-.201 1.75a1.5 1.5 0 0 1-.549.549c-.348.201-.815.201-1.75.201H15c-1.414 0-2.121 0-2.56-.44C12 9.122 12 8.415 12 7zM12 18v-1.667c0-.777 0-1.165.14-1.467a1.5 1.5 0 0 1 .726-.726c.302-.14.69-.14 1.467-.14.408 0 .611 0 .8.05.2.052.386.146.548.274.152.12.275.284.519.61L17 16h1.5c.935 0 1.402 0 1.75.201a1.5 1.5 0 0 1 .549.549c.201.348.201.815.201 1.75s0 1.402-.201 1.75a1.5 1.5 0 0 1-.549.549c-.348.201-.815.201-1.75.201H15c-1.414 0-2.121 0-2.56-.44C12 20.122 12 19.415 12 18zM8 7H7c-.93 0-1.395 0-1.776-.102a3 3 0 0 1-2.122-2.122C3 4.395 3 3.93 3 3"
         stroke="currentColor"
@@ -189,21 +124,8 @@ function FolderTreeIcon({ className }: { className?: string }) {
 
 function CancelIcon({ className }: { className?: string }) {
   return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      className={className}
-    >
-      <path
-        d="M18 6L6 18m12 0L6 6"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" className={className}>
+      <path d="M18 6L6 18m12 0L6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
@@ -211,20 +133,20 @@ function CancelIcon({ className }: { className?: string }) {
 /* ── Project avatar (colored square + first letter) ───────────── */
 
 const AVATAR_COLORS = [
-  "bg-[#5e6ad2]", // brand indigo
-  "bg-[#7170ff]", // accent violet
-  "bg-[#828fff]", // accent hover
-  "bg-[#7a7fad]", // security lavender
-  "bg-[#62666d]", // quaternary gray
-  "bg-[#8a8f98]", // tertiary gray
-  "bg-[#4a4d55]", // dark gray
-  "bg-[#3e3e44]", // border tertiary
-  "bg-[#34343a]", // border secondary
-  "bg-[#23252a]", // border primary
+  'bg-[#5e6ad2]', // brand indigo
+  'bg-[#7170ff]', // accent violet
+  'bg-[#828fff]', // accent hover
+  'bg-[#7a7fad]', // security lavender
+  'bg-[#62666d]', // quaternary gray
+  'bg-[#8a8f98]', // tertiary gray
+  'bg-[#4a4d55]', // dark gray
+  'bg-[#3e3e44]', // border tertiary
+  'bg-[#34343a]', // border secondary
+  'bg-[#23252a]', // border primary
 ];
 
 function ProjectAvatar({ name }: { name: string }) {
-  const letter = (name[0] ?? "?").toUpperCase();
+  const letter = (name[0] ?? '?').toUpperCase();
   // Deterministic color from name
   let hash = 0;
   for (let i = 0; i < name.length; i++) {
@@ -233,7 +155,7 @@ function ProjectAvatar({ name }: { name: string }) {
   const colorClass = AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
   return (
     <span
-      className={`flex size-5 shrink-0 items-center justify-center rounded text-[11px] font-[590] text-[#f7f8f8] ${colorClass}`}
+      className={`flex size-5 shrink-0 items-center justify-center rounded font-[590] text-[#f7f8f8] text-[11px] ${colorClass}`}
     >
       {letter}
     </span>
@@ -253,7 +175,7 @@ function formatRelativeTime(timestamp: number): string {
   const months = Math.floor(days / 30);
   const years = Math.floor(days / 365);
 
-  if (seconds < 60) return "just now";
+  if (seconds < 60) return 'just now';
   if (minutes < 60) return `${minutes}m ago`;
   if (hours < 24) return `${hours}h ago`;
   if (days < 7) return `${days}d ago`;
@@ -272,12 +194,7 @@ function useWorkspaceAgentStatus(workspaceId: string): AgentStatus | undefined {
   const exitedPtyIds = useAppStore((state) => state.exitedPtyIds);
 
   return useMemo(() => {
-    const agentTabs = tabs.filter(
-      (t) =>
-        t.workspaceId === workspaceId &&
-        t.type === "terminal" &&
-        t.isAgent === true,
-    );
+    const agentTabs = tabs.filter((t) => t.workspaceId === workspaceId && t.type === 'terminal' && t.isAgent === true);
     if (agentTabs.length === 0) return undefined;
 
     let highest: AgentStatus | undefined;
@@ -289,9 +206,9 @@ function useWorkspaceAgentStatus(workspaceId: string): AgentStatus | undefined {
     };
 
     for (const tab of agentTabs) {
-      if (tab.type !== "terminal") continue;
+      if (tab.type !== 'terminal') continue;
       const isExited = exitedPtyIds.has(tab.ptyId);
-      const status: AgentStatus = agentStatuses[tab.ptyId] ?? "idle";
+      const status: AgentStatus = agentStatuses[tab.ptyId] ?? 'idle';
       if (!highest || priority[status] > priority[highest]) {
         highest = status;
       }
@@ -301,28 +218,20 @@ function useWorkspaceAgentStatus(workspaceId: string): AgentStatus | undefined {
 }
 
 /** Animated status indicator for workspace items in the sidebar. */
-function WorkspaceStatusDot({
-  isActive,
-  agentStatus,
-}: {
-  isActive: boolean;
-  agentStatus: AgentStatus | undefined;
-}) {
+function WorkspaceStatusDot({ isActive, agentStatus }: { isActive: boolean; agentStatus: AgentStatus | undefined }) {
   const spinnerStyle = useAppStore((state) => state.settings.spinnerStyle);
 
   // Working → unicode braille spinner
-  if (agentStatus === "working") {
+  if (agentStatus === 'working') {
     return (
       <span className="text-[14px] text-accent leading-none">
-        <Spinner
-          name={spinnerStyle as import("unicode-animations").BrailleSpinnerName}
-        />
+        <Spinner name={spinnerStyle as import('unicode-animations').BrailleSpinnerName} />
       </span>
     );
   }
 
   // Permission needed → pulsing amber dot
-  if (agentStatus === "permission") {
+  if (agentStatus === 'permission') {
     return (
       <span className="relative flex size-2">
         <span className="absolute inline-flex size-full animate-ping rounded-full bg-warn opacity-75" />
@@ -332,7 +241,7 @@ function WorkspaceStatusDot({
   }
 
   // Review (agent finished) → green dot
-  if (agentStatus === "review") {
+  if (agentStatus === 'review') {
     return <span className="block size-2 rounded-full bg-ok" />;
   }
 
@@ -359,25 +268,21 @@ function SortableProjectGroup({
   onAddWorktree: () => void;
   onContextMenu: (e: React.MouseEvent) => void;
 }) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: projectId, data: { type: "project" } });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: projectId,
+    data: { type: 'project' },
+  });
 
   const style = {
     transform: CSS.Transform.toString(transform),
-    transition: transition ?? "transform 180ms cubic-bezier(0.2, 0, 0, 1)",
+    transition: transition ?? 'transform 180ms cubic-bezier(0.2, 0, 0, 1)',
     opacity: isDragging ? 0.74 : 1,
     zIndex: isDragging ? 20 : undefined,
-    willChange: "transform",
+    willChange: 'transform',
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === "Enter" || event.key === " ") {
+    if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
       onToggle();
     }
@@ -387,7 +292,7 @@ function SortableProjectGroup({
     <div
       ref={setNodeRef}
       style={style}
-      className={`group/sidebar-project flex min-w-0 flex-col rounded-lg${hasActive ? " bg-panel/60" : ""}${isDragging ? " shadow-[0_16px_34px_rgba(0,0,0,0.28)] ring-1 ring-accent/25" : ""}`}
+      className={`group/sidebar-project flex min-w-0 flex-col rounded-lg${hasActive ? 'bg-panel/60' : ''}${isDragging ? 'shadow-[0_16px_34px_rgba(0,0,0,0.28)] ring-1 ring-accent/25' : ''}`}
     >
       <div
         className="flex h-8 w-full cursor-grab items-center gap-1.5 rounded-md bg-transparent px-1.5 text-left text-text transition-colors duration-150 hover:bg-panel-2 active:cursor-grabbing"
@@ -400,11 +305,9 @@ function SortableProjectGroup({
         {...listeners}
       >
         <ProjectAvatar name={name} />
-        <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[13px] font-[510]">
-          {name}
-        </span>
+        <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap font-[510] text-[13px]">{name}</span>
         <button
-          className="grid size-5 shrink-0 cursor-pointer place-items-center rounded text-subtle opacity-0 transition-opacity hover:bg-panel-3 hover:text-text group-hover/sidebar-project:opacity-100 focus:opacity-100"
+          className="grid size-5 shrink-0 cursor-pointer place-items-center rounded text-subtle opacity-0 transition-opacity hover:bg-panel-3 hover:text-text focus:opacity-100 group-hover/sidebar-project:opacity-100"
           type="button"
           title="New worktree"
           onPointerDown={(event) => event.stopPropagation()}
@@ -416,7 +319,7 @@ function SortableProjectGroup({
           <AddIcon />
         </button>
         <ArrowDownIcon
-          className={`shrink-0 cursor-pointer text-subtle transition-transform duration-200 ease-[ease]${isCollapsed ? " -rotate-90" : ""}`}
+          className={`shrink-0 cursor-pointer text-subtle transition-transform duration-200 ease-[ease]${isCollapsed ? '-rotate-90' : ''}`}
         />
       </div>
       {children}
@@ -448,25 +351,21 @@ function SortableWorkspaceRow({
   const hasRemoteStats = stats.ahead > 0 || stats.behind > 0;
   const agentStatus = useWorkspaceAgentStatus(workspace.id);
 
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: workspace.id, data: { type: "workspace" } });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: workspace.id,
+    data: { type: 'workspace' },
+  });
 
   const style = {
     transform: CSS.Transform.toString(transform),
-    transition: transition ?? "transform 180ms cubic-bezier(0.2, 0, 0, 1)",
+    transition: transition ?? 'transform 180ms cubic-bezier(0.2, 0, 0, 1)',
     opacity: isDragging ? 0.68 : 1,
     zIndex: isDragging ? 30 : undefined,
-    willChange: "transform",
+    willChange: 'transform',
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === "Enter" || event.key === " ") {
+    if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
       onClick();
     }
@@ -476,7 +375,7 @@ function SortableWorkspaceRow({
     <div
       ref={setNodeRef}
       style={style}
-      className={`group/sidebar-workspace relative flex w-full min-w-0 cursor-grab items-start gap-2 rounded-md px-2 py-1.5 text-left transition-colors duration-150 active:cursor-grabbing${isActive ? "" : " hover:bg-panel-2"}${isDragging ? " bg-panel-2 ring-1 ring-accent/20" : ""}`}
+      className={`group/sidebar-workspace relative flex w-full min-w-0 cursor-grab items-start gap-2 rounded-md px-2 py-1.5 text-left transition-colors duration-150 active:cursor-grabbing${isActive ? '' : 'hover:bg-panel-2'}${isDragging ? 'bg-panel-2 ring-1 ring-accent/20' : ''}`}
       role="button"
       tabIndex={0}
       onClick={onClick}
@@ -484,12 +383,10 @@ function SortableWorkspaceRow({
       {...attributes}
       {...listeners}
     >
-      {isActive && (
-        <span className="absolute left-0 top-1 bottom-1 w-[3px] rounded-full bg-accent" />
-      )}
+      {isActive && <span className="absolute top-1 bottom-1 left-0 w-[3px] rounded-full bg-accent" />}
       {onDelete && (
         <div
-          className="absolute right-1 top-1 hidden size-5 items-center justify-center rounded text-subtle hover:text-danger group-hover/sidebar-workspace:flex cursor-pointer"
+          className="absolute top-1 right-1 hidden size-5 cursor-pointer items-center justify-center rounded text-subtle hover:text-danger group-hover/sidebar-workspace:flex"
           onClick={(e) => {
             e.stopPropagation();
             onDelete();
@@ -499,7 +396,7 @@ function SortableWorkspaceRow({
         </div>
       )}
       <div className="mt-[3px] flex size-[14px] shrink-0 items-center justify-center">
-        {agentStatus && agentStatus !== "idle" ? (
+        {agentStatus && agentStatus !== 'idle' ? (
           <WorkspaceStatusDot isActive={isActive} agentStatus={agentStatus} />
         ) : (
           <GitMergeIcon className="text-subtle" />
@@ -508,18 +405,14 @@ function SortableWorkspaceRow({
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <div className="flex min-w-0 items-center gap-2">
           <span
-            className={`min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap font-mono text-[13px] font-[510]${isActive ? " text-text" : ""}`}
+            className={`min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap font-mono text-[13px] font-[510]${isActive ? 'text-text' : ''}`}
           >
-            {workspace.branch || "detached"}
+            {workspace.branch || 'detached'}
           </span>
           {hasDiffStats && (
-            <span className="flex shrink-0 items-center gap-1 text-[10px] font-mono">
-              {stats.additions > 0 && (
-                <span className="text-text-addition">+{stats.additions}</span>
-              )}
-              {stats.deletions > 0 && (
-                <span className="text-text-deletion">−{stats.deletions}</span>
-              )}
+            <span className="flex shrink-0 items-center gap-1 font-mono text-[10px]">
+              {stats.additions > 0 && <span className="text-text-addition">+{stats.additions}</span>}
+              {stats.deletions > 0 && <span className="text-text-deletion">−{stats.deletions}</span>}
             </span>
           )}
         </div>
@@ -529,14 +422,12 @@ function SortableWorkspaceRow({
           </span>
           {hasRemoteStats && (
             <span className="shrink-0 font-mono text-[10px] text-subtle">
-              {stats.ahead > 0 ? `↑${stats.ahead}` : ""}
-              {stats.ahead > 0 && stats.behind > 0 ? " " : ""}
-              {stats.behind > 0 ? `↓${stats.behind}` : ""}
+              {stats.ahead > 0 ? `↑${stats.ahead}` : ''}
+              {stats.ahead > 0 && stats.behind > 0 ? ' ' : ''}
+              {stats.behind > 0 ? `↓${stats.behind}` : ''}
             </span>
           )}
-          <span className="shrink-0 text-[10px] text-subtle/40 tabular-nums">
-            ⌘{globalIndex + 1}
-          </span>
+          <span className="shrink-0 text-[10px] text-subtle/40 tabular-nums">⌘{globalIndex + 1}</span>
         </div>
       </div>
     </div>
@@ -589,25 +480,25 @@ function ProjectContextMenu({
   );
 
   useEffect(() => {
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [handleClickOutside]);
 
   useEffect(() => {
     const handleKey = (e: globalThis.KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === 'Escape') onClose();
     };
-    document.addEventListener("keydown", handleKey);
-    return () => document.removeEventListener("keydown", handleKey);
+    document.addEventListener('keydown', handleKey);
+    return () => document.removeEventListener('keydown', handleKey);
   }, [onClose]);
 
   const itemClass =
-    "flex items-center gap-2 h-7 rounded-[5px] px-[9px] text-[12px] bg-transparent text-text hover:bg-panel-3 cursor-pointer w-full";
+    'flex items-center gap-2 h-7 rounded-[5px] px-[9px] text-[12px] bg-transparent text-text hover:bg-panel-3 cursor-pointer w-full';
 
   return (
     <div
       ref={menuRef}
-      className="fixed z-50 w-max min-w-[140px] grid gap-[2px] rounded-[7px] border border-border bg-panel-2 p-[5px] shadow-[0_14px_32px_rgba(0,0,0,0.3)]"
+      className="fixed z-50 grid w-max min-w-[140px] gap-[2px] rounded-[7px] border border-border bg-panel-2 p-[5px] shadow-[0_14px_32px_rgba(0,0,0,0.3)]"
       style={{ left: x, top: y }}
     >
       <div
@@ -642,7 +533,7 @@ function ProjectContextMenu({
       </div>
       <div className="mx-[5px] my-[3px] h-px bg-border" />
       <div
-        className="flex items-center gap-2 h-7 rounded-[5px] px-[9px] text-[12px] bg-transparent text-danger hover:bg-panel-3 cursor-pointer w-full"
+        className="flex h-7 w-full cursor-pointer items-center gap-2 rounded-[5px] bg-transparent px-[9px] text-[12px] text-danger hover:bg-panel-3"
         onClick={() => {
           onClose();
           onCloseProject();
@@ -668,12 +559,10 @@ function NewWorktreeDialog({
   onClose: () => void;
   onCreate: (branch: string, trackRemote: boolean) => void;
 }) {
-  const [branch, setBranch] = useState("");
+  const [branch, setBranch] = useState('');
   const [trackRemote, setTrackRemote] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [remoteStatus, setRemoteStatus] = useState<
-    "idle" | "checking" | "exists" | "not-found"
-  >("idle");
+  const [remoteStatus, setRemoteStatus] = useState<'idle' | 'checking' | 'exists' | 'not-found'>('idle');
   const inputRef = useRef<HTMLInputElement>(null);
   const checkTimerRef = useRef<ReturnType<typeof setTimeout>>();
 
@@ -683,30 +572,28 @@ function NewWorktreeDialog({
 
   useEffect(() => {
     const handleKey = (e: globalThis.KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === 'Escape') onClose();
     };
-    document.addEventListener("keydown", handleKey);
-    return () => document.removeEventListener("keydown", handleKey);
+    document.addEventListener('keydown', handleKey);
+    return () => document.removeEventListener('keydown', handleKey);
   }, [onClose]);
 
   // Debounced remote branch check
   useEffect(() => {
     if (!trackRemote || !branch.trim()) {
-      setRemoteStatus("idle");
+      setRemoteStatus('idle');
       return;
     }
-    setRemoteStatus("checking");
+    setRemoteStatus('checking');
     clearTimeout(checkTimerRef.current);
     checkTimerRef.current = setTimeout(async () => {
       try {
         const branches = await window.forgepad.git.listRemoteBranches(repoPath);
         const trimmed = branch.trim();
-        const found = branches.some(
-          (b) => b === `origin/${trimmed}` || b === trimmed,
-        );
-        setRemoteStatus(found ? "exists" : "not-found");
+        const found = branches.some((b) => b === `origin/${trimmed}` || b === trimmed);
+        setRemoteStatus(found ? 'exists' : 'not-found');
       } catch {
-        setRemoteStatus("not-found");
+        setRemoteStatus('not-found');
       }
     }, 400);
     return () => clearTimeout(checkTimerRef.current);
@@ -724,18 +611,13 @@ function NewWorktreeDialog({
   };
 
   return (
-    <div
-      className="fixed inset-0 z-[60] grid place-items-center bg-black/85"
-      onMouseDown={onClose}
-    >
+    <div className="fixed inset-0 z-[60] grid place-items-center bg-black/85" onMouseDown={onClose}>
       <div
         className="w-[min(400px,90vw)] rounded-xl border border-border bg-panel-2 shadow-[0_20px_40px_rgba(0,0,0,0.4)]"
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-border px-4 py-3">
-          <span className="text-[14px] font-[590] text-text">
-            New Worktree — {projectName}
-          </span>
+        <div className="flex items-center justify-between border-border border-b px-4 py-3">
+          <span className="font-[590] text-[14px] text-text">New Worktree — {projectName}</span>
         </div>
         <div className="flex flex-col gap-3 px-4 py-4">
           <label className="flex flex-col gap-1.5">
@@ -748,11 +630,11 @@ function NewWorktreeDialog({
               value={branch}
               onChange={(e) => setBranch(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter") void handleSubmit();
+                if (e.key === 'Enter') void handleSubmit();
               }}
             />
           </label>
-          <label className="flex items-center gap-2 cursor-pointer select-none">
+          <label className="flex cursor-pointer select-none items-center gap-2">
             <input
               type="checkbox"
               className="size-3.5 cursor-pointer accent-accent"
@@ -763,40 +645,33 @@ function NewWorktreeDialog({
           </label>
           {trackRemote && branch.trim() && (
             <div className="text-[11px]">
-              {remoteStatus === "checking" && (
-                <span className="text-subtle">
-                  Checking origin/{branch.trim()}…
-                </span>
+              {remoteStatus === 'checking' && <span className="text-subtle">Checking origin/{branch.trim()}…</span>}
+              {remoteStatus === 'exists' && (
+                <span className="text-text-addition">✓ origin/{branch.trim()} found — will create tracking branch</span>
               )}
-              {remoteStatus === "exists" && (
-                <span className="text-text-addition">
-                  ✓ origin/{branch.trim()} found — will create tracking branch
-                </span>
-              )}
-              {remoteStatus === "not-found" && (
+              {remoteStatus === 'not-found' && (
                 <span className="text-text-warning-status">
-                  ✗ origin/{branch.trim()} not found — will create new branch
-                  and push
+                  ✗ origin/{branch.trim()} not found — will create new branch and push
                 </span>
               )}
             </div>
           )}
         </div>
-        <div className="flex justify-end gap-2 border-t border-border px-4 py-3">
+        <div className="flex justify-end gap-2 border-border border-t px-4 py-3">
           <button
             type="button"
-            className="h-8 rounded-md border border-border bg-transparent px-3 text-[13px] text-text hover:bg-panel-3 cursor-pointer"
+            className="h-8 cursor-pointer rounded-md border border-border bg-transparent px-3 text-[13px] text-text hover:bg-panel-3"
             onClick={onClose}
           >
             Cancel
           </button>
           <button
             type="button"
-            className="h-8 rounded-md border border-transparent bg-accent px-3 text-[13px] text-accent-contrast hover:brightness-110 cursor-pointer disabled:opacity-50"
+            className="h-8 cursor-pointer rounded-md border border-transparent bg-accent px-3 text-[13px] text-accent-contrast hover:brightness-110 disabled:opacity-50"
             disabled={!branch.trim() || loading}
             onClick={() => void handleSubmit()}
           >
-            {loading ? "Creating…" : "Create"}
+            {loading ? 'Creating…' : 'Create'}
           </button>
         </div>
       </div>
@@ -806,23 +681,15 @@ function NewWorktreeDialog({
 
 /* ── Delete worktree confirmation dialog ─────────────────────── */
 
-function DeleteWorktreeDialog({
-  branch,
-  onClose,
-  onConfirm,
-}: {
-  branch: string;
-  onClose: () => void;
-  onConfirm: () => void;
-}) {
+function DeleteWorktreeDialog({ branch, onClose, onConfirm }: { branch: string; onClose: () => void; onConfirm: () => void }) {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     const handleKey = (e: globalThis.KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === 'Escape') onClose();
     };
-    document.addEventListener("keydown", handleKey);
-    return () => document.removeEventListener("keydown", handleKey);
+    document.addEventListener('keydown', handleKey);
+    return () => document.removeEventListener('keydown', handleKey);
   }, [onClose]);
 
   const handleDelete = () => {
@@ -831,39 +698,33 @@ function DeleteWorktreeDialog({
   };
 
   return (
-    <div
-      className="fixed inset-0 z-[60] grid place-items-center bg-black/85"
-      onMouseDown={onClose}
-    >
+    <div className="fixed inset-0 z-[60] grid place-items-center bg-black/85" onMouseDown={onClose}>
       <div
         className="w-[min(380px,90vw)] rounded-xl border border-border bg-panel-2 shadow-[0_20px_40px_rgba(0,0,0,0.4)]"
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-border px-4 py-3">
-          <span className="text-[14px] font-[590] text-text">
-            Delete Worktree
-          </span>
+        <div className="flex items-center justify-between border-border border-b px-4 py-3">
+          <span className="font-[590] text-[14px] text-text">Delete Worktree</span>
         </div>
         <div className="px-4 py-4 text-[13px] text-subtle leading-relaxed">
-          Are you sure you want to delete worktree{" "}
-          <span className="font-mono font-[590] text-text">{branch}</span>? This
-          will remove the worktree directory and delete the local branch.
+          Are you sure you want to delete worktree <span className="font-[590] font-mono text-text">{branch}</span>? This will
+          remove the worktree directory and delete the local branch.
         </div>
-        <div className="flex justify-end gap-2 border-t border-border px-4 py-3">
+        <div className="flex justify-end gap-2 border-border border-t px-4 py-3">
           <button
             type="button"
-            className="h-8 rounded-md border border-border bg-transparent px-3 text-[13px] text-text hover:bg-panel-3 cursor-pointer"
+            className="h-8 cursor-pointer rounded-md border border-border bg-transparent px-3 text-[13px] text-text hover:bg-panel-3"
             onClick={onClose}
           >
             Cancel
           </button>
           <button
             type="button"
-            className="h-8 rounded-md border border-transparent bg-danger px-3 text-[13px] text-accent-contrast hover:brightness-110 cursor-pointer disabled:opacity-50"
+            className="h-8 cursor-pointer rounded-md border border-transparent bg-danger px-3 text-[13px] text-accent-contrast hover:brightness-110 disabled:opacity-50"
             disabled={loading}
             onClick={handleDelete}
           >
-            {loading ? "Deleting…" : "Delete"}
+            {loading ? 'Deleting…' : 'Delete'}
           </button>
         </div>
       </div>
@@ -872,9 +733,7 @@ function DeleteWorktreeDialog({
 }
 
 export function Sidebar() {
-  const [collapsedProjects, setCollapsedProjects] = useState<Set<string>>(
-    new Set(),
-  );
+  const [collapsedProjects, setCollapsedProjects] = useState<Set<string>>(new Set());
   const [contextMenu, setContextMenu] = useState<{
     project: Project;
     x: number;
@@ -922,7 +781,9 @@ export function Sidebar() {
 
   const workspaceIndexMap = useMemo(() => {
     const map = new Map<string, number>();
-    workspaceOrder.forEach((id, idx) => map.set(id, idx));
+    for (const [idx, id] of workspaceOrder.entries()) {
+      map.set(id, idx);
+    }
     return map;
   }, [workspaceOrder]);
 
@@ -946,11 +807,7 @@ export function Sidebar() {
     if (activeProject) {
       const overProject =
         projects.find((project) => project.id === overId) ??
-        projects.find(
-          (project) =>
-            project.id ===
-            workspaces.find((workspace) => workspace.id === overId)?.projectId,
-        );
+        projects.find((project) => project.id === workspaces.find((workspace) => workspace.id === overId)?.projectId);
       if (overProject && activeProject.id !== overProject.id) {
         reorderProjects(activeProject.id, overProject.id);
       }
@@ -966,13 +823,11 @@ export function Sidebar() {
 
   return (
     <aside
-      className="flex h-full min-h-0 min-w-0 flex-col border-r border-border bg-sidebar-bg"
-      onMouseDown={() => setFocusedColumn("sidebar")}
+      className="flex h-full min-h-0 min-w-0 flex-col border-border border-r bg-sidebar-bg"
+      onMouseDown={() => setFocusedColumn('sidebar')}
     >
-      <div className="flex h-9 shrink-0 items-center justify-between border-b border-border px-3">
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-muted">
-          Workspaces
-        </span>
+      <div className="flex h-9 shrink-0 items-center justify-between border-border border-b px-3">
+        <span className="font-semibold text-[11px] text-muted uppercase tracking-wider">Workspaces</span>
         <button
           className="icon-button small border-transparent"
           type="button"
@@ -982,12 +837,12 @@ export function Sidebar() {
           <Settings size={15} />
         </button>
       </div>
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-0.5 overflow-y-auto overflow-x-hidden px-2 py-1.5 scrollbar-thin scroll-mask-y">
+      <div className="scrollbar-thin scroll-mask-y flex min-h-0 min-w-0 flex-1 flex-col gap-0.5 overflow-y-auto overflow-x-hidden px-2 py-1.5">
         {!hydrated ? (
           <SidebarSkeleton />
         ) : projects.length === 0 ? (
           <button
-            className="flex w-full items-center gap-2.5 rounded-lg border border-dashed border-border bg-transparent px-2.5 py-3.5 text-[13px] text-muted hover:bg-panel-2 hover:text-text hover:border-subtle cursor-pointer"
+            className="flex w-full cursor-pointer items-center gap-2.5 rounded-lg border border-border border-dashed bg-transparent px-2.5 py-3.5 text-[13px] text-muted hover:border-subtle hover:bg-panel-2 hover:text-text"
             type="button"
             onClick={openProject}
           >
@@ -995,32 +850,16 @@ export function Sidebar() {
             <span>Open a project to get started</span>
           </button>
         ) : (
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragEnd={handleDragEnd}
-          >
-            <SortableContext
-              items={projectIds}
-              strategy={verticalListSortingStrategy}
-            >
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <SortableContext items={projectIds} strategy={verticalListSortingStrategy}>
               {projects.map((project, projectIdx) => {
-                const projectWorkspaces = workspaces.filter(
-                  (w) => w.projectId === project.id,
-                );
+                const projectWorkspaces = workspaces.filter((w) => w.projectId === project.id);
                 const isCollapsed = collapsedProjects.has(project.id);
-                const hasActive = projectWorkspaces.some(
-                  (w) => w.id === activeWorkspaceId,
-                );
+                const hasActive = projectWorkspaces.some((w) => w.id === activeWorkspaceId);
                 const wsIds = projectWorkspaces.map((w) => w.id);
 
                 return (
-                  <div
-                    className={
-                      projectIdx > 0 ? "mt-2 border-t border-border pt-2" : ""
-                    }
-                    key={project.id}
-                  >
+                  <div className={projectIdx > 0 ? 'mt-2 border-border border-t pt-2' : ''} key={project.id}>
                     <SortableProjectGroup
                       projectId={project.id}
                       name={project.name}
@@ -1044,25 +883,18 @@ export function Sidebar() {
                       }}
                     >
                       <div
-                        className={`grid transition-[grid-template-rows] duration-300 ease-in-out${isCollapsed ? " grid-rows-[0fr]" : " grid-rows-[1fr]"}`}
+                        className={`grid transition-[grid-template-rows] duration-300 ease-in-out${isCollapsed ? 'grid-rows-[0fr]' : 'grid-rows-[1fr]'}`}
                       >
                         <div className="overflow-hidden">
-                          <SortableContext
-                            items={wsIds}
-                            strategy={verticalListSortingStrategy}
-                          >
+                          <SortableContext items={wsIds} strategy={verticalListSortingStrategy}>
                             <div className="flex flex-col pb-1">
                               {projectWorkspaces.map((workspace) => (
                                 <SortableWorkspaceRow
                                   key={workspace.id}
                                   workspace={workspace}
-                                  globalIndex={
-                                    workspaceIndexMap.get(workspace.id) ?? 0
-                                  }
+                                  globalIndex={workspaceIndexMap.get(workspace.id) ?? 0}
                                   isActive={workspace.id === activeWorkspaceId}
-                                  onClick={() =>
-                                    setActiveWorkspace(workspace.id)
-                                  }
+                                  onClick={() => setActiveWorkspace(workspace.id)}
                                   onDelete={
                                     workspace.isRoot
                                       ? undefined
@@ -1087,9 +919,9 @@ export function Sidebar() {
         )}
       </div>
 
-      <div className="border-t border-border p-2">
+      <div className="border-border border-t p-2">
         <button
-          className="flex h-8 w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-border bg-transparent text-xs text-muted hover:bg-panel-2 hover:text-text hover:border-subtle cursor-pointer"
+          className="flex h-8 w-full cursor-pointer items-center justify-center gap-1.5 rounded-md border border-border border-dashed bg-transparent text-muted text-xs hover:border-subtle hover:bg-panel-2 hover:text-text"
           type="button"
           onClick={openProject}
         >
@@ -1112,9 +944,7 @@ export function Sidebar() {
             })
           }
           onCloseProject={() => {
-            const confirmed = window.confirm(
-              `Remove ${contextMenu.project.name} from ForgePad? Files stay on disk.`,
-            );
+            const confirmed = window.confirm(`Remove ${contextMenu.project.name} from ForgePad? Files stay on disk.`);
             if (confirmed) removeProject(contextMenu.project.id);
           }}
         />
@@ -1125,9 +955,7 @@ export function Sidebar() {
           projectName={worktreeDialog.projectName}
           repoPath={worktreeDialog.repoPath}
           onClose={() => setWorktreeDialog(null)}
-          onCreate={(branch, trackRemote) =>
-            void createWorktree(worktreeDialog.projectId, branch, trackRemote)
-          }
+          onCreate={(branch, trackRemote) => void createWorktree(worktreeDialog.projectId, branch, trackRemote)}
         />
       )}
 

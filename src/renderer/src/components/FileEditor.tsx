@@ -1,50 +1,26 @@
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ComponentPropsWithoutRef,
-} from "react";
-import ReactMarkdown from "react-markdown";
-import rehypeRaw from "rehype-raw";
-import rehypeSanitize from "rehype-sanitize";
-import remarkGfm from "remark-gfm";
-import mermaid from "mermaid";
-import {
-  getFiletypeFromFileName,
-  getSharedHighlighter,
-  type BundledLanguage,
-  type DiffsHighlighter,
-} from "@pierre/diffs";
-import type { SelectedLineRange } from "@pierre/diffs";
-import { File as PierreFile } from "@pierre/diffs/react";
-import type { FileOptions, LineAnnotation } from "@pierre/diffs/react";
-import {
-  Check,
-  ChevronDown,
-  ChevronUp,
-  Code,
-  Copy,
-  FileCode,
-  Image,
-  MessageSquarePlus,
-  Search,
-  X,
-} from "lucide-react";
-import type { CodeSelectionItem, Tab, Workspace } from "@shared/types";
-import { useAppStore } from "@renderer/store/app-store";
-import { useResolvedTheme } from "@renderer/App";
+import { type ComponentPropsWithoutRef, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import type { SelectedLineRange } from '@pierre/diffs';
+import { type BundledLanguage, type DiffsHighlighter, getFiletypeFromFileName, getSharedHighlighter } from '@pierre/diffs';
+import type { FileOptions, LineAnnotation } from '@pierre/diffs/react';
+import { File as PierreFile } from '@pierre/diffs/react';
+import { useResolvedTheme } from '@renderer/App';
+import { useAppStore } from '@renderer/store/app-store';
+import type { CodeSelectionItem, Tab, Workspace } from '@shared/types';
+import { Check, ChevronDown, ChevronUp, Code, Copy, FileCode, Image, MessageSquarePlus, Search, X } from 'lucide-react';
+import mermaid from 'mermaid';
+import ReactMarkdown from 'react-markdown';
+import rehypeRaw from 'rehype-raw';
+import rehypeSanitize from 'rehype-sanitize';
+import remarkGfm from 'remark-gfm';
 
-type FileTab = Extract<Tab, { type: "file" }>;
+type FileTab = Extract<Tab, { type: 'file' }>;
 
 type FileEditorProps = {
   tab: FileTab;
   workspace: Workspace;
 };
 
-type MarkdownMode = "rendered" | "raw";
+type MarkdownMode = 'rendered' | 'raw';
 
 type HighlightRegistryLike = {
   set: (name: string, highlight: unknown) => void;
@@ -63,109 +39,95 @@ type PendingCodeSelection = {
   note: string;
 };
 
-type AnnotationMeta =
-  | { kind: "pending" }
-  | { kind: "comment"; comment: CodeSelectionItem };
+type AnnotationMeta = { kind: 'pending' } | { kind: 'comment'; comment: CodeSelectionItem };
 
-const IMAGE_EXTENSIONS = new Set([
-  "png",
-  "jpg",
-  "jpeg",
-  "gif",
-  "webp",
-  "bmp",
-  "ico",
-  "svg",
-  "avif",
-]);
+const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'ico', 'svg', 'avif']);
 
 function isImageFile(relPath: string): boolean {
-  const ext = relPath.split(".").pop()?.toLowerCase() ?? "";
+  const ext = relPath.split('.').pop()?.toLowerCase() ?? '';
   return IMAGE_EXTENSIONS.has(ext);
 }
 
 function isMarkdownPath(path: string): boolean {
   const lower = path.toLowerCase();
-  return lower.endsWith(".md") || lower.endsWith(".markdown");
+  return lower.endsWith('.md') || lower.endsWith('.markdown');
 }
 
 // --- Markdown code block highlighting ---
 
 const MD_LANG_MAP: Record<string, BundledLanguage> = {
-  typescript: "typescript",
-  ts: "typescript",
-  tsx: "tsx",
-  javascript: "javascript",
-  js: "javascript",
-  jsx: "jsx",
-  json: "json",
-  css: "css",
-  scss: "scss",
-  less: "less",
-  html: "html",
-  python: "python",
-  py: "python",
-  go: "go",
-  rust: "rust",
-  rs: "rust",
-  shell: "shellscript",
-  sh: "shellscript",
-  bash: "shellscript",
-  zsh: "shellscript",
-  yaml: "yaml",
-  yml: "yaml",
-  toml: "toml",
-  xml: "xml",
-  sql: "sql",
-  graphql: "graphql",
-  java: "java",
-  c: "c",
-  cpp: "cpp",
-  ruby: "ruby",
-  rb: "ruby",
-  php: "php",
-  swift: "swift",
-  kotlin: "kotlin",
-  kt: "kotlin",
-  scala: "scala",
-  dart: "dart",
-  lua: "lua",
-  r: "r",
-  perl: "perl",
-  elixir: "elixir",
-  dockerfile: "dockerfile",
-  makefile: "makefile",
-  markdown: "markdown",
-  md: "markdown",
-  mdx: "mdx",
-  vue: "html",
-  svelte: "html",
+  typescript: 'typescript',
+  ts: 'typescript',
+  tsx: 'tsx',
+  javascript: 'javascript',
+  js: 'javascript',
+  jsx: 'jsx',
+  json: 'json',
+  css: 'css',
+  scss: 'scss',
+  less: 'less',
+  html: 'html',
+  python: 'python',
+  py: 'python',
+  go: 'go',
+  rust: 'rust',
+  rs: 'rust',
+  shell: 'shellscript',
+  sh: 'shellscript',
+  bash: 'shellscript',
+  zsh: 'shellscript',
+  yaml: 'yaml',
+  yml: 'yaml',
+  toml: 'toml',
+  xml: 'xml',
+  sql: 'sql',
+  graphql: 'graphql',
+  java: 'java',
+  c: 'c',
+  cpp: 'cpp',
+  ruby: 'ruby',
+  rb: 'ruby',
+  php: 'php',
+  swift: 'swift',
+  kotlin: 'kotlin',
+  kt: 'kotlin',
+  scala: 'scala',
+  dart: 'dart',
+  lua: 'lua',
+  r: 'r',
+  perl: 'perl',
+  elixir: 'elixir',
+  dockerfile: 'dockerfile',
+  makefile: 'makefile',
+  markdown: 'markdown',
+  md: 'markdown',
+  mdx: 'mdx',
+  vue: 'html',
+  svelte: 'html',
 };
 
-const MD_ALL_LANGS: BundledLanguage[] = [
-  ...new Set(Object.values(MD_LANG_MAP)),
-];
+const MD_ALL_LANGS: BundledLanguage[] = [...new Set(Object.values(MD_LANG_MAP))];
 
 let hlPromise: Promise<DiffsHighlighter> | null = null;
 
 function getHl(): Promise<DiffsHighlighter> {
   if (!hlPromise) {
     hlPromise = getSharedHighlighter({
-      themes: ["pierre-dark", "pierre-light"],
+      themes: ['pierre-dark', 'pierre-light'],
       langs: MD_ALL_LANGS,
     });
   }
   return hlPromise;
 }
 
-function getShikiTheme(resolvedTheme: "dark" | "light"): string {
-  return resolvedTheme === "dark" ? "pierre-dark" : "pierre-light";
+function getShikiTheme(resolvedTheme: 'dark' | 'light'): string {
+  return resolvedTheme === 'dark' ? 'pierre-dark' : 'pierre-light';
 }
 
 // --- Search helpers (used for find-in-file in markdown/raw modes) ---
 
-const SEARCH_HIGHLIGHT = "forgepad-file-search";
-const ACTIVE_SEARCH_HIGHLIGHT = "forgepad-file-search-active";
+const SEARCH_HIGHLIGHT = 'forgepad-file-search';
+const ACTIVE_SEARCH_HIGHLIGHT = 'forgepad-file-search-active';
 
 /** CSS injected into the @pierre/diffs Shadow DOM so `::highlight()` works. */
 const SEARCH_HIGHLIGHT_CSS = `
@@ -180,8 +142,7 @@ const SEARCH_HIGHLIGHT_CSS = `
 `;
 
 function getHighlightSupport() {
-  const registry = (CSS as unknown as { highlights?: HighlightRegistryLike })
-    .highlights;
+  const registry = (CSS as unknown as { highlights?: HighlightRegistryLike }).highlights;
   const HighlightCtor = (
     window as Window & {
       Highlight?: new (...ranges: Range[]) => unknown;
@@ -209,7 +170,7 @@ function collectTextNodes(root: HTMLElement): TextNodeRange[] {
     if (parent instanceof HTMLElement && parent.shadowRoot) {
       // Inside the shadow root, only walk the *content* column
       // (data-content) so we skip gutter line-numbers.
-      const contentCol = parent.shadowRoot.querySelector("[data-content]");
+      const contentCol = parent.shadowRoot.querySelector('[data-content]');
       if (contentCol) {
         walk(contentCol);
         return;
@@ -220,7 +181,7 @@ function collectTextNodes(root: HTMLElement): TextNodeRange[] {
     }
 
     if (parent.nodeType === Node.TEXT_NODE) {
-      const text = parent.textContent ?? "";
+      const text = parent.textContent ?? '';
       if (text.length > 0) {
         nodes.push({
           node: parent as Text,
@@ -262,12 +223,10 @@ function buildSearchRanges(root: HTMLElement, query: string): Range[] {
   const nodes = collectTextNodes(root);
   // Reconstruct the full text from the collected nodes so it matches the
   // offsets exactly (root.textContent won't include Shadow DOM text).
-  const text = nodes.map((n) => n.node.textContent ?? "").join("");
+  const text = nodes.map((n) => n.node.textContent ?? '').join('');
   const caseSensitive = /[A-Z]/.test(normalizedQuery);
   const haystack = caseSensitive ? text : text.toLowerCase();
-  const needle = caseSensitive
-    ? normalizedQuery
-    : normalizedQuery.toLowerCase();
+  const needle = caseSensitive ? normalizedQuery : normalizedQuery.toLowerCase();
   const ranges: Range[] = [];
   let index = haystack.indexOf(needle);
 
@@ -302,72 +261,49 @@ function scrollRangeIntoContainer(range: Range, container: HTMLElement) {
 
   const containerRect = scrollTarget.getBoundingClientRect();
   scrollTarget.scrollTo({
-    top:
-      scrollTarget.scrollTop +
-      target.top -
-      containerRect.top -
-      scrollTarget.clientHeight / 2,
-    left:
-      scrollTarget.scrollLeft +
-      target.left -
-      containerRect.left -
-      Math.min(80, scrollTarget.clientWidth / 4),
-    behavior: "smooth",
+    top: scrollTarget.scrollTop + target.top - containerRect.top - scrollTarget.clientHeight / 2,
+    left: scrollTarget.scrollLeft + target.left - containerRect.left - Math.min(80, scrollTarget.clientWidth / 4),
+    behavior: 'smooth',
   });
 }
 
 /** Walk up from `node` to find the nearest scrollable ancestor, stopping at
  *  `boundary`.  Falls back to `boundary` itself. */
-function findScrollableAncestor(
-  node: Node,
-  boundary: HTMLElement,
-): HTMLElement {
+function findScrollableAncestor(node: Node, boundary: HTMLElement): HTMLElement {
   let current: Node | null = node;
   while (current && current !== boundary) {
     if (current instanceof HTMLElement) {
       const { overflowY, overflowX } = getComputedStyle(current);
-      if (
-        overflowY === "auto" ||
-        overflowY === "scroll" ||
-        overflowX === "auto" ||
-        overflowX === "scroll"
-      ) {
+      if (overflowY === 'auto' || overflowY === 'scroll' || overflowX === 'auto' || overflowX === 'scroll') {
         return current;
       }
     }
     // Traverse up: if we hit a shadow root, jump out to the host element.
-    current =
-      current.parentNode instanceof ShadowRoot
-        ? current.parentNode.host
-        : current.parentNode;
+    current = current.parentNode instanceof ShadowRoot ? current.parentNode.host : current.parentNode;
   }
   return boundary;
 }
 
 // --- Mermaid ---
 
-mermaid.initialize({ startOnLoad: false, theme: "dark" });
+mermaid.initialize({ startOnLoad: false, theme: 'dark' });
 
-function getMermaidTheme(resolvedTheme: "dark" | "light"): string {
-  return resolvedTheme === "dark" ? "dark" : "default";
+function getMermaidTheme(resolvedTheme: 'dark' | 'light'): string {
+  return resolvedTheme === 'dark' ? 'dark' : 'default';
 }
 
 let mermaidCounter = 0;
 
 // --- Markdown code block component ---
 
-function MarkdownCodeBlock({
-  className,
-  children,
-  ...rest
-}: ComponentPropsWithoutRef<"code">) {
+function MarkdownCodeBlock({ className, children, ...rest }: ComponentPropsWithoutRef<'code'>) {
   const [copied, setCopied] = useState(false);
-  const [highlighted, setHighlighted] = useState("");
-  const [mermaidSvg, setMermaidSvg] = useState("");
+  const [highlighted, setHighlighted] = useState('');
+  const [mermaidSvg, setMermaidSvg] = useState('');
   const resolvedTheme = useResolvedTheme();
 
-  const lang = (className?.replace("language-", "") ?? "").toLowerCase();
-  const code = String(children).replace(/\n$/, "");
+  const lang = (className?.replace('language-', '') ?? '').toLowerCase();
+  const code = String(children).replace(/\n$/, '');
   const isInline = !className;
 
   const copy = useCallback(async () => {
@@ -379,15 +315,13 @@ function MarkdownCodeBlock({
   }, [code]);
 
   useEffect(() => {
-    if (isInline || lang === "mermaid") return;
+    if (isInline || lang === 'mermaid') return;
     let disposed = false;
     getHl().then((hl) => {
       if (disposed) return;
-      const resolved = (hl.getLoadedLanguages() as string[]).includes(
-        MD_LANG_MAP[lang] ?? lang,
-      )
+      const resolved = (hl.getLoadedLanguages() as string[]).includes(MD_LANG_MAP[lang] ?? lang)
         ? (MD_LANG_MAP[lang] ?? lang)
-        : "text";
+        : 'text';
       const html = hl.codeToHtml(code, {
         lang: resolved as BundledLanguage,
         theme: getShikiTheme(resolvedTheme),
@@ -400,7 +334,7 @@ function MarkdownCodeBlock({
   }, [code, lang, isInline, resolvedTheme]);
 
   useEffect(() => {
-    if (lang !== "mermaid") return;
+    if (lang !== 'mermaid') return;
     let disposed = false;
     mermaid.initialize({
       startOnLoad: false,
@@ -413,23 +347,15 @@ function MarkdownCodeBlock({
         if (!disposed) setMermaidSvg(svg);
       })
       .catch(() => {
-        if (!disposed)
-          setMermaidSvg(
-            `<p style="color:#e55;font-size:13px">Mermaid render error</p>`,
-          );
+        if (!disposed) setMermaidSvg(`<p style="color:#e55;font-size:13px">Mermaid render error</p>`);
       });
     return () => {
       disposed = true;
     };
   }, [code, lang, resolvedTheme]);
 
-  if (lang === "mermaid" && mermaidSvg) {
-    return (
-      <div
-        className="mermaid-container"
-        dangerouslySetInnerHTML={{ __html: mermaidSvg }}
-      />
-    );
+  if (lang === 'mermaid' && mermaidSvg) {
+    return <div className="mermaid-container" dangerouslySetInnerHTML={{ __html: mermaidSvg }} />;
   }
 
   if (isInline) {
@@ -439,13 +365,8 @@ function MarkdownCodeBlock({
   return (
     <div className="md-code-block">
       <div className="md-code-header">
-        <span className="md-code-lang">{lang || "text"}</span>
-        <button
-          type="button"
-          className="md-code-copy"
-          onClick={copy}
-          title="Copy code"
-        >
+        <span className="md-code-lang">{lang || 'text'}</span>
+        <button type="button" className="md-code-copy" onClick={copy} title="Copy code">
           {copied ? <Check size={13} /> : <Copy size={13} />}
         </button>
       </div>
@@ -463,10 +384,10 @@ function MarkdownCodeBlock({
 }
 
 const MarkdownComponents = {
-  code(props: ComponentPropsWithoutRef<"code">) {
+  code(props: ComponentPropsWithoutRef<'code'>) {
     return <MarkdownCodeBlock {...props} />;
   },
-  table(props: ComponentPropsWithoutRef<"table">) {
+  table(props: ComponentPropsWithoutRef<'table'>) {
     return (
       <div className="table-wrapper">
         <table {...props} />
@@ -478,13 +399,9 @@ const MarkdownComponents = {
 // --- Helpers ---
 
 /** Extract lines from file text by 1-based line numbers (inclusive). */
-function extractLines(
-  text: string,
-  startLine: number,
-  endLine: number,
-): string {
-  const lines = text.split("\n");
-  return lines.slice(startLine - 1, endLine).join("\n");
+function extractLines(text: string, startLine: number, endLine: number): string {
+  const lines = text.split('\n');
+  return lines.slice(startLine - 1, endLine).join('\n');
 }
 
 // --- Main component ---
@@ -494,39 +411,30 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
   const previewRef = useRef<HTMLDivElement>(null);
   const codeViewerRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const [fileText, setFileText] = useState("");
+  const [fileText, setFileText] = useState('');
   const [lineCount, setLineCount] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [markdownMode, setMarkdownMode] = useState<MarkdownMode>("rendered");
+  const [markdownMode, setMarkdownMode] = useState<MarkdownMode>('rendered');
   const [searchOpen, setSearchOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState('');
   const [searchRanges, setSearchRanges] = useState<Range[]>([]);
   const [activeMatchIndex, setActiveMatchIndex] = useState(0);
-  const [pendingSelection, setPendingSelection] =
-    useState<PendingCodeSelection | null>(null);
-  const [selectedRange, setSelectedRange] = useState<SelectedLineRange | null>(
-    null,
-  );
-  const [imageUrl, setImageUrl] = useState("");
-  const [imageViewMode, setImageViewMode] = useState<"preview" | "raw">(
-    "preview",
-  );
+  const [pendingSelection, setPendingSelection] = useState<PendingCodeSelection | null>(null);
+  const [selectedRange, setSelectedRange] = useState<SelectedLineRange | null>(null);
+  const [imageUrl, setImageUrl] = useState('');
+  const [imageViewMode, setImageViewMode] = useState<'preview' | 'raw'>('preview');
   const resolvedTheme = useResolvedTheme();
   const addToast = useAppStore((state) => state.addToast);
   const addContextFiles = useAppStore((state) => state.addContextFiles);
   const addCodeSelection = useAppStore((state) => state.addCodeSelection);
   const contextItems = useAppStore((state) => state.contextItems);
   const editorFontSize = useAppStore((state) => state.settings.editorFontSize);
-  const markdownFile = useMemo(
-    () => isMarkdownPath(tab.relPath),
-    [tab.relPath],
-  );
+  const markdownFile = useMemo(() => isMarkdownPath(tab.relPath), [tab.relPath]);
   const isImage = useMemo(() => isImageFile(tab.relPath), [tab.relPath]);
-  const showRenderedMarkdown = markdownFile && markdownMode === "rendered";
-  const showImagePreview = isImage && imageViewMode === "preview";
+  const showRenderedMarkdown = markdownFile && markdownMode === 'rendered';
+  const showImagePreview = isImage && imageViewMode === 'preview';
   // showCodeViewer is computed later but we need it for search; mirror the logic here.
-  const showCodeViewer =
-    !loading && !showImagePreview && !showRenderedMarkdown && fileText;
+  const showCodeViewer = !loading && !showImagePreview && !showRenderedMarkdown && fileText;
   const searchable = showRenderedMarkdown || !!showCodeViewer;
   const searchTargetRef = showRenderedMarkdown ? previewRef : codeViewerRef;
   const searchScrollRef = showRenderedMarkdown ? scrollRef : codeViewerRef;
@@ -534,17 +442,15 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
     searchQuery.trim() && searchRanges.length > 0
       ? `${(activeMatchIndex % searchRanges.length) + 1}/${searchRanges.length}`
       : searchQuery.trim()
-        ? "0/0"
-        : "";
+        ? '0/0'
+        : '';
 
   // Existing code selection comments for this file
   const fileComments = useMemo(
     () =>
       contextItems.filter(
         (item): item is CodeSelectionItem =>
-          item.type === "selection" &&
-          item.workspaceId === workspace.id &&
-          item.relPath === tab.relPath,
+          item.type === 'selection' && item.workspaceId === workspace.id && item.relPath === tab.relPath,
       ),
     [contextItems, workspace.id, tab.relPath],
   );
@@ -552,12 +458,12 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
   // --- File options for @pierre/diffs File component ---
   const fileOptions: FileOptions<AnnotationMeta> = useMemo(
     () => ({
-      theme: resolvedTheme === "dark" ? "pierre-dark" : "pierre-light",
+      theme: resolvedTheme === 'dark' ? 'pierre-dark' : 'pierre-light',
       themeType: resolvedTheme,
-      overflow: "scroll" as const,
+      overflow: 'scroll' as const,
       disableFileHeader: true,
       enableLineSelection: true,
-      lineHoverHighlight: "both" as const,
+      lineHoverHighlight: 'both' as const,
       unsafeCSS: SEARCH_HIGHLIGHT_CSS,
       onLineSelectionEnd: (range: SelectedLineRange | null) => {
         if (range) {
@@ -565,7 +471,7 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
           setPendingSelection({
             startLine: Math.min(range.start, range.end),
             endLine: Math.max(range.start, range.end),
-            note: "",
+            note: '',
           });
         }
       },
@@ -577,26 +483,20 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
   // Detect plain-text files (unrecognised extensions, dotfiles, etc.) so we
   // can avoid passing them to PierreFile which has an infinite-loop bug when
   // the computed language is "text".
-  const detectedLang = useMemo(
-    () => getFiletypeFromFileName(tab.relPath),
-    [tab.relPath],
-  );
-  const isPlainText = detectedLang === "text";
+  const detectedLang = useMemo(() => getFiletypeFromFileName(tab.relPath), [tab.relPath]);
+  const isPlainText = detectedLang === 'text';
 
-  const pierreFileData = useMemo(
-    () => ({ name: tab.relPath, contents: fileText }),
-    [tab.relPath, fileText],
-  );
+  const pierreFileData = useMemo(() => ({ name: tab.relPath, contents: fileText }), [tab.relPath, fileText]);
 
   // --- Load file ---
   useEffect(() => {
     let disposed = false;
     setLoading(true);
-    setFileText("");
+    setFileText('');
     setSearchRanges([]);
     setPendingSelection(null);
     setSelectedRange(null);
-    setImageUrl("");
+    setImageUrl('');
 
     if (isImage) {
       window.forgepad.fs
@@ -604,12 +504,7 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
         .then((dataUrl) => {
           if (!disposed) setImageUrl(dataUrl);
         })
-        .catch((error) =>
-          addToast(
-            "error",
-            error instanceof Error ? error.message : "Failed to load image.",
-          ),
-        )
+        .catch((error) => addToast('error', error instanceof Error ? error.message : 'Failed to load image.'))
         .finally(() => {
           if (!disposed) setLoading(false);
         });
@@ -620,14 +515,11 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
       .then((text) => {
         if (disposed) return;
         setFileText(text);
-        setLineCount(text.split("\n").length);
+        setLineCount(text.split('\n').length);
       })
       .catch((error) => {
         if (isImage) return;
-        addToast(
-          "error",
-          error instanceof Error ? error.message : "Failed to load file.",
-        );
+        addToast('error', error instanceof Error ? error.message : 'Failed to load file.');
       })
       .finally(() => {
         if (!disposed) setLoading(false);
@@ -639,11 +531,11 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
   }, [addToast, tab.relPath, workspace.worktreePath, isImage]);
 
   useEffect(() => {
-    setMarkdownMode("rendered");
+    setMarkdownMode('rendered');
     setPendingSelection(null);
     setSelectedRange(null);
-    setImageViewMode("preview");
-  }, [tab.relPath]);
+    setImageViewMode('preview');
+  }, []);
 
   useEffect(() => {
     if (showRenderedMarkdown) {
@@ -657,13 +549,7 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
   useLayoutEffect(() => {
     clearSearchHighlights();
 
-    if (
-      !searchOpen ||
-      loading ||
-      !searchTargetRef.current ||
-      !searchQuery.trim() ||
-      !searchable
-    ) {
+    if (!searchOpen || loading || !searchTargetRef.current || !searchQuery.trim() || !searchable) {
       setSearchRanges([]);
       return;
     }
@@ -671,7 +557,7 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
     setSearchRanges(buildSearchRanges(searchTargetRef.current, searchQuery));
 
     return clearSearchHighlights;
-  }, [fileText, loading, searchOpen, searchQuery, searchable]);
+  }, [loading, searchOpen, searchQuery, searchable, searchTargetRef.current]);
 
   useEffect(() => {
     setActiveMatchIndex((index) => {
@@ -687,22 +573,14 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
 
     const normalizedIndex = activeMatchIndex % searchRanges.length;
     const activeRange = searchRanges[normalizedIndex];
-    const passiveRanges = searchRanges.filter(
-      (_, index) => index !== normalizedIndex,
-    );
+    const passiveRanges = searchRanges.filter((_, index) => index !== normalizedIndex);
 
     if (passiveRanges.length > 0) {
-      support.registry.set(
-        SEARCH_HIGHLIGHT,
-        new support.HighlightCtor(...passiveRanges),
-      );
+      support.registry.set(SEARCH_HIGHLIGHT, new support.HighlightCtor(...passiveRanges));
     }
 
     if (activeRange) {
-      support.registry.set(
-        ACTIVE_SEARCH_HIGHLIGHT,
-        new support.HighlightCtor(activeRange),
-      );
+      support.registry.set(ACTIVE_SEARCH_HIGHLIGHT, new support.HighlightCtor(activeRange));
     }
 
     return clearSearchHighlights;
@@ -713,7 +591,7 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
     const activeRange = searchRanges[activeMatchIndex % searchRanges.length];
     const scrollContainer = searchScrollRef.current;
     if (scrollContainer) scrollRangeIntoContainer(activeRange, scrollContainer);
-  }, [activeMatchIndex, searchOpen, searchRanges]);
+  }, [activeMatchIndex, searchOpen, searchRanges, searchScrollRef.current]);
 
   const focusSearch = useCallback(() => {
     window.requestAnimationFrame(() => {
@@ -729,7 +607,7 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
 
   const closeSearch = useCallback(() => {
     setSearchOpen(false);
-    setSearchQuery("");
+    setSearchQuery('');
     setSearchRanges([]);
     clearSearchHighlights();
   }, []);
@@ -749,13 +627,13 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
       const key = event.key.toLowerCase();
       const mod = event.metaKey || event.ctrlKey;
 
-      if (mod && key === "f") {
+      if (mod && key === 'f') {
         event.preventDefault();
         openSearch();
         return;
       }
 
-      if (event.key === "Escape") {
+      if (event.key === 'Escape') {
         if (pendingSelection) {
           event.preventDefault();
           setPendingSelection(null);
@@ -772,42 +650,35 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
 
       if (!searchOpen) return;
 
-      if (
-        event.key === "Enter" &&
-        document.activeElement === searchInputRef.current
-      ) {
+      if (event.key === 'Enter' && document.activeElement === searchInputRef.current) {
         event.preventDefault();
         goToMatch(event.shiftKey ? -1 : 1);
         return;
       }
 
-      if (mod && key === "g") {
+      if (mod && key === 'g') {
         event.preventDefault();
         goToMatch(event.shiftKey ? -1 : 1);
       }
     };
 
-    window.addEventListener("keydown", handleKeyDown, true);
-    return () => window.removeEventListener("keydown", handleKeyDown, true);
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
   }, [closeSearch, goToMatch, openSearch, searchOpen, pendingSelection]);
 
   const copyContent = async () => {
     try {
       await navigator.clipboard.writeText(fileText);
-      addToast("success", "Copied to clipboard");
+      addToast('success', 'Copied to clipboard');
     } catch {
-      addToast("error", "Failed to copy");
+      addToast('error', 'Failed to copy');
     }
   };
 
   // --- Submit code selection comment ---
   const submitCodeSelection = useCallback(() => {
-    if (!pendingSelection || !pendingSelection.note.trim()) return;
-    const selectedText = extractLines(
-      fileText,
-      pendingSelection.startLine,
-      pendingSelection.endLine,
-    );
+    if (!pendingSelection?.note.trim()) return;
+    const selectedText = extractLines(fileText, pendingSelection.startLine, pendingSelection.endLine);
     addCodeSelection(
       workspace.id,
       tab.relPath,
@@ -820,15 +691,8 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
     );
     setSelectedRange(null);
     setPendingSelection(null);
-    addToast("success", "Saved code selection to context");
-  }, [
-    addCodeSelection,
-    addToast,
-    fileText,
-    pendingSelection,
-    tab.relPath,
-    workspace.id,
-  ]);
+    addToast('success', 'Saved code selection to context');
+  }, [addCodeSelection, addToast, fileText, pendingSelection, tab.relPath, workspace.id]);
 
   // --- Inline annotations: pending comment form + existing comments ---
   const lineAnnotations = useMemo(() => {
@@ -837,14 +701,14 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
     for (const comment of fileComments) {
       annotations.push({
         lineNumber: comment.endLine,
-        metadata: { kind: "comment", comment },
+        metadata: { kind: 'comment', comment },
       });
     }
     // Pending comment form → appears after the last selected line
     if (pendingSelection) {
       annotations.push({
         lineNumber: pendingSelection.endLine,
-        metadata: { kind: "pending" },
+        metadata: { kind: 'pending' },
       });
     }
     return annotations;
@@ -853,15 +717,13 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
   const renderAnnotation = useCallback(
     (annotation: LineAnnotation<AnnotationMeta>) => {
       const meta = annotation.metadata!;
-      if (meta.kind === "pending" && pendingSelection) {
+      if (meta.kind === 'pending' && pendingSelection) {
         return (
           <div className="m-2.5 rounded-lg border border-border bg-panel p-2.5">
-            <div className="mb-2 flex items-center gap-2 text-xs text-accent">
+            <div className="mb-2 flex items-center gap-2 text-accent text-xs">
               <MessageSquarePlus size={15} />
               Comment on L{pendingSelection.startLine}
-              {pendingSelection.endLine !== pendingSelection.startLine
-                ? `-L${pendingSelection.endLine}`
-                : ""}
+              {pendingSelection.endLine !== pendingSelection.startLine ? `-L${pendingSelection.endLine}` : ''}
             </div>
             <textarea
               className="w-full"
@@ -874,7 +736,7 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
               }
               placeholder="Add a note for the agent"
               onKeyDown={(event) => {
-                if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+                if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
                   event.preventDefault();
                   submitCodeSelection();
                 }
@@ -891,30 +753,22 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
               >
                 Cancel
               </button>
-              <button
-                className="primary-button"
-                type="button"
-                onClick={submitCodeSelection}
-              >
+              <button className="primary-button" type="button" onClick={submitCodeSelection}>
                 Add Comment
               </button>
             </div>
           </div>
         );
       }
-      if (meta.kind === "comment") {
+      if (meta.kind === 'comment') {
         const { comment } = meta;
         return (
           <div className="mx-2.5 my-1 grid gap-2 rounded-lg border border-border bg-surface-card p-[9px]">
             <strong className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[13px]">
               L{comment.startLine}
-              {comment.endLine !== comment.startLine
-                ? `-L${comment.endLine}`
-                : ""}
+              {comment.endLine !== comment.startLine ? `-L${comment.endLine}` : ''}
             </strong>
-            <p className="m-0 text-sm leading-relaxed text-muted">
-              {comment.text}
-            </p>
+            <p className="m-0 text-muted text-sm leading-relaxed">{comment.text}</p>
           </div>
         );
       }
@@ -926,9 +780,9 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
   return (
     <section className="absolute inset-0 flex min-h-0 min-w-0 flex-col bg-bg">
       {/* Toolbar */}
-      <div className="flex min-h-[42px] items-center justify-between gap-3 border-b border-border bg-panel px-3">
+      <div className="flex min-h-[42px] items-center justify-between gap-3 border-border border-b bg-panel px-3">
         <div
-          className="min-w-0 flex items-center gap-[7px] overflow-hidden text-ellipsis whitespace-nowrap text-[13px] font-[510]"
+          className="flex min-w-0 items-center gap-[7px] overflow-hidden text-ellipsis whitespace-nowrap font-[510] text-[13px]"
           title={tab.relPath}
         >
           <FileCode size={14} className="text-muted" />
@@ -937,82 +791,60 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
         </div>
         <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
           {isImage ? (
-            <div
-              className="view-mode-toggle"
-              role="radiogroup"
-              aria-label="Image view"
-            >
+            <div className="view-mode-toggle" role="radiogroup" aria-label="Image view">
               <button
-                className={`view-mode-btn ${imageViewMode === "preview" ? "active" : ""}`}
+                className={`view-mode-btn ${imageViewMode === 'preview' ? 'active' : ''}`}
                 type="button"
                 role="radio"
-                aria-checked={imageViewMode === "preview"}
+                aria-checked={imageViewMode === 'preview'}
                 title="Preview"
-                onClick={() => setImageViewMode("preview")}
+                onClick={() => setImageViewMode('preview')}
               >
                 <Image size={14} />
               </button>
               <button
-                className={`view-mode-btn ${imageViewMode === "raw" ? "active" : ""}`}
+                className={`view-mode-btn ${imageViewMode === 'raw' ? 'active' : ''}`}
                 type="button"
                 role="radio"
-                aria-checked={imageViewMode === "raw"}
+                aria-checked={imageViewMode === 'raw'}
                 title="Raw"
-                onClick={() => setImageViewMode("raw")}
+                onClick={() => setImageViewMode('raw')}
               >
                 <Code size={14} />
               </button>
             </div>
           ) : null}
           {markdownFile ? (
-            <div
-              className="segmented-control"
-              role="radiogroup"
-              aria-label="Markdown view"
-            >
+            <div className="segmented-control" role="radiogroup" aria-label="Markdown view">
               <button
                 type="button"
                 role="radio"
-                aria-checked={markdownMode === "rendered"}
-                className={markdownMode === "rendered" ? "active" : ""}
-                onClick={() => setMarkdownMode("rendered")}
+                aria-checked={markdownMode === 'rendered'}
+                className={markdownMode === 'rendered' ? 'active' : ''}
+                onClick={() => setMarkdownMode('rendered')}
               >
                 Rendered
               </button>
               <button
                 type="button"
                 role="radio"
-                aria-checked={markdownMode === "raw"}
-                className={markdownMode === "raw" ? "active" : ""}
-                onClick={() => setMarkdownMode("raw")}
+                aria-checked={markdownMode === 'raw'}
+                className={markdownMode === 'raw' ? 'active' : ''}
+                onClick={() => setMarkdownMode('raw')}
               >
                 Raw
               </button>
             </div>
           ) : null}
-          <button
-            className="secondary-button"
-            type="button"
-            onClick={() => addContextFiles(workspace.id, [tab.relPath])}
-          >
+          <button className="secondary-button" type="button" onClick={() => addContextFiles(workspace.id, [tab.relPath])}>
             Add Context
           </button>
           {searchable ? (
-            <button
-              className="icon-button"
-              type="button"
-              title="Search file"
-              onClick={openSearch}
-            >
+            <button className="icon-button" type="button" title="Search file" onClick={openSearch}>
               <Search size={16} />
             </button>
           ) : null}
-          <button
-            className="icon-button"
-            type="button"
-            title="Copy file"
-            onClick={copyContent}
-          >
+          <button className="icon-button" type="button" title="Copy file" onClick={copyContent}>
             <Copy size={16} />
           </button>
         </div>
@@ -1021,7 +853,7 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
       {/* Search bar */}
       {searchOpen && searchable ? (
         <form
-          className="flex min-h-[38px] items-center gap-2 border-b border-border bg-surface-card px-2.5 py-1"
+          className="flex min-h-[38px] items-center gap-2 border-border border-b bg-surface-card px-2.5 py-1"
           onSubmit={(event) => {
             event.preventDefault();
             goToMatch(1);
@@ -1037,9 +869,7 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
               setActiveMatchIndex(0);
             }}
           />
-          <span className="w-[54px] text-center text-xs tabular-nums text-muted">
-            {activeSearchLabel}
-          </span>
+          <span className="w-[54px] text-center text-muted text-xs tabular-nums">{activeSearchLabel}</span>
           <button
             className="icon-button"
             type="button"
@@ -1058,12 +888,7 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
           >
             <ChevronDown size={15} />
           </button>
-          <button
-            className="icon-button"
-            type="button"
-            title="Close search"
-            onClick={closeSearch}
-          >
+          <button className="icon-button" type="button" title="Close search" onClick={closeSearch}>
             <X size={15} />
           </button>
         </form>
@@ -1071,22 +896,13 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
 
       {/* Content area */}
       {loading ? (
-        <div className="grid min-h-[90px] place-items-center text-muted">
-          Loading file
-        </div>
+        <div className="grid min-h-[90px] place-items-center text-muted">Loading file</div>
       ) : showImagePreview && imageUrl ? (
-        <div className="flex flex-1 min-h-0 items-center justify-center overflow-auto bg-surface-inset p-6 scrollbar-thin scroll-mask">
-          <img
-            className="max-h-full max-w-full rounded object-contain"
-            src={imageUrl}
-            alt={tab.relPath}
-          />
+        <div className="scrollbar-thin scroll-mask flex min-h-0 flex-1 items-center justify-center overflow-auto bg-surface-inset p-6">
+          <img className="max-h-full max-w-full rounded object-contain" src={imageUrl} alt={tab.relPath} />
         </div>
       ) : showRenderedMarkdown ? (
-        <div
-          className="markdown-viewer-scroll flex-1 min-h-0 overflow-auto scrollbar-thin scroll-mask-y"
-          ref={scrollRef}
-        >
+        <div className="markdown-viewer-scroll scrollbar-thin scroll-mask-y min-h-0 flex-1 overflow-auto" ref={scrollRef}>
           <div ref={previewRef} className="markdown-preview">
             <ReactMarkdown
               remarkPlugins={[remarkGfm]}
@@ -1098,10 +914,7 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
           </div>
         </div>
       ) : (
-        <div
-          ref={codeViewerRef}
-          className="flex min-h-0 flex-1 flex-col overflow-auto scrollbar-thin scroll-mask"
-        >
+        <div ref={codeViewerRef} className="scrollbar-thin scroll-mask flex min-h-0 flex-1 flex-col overflow-auto">
           {/* Code viewer via @pierre/diffs File component */}
           {showCodeViewer ? (
             isPlainText ? (
@@ -1115,17 +928,12 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
               >
                 <table className="border-collapse">
                   <tbody>
-                    {fileText.split("\n").map((line, i) => (
+                    {fileText.split('\n').map((line, i) => (
                       <tr key={i}>
-                        <td
-                          className="select-none pr-4 text-right align-top text-subtle/50"
-                          style={{ minWidth: "3em" }}
-                        >
+                        <td className="select-none pr-4 text-right align-top text-subtle/50" style={{ minWidth: '3em' }}>
                           {i + 1}
                         </td>
-                        <td className="whitespace-pre-wrap break-all">
-                          {line || "\u00A0"}
-                        </td>
+                        <td className="whitespace-pre-wrap break-all">{line || '\u00A0'}</td>
                       </tr>
                     ))}
                   </tbody>

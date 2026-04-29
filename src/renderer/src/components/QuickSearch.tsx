@@ -1,8 +1,5 @@
-import {
-  getTabTitle,
-  useAppStore,
-  type SettingsSection,
-} from "@renderer/store/app-store";
+import { type KeyboardEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import { getTabTitle, type SettingsSection, useAppStore } from '@renderer/store/app-store';
 import {
   Bot,
   CornerDownLeft,
@@ -16,15 +13,7 @@ import {
   Settings,
   Terminal,
   TerminalSquare,
-} from "lucide-react";
-import {
-  type KeyboardEvent,
-  type ReactNode,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+} from 'lucide-react';
 
 type QuickSearchProps = {
   open: boolean;
@@ -45,7 +34,7 @@ function matches(item: QuickSearchItem, query: string): boolean {
 }
 
 export function QuickSearch({ open, onClose }: QuickSearchProps) {
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [filePaths, setFilePaths] = useState<string[]>([]);
   const listRef = useRef<HTMLDivElement>(null);
@@ -56,9 +45,7 @@ export function QuickSearch({ open, onClose }: QuickSearchProps) {
   const tabs = useAppStore((state) => state.tabs);
   const activeWorkspaceId = useAppStore((state) => state.activeWorkspaceId);
   const settings = useAppStore((state) => state.settings);
-  const activeWorkspace = workspaces.find(
-    (workspace) => workspace.id === activeWorkspaceId,
-  );
+  const activeWorkspace = workspaces.find((workspace) => workspace.id === activeWorkspaceId);
   const openProject = useAppStore((state) => state.openProject);
   const setActiveWorkspace = useAppStore((state) => state.setActiveWorkspace);
   const setActiveTab = useAppStore((state) => state.setActiveTab);
@@ -72,18 +59,16 @@ export function QuickSearch({ open, onClose }: QuickSearchProps) {
   const items = useMemo<QuickSearchItem[]>(() => {
     const next: QuickSearchItem[] = [
       {
-        id: "open-project",
-        label: "Open Project",
-        detail: "Repository",
+        id: 'open-project',
+        label: 'Open Project',
+        detail: 'Repository',
         icon: <FolderOpen size={16} />,
         run: () => void openProject(),
       },
     ];
 
     for (const project of projects) {
-      const projectWorkspaces = workspaces.filter(
-        (workspace) => workspace.projectId === project.id,
-      );
+      const projectWorkspaces = workspaces.filter((workspace) => workspace.projectId === project.id);
       for (const workspace of projectWorkspaces) {
         next.push({
           id: `workspace:${workspace.id}`,
@@ -97,7 +82,7 @@ export function QuickSearch({ open, onClose }: QuickSearchProps) {
 
     if (activeWorkspace) {
       for (const relPath of filePaths) {
-        const fileName = relPath.split("/").pop() ?? relPath;
+        const fileName = relPath.split('/').pop() ?? relPath;
         next.push({
           id: `file:${activeWorkspace.id}:${relPath}`,
           label: fileName,
@@ -114,12 +99,7 @@ export function QuickSearch({ open, onClose }: QuickSearchProps) {
         id: `tab:${tab.id}`,
         label: getTabTitle(tab),
         detail: workspace ? `${workspace.name} · ${tab.type}` : tab.type,
-        icon:
-          tab.type === "terminal" ? (
-            <TerminalSquare size={16} />
-          ) : (
-            <FileCode2 size={16} />
-          ),
+        icon: tab.type === 'terminal' ? <TerminalSquare size={16} /> : <FileCode2 size={16} />,
         run: () => {
           setActiveWorkspace(tab.workspaceId);
           setActiveTab(tab.id);
@@ -130,49 +110,42 @@ export function QuickSearch({ open, onClose }: QuickSearchProps) {
     if (activeWorkspaceId) {
       next.push(
         {
-          id: "new-terminal",
-          label: "New Terminal",
-          detail: "Active workspace",
+          id: 'new-terminal',
+          label: 'New Terminal',
+          detail: 'Active workspace',
           icon: <TerminalSquare size={16} />,
           run: () => void createTerminal(activeWorkspaceId),
         },
         {
-          id: "open-changes",
-          label: "Open Changes",
-          detail: "Diff tab",
+          id: 'open-changes',
+          label: 'Open Changes',
+          detail: 'Diff tab',
           icon: <GitCompare size={16} />,
           run: () => openDiffTab(activeWorkspaceId),
         },
         {
-          id: "panel-files",
-          label: "Files Panel",
-          detail: "Right panel",
+          id: 'panel-files',
+          label: 'Files Panel',
+          detail: 'Right panel',
           icon: <PanelRight size={16} />,
-          run: () => setRightPanelMode("files"),
+          run: () => setRightPanelMode('files'),
         },
         {
-          id: "panel-context",
-          label: "Context Panel",
-          detail: "Right panel",
+          id: 'panel-context',
+          label: 'Context Panel',
+          detail: 'Right panel',
           icon: <SendHorizontal size={16} />,
-          run: () => setRightPanelMode("context"),
+          run: () => setRightPanelMode('context'),
         },
       );
 
-      for (const preset of settings.agentPresets.filter(
-        (preset) => preset.enabled,
-      )) {
+      for (const preset of settings.agentPresets.filter((preset) => preset.enabled)) {
         next.push({
           id: `agent:${preset.id}`,
           label: `New ${preset.label}`,
           detail: preset.command,
           icon: <Bot size={16} />,
-          run: () =>
-            void createAgentTerminal(
-              activeWorkspaceId,
-              preset.command,
-              preset.id,
-            ),
+          run: () => void createAgentTerminal(activeWorkspaceId, preset.command, preset.id),
         });
       }
     }
@@ -185,33 +158,33 @@ export function QuickSearch({ open, onClose }: QuickSearchProps) {
       icon: ReactNode;
     }[] = [
       {
-        id: "settings:general",
-        section: "general",
-        label: "General",
+        id: 'settings:general',
+        section: 'general',
+        label: 'General',
         icon: <Paintbrush size={16} />,
       },
       {
-        id: "settings:agent",
-        section: "agent",
-        label: "Agent",
+        id: 'settings:agent',
+        section: 'agent',
+        label: 'Agent',
         icon: <Bot size={16} />,
       },
       {
-        id: "settings:terminal",
-        section: "terminal",
-        label: "Terminal",
+        id: 'settings:terminal',
+        section: 'terminal',
+        label: 'Terminal',
         icon: <Terminal size={16} />,
       },
       {
-        id: "settings:changes",
-        section: "changes",
-        label: "Changes",
+        id: 'settings:changes',
+        section: 'changes',
+        label: 'Changes',
         icon: <GitCompare size={16} />,
       },
       {
-        id: "settings:advanced",
-        section: "advanced",
-        label: "Advanced",
+        id: 'settings:advanced',
+        section: 'advanced',
+        label: 'Advanced',
         icon: <Settings size={16} />,
       },
     ];
@@ -219,7 +192,7 @@ export function QuickSearch({ open, onClose }: QuickSearchProps) {
       next.push({
         id: item.id,
         label: `Settings: ${item.label}`,
-        detail: "Settings",
+        detail: 'Settings',
         icon: item.icon,
         run: () => useAppStore.setState({ settingsOpen: item.section }),
       });
@@ -246,15 +219,13 @@ export function QuickSearch({ open, onClose }: QuickSearchProps) {
 
   const filteredItems = useMemo(() => {
     const trimmed = query.trim();
-    const result = trimmed
-      ? items.filter((item) => matches(item, trimmed))
-      : items;
+    const result = trimmed ? items.filter((item) => matches(item, trimmed)) : items;
     return result.slice(0, 12);
   }, [items, query]);
 
   useEffect(() => {
     if (!open) return;
-    setQuery("");
+    setQuery('');
     setSelectedIndex(0);
     window.setTimeout(() => inputRef.current?.focus(), 0);
   }, [open]);
@@ -274,10 +245,7 @@ export function QuickSearch({ open, onClose }: QuickSearchProps) {
       .catch((error) => {
         if (disposed) return;
         setFilePaths([]);
-        addToast(
-          "error",
-          error instanceof Error ? error.message : "Failed to search files.",
-        );
+        addToast('error', error instanceof Error ? error.message : 'Failed to search files.');
       });
 
     return () => {
@@ -287,14 +255,14 @@ export function QuickSearch({ open, onClose }: QuickSearchProps) {
 
   useEffect(() => {
     setSelectedIndex(0);
-  }, [query]);
+  }, []);
 
   // Scroll selected item into view
   useEffect(() => {
     const container = listRef.current;
     if (!container) return;
     const child = container.children[selectedIndex] as HTMLElement | undefined;
-    child?.scrollIntoView({ block: "nearest" });
+    child?.scrollIntoView({ block: 'nearest' });
   }, [selectedIndex]);
 
   if (!open) return null;
@@ -307,43 +275,34 @@ export function QuickSearch({ open, onClose }: QuickSearchProps) {
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
-    if (event.key === "Escape") {
+    if (event.key === 'Escape') {
       event.preventDefault();
       onClose();
       return;
     }
-    if (event.key === "ArrowDown") {
+    if (event.key === 'ArrowDown') {
       event.preventDefault();
-      setSelectedIndex((index) =>
-        filteredItems.length === 0 ? 0 : (index + 1) % filteredItems.length,
-      );
+      setSelectedIndex((index) => (filteredItems.length === 0 ? 0 : (index + 1) % filteredItems.length));
       return;
     }
-    if (event.key === "ArrowUp") {
+    if (event.key === 'ArrowUp') {
       event.preventDefault();
-      setSelectedIndex((index) =>
-        filteredItems.length === 0
-          ? 0
-          : (index - 1 + filteredItems.length) % filteredItems.length,
-      );
+      setSelectedIndex((index) => (filteredItems.length === 0 ? 0 : (index - 1 + filteredItems.length) % filteredItems.length));
       return;
     }
-    if (event.key === "Enter") {
+    if (event.key === 'Enter') {
       event.preventDefault();
       runSelected();
     }
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 grid place-items-start justify-center pt-[58px]"
-      onMouseDown={onClose}
-    >
+    <div className="fixed inset-0 z-50 grid place-items-start justify-center pt-[58px]" onMouseDown={onClose}>
       <div
         className="w-[min(680px,calc(100vw-32px))] overflow-hidden rounded-xl border border-border bg-surface-dialog shadow-[0_28px_70px_rgba(0,0,0,0.46)]"
         onMouseDown={(event) => event.stopPropagation()}
       >
-        <div className="flex h-12 items-center gap-3 border-b border-border px-4">
+        <div className="flex h-12 items-center gap-3 border-border border-b px-4">
           <Search size={18} className="text-muted" />
           <input
             ref={inputRef}
@@ -354,21 +313,14 @@ export function QuickSearch({ open, onClose }: QuickSearchProps) {
             onKeyDown={handleKeyDown}
           />
         </div>
-        <div
-          ref={listRef}
-          className="max-h-[360px] overflow-y-auto p-2 scrollbar-thin scroll-mask-y"
-        >
+        <div ref={listRef} className="scrollbar-thin scroll-mask-y max-h-[360px] overflow-y-auto p-2">
           {filteredItems.length === 0 ? (
-            <div className="grid h-24 place-items-center text-sm text-muted">
-              No results
-            </div>
+            <div className="grid h-24 place-items-center text-muted text-sm">No results</div>
           ) : (
             filteredItems.map((item, index) => (
               <button
                 className={`grid h-9 w-full grid-cols-[24px_minmax(120px,auto)_minmax(0,1fr)_18px] items-center gap-3 rounded-lg px-3 text-left transition-colors${
-                  index === selectedIndex
-                    ? " bg-panel-3 text-text"
-                    : " text-muted hover:bg-panel-2 hover:text-text"
+                  index === selectedIndex ? 'bg-panel-3 text-text' : 'text-muted hover:bg-panel-2 hover:text-text'
                 }`}
                 key={item.id}
                 type="button"
@@ -378,13 +330,9 @@ export function QuickSearch({ open, onClose }: QuickSearchProps) {
                   onClose();
                 }}
               >
-                <span className="grid size-6 place-items-center">
-                  {item.icon}
-                </span>
-                <span className="overflow-hidden text-ellipsis whitespace-nowrap text-[15px] font-[510]">
-                  {item.label}
-                </span>
-                <span className="max-w-[400px] overflow-hidden text-ellipsis whitespace-nowrap text-sm text-muted">
+                <span className="grid size-6 place-items-center">{item.icon}</span>
+                <span className="overflow-hidden text-ellipsis whitespace-nowrap font-[510] text-[15px]">{item.label}</span>
+                <span className="max-w-[400px] overflow-hidden text-ellipsis whitespace-nowrap text-muted text-sm">
                   {item.detail}
                 </span>
                 <CornerDownLeft size={15} className="text-subtle" />
