@@ -1,8 +1,8 @@
-import path from "node:path";
-import fs from "node:fs/promises";
-import os from "node:os";
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
 
-const MARKER = "__forgepad_managed__";
+const MARKER = '__forgepad_managed__';
 
 const NOTIFY_SCRIPT = `#!/usr/bin/env bash
 # ${MARKER} — DO NOT EDIT. Managed by ForgePad.
@@ -64,31 +64,15 @@ exit 0
 
 const HOOK_COMMAND = `[ -f "$HOME/.forgepad/hooks/notify.sh" ] && "$HOME/.forgepad/hooks/notify.sh" || true`;
 
-const CLAUDE_HOOK_EVENTS = [
-  "UserPromptSubmit",
-  "Stop",
-  "PermissionRequest",
-  "PreToolUse",
-];
+const CLAUDE_HOOK_EVENTS = ['UserPromptSubmit', 'Stop', 'PermissionRequest', 'PreToolUse'];
 
-type JsonValue =
-  | string
-  | number
-  | boolean
-  | null
-  | JsonValue[]
-  | { [key: string]: JsonValue };
+type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
 
 export class AgentHooksService {
   private notifyScriptPath: string;
 
   constructor() {
-    this.notifyScriptPath = path.join(
-      os.homedir(),
-      ".forgepad",
-      "hooks",
-      "notify.sh",
-    );
+    this.notifyScriptPath = path.join(os.homedir(), '.forgepad', 'hooks', 'notify.sh');
   }
 
   /** Call once at startup. Idempotent. */
@@ -105,15 +89,11 @@ export class AgentHooksService {
   }
 
   private async injectClaudeCodeHooks(): Promise<void> {
-    const configPath = path.join(os.homedir(), ".claude", "settings.json");
+    const configPath = path.join(os.homedir(), '.claude', 'settings.json');
     const config = await this.readJsonSafe(configPath);
 
     // Ensure hooks object
-    if (
-      !config.hooks ||
-      typeof config.hooks !== "object" ||
-      Array.isArray(config.hooks)
-    ) {
+    if (!config.hooks || typeof config.hooks !== 'object' || Array.isArray(config.hooks)) {
       config.hooks = {};
     }
 
@@ -131,20 +111,16 @@ export class AgentHooksService {
       // Check both old flat format { type, command } and new nested format { matcher, hooks: [...] }
       hooks[event] = eventHooks.filter((h) => {
         // Old flat format: { type, command }
-        if (typeof h.command === "string" && h.command.includes(MARKER))
-          return false;
+        if (typeof h.command === 'string' && h.command.includes(MARKER)) return false;
         // New nested format: { matcher, hooks: [{ type, command }] }
         if (Array.isArray(h.hooks)) {
           return !h.hooks.some(
             (inner) =>
-              typeof inner === "object" &&
+              typeof inner === 'object' &&
               inner !== null &&
-              "command" in inner &&
-              typeof (inner as Record<string, JsonValue>).command ===
-                "string" &&
-              ((inner as Record<string, JsonValue>).command as string).includes(
-                MARKER,
-              ),
+              'command' in inner &&
+              typeof (inner as Record<string, JsonValue>).command === 'string' &&
+              ((inner as Record<string, JsonValue>).command as string).includes(MARKER),
           );
         }
         return true;
@@ -153,10 +129,10 @@ export class AgentHooksService {
       // Add our hook entry using Claude Code's required format:
       // { matcher: "...", hooks: [{ type: "command", command: "..." }] }
       (hooks[event] as JsonValue[]).push({
-        matcher: "",
+        matcher: '',
         hooks: [
           {
-            type: "command",
+            type: 'command',
             command: `${HOOK_COMMAND} # ${MARKER}`,
           },
         ],
@@ -164,20 +140,14 @@ export class AgentHooksService {
     }
 
     await fs.mkdir(path.dirname(configPath), { recursive: true });
-    await fs.writeFile(configPath, JSON.stringify(config, null, 2) + "\n");
+    await fs.writeFile(configPath, `${JSON.stringify(config, null, 2)}\n`);
   }
 
-  private async readJsonSafe(
-    filePath: string,
-  ): Promise<Record<string, JsonValue>> {
+  private async readJsonSafe(filePath: string): Promise<Record<string, JsonValue>> {
     try {
-      const raw = await fs.readFile(filePath, "utf-8");
+      const raw = await fs.readFile(filePath, 'utf-8');
       const parsed: unknown = JSON.parse(raw);
-      if (
-        typeof parsed === "object" &&
-        parsed !== null &&
-        !Array.isArray(parsed)
-      ) {
+      if (typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed)) {
         return parsed as Record<string, JsonValue>;
       }
       return {};

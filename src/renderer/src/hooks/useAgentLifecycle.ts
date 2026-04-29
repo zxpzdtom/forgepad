@@ -1,5 +1,5 @@
-import { useEffect } from "react";
-import { useAppStore } from "@renderer/store/app-store";
+import { useEffect } from 'react';
+import { useAppStore } from '@renderer/store/app-store';
 
 /**
  * Subscribes to agent status updates and focus-tab events from the main process.
@@ -7,19 +7,13 @@ import { useAppStore } from "@renderer/store/app-store";
  */
 export function useAgentLifecycle(): void {
   useEffect(() => {
-    const removeStatusListener = window.forgepad.agent.onStatusUpdate(
-      (update) => {
-        useAppStore
-          .getState()
-          .handleAgentStatusUpdate(update.ptyId, update.status);
-      },
-    );
+    const removeStatusListener = window.forgepad.agent.onStatusUpdate((update) => {
+      useAppStore.getState().handleAgentStatusUpdate(update.ptyId, update.status);
+    });
 
     const removeFocusListener = window.forgepad.agent.onFocusTab((ptyId) => {
       const state = useAppStore.getState();
-      const tab = state.tabs.find(
-        (t) => t.type === "terminal" && t.ptyId === ptyId,
-      );
+      const tab = state.tabs.find((t) => t.type === 'terminal' && t.ptyId === ptyId);
       if (tab) {
         state.setActiveTab(tab.id);
         if (tab.workspaceId !== state.activeWorkspaceId) {
@@ -28,11 +22,9 @@ export function useAgentLifecycle(): void {
       }
     });
 
-    const removeRenameListener = window.forgepad.agent.onRenameTab(
-      ({ ptyId, title }) => {
-        useAppStore.getState().renameTab(ptyId, title);
-      },
-    );
+    const removeRenameListener = window.forgepad.agent.onRenameTab(({ ptyId, title }) => {
+      useAppStore.getState().renameTab(ptyId, title);
+    });
 
     return () => {
       removeStatusListener();

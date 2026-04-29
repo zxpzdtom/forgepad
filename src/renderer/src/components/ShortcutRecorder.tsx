@@ -1,43 +1,30 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { RotateCcw } from "lucide-react";
-import { useAppStore } from "@renderer/store/app-store";
-import {
-  comboFromEvent,
-  comboToDisplay,
-  comboToString,
-  findConflict,
-} from "@renderer/lib/shortcut-utils";
-import type { ShortcutActionId, ShortcutCombo } from "@shared/types";
-import { DEFAULT_SHORTCUTS, SHORTCUT_DEFINITIONS } from "@shared/types";
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { comboFromEvent, comboToDisplay, comboToString, findConflict } from '@renderer/lib/shortcut-utils';
+import { useAppStore } from '@renderer/store/app-store';
+import type { ShortcutActionId, ShortcutCombo } from '@shared/types';
+import { DEFAULT_SHORTCUTS, SHORTCUT_DEFINITIONS } from '@shared/types';
+import { RotateCcw } from 'lucide-react';
 
 interface ShortcutRecorderProps {
   actionId: ShortcutActionId;
   currentCombo: ShortcutCombo;
 }
 
-export function ShortcutRecorder({
-  actionId,
-  currentCombo,
-}: ShortcutRecorderProps) {
+export function ShortcutRecorder({ actionId, currentCombo }: ShortcutRecorderProps) {
   const [recording, setRecording] = useState(false);
   const [pendingCombo, setPendingCombo] = useState<ShortcutCombo | null>(null);
   const [conflict, setConflict] = useState<string | null>(null);
   const ref = useRef<HTMLDivElement>(null);
   const keyboardShortcuts = useAppStore((s) => s.settings.keyboardShortcuts);
   const shortcuts = useMemo(
-    () =>
-      ({ ...DEFAULT_SHORTCUTS, ...(keyboardShortcuts ?? {}) }) as Record<
-        ShortcutActionId,
-        ShortcutCombo
-      >,
+    () => ({ ...DEFAULT_SHORTCUTS, ...(keyboardShortcuts ?? {}) }) as Record<ShortcutActionId, ShortcutCombo>,
     [keyboardShortcuts],
   );
   const updateShortcut = useAppStore((s) => s.updateShortcut);
   const resetShortcut = useAppStore((s) => s.resetShortcut);
 
   const defaultCombo = DEFAULT_SHORTCUTS[actionId];
-  const isModified =
-    comboToString(currentCombo) !== comboToString(defaultCombo);
+  const isModified = comboToString(currentCombo) !== comboToString(defaultCombo);
 
   useEffect(() => {
     if (!recording) return;
@@ -46,7 +33,7 @@ export function ShortcutRecorder({
       e.preventDefault();
       e.stopPropagation();
 
-      if (e.key === "Escape") {
+      if (e.key === 'Escape') {
         setRecording(false);
         setPendingCombo(null);
         setConflict(null);
@@ -70,8 +57,8 @@ export function ShortcutRecorder({
     };
 
     // Capture phase — intercepts before App.tsx global handler
-    window.addEventListener("keydown", handleKeyDown, true);
-    return () => window.removeEventListener("keydown", handleKeyDown, true);
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
   }, [recording, shortcuts, actionId, updateShortcut]);
 
   // Click-outside to cancel
@@ -84,8 +71,8 @@ export function ShortcutRecorder({
         setConflict(null);
       }
     };
-    window.addEventListener("mousedown", handleClick);
-    return () => window.removeEventListener("mousedown", handleClick);
+    window.addEventListener('mousedown', handleClick);
+    return () => window.removeEventListener('mousedown', handleClick);
   }, [recording]);
 
   const handleConfirmConflict = () => {
@@ -121,11 +108,7 @@ export function ShortcutRecorder({
           >
             Assign
           </button>
-          <button
-            type="button"
-            onClick={handleTryAnother}
-            className="underline decoration-zinc-500 hover:text-zinc-300"
-          >
+          <button type="button" onClick={handleTryAnother} className="underline decoration-zinc-500 hover:text-zinc-300">
             Retry
           </button>
         </div>
@@ -153,17 +136,13 @@ export function ShortcutRecorder({
         }}
         className={`inline-flex min-w-[60px] items-center justify-center rounded-md border px-2.5 py-1 font-mono text-[11px] transition-all ${
           recording
-            ? "border-accent bg-accent/10 text-accent"
+            ? 'border-accent bg-accent/10 text-accent'
             : `border-border bg-panel-2 text-muted hover:border-zinc-500 hover:text-text ${
-                isModified ? "ring-1 ring-accent/20" : ""
+                isModified ? 'ring-1 ring-accent/20' : ''
               }`
         }`}
       >
-        {recording
-          ? pendingCombo
-            ? comboToDisplay(pendingCombo)
-            : "Type shortcut\u2026"
-          : comboToDisplay(currentCombo)}
+        {recording ? (pendingCombo ? comboToDisplay(pendingCombo) : 'Type shortcut\u2026') : comboToDisplay(currentCombo)}
       </button>
     </div>
   );

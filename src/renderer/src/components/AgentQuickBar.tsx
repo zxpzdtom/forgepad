@@ -1,12 +1,13 @@
-import { useState } from "react";
-import { Bot, Play, TerminalSquare } from "lucide-react";
-import { useAppStore } from "@renderer/store/app-store";
-import { agentPresetIcon } from "./AgentIcons";
-import { RunSetupDialog } from "./RunSetupDialog";
-import type { AgentPreset } from "@shared/types";
+import { useState } from 'react';
+import { useAppStore } from '@renderer/store/app-store';
+import type { AgentPreset } from '@shared/types';
+import { Bot, Play, TerminalSquare } from 'lucide-react';
+
+import { agentPresetIcon } from './AgentIcons';
+import { RunSetupDialog } from './RunSetupDialog';
 
 function shortPresetLabel(label: string): string {
-  return label.replace(/\s+code$/i, "").trim();
+  return label.replace(/\s+code$/i, '').trim();
 }
 
 function presetIcon(preset: AgentPreset) {
@@ -23,16 +24,11 @@ export function AgentQuickBar() {
   const settings = useAppStore((state) => state.settings);
   const updateSettings = useAppStore((state) => state.updateSettings);
 
-  const enabledPresets = settings.agentPresets.filter(
-    (preset) => preset.enabled,
-  );
+  const enabledPresets = settings.agentPresets.filter((preset) => preset.enabled);
 
   const handleRun = () => {
     if (settings.runCommand?.trim()) {
-      void createTerminal(
-        activeWorkspaceId ?? undefined,
-        settings.runCommand.trim(),
-      );
+      void createTerminal(activeWorkspaceId ?? undefined, settings.runCommand.trim());
     } else {
       setRunSetupOpen(true);
     }
@@ -61,14 +57,14 @@ export function AgentQuickBar() {
 
   return (
     <>
-      <div className="agent-quickbar flex h-9 shrink-0 items-center gap-1.5 border-b border-border bg-surface-toolbar px-3">
-        <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto scrollbar-none scroll-mask-x">
+      <div className="agent-quickbar flex h-9 shrink-0 items-center gap-1.5 border-border border-b bg-surface-toolbar px-3">
+        <div className="scrollbar-none scroll-mask-x flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto">
           {enabledPresets.map((preset) => (
             <button
               className={`flex h-7 shrink-0 items-center gap-1.5 rounded-md border px-2.5 text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-45${
                 preset.command === settings.defaultAgentCommand
-                  ? " border-accent/45 bg-accent-surface text-text"
-                  : " border-transparent bg-transparent text-muted hover:bg-panel-2 hover:text-text"
+                  ? 'border-accent/45 bg-accent-surface text-text'
+                  : 'border-transparent bg-transparent text-muted hover:bg-panel-2 hover:text-text'
               }`}
               key={preset.id}
               type="button"
@@ -76,11 +72,7 @@ export function AgentQuickBar() {
               disabled={!activeWorkspaceId}
               onClick={() => {
                 updateSettings({ defaultAgentCommand: preset.command });
-                void createAgentTerminal(
-                  activeWorkspaceId ?? undefined,
-                  preset.command,
-                  preset.id,
-                );
+                void createAgentTerminal(activeWorkspaceId ?? undefined, preset.command, preset.id);
               }}
             >
               {presetIcon(preset)}
@@ -92,11 +84,7 @@ export function AgentQuickBar() {
         <button
           className="secondary-button min-h-7"
           type="button"
-          title={
-            settings.runCommand?.trim()
-              ? `运行: ${settings.runCommand}\n右键点击编辑`
-              : "配置并运行项目"
-          }
+          title={settings.runCommand?.trim() ? `运行: ${settings.runCommand}\n右键点击编辑` : '配置并运行项目'}
           disabled={!activeWorkspaceId}
           onClick={handleRun}
           onContextMenu={handleRunEdit}
@@ -120,9 +108,7 @@ export function AgentQuickBar() {
           initialCommand={settings.runCommand}
           onSave={handleRunSetupSave}
           onSaveOnly={handleRunSetupSaveOnly}
-          onClear={
-            settings.runCommand?.trim() ? handleRunSetupClear : undefined
-          }
+          onClear={settings.runCommand?.trim() ? handleRunSetupClear : undefined}
           onClose={() => setRunSetupOpen(false)}
         />
       )}

@@ -1,9 +1,9 @@
-import http from "node:http";
-import { URL } from "node:url";
-import { BrowserWindow, Notification } from "electron";
-import { IPC } from "@shared/ipc";
-import { mapEventToStatus } from "@shared/agent-lifecycle";
-import type { AgentStatus, AgentStatusUpdate } from "@shared/agent-lifecycle";
+import http from 'node:http';
+import { URL } from 'node:url';
+import type { AgentStatus, AgentStatusUpdate } from '@shared/agent-lifecycle';
+import { mapEventToStatus } from '@shared/agent-lifecycle';
+import { IPC } from '@shared/ipc';
+import { BrowserWindow, Notification } from 'electron';
 
 export class HookServer {
   private server: http.Server | null = null;
@@ -19,14 +19,14 @@ export class HookServer {
         void this.handleRequest(req, res);
       });
 
-      this.server.listen(0, "127.0.0.1", () => {
+      this.server.listen(0, '127.0.0.1', () => {
         const addr = this.server!.address();
-        this._port = typeof addr === "object" && addr ? addr.port : 0;
+        this._port = typeof addr === 'object' && addr ? addr.port : 0;
         console.log(`[HookServer] listening on 127.0.0.1:${this._port}`);
         resolve(this._port);
       });
 
-      this.server.on("error", reject);
+      this.server.on('error', reject);
     });
   }
 
@@ -40,20 +40,17 @@ export class HookServer {
     });
   }
 
-  private async handleRequest(
-    req: http.IncomingMessage,
-    res: http.ServerResponse,
-  ): Promise<void> {
+  private async handleRequest(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
     try {
-      const url = new URL(req.url ?? "/", "http://127.0.0.1");
+      const url = new URL(req.url ?? '/', 'http://127.0.0.1');
 
-      if (url.pathname === "/hook/notify") {
-        const eventType = url.searchParams.get("eventType") ?? "";
-        const ptyId = url.searchParams.get("ptyId") ?? "";
+      if (url.pathname === '/hook/notify') {
+        const eventType = url.searchParams.get('eventType') ?? '';
+        const ptyId = url.searchParams.get('ptyId') ?? '';
 
         if (!ptyId || !eventType) {
           res.writeHead(400);
-          res.end("missing params");
+          res.end('missing params');
           return;
         }
 
@@ -63,12 +60,12 @@ export class HookServer {
         }
 
         // For UserPromptSubmit: read prompt from POST body, generate tab title
-        if (eventType === "UserPromptSubmit" && req.method === "POST") {
+        if (eventType === 'UserPromptSubmit' && req.method === 'POST') {
           const body = await this.readBody(req);
-          let prompt = "";
+          let prompt = '';
           try {
             const json = JSON.parse(body) as Record<string, unknown>;
-            if (typeof json.prompt === "string") prompt = json.prompt;
+            if (typeof json.prompt === 'string') prompt = json.prompt;
           } catch {
             // ignore parse errors
           }
@@ -76,11 +73,11 @@ export class HookServer {
           if (prompt) {
             const title = this.generateTitle(prompt);
             this.broadcastRenameTab(ptyId, title);
-            res.writeHead(200, { "Content-Type": "application/json" });
+            res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(
               JSON.stringify({
                 hookSpecificOutput: {
-                  hookEventName: "UserPromptSubmit",
+                  hookEventName: 'UserPromptSubmit',
                   sessionTitle: title,
                 },
               }),
@@ -90,40 +87,40 @@ export class HookServer {
         }
 
         res.writeHead(200);
-        res.end("ok");
+        res.end('ok');
         return;
       }
 
-      if (url.pathname === "/health") {
+      if (url.pathname === '/health') {
         res.writeHead(200);
-        res.end("ok");
+        res.end('ok');
         return;
       }
 
       res.writeHead(404);
-      res.end("not found");
+      res.end('not found');
     } catch (error) {
-      console.error("[HookServer] error:", error);
+      console.error('[HookServer] error:', error);
       res.writeHead(500);
-      res.end("error");
+      res.end('error');
     }
   }
 
   private readBody(req: http.IncomingMessage): Promise<string> {
     return new Promise((resolve) => {
       const chunks: Buffer[] = [];
-      req.on("data", (chunk: Buffer) => chunks.push(chunk));
-      req.on("end", () => resolve(Buffer.concat(chunks).toString("utf-8")));
-      req.on("error", () => resolve(""));
+      req.on('data', (chunk: Buffer) => chunks.push(chunk));
+      req.on('end', () => resolve(Buffer.concat(chunks).toString('utf-8')));
+      req.on('error', () => resolve(''));
     });
   }
 
   private generateTitle(prompt: string): string {
-    const cleaned = prompt.trim().replace(/\s+/g, " ");
+    const cleaned = prompt.trim().replace(/\s+/g, ' ');
     if (cleaned.length <= 30) return cleaned;
     const truncated = cleaned.slice(0, 30);
-    const lastSpace = truncated.lastIndexOf(" ");
-    return (lastSpace > 10 ? truncated.slice(0, lastSpace) : truncated) + "…";
+    const lastSpace = truncated.lastIndexOf(' ');
+    return `${lastSpace > 10 ? truncated.slice(0, lastSpace) : truncated}…`;
   }
 
   private broadcastRenameTab(ptyId: string, title: string): void {
@@ -145,20 +142,17 @@ export class HookServer {
   }
 
   private showNotification(ptyId: string, status: AgentStatus): void {
-    if (status !== "review" && status !== "permission") return;
+    if (status !== 'review' && status !== 'permission') return;
 
     // Skip notification if the app window is focused
     const focusedWin = BrowserWindow.getFocusedWindow();
     if (focusedWin) return;
 
-    const title = status === "review" ? "Agent completed" : "Agent needs input";
-    const body =
-      status === "review"
-        ? "The agent has finished its task."
-        : "The agent is waiting for your approval.";
+    const title = status === 'review' ? 'Agent completed' : 'Agent needs input';
+    const body = status === 'review' ? 'The agent has finished its task.' : 'The agent is waiting for your approval.';
 
     const notification = new Notification({ title, body });
-    notification.on("click", () => {
+    notification.on('click', () => {
       // Focus the main window and tell the renderer to switch to this agent tab
       const win = BrowserWindow.getAllWindows()[0];
       if (win) {

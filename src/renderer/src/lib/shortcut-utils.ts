@@ -1,4 +1,4 @@
-import type { ShortcutActionId, ShortcutCombo } from "@shared/types";
+import type { ShortcutActionId, ShortcutCombo } from '@shared/types';
 
 /**
  * Serialize a combo to a stable string key for comparison/dedup.
@@ -6,26 +6,26 @@ import type { ShortcutActionId, ShortcutCombo } from "@shared/types";
  */
 export function comboToString(combo: ShortcutCombo): string {
   const parts: string[] = [];
-  if (combo.ctrl) parts.push("ctrl");
-  if (combo.alt) parts.push("alt");
-  if (combo.shift) parts.push("shift");
-  if (combo.meta) parts.push("meta");
+  if (combo.ctrl) parts.push('ctrl');
+  if (combo.alt) parts.push('alt');
+  if (combo.shift) parts.push('shift');
+  if (combo.meta) parts.push('meta');
   parts.push(combo.key.toLowerCase());
-  return parts.join("+");
+  return parts.join('+');
 }
 
 const KEY_DISPLAY: Record<string, string> = {
-  tab: "Tab",
-  enter: "Return",
-  backspace: "Delete",
-  delete: "Fn Delete",
-  escape: "Esc",
-  arrowup: "\u2191",
-  arrowdown: "\u2193",
-  arrowleft: "\u2190",
-  arrowright: "\u2192",
-  " ": "Space",
-  ",": ",",
+  tab: 'Tab',
+  enter: 'Return',
+  backspace: 'Delete',
+  delete: 'Fn Delete',
+  escape: 'Esc',
+  arrowup: '\u2191',
+  arrowdown: '\u2193',
+  arrowleft: '\u2190',
+  arrowright: '\u2192',
+  ' ': 'Space',
+  ',': ',',
 };
 
 /**
@@ -34,16 +34,15 @@ const KEY_DISPLAY: Record<string, string> = {
  */
 export function comboToDisplay(combo: ShortcutCombo): string {
   const parts: string[] = [];
-  if (combo.ctrl) parts.push("\u2303");
-  if (combo.alt) parts.push("\u2325");
-  if (combo.shift) parts.push("\u21E7");
-  if (combo.meta) parts.push("\u2318");
+  if (combo.ctrl) parts.push('\u2303');
+  if (combo.alt) parts.push('\u2325');
+  if (combo.shift) parts.push('\u21E7');
+  if (combo.meta) parts.push('\u2318');
 
-  const displayKey =
-    KEY_DISPLAY[combo.key.toLowerCase()] ?? combo.key.toUpperCase();
+  const displayKey = KEY_DISPLAY[combo.key.toLowerCase()] ?? combo.key.toUpperCase();
   parts.push(displayKey);
 
-  return parts.join("");
+  return parts.join('');
 }
 
 /**
@@ -54,18 +53,17 @@ export function comboToParts(combo: ShortcutCombo): {
   key: string;
 } {
   const mods: string[] = [];
-  if (combo.ctrl) mods.push("\u2303");
-  if (combo.alt) mods.push("\u2325");
-  if (combo.shift) mods.push("\u21E7");
-  if (combo.meta) mods.push("\u2318");
+  if (combo.ctrl) mods.push('\u2303');
+  if (combo.alt) mods.push('\u2325');
+  if (combo.shift) mods.push('\u21E7');
+  if (combo.meta) mods.push('\u2318');
 
-  const displayKey =
-    KEY_DISPLAY[combo.key.toLowerCase()] ?? combo.key.toUpperCase();
+  const displayKey = KEY_DISPLAY[combo.key.toLowerCase()] ?? combo.key.toUpperCase();
 
-  return { modifiers: mods.join(""), key: displayKey };
+  return { modifiers: mods.join(''), key: displayKey };
 }
 
-const MODIFIER_KEYS = new Set(["Meta", "Control", "Shift", "Alt"]);
+const MODIFIER_KEYS = new Set(['Meta', 'Control', 'Shift', 'Alt']);
 
 /**
  * Extract a ShortcutCombo from a live KeyboardEvent.
@@ -86,10 +84,7 @@ export function comboFromEvent(e: KeyboardEvent): ShortcutCombo | null {
 /**
  * Check if a KeyboardEvent matches a ShortcutCombo.
  */
-export function eventMatchesCombo(
-  e: KeyboardEvent,
-  combo: ShortcutCombo,
-): boolean {
+export function eventMatchesCombo(e: KeyboardEvent, combo: ShortcutCombo): boolean {
   return (
     e.metaKey === combo.meta &&
     e.ctrlKey === combo.ctrl &&

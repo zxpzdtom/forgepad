@@ -1,20 +1,14 @@
-export type GitStatusKind =
-  | "modified"
-  | "added"
-  | "deleted"
-  | "renamed"
-  | "untracked"
-  | "conflicted";
+export type GitStatusKind = 'modified' | 'added' | 'deleted' | 'renamed' | 'untracked' | 'conflicted';
 
-export type GitBucket = "staged" | "unstaged" | "untracked";
+export type GitBucket = 'staged' | 'unstaged' | 'untracked';
 
-export type RightPanelMode = "files" | "changes" | "context";
+export type RightPanelMode = 'files' | 'changes' | 'context';
 
 export type Tab =
   | {
       id: string;
       workspaceId: string;
-      type: "terminal";
+      type: 'terminal';
       title: string;
       ptyId: string;
       isAgent?: boolean;
@@ -28,15 +22,15 @@ export type Tab =
   | {
       id: string;
       workspaceId: string;
-      type: "file";
+      type: 'file';
       relPath: string;
       unsaved?: boolean;
     }
-  | { id: string; workspaceId: string; type: "diff"; activePath?: string }
+  | { id: string; workspaceId: string; type: 'diff'; activePath?: string }
   | {
       id: string;
       workspaceId: string;
-      type: "context-preview";
+      type: 'context-preview';
       bundleId?: string;
     };
 
@@ -60,7 +54,7 @@ export type Workspace = {
   createdAt: number;
 };
 
-export type TaskStatus = "backlog" | "ready" | "running" | "review" | "done";
+export type TaskStatus = 'backlog' | 'ready' | 'running' | 'review' | 'done';
 
 export type Task = {
   id: string;
@@ -76,9 +70,9 @@ export type Task = {
 export type FileNode = {
   name: string;
   path: string;
-  type: "file" | "directory";
+  type: 'file' | 'directory';
   children?: FileNode[];
-  gitStatus?: Exclude<GitStatusKind, "conflicted">;
+  gitStatus?: Exclude<GitStatusKind, 'conflicted'>;
 };
 
 export type FileStatus = {
@@ -107,7 +101,7 @@ export type DiffFileData = {
 
 export type ContextFileItem = {
   id: string;
-  type: "file";
+  type: 'file';
   workspaceId: string;
   relPath: string;
   note?: string;
@@ -117,7 +111,7 @@ export type ContextFileItem = {
 
 export type ContextDiffItem = {
   id: string;
-  type: "diff";
+  type: 'diff';
   workspaceId: string;
   relPath: string;
   bucket: GitBucket;
@@ -128,7 +122,7 @@ export type ContextDiffItem = {
 
 export type ContextTaskItem = {
   id: string;
-  type: "task";
+  type: 'task';
   workspaceId: string;
   taskId: string;
   title: string;
@@ -140,12 +134,12 @@ export type ContextTaskItem = {
 
 export type DiffCommentItem = {
   id: string;
-  type: "comment";
+  type: 'comment';
   workspaceId: string;
   relPath: string;
   bucket: GitBucket;
-  side: "additions" | "deletions";
-  endSide?: "additions" | "deletions";
+  side: 'additions' | 'deletions';
+  endSide?: 'additions' | 'deletions';
   startLine: number;
   endLine: number;
   text: string;
@@ -154,7 +148,7 @@ export type DiffCommentItem = {
 
 export type CodeSelectionItem = {
   id: string;
-  type: "selection";
+  type: 'selection';
   workspaceId: string;
   relPath: string;
   startLine: number;
@@ -164,12 +158,7 @@ export type CodeSelectionItem = {
   addedAt: number;
 };
 
-export type ContextItem =
-  | ContextFileItem
-  | ContextDiffItem
-  | ContextTaskItem
-  | DiffCommentItem
-  | CodeSelectionItem;
+export type ContextItem = ContextFileItem | ContextDiffItem | ContextTaskItem | DiffCommentItem | CodeSelectionItem;
 
 export type ContextBundleResult = {
   id: string;
@@ -199,13 +188,13 @@ export type PersistedAppState = {
   settings: AppSettings;
 };
 
-export type ThemePreference = "dark" | "light" | "system";
-export type TerminalThemeMode = "follow" | "dark" | "light";
+export type ThemePreference = 'dark' | 'light' | 'system';
+export type TerminalThemeMode = 'follow' | 'dark' | 'light';
 
-export type DiffViewStyle = "split" | "unified";
-export type DiffIndicators = "classic" | "bars" | "none";
-export type DiffLineDiffType = "word-alt" | "word" | "char" | "none";
-export type DiffOverflow = "scroll" | "wrap";
+export type DiffViewStyle = 'split' | 'unified';
+export type DiffIndicators = 'classic' | 'bars' | 'none';
+export type DiffLineDiffType = 'word-alt' | 'word' | 'char' | 'none';
+export type DiffOverflow = 'scroll' | 'wrap';
 
 export type AgentPreset = {
   id: string;
@@ -221,59 +210,59 @@ export type AgentPreset = {
 
 export const DEFAULT_AGENT_PRESETS: AgentPreset[] = [
   {
-    id: "claude",
-    label: "Claude Code",
-    command: "claude --permission-mode acceptEdits",
+    id: 'claude',
+    label: 'Claude Code',
+    command: 'claude --permission-mode acceptEdits',
     enabled: true,
     builtIn: true,
-    sessionTemplate: "--session-id {sessionId}",
-    restoreTemplate: "claude --resume {sessionId}",
+    sessionTemplate: '--session-id {sessionId}',
+    restoreTemplate: 'claude --resume {sessionId}',
   },
   {
-    id: "codex",
-    label: "Codex",
-    command: "codex",
+    id: 'codex',
+    label: 'Codex',
+    command: 'codex',
     enabled: true,
     builtIn: true,
-    restoreTemplate: "codex resume {sessionId}",
+    restoreTemplate: 'codex resume {sessionId}',
   },
   {
-    id: "gemini",
-    label: "Gemini",
-    command: "gemini --approval-mode=auto_edit",
+    id: 'gemini',
+    label: 'Gemini',
+    command: 'gemini --approval-mode=auto_edit',
     enabled: true,
     builtIn: true,
-    restoreTemplate: "gemini --resume {sessionId}",
+    restoreTemplate: 'gemini --resume {sessionId}',
   },
 ];
 
 /* ─── Keyboard Shortcuts ─── */
 
 export type ShortcutActionId =
-  | "quickSearch"
-  | "toggleSettings"
-  | "cycleTabForward"
-  | "cycleTabBackward"
-  | "switchTab1"
-  | "switchTab2"
-  | "switchTab3"
-  | "switchTab4"
-  | "switchTab5"
-  | "switchTab6"
-  | "switchTab7"
-  | "switchTab8"
-  | "switchTab9"
-  | "newTerminal"
-  | "newAgent"
-  | "closeTab"
-  | "toggleTerminal"
-  | "toggleSidebar"
-  | "toggleRightPanel"
-  | "openRightPanelFiles"
-  | "openRightPanelChanges"
-  | "openRightPanelContext"
-  | "copyPath"
-  | "copyRelativePath";
+  | 'quickSearch'
+  | 'toggleSettings'
+  | 'cycleTabForward'
+  | 'cycleTabBackward'
+  | 'switchTab1'
+  | 'switchTab2'
+  | 'switchTab3'
+  | 'switchTab4'
+  | 'switchTab5'
+  | 'switchTab6'
+  | 'switchTab7'
+  | 'switchTab8'
+  | 'switchTab9'
+  | 'newTerminal'
+  | 'newAgent'
+  | 'closeTab'
+  | 'toggleTerminal'
+  | 'toggleSidebar'
+  | 'toggleRightPanel'
+  | 'openRightPanelFiles'
+  | 'openRightPanelChanges'
+  | 'openRightPanelContext'
+  | 'copyPath'
+  | 'copyRelativePath';
 
 export type ShortcutCombo = {
   meta: boolean;
@@ -284,14 +273,9 @@ export type ShortcutCombo = {
   key: string;
 };
 
-export type KeyboardShortcuts = Partial<
-  Record<ShortcutActionId, ShortcutCombo>
->;
+export type KeyboardShortcuts = Partial<Record<ShortcutActionId, ShortcutCombo>>;
 
-const combo = (
-  key: string,
-  mods: { meta?: boolean; ctrl?: boolean; shift?: boolean; alt?: boolean } = {},
-): ShortcutCombo => ({
+const combo = (key: string, mods: { meta?: boolean; ctrl?: boolean; shift?: boolean; alt?: boolean } = {}): ShortcutCombo => ({
   meta: mods.meta ?? false,
   ctrl: mods.ctrl ?? false,
   shift: mods.shift ?? false,
@@ -300,33 +284,33 @@ const combo = (
 });
 
 export const DEFAULT_SHORTCUTS: Record<ShortcutActionId, ShortcutCombo> = {
-  quickSearch: combo("p", { meta: true }),
-  toggleSettings: combo(",", { meta: true }),
-  cycleTabForward: combo("tab", { ctrl: true }),
-  cycleTabBackward: combo("tab", { ctrl: true, shift: true }),
-  switchTab1: combo("1", { meta: true }),
-  switchTab2: combo("2", { meta: true }),
-  switchTab3: combo("3", { meta: true }),
-  switchTab4: combo("4", { meta: true }),
-  switchTab5: combo("5", { meta: true }),
-  switchTab6: combo("6", { meta: true }),
-  switchTab7: combo("7", { meta: true }),
-  switchTab8: combo("8", { meta: true }),
-  switchTab9: combo("9", { meta: true }),
-  newTerminal: combo("t", { meta: true }),
-  newAgent: combo("t", { meta: true, shift: true }),
-  closeTab: combo("w", { meta: true }),
-  toggleTerminal: combo("j", { meta: true }),
-  toggleSidebar: combo("b", { meta: true }),
-  toggleRightPanel: combo("b", { meta: true, shift: true }),
-  openRightPanelFiles: combo("e", { meta: true, shift: true }),
-  openRightPanelChanges: combo("g", { meta: true, shift: true }),
-  openRightPanelContext: combo("c", { meta: true, shift: true }),
-  copyPath: combo("c", { meta: true, alt: true }),
-  copyRelativePath: combo("c", { meta: true, shift: true, alt: true }),
+  quickSearch: combo('p', { meta: true }),
+  toggleSettings: combo(',', { meta: true }),
+  cycleTabForward: combo('tab', { ctrl: true }),
+  cycleTabBackward: combo('tab', { ctrl: true, shift: true }),
+  switchTab1: combo('1', { meta: true }),
+  switchTab2: combo('2', { meta: true }),
+  switchTab3: combo('3', { meta: true }),
+  switchTab4: combo('4', { meta: true }),
+  switchTab5: combo('5', { meta: true }),
+  switchTab6: combo('6', { meta: true }),
+  switchTab7: combo('7', { meta: true }),
+  switchTab8: combo('8', { meta: true }),
+  switchTab9: combo('9', { meta: true }),
+  newTerminal: combo('t', { meta: true }),
+  newAgent: combo('t', { meta: true, shift: true }),
+  closeTab: combo('w', { meta: true }),
+  toggleTerminal: combo('j', { meta: true }),
+  toggleSidebar: combo('b', { meta: true }),
+  toggleRightPanel: combo('b', { meta: true, shift: true }),
+  openRightPanelFiles: combo('e', { meta: true, shift: true }),
+  openRightPanelChanges: combo('g', { meta: true, shift: true }),
+  openRightPanelContext: combo('c', { meta: true, shift: true }),
+  copyPath: combo('c', { meta: true, alt: true }),
+  copyRelativePath: combo('c', { meta: true, shift: true, alt: true }),
 };
 
-export type ShortcutCategory = "navigation" | "tabs" | "panels" | "other";
+export type ShortcutCategory = 'navigation' | 'tabs' | 'panels' | 'other';
 
 export type ShortcutDefinition = {
   id: ShortcutActionId;
@@ -335,42 +319,42 @@ export type ShortcutDefinition = {
 };
 
 export const SHORTCUT_DEFINITIONS: ShortcutDefinition[] = [
-  { id: "quickSearch", label: "Quick Search", category: "navigation" },
-  { id: "toggleSettings", label: "Settings", category: "navigation" },
-  { id: "newTerminal", label: "New Terminal", category: "other" },
-  { id: "newAgent", label: "New Agent", category: "other" },
-  { id: "closeTab", label: "Close Tab", category: "tabs" },
-  { id: "cycleTabForward", label: "Next Tab", category: "tabs" },
-  { id: "cycleTabBackward", label: "Previous Tab", category: "tabs" },
-  { id: "switchTab1", label: "Switch to Tab 1", category: "tabs" },
-  { id: "switchTab2", label: "Switch to Tab 2", category: "tabs" },
-  { id: "switchTab3", label: "Switch to Tab 3", category: "tabs" },
-  { id: "switchTab4", label: "Switch to Tab 4", category: "tabs" },
-  { id: "switchTab5", label: "Switch to Tab 5", category: "tabs" },
-  { id: "switchTab6", label: "Switch to Tab 6", category: "tabs" },
-  { id: "switchTab7", label: "Switch to Tab 7", category: "tabs" },
-  { id: "switchTab8", label: "Switch to Tab 8", category: "tabs" },
-  { id: "switchTab9", label: "Switch to Tab 9", category: "tabs" },
-  { id: "toggleSidebar", label: "Toggle Sidebar", category: "panels" },
-  { id: "toggleRightPanel", label: "Toggle Right Panel", category: "panels" },
-  { id: "toggleTerminal", label: "Toggle Terminal", category: "panels" },
+  { id: 'quickSearch', label: 'Quick Search', category: 'navigation' },
+  { id: 'toggleSettings', label: 'Settings', category: 'navigation' },
+  { id: 'newTerminal', label: 'New Terminal', category: 'other' },
+  { id: 'newAgent', label: 'New Agent', category: 'other' },
+  { id: 'closeTab', label: 'Close Tab', category: 'tabs' },
+  { id: 'cycleTabForward', label: 'Next Tab', category: 'tabs' },
+  { id: 'cycleTabBackward', label: 'Previous Tab', category: 'tabs' },
+  { id: 'switchTab1', label: 'Switch to Tab 1', category: 'tabs' },
+  { id: 'switchTab2', label: 'Switch to Tab 2', category: 'tabs' },
+  { id: 'switchTab3', label: 'Switch to Tab 3', category: 'tabs' },
+  { id: 'switchTab4', label: 'Switch to Tab 4', category: 'tabs' },
+  { id: 'switchTab5', label: 'Switch to Tab 5', category: 'tabs' },
+  { id: 'switchTab6', label: 'Switch to Tab 6', category: 'tabs' },
+  { id: 'switchTab7', label: 'Switch to Tab 7', category: 'tabs' },
+  { id: 'switchTab8', label: 'Switch to Tab 8', category: 'tabs' },
+  { id: 'switchTab9', label: 'Switch to Tab 9', category: 'tabs' },
+  { id: 'toggleSidebar', label: 'Toggle Sidebar', category: 'panels' },
+  { id: 'toggleRightPanel', label: 'Toggle Right Panel', category: 'panels' },
+  { id: 'toggleTerminal', label: 'Toggle Terminal', category: 'panels' },
   {
-    id: "openRightPanelFiles",
-    label: "Files Panel",
-    category: "panels",
+    id: 'openRightPanelFiles',
+    label: 'Files Panel',
+    category: 'panels',
   },
   {
-    id: "openRightPanelChanges",
-    label: "Changes Panel",
-    category: "panels",
+    id: 'openRightPanelChanges',
+    label: 'Changes Panel',
+    category: 'panels',
   },
   {
-    id: "openRightPanelContext",
-    label: "Context Panel",
-    category: "panels",
+    id: 'openRightPanelContext',
+    label: 'Context Panel',
+    category: 'panels',
   },
-  { id: "copyPath", label: "Copy Path", category: "other" },
-  { id: "copyRelativePath", label: "Copy Relative Path", category: "other" },
+  { id: 'copyPath', label: 'Copy Path', category: 'other' },
+  { id: 'copyRelativePath', label: 'Copy Relative Path', category: 'other' },
 ];
 
 export type AppSettings = {
@@ -397,23 +381,23 @@ export type AppSettings = {
 };
 
 export const DEFAULT_SETTINGS: AppSettings = {
-  theme: "dark",
-  defaultShell: "",
+  theme: 'dark',
+  defaultShell: '',
   defaultAgentCommand: DEFAULT_AGENT_PRESETS[0].command,
   agentPresets: [...DEFAULT_AGENT_PRESETS],
   terminalFontSize: 14,
-  terminalThemeMode: "follow",
-  agentThemeMode: "follow",
+  terminalThemeMode: 'follow',
+  agentThemeMode: 'follow',
   editorFontSize: 13,
   diffInline: false,
-  diffStyle: "split",
-  diffIndicators: "bars",
-  diffLineDiffType: "word-alt",
-  diffOverflow: "scroll",
+  diffStyle: 'split',
+  diffIndicators: 'bars',
+  diffLineDiffType: 'word-alt',
+  diffOverflow: 'scroll',
   diffDisableBackground: false,
   sendAndClearComments: false,
-  defaultOpenWith: "finder",
-  spinnerStyle: "braille",
+  defaultOpenWith: 'finder',
+  spinnerStyle: 'braille',
 };
 
 export type OpenProjectResult = {
@@ -447,10 +431,6 @@ export type CreateBundleInput = {
     status: GitStatusKind;
     note?: string;
   }>;
-  comments: Array<
-    Omit<DiffCommentItem, "id" | "type" | "workspaceId" | "addedAt">
-  >;
-  selections: Array<
-    Omit<CodeSelectionItem, "id" | "type" | "workspaceId" | "addedAt">
-  >;
+  comments: Array<Omit<DiffCommentItem, 'id' | 'type' | 'workspaceId' | 'addedAt'>>;
+  selections: Array<Omit<CodeSelectionItem, 'id' | 'type' | 'workspaceId' | 'addedAt'>>;
 };

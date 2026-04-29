@@ -1,11 +1,5 @@
-import {
-  type CSSProperties,
-  type ReactNode,
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import { type CSSProperties, type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
+import { useAppStore } from '@renderer/store/app-store';
 import {
   Check,
   ChevronDown,
@@ -17,10 +11,9 @@ import {
   PanelRightClose,
   PanelRightOpen,
   Search,
-  TerminalSquare,
-} from "lucide-react";
-import { useAppStore } from "@renderer/store/app-store";
-import { ideIcon, appIcon } from "./AgentIcons";
+} from 'lucide-react';
+
+import { appIcon, ideIcon } from './AgentIcons';
 
 /* ── Types ── */
 
@@ -58,15 +51,13 @@ function MenuItem({
 }) {
   return (
     <button
-      className={`flex h-8 w-full items-center gap-2.5 rounded-md px-2 text-left text-[13px] text-text transition-colors hover:bg-panel-3${selected ? " bg-panel-3/60" : ""}`}
+      className={`flex h-8 w-full items-center gap-2.5 rounded-md px-2 text-left text-[13px] text-text transition-colors hover:bg-panel-3${selected ? 'bg-panel-3/60' : ''}`}
       type="button"
       onClick={onClick}
     >
       <span className="grid size-4 shrink-0 place-items-center">{icon}</span>
       <span className="min-w-0 flex-1">{label}</span>
-      <span className="grid size-4 shrink-0 place-items-center text-accent">
-        {selected && <Check size={13} />}
-      </span>
+      <span className="grid size-4 shrink-0 place-items-center text-accent">{selected && <Check size={13} />}</span>
     </button>
   );
 }
@@ -101,23 +92,18 @@ function Submenu({
 
   useEffect(() => () => clearTimeout(closeTimer.current), []);
 
-  const isChildSelected =
-    selectedId !== null && items.some((i) => i.id === selectedId);
+  const isChildSelected = selectedId !== null && items.some((i) => i.id === selectedId);
 
   return (
     <div onMouseEnter={handleEnter} onMouseLeave={handleLeave}>
       {/* Parent row */}
       <div
-        className={`flex h-8 w-full cursor-default items-center gap-2.5 rounded-md px-2 text-[13px] text-text transition-colors hover:bg-panel-3${isChildSelected ? " bg-panel-3/60" : ""}`}
+        className={`flex h-8 w-full cursor-default items-center gap-2.5 rounded-md px-2 text-[13px] text-text transition-colors hover:bg-panel-3${isChildSelected ? 'bg-panel-3/60' : ''}`}
         style={{ anchorName } as CSSProperties}
       >
-        <span className="grid size-4 shrink-0 place-items-center">
-          {parentIcon}
-        </span>
+        <span className="grid size-4 shrink-0 place-items-center">{parentIcon}</span>
         <span className="min-w-0 flex-1">{parentLabel}</span>
-        <span className="grid size-4 shrink-0 place-items-center text-accent">
-          {isChildSelected && <Check size={13} />}
-        </span>
+        <span className="grid size-4 shrink-0 place-items-center text-accent">{isChildSelected && <Check size={13} />}</span>
         <ChevronRight size={13} className="shrink-0 text-subtle" />
       </div>
 
@@ -127,10 +113,10 @@ function Submenu({
         style={
           {
             positionAnchor: anchorName,
-            top: "anchor(top)",
-            left: "anchor(right)",
-            marginLeft: "4px",
-            positionTryFallbacks: "flip-inline",
+            top: 'anchor(top)',
+            left: 'anchor(right)',
+            marginLeft: '4px',
+            positionTryFallbacks: 'flip-inline',
           } as CSSProperties
         }
         hidden={!open}
@@ -148,7 +134,7 @@ function Submenu({
             />
           ))
         ) : (
-          <div className="px-3 py-2 text-xs text-subtle">None detected</div>
+          <div className="px-3 py-2 text-subtle text-xs">None detected</div>
         )}
       </div>
     </div>
@@ -162,9 +148,9 @@ type TopBarProps = {
 };
 
 /** IDE ids that map to a known category */
-const IDE_IDS = new Set(["zed", "vscode", "cursor", "windsurf", "intellij"]);
+const IDE_IDS = new Set(['zed', 'vscode', 'cursor', 'windsurf', 'intellij']);
 /** Terminal ids */
-const TERMINAL_IDS = new Set(["terminal", "iterm", "iterm2", "ghostty"]);
+const TERMINAL_IDS = new Set(['terminal', 'iterm', 'iterm2', 'ghostty']);
 
 export function TopBar({ onOpenSearch }: TopBarProps) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -175,15 +161,11 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
   const rightPanelOpen = useAppStore((state) => state.rightPanelOpen);
   const activeWorkspaceId = useAppStore((state) => state.activeWorkspaceId);
   const workspaces = useAppStore((state) => state.workspaces);
-  const defaultOpenWith = useAppStore(
-    (state) => state.settings.defaultOpenWith,
-  );
+  const defaultOpenWith = useAppStore((state) => state.settings.defaultOpenWith);
   const updateSettings = useAppStore((state) => state.updateSettings);
   const addToast = useAppStore((state) => state.addToast);
 
-  const activeWorkspace = workspaces.find(
-    (workspace) => workspace.id === activeWorkspaceId,
-  );
+  const activeWorkspace = workspaces.find((workspace) => workspace.id === activeWorkspaceId);
 
   // Detect IDEs + terminals on mount and when menu opens
   useEffect(() => {
@@ -217,13 +199,13 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
       }
     };
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setMenuOpen(false);
+      if (event.key === 'Escape') setMenuOpen(false);
     };
-    document.addEventListener("pointerdown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
     return () => {
-      document.removeEventListener("pointerdown", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
     };
   }, [menuOpen]);
 
@@ -232,31 +214,21 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
   const selectedIsTerminal = TERMINAL_IDS.has(defaultOpenWith);
 
   // Resolve the icon for the selected IDE / Terminal within the submenu parent row
-  const ideParentIcon = selectedIsIde
-    ? resolveIcon(defaultOpenWith, ICON_SIZE)
-    : resolveIcon("vscode", ICON_SIZE); // default icon: VSCode
-  const terminalParentIcon = selectedIsTerminal
-    ? resolveIcon(defaultOpenWith, ICON_SIZE)
-    : resolveIcon("terminal", ICON_SIZE); // default icon: Terminal.app
+  const ideParentIcon = selectedIsIde ? resolveIcon(defaultOpenWith, ICON_SIZE) : resolveIcon('vscode', ICON_SIZE); // default icon: VSCode
+  const terminalParentIcon = selectedIsTerminal ? resolveIcon(defaultOpenWith, ICON_SIZE) : resolveIcon('terminal', ICON_SIZE); // default icon: Terminal.app
 
   // Main button icon: always the selected item's icon
   const selectedIcon = resolveIcon(defaultOpenWith, ICON_SIZE);
 
   // Resolve action for selected option
-  const resolveAction = useCallback(
-    (id: string): ((path: string) => Promise<void>) | null => {
-      if (id === "finder") return window.forgepad.shell.openPath;
-      if (TERMINAL_IDS.has(id))
-        return (path: string) =>
-          window.forgepad.shell.openWithTerminal(path, id);
-      if (IDE_IDS.has(id))
-        return (path: string) => window.forgepad.shell.openWithIde(path, id);
-      // Legacy fallback
-      if (id === "terminal") return window.forgepad.shell.openInTerminal;
-      return null;
-    },
-    [],
-  );
+  const resolveAction = useCallback((id: string): ((path: string) => Promise<void>) | null => {
+    if (id === 'finder') return window.forgepad.shell.openPath;
+    if (TERMINAL_IDS.has(id)) return (path: string) => window.forgepad.shell.openWithTerminal(path, id);
+    if (IDE_IDS.has(id)) return (path: string) => window.forgepad.shell.openWithIde(path, id);
+    // Legacy fallback
+    if (id === 'terminal') return window.forgepad.shell.openInTerminal;
+    return null;
+  }, []);
 
   const handleOpen = async () => {
     if (!activeWorkspace) return;
@@ -265,10 +237,7 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
     try {
       await action(activeWorkspace.worktreePath);
     } catch (error) {
-      addToast(
-        "error",
-        error instanceof Error ? error.message : "Failed to open.",
-      );
+      addToast('error', error instanceof Error ? error.message : 'Failed to open.');
     }
   };
 
@@ -278,19 +247,15 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
   };
 
   return (
-    <header className="app-topbar relative flex h-12 shrink-0 items-center border-b border-border bg-surface-toolbar px-3">
+    <header className="app-topbar relative flex h-12 shrink-0 items-center border-border border-b bg-surface-toolbar px-3">
       <div className="flex items-center pl-[80px]">
         <button
           className="icon-button border-transparent"
           type="button"
-          title={sidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
+          title={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
           onClick={() => useAppStore.setState({ sidebarOpen: !sidebarOpen })}
         >
-          {sidebarOpen ? (
-            <PanelLeftClose size={17} />
-          ) : (
-            <PanelLeftOpen size={17} />
-          )}
+          {sidebarOpen ? <PanelLeftClose size={17} /> : <PanelLeftOpen size={17} />}
         </button>
       </div>
 
@@ -303,12 +268,12 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
         <Search size={17} />
         <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[13px]">
           Search ForgePad
-          {activeWorkspace ? ` - ${activeWorkspace.name}` : ""}
+          {activeWorkspace ? ` - ${activeWorkspace.name}` : ''}
         </span>
-        <kbd className="grid size-[20px] place-items-center rounded border border-border bg-panel-2 text-[11px] leading-none text-subtle">
+        <kbd className="grid size-[20px] place-items-center rounded border border-border bg-panel-2 text-[11px] text-subtle leading-none">
           ⌘
         </kbd>
-        <kbd className="grid size-[20px] place-items-center rounded border border-border bg-panel-2 text-[11px] leading-none text-subtle">
+        <kbd className="grid size-[20px] place-items-center rounded border border-border bg-panel-2 text-[11px] text-subtle leading-none">
           P
         </kbd>
       </button>
@@ -318,16 +283,10 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
         <button
           className="icon-button border-transparent"
           type="button"
-          title={rightPanelOpen ? "Close side panel" : "Open side panel"}
-          onClick={() =>
-            useAppStore.setState({ rightPanelOpen: !rightPanelOpen })
-          }
+          title={rightPanelOpen ? 'Close side panel' : 'Open side panel'}
+          onClick={() => useAppStore.setState({ rightPanelOpen: !rightPanelOpen })}
         >
-          {rightPanelOpen ? (
-            <PanelRightClose size={17} />
-          ) : (
-            <PanelRightOpen size={17} />
-          )}
+          {rightPanelOpen ? <PanelRightClose size={17} /> : <PanelRightOpen size={17} />}
         </button>
         <div className="relative">
           <div className="flex overflow-hidden rounded-lg border border-border bg-surface-search">
@@ -339,20 +298,18 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
               title={`Open with ${defaultOpenWith}`}
               onClick={handleOpen}
             >
-              <span className="grid size-4 place-items-center">
-                {selectedIcon}
-              </span>
+              <span className="grid size-4 place-items-center">{selectedIcon}</span>
               <span className="font-[590]">Open</span>
             </button>
 
             {/* Right: chevron trigger (anchor for dropdown) */}
             <button
-              className="grid h-8 w-8 place-items-center border-l border-border text-muted hover:text-text disabled:cursor-not-allowed disabled:text-subtle"
+              className="grid h-8 w-8 place-items-center border-border border-l text-muted hover:text-text disabled:cursor-not-allowed disabled:text-subtle"
               type="button"
               disabled={!activeWorkspace}
               title="Default open with"
               onClick={() => setMenuOpen((v) => !v)}
-              style={{ anchorName: "--open-with-trigger" } as CSSProperties}
+              style={{ anchorName: '--open-with-trigger' } as CSSProperties}
             >
               <ChevronDown size={15} />
             </button>
@@ -363,25 +320,23 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
             className="anchor-menu"
             style={
               {
-                positionAnchor: "--open-with-trigger",
-                top: "anchor(bottom)",
-                right: "anchor(right)",
-                marginTop: "7px",
-                positionTryFallbacks: "flip-block",
+                positionAnchor: '--open-with-trigger',
+                top: 'anchor(bottom)',
+                right: 'anchor(right)',
+                marginTop: '7px',
+                positionTryFallbacks: 'flip-block',
               } as CSSProperties
             }
             hidden={!menuOpen || !activeWorkspace}
           >
-            <div className="px-2 py-1.5 text-[11px] text-subtle">
-              Default open with
-            </div>
+            <div className="px-2 py-1.5 text-[11px] text-subtle">Default open with</div>
 
             {/* Finder */}
             <MenuItem
-              icon={appIcon("finder", ICON_SIZE) ?? <Folder size={ICON_SIZE} />}
+              icon={appIcon('finder', ICON_SIZE) ?? <Folder size={ICON_SIZE} />}
               label="Finder"
-              selected={defaultOpenWith === "finder"}
-              onClick={() => handleSelect("finder")}
+              selected={defaultOpenWith === 'finder'}
+              onClick={() => handleSelect('finder')}
             />
 
             {/* IDE submenu */}

@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import { Play, Save, Trash2, X } from "lucide-react";
+import { useEffect, useRef, useState } from 'react';
+import { Play, Save, Trash2, X } from 'lucide-react';
 
 export function RunSetupDialog({
   initialCommand,
@@ -14,7 +14,7 @@ export function RunSetupDialog({
   onClear?: () => void;
   onClose: () => void;
 }) {
-  const [command, setCommand] = useState(initialCommand ?? "");
+  const [command, setCommand] = useState(initialCommand ?? '');
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -24,31 +24,21 @@ export function RunSetupDialog({
   const canSave = command.trim().length > 0;
 
   return (
-    <div
-      className="fixed inset-0 z-[60] grid place-items-center bg-black/85"
-      onMouseDown={onClose}
-    >
+    <div className="fixed inset-0 z-[60] grid place-items-center bg-black/85" onMouseDown={onClose}>
       <div
         className="w-[min(480px,calc(100vw-32px))] overflow-hidden rounded-xl border border-border bg-surface-dialog shadow-[0_28px_70px_rgba(0,0,0,0.46)]"
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <div className="flex h-12 items-center justify-between border-b border-border px-4">
-          <span className="text-[15px] font-[590] text-text">配置启动命令</span>
-          <button
-            className="icon-button border-transparent"
-            type="button"
-            onClick={onClose}
-          >
+        <div className="flex h-12 items-center justify-between border-border border-b px-4">
+          <span className="font-[590] text-[15px] text-text">配置启动命令</span>
+          <button className="icon-button border-transparent" type="button" onClick={onClose}>
             <X size={16} />
           </button>
         </div>
 
         <div className="space-y-4 p-4">
           <div className="space-y-1.5">
-            <label
-              className="text-[12px] font-[510] text-subtle"
-              htmlFor="run-command"
-            >
+            <label className="font-[510] text-[12px] text-subtle" htmlFor="run-command">
               启动命令
             </label>
             <input
@@ -58,54 +48,34 @@ export function RunSetupDialog({
               value={command}
               placeholder="e.g. bun install && bun run dev"
               onKeyDown={(e) => {
-                if (e.key === "Enter" && canSave) onSave(command.trim());
+                if (e.key === 'Enter' && canSave) onSave(command.trim());
               }}
               onChange={(e) => setCommand(e.currentTarget.value)}
             />
-            <p className="text-[11px] text-subtle/60">
-              该命令将在终端中执行，用于启动开发服务
-            </p>
+            <p className="text-[11px] text-subtle/60">该命令将在终端中执行，用于启动开发服务</p>
           </div>
         </div>
 
-        <div className="flex items-center justify-between border-t border-border px-4 py-3">
+        <div className="flex items-center justify-between border-border border-t px-4 py-3">
           <div>
             {onClear && (
-              <button
-                className="secondary-button text-red-400 hover:text-red-300"
-                type="button"
-                onClick={onClear}
-              >
+              <button className="secondary-button text-red-400 hover:text-red-300" type="button" onClick={onClear}>
                 <Trash2 size={14} />
                 清除
               </button>
             )}
           </div>
           <div className="flex items-center gap-2">
-            <button
-              className="secondary-button"
-              type="button"
-              onClick={onClose}
-            >
+            <button className="secondary-button" type="button" onClick={onClose}>
               取消
             </button>
             {onSaveOnly && (
-              <button
-                className="secondary-button"
-                type="button"
-                disabled={!canSave}
-                onClick={() => onSaveOnly(command.trim())}
-              >
+              <button className="secondary-button" type="button" disabled={!canSave} onClick={() => onSaveOnly(command.trim())}>
                 <Save size={14} />
                 保存
               </button>
             )}
-            <button
-              className="primary-button"
-              type="button"
-              disabled={!canSave}
-              onClick={() => onSave(command.trim())}
-            >
+            <button className="primary-button" type="button" disabled={!canSave} onClick={() => onSave(command.trim())}>
               <Play size={14} />
               保存并运行
             </button>

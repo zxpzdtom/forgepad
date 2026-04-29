@@ -1,15 +1,13 @@
-import { useEffect } from "react";
-import { useAppStore } from "@renderer/store/app-store";
-import type { ThemePreference } from "@shared/types";
+import { useEffect } from 'react';
+import { useAppStore } from '@renderer/store/app-store';
+import type { ThemePreference } from '@shared/types';
 
 /** Resolved theme — never 'system' */
-export type ResolvedTheme = "dark" | "light";
+export type ResolvedTheme = 'dark' | 'light';
 
 function resolveTheme(preference: ThemePreference): ResolvedTheme {
-  if (preference !== "system") return preference;
-  return window.matchMedia("(prefers-color-scheme: dark)").matches
-    ? "dark"
-    : "light";
+  if (preference !== 'system') return preference;
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
 }
 
 /**
@@ -31,13 +29,13 @@ export function useTheme(): ResolvedTheme {
     apply(resolved);
 
     // If 'system', listen for OS theme changes
-    if (preference === "system") {
-      const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    if (preference === 'system') {
+      const mq = window.matchMedia('(prefers-color-scheme: dark)');
       const handler = (e: MediaQueryListEvent) => {
-        apply(e.matches ? "dark" : "light");
+        apply(e.matches ? 'dark' : 'light');
       };
-      mq.addEventListener("change", handler);
-      return () => mq.removeEventListener("change", handler);
+      mq.addEventListener('change', handler);
+      return () => mq.removeEventListener('change', handler);
     }
   }, [preference, resolved]);
 

@@ -1,9 +1,9 @@
-import { app } from "electron";
-import { access, mkdir, readFile, writeFile } from "node:fs/promises";
-import path from "node:path";
-import type { PersistedAppState } from "@shared/types";
+import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
+import path from 'node:path';
+import type { PersistedAppState } from '@shared/types';
+import { app } from 'electron';
 
-const STATE_FILE_NAME = "forgepad-state.json";
+const STATE_FILE_NAME = 'forgepad-state.json';
 
 async function pathExists(value: string | undefined): Promise<boolean> {
   if (!value) return false;
@@ -16,17 +16,17 @@ async function pathExists(value: string | undefined): Promise<boolean> {
 }
 
 function isObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
+  return typeof value === 'object' && value !== null;
 }
 
 export class StateService {
   private static getStatePath(): string {
-    return path.join(app.getPath("userData"), STATE_FILE_NAME);
+    return path.join(app.getPath('userData'), STATE_FILE_NAME);
   }
 
   static async load(): Promise<Partial<PersistedAppState> | null> {
     try {
-      const raw = await readFile(this.getStatePath(), "utf8");
+      const raw = await readFile(StateService.getStatePath(), 'utf8');
       const parsed = JSON.parse(raw) as unknown;
       if (!isObject(parsed)) return null;
       if (parsed.schemaVersion !== 1) return null;
@@ -41,8 +41,7 @@ export class StateService {
       const workspaces = [];
       for (const workspace of state.workspaces ?? []) {
         if (!projectIds.has(workspace.projectId)) continue;
-        if (await pathExists(workspace.worktreePath))
-          workspaces.push(workspace);
+        if (await pathExists(workspace.worktreePath)) workspaces.push(workspace);
       }
 
       const workspaceIds = new Set(workspaces.map((workspace) => workspace.id));
@@ -52,13 +51,11 @@ export class StateService {
       });
       const taskIds = new Set(tasks.map((task) => task.id));
 
-      const tabs = (state.tabs ?? []).filter((tab) =>
-        workspaceIds.has(tab.workspaceId),
-      );
+      const tabs = (state.tabs ?? []).filter((tab) => workspaceIds.has(tab.workspaceId));
       const tabIds = new Set(tabs.map((tab) => tab.id));
       const contextItems = (state.contextItems ?? []).filter((item) => {
         if (!workspaceIds.has(item.workspaceId)) return false;
-        if (item.type === "task") return taskIds.has(item.taskId);
+        if (item.type === 'task') return taskIds.has(item.taskId);
         return true;
       });
 
@@ -72,10 +69,7 @@ export class StateService {
           state.activeWorkspaceId && workspaceIds.has(state.activeWorkspaceId)
             ? state.activeWorkspaceId
             : (workspaces[0]?.id ?? null),
-        activeTabId:
-          state.activeTabId && tabIds.has(state.activeTabId)
-            ? state.activeTabId
-            : null,
+        activeTabId: state.activeTabId && tabIds.has(state.activeTabId) ? state.activeTabId : null,
         contextItems,
       };
     } catch {
@@ -84,8 +78,8 @@ export class StateService {
   }
 
   static async save(state: PersistedAppState): Promise<void> {
-    const statePath = this.getStatePath();
+    const statePath = StateService.getStatePath();
     await mkdir(path.dirname(statePath), { recursive: true });
-    await writeFile(statePath, JSON.stringify(state, null, 2), "utf8");
+    await writeFile(statePath, JSON.stringify(state, null, 2), 'utf8');
   }
 }
