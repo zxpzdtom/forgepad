@@ -357,6 +357,54 @@ export const SHORTCUT_DEFINITIONS: ShortcutDefinition[] = [
   { id: 'copyRelativePath', label: 'Copy Relative Path', category: 'other' },
 ];
 
+/* ─── Notification types ─── */
+
+export type NotificationSound = {
+  id: string;
+  name: string;
+  subtitle: string;
+  durationMs: number;
+  source: 'built-in' | 'custom';
+  /** For custom sounds: the userData file path (used as key for deletion) */
+  assetPath?: string;
+  /** For custom sounds: data URL for playback */
+  dataUrl?: string;
+  createdAt: number;
+};
+
+export type NotificationSettings = {
+  /** Master toggle: play sounds at all */
+  enabled: boolean;
+  /** Volume 0–100 */
+  volume: number;
+  /** ID of the selected built-in or custom sound */
+  selectedSoundId: string;
+  /** User-imported custom sounds */
+  customSounds: NotificationSound[];
+  /** Play sound even when app window is focused */
+  playWhenAppFocused: boolean;
+  /** Show OS desktop notification banners */
+  desktopNotificationEnabled: boolean;
+  /** Trigger when agent finishes (review status) */
+  notifyOnAgentDone: boolean;
+  /** Trigger when agent waits for user approval */
+  notifyOnAgentNeedsApproval: boolean;
+  /** Trigger when a Task status changes to done */
+  notifyOnTaskDone: boolean;
+};
+
+export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
+  enabled: true,
+  volume: 70,
+  selectedSoundId: 'ping',
+  customSounds: [],
+  playWhenAppFocused: false,
+  desktopNotificationEnabled: true,
+  notifyOnAgentDone: true,
+  notifyOnAgentNeedsApproval: true,
+  notifyOnTaskDone: false,
+};
+
 export type AppSettings = {
   theme: ThemePreference;
   defaultShell: string;
@@ -378,6 +426,7 @@ export type AppSettings = {
   spinnerStyle: string;
   keyboardShortcuts?: KeyboardShortcuts;
   lastSettingsTab?: string;
+  notifications: NotificationSettings;
 };
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -398,6 +447,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   sendAndClearComments: false,
   defaultOpenWith: 'finder',
   spinnerStyle: 'braille',
+  notifications: { ...DEFAULT_NOTIFICATION_SETTINGS },
 };
 
 export type OpenProjectResult = {

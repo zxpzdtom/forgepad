@@ -71,7 +71,7 @@ export function TabBar() {
   }, []);
 
   return (
-    <div className="workspace-tabbar tabbar relative flex h-9 shrink-0 items-center border-b border-border bg-bg">
+    <div className="workspace-tabbar tabbar relative flex h-9 shrink-0 items-center border-border border-b bg-bg">
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}

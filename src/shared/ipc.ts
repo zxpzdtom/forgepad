@@ -42,4 +42,8 @@ export const IPC = {
   AGENT_FOCUS_TAB: 'agent:focus-tab',
   AGENT_RENAME_TAB: 'agent:rename-tab',
   MENU_OPEN_SETTINGS: 'menu:open-settings',
+  NOTIFICATION_PICK_AUDIO: 'notification:pick-audio',
+  NOTIFICATION_DELETE_AUDIO: 'notification:delete-audio',
+  APP_IS_FOCUSED: 'app:is-focused',
+  APP_FOCUS_WINDOW: 'app:focus-window',
 } as const;
