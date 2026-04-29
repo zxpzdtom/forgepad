@@ -42,4 +42,19 @@ export const IPC = {
   AGENT_FOCUS_TAB: 'agent:focus-tab',
   AGENT_RENAME_TAB: 'agent:rename-tab',
   MENU_OPEN_SETTINGS: 'menu:open-settings',
+  // Browser (WebContentsView)
+  BROWSER_CREATE: 'browser:create',
+  BROWSER_DESTROY: 'browser:destroy',
+  BROWSER_NAVIGATE: 'browser:navigate',
+  BROWSER_GO_BACK: 'browser:go-back',
+  BROWSER_GO_FORWARD: 'browser:go-forward',
+  BROWSER_RELOAD: 'browser:reload',
+  BROWSER_STOP: 'browser:stop',
+  BROWSER_SET_BOUNDS: 'browser:set-bounds',
+  BROWSER_SET_VISIBLE: 'browser:set-visible',
+  BROWSER_START_SELECT: 'browser:start-select',
+  BROWSER_STOP_SELECT: 'browser:stop-select',
+  // Browser → Renderer events
+  BROWSER_NAV_STATE: 'browser:nav-state',
+  BROWSER_ELEMENT_SELECTED: 'browser:element-selected',
 } as const;

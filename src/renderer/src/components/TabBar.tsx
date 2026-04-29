@@ -4,7 +4,7 @@ import { restrictToHorizontalAxis, restrictToParentElement } from '@dnd-kit/modi
 import { horizontalListSortingStrategy, SortableContext } from '@dnd-kit/sortable';
 import { getTabTitle, useAppStore } from '@renderer/store/app-store';
 import type { Tab } from '@shared/types';
-import { Bot, ClipboardList, GitCompare, TerminalSquare } from 'lucide-react';
+import { Bot, ClipboardList, GitCompare, Globe, TerminalSquare } from 'lucide-react';
 
 import { FileIcon } from './FileIcon';
 import { SortableTabItem } from './SortableTabItem';
@@ -14,6 +14,7 @@ function tabIcon(tab: Tab) {
   if (tab.type === 'terminal') return tab.isAgent ? <Bot size={14} /> : <TerminalSquare size={14} />;
   if (tab.type === 'diff') return <GitCompare size={14} />;
   if (tab.type === 'context-preview') return <ClipboardList size={14} />;
+  if (tab.type === 'browser') return <Globe size={14} />;
   return <FileIcon filePath={tab.relPath} size={16} />;
 }
 
@@ -70,6 +71,8 @@ export function TabBar() {
     setContextMenu({ tab, x: event.clientX, y: event.clientY });
   }, []);
 
+  const createBrowserTab = useAppStore((state) => state.createBrowserTab);
+
   return (
     <div className="workspace-tabbar tabbar relative flex h-9 shrink-0 items-center border-b border-border bg-bg">
       <DndContext
@@ -101,6 +104,15 @@ export function TabBar() {
           </div>
         </SortableContext>
       </DndContext>
+      {/* Open Browser tab button */}
+      <button
+        type="button"
+        onClick={() => createBrowserTab()}
+        title="Open Browser"
+        className="mx-1 flex h-7 w-7 shrink-0 items-center justify-center rounded text-(--color-text-3) transition-colors hover:bg-(--color-bg-3) hover:text-(--color-text-1)"
+      >
+        <Globe size={14} />
+      </button>
       {contextMenu && (
         <TabContextMenu
           tab={contextMenu.tab}

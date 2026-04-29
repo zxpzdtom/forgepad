@@ -1,6 +1,7 @@
 import type { AgentStatusUpdate } from '@shared/agent-lifecycle';
 import { IPC } from '@shared/ipc';
 import type {
+  BrowserNavState,
   ContextBundleResult,
   CreateBundleInput,
   FileNode,
@@ -9,6 +10,8 @@ import type {
   GitStatusKind,
   OpenProjectResult,
   PersistedAppState,
+  SelectedElementInfo,
+  ViewBounds,
   WorkspaceChangeEvent,
 } from '@shared/types';
 import { contextBridge, ipcRenderer } from 'electron';
@@ -141,6 +144,34 @@ const api = {
       ipcRenderer.invoke(IPC.SHELL_DETECT_TERMINALS) as Promise<Array<{ id: string; label: string; appName: string }>>,
     openWithTerminal: (fullPath: string, terminalId: string) =>
       ipcRenderer.invoke(IPC.SHELL_OPEN_WITH_TERMINAL, fullPath, terminalId) as Promise<void>,
+  },
+  browser: {
+    create: (url?: string) => ipcRenderer.invoke(IPC.BROWSER_CREATE, { url }) as Promise<{ tabId: string }>,
+    destroy: (tabId: string) => ipcRenderer.invoke(IPC.BROWSER_DESTROY, { tabId }) as Promise<void>,
+    navigate: (tabId: string, url: string) => ipcRenderer.invoke(IPC.BROWSER_NAVIGATE, { tabId, url }) as Promise<void>,
+    goBack: (tabId: string) => ipcRenderer.invoke(IPC.BROWSER_GO_BACK, { tabId }) as Promise<void>,
+    goForward: (tabId: string) => ipcRenderer.invoke(IPC.BROWSER_GO_FORWARD, { tabId }) as Promise<void>,
+    reload: (tabId: string) => ipcRenderer.invoke(IPC.BROWSER_RELOAD, { tabId }) as Promise<void>,
+    stop: (tabId: string) => ipcRenderer.invoke(IPC.BROWSER_STOP, { tabId }) as Promise<void>,
+    setBounds: (tabId: string, bounds: ViewBounds) =>
+      ipcRenderer.invoke(IPC.BROWSER_SET_BOUNDS, { tabId, bounds }) as Promise<void>,
+    setVisible: (tabId: string, visible: boolean) =>
+      ipcRenderer.invoke(IPC.BROWSER_SET_VISIBLE, { tabId, visible }) as Promise<void>,
+    startSelect: (tabId: string) => ipcRenderer.invoke(IPC.BROWSER_START_SELECT, { tabId }) as Promise<void>,
+    stopSelect: (tabId: string) => ipcRenderer.invoke(IPC.BROWSER_STOP_SELECT, { tabId }) as Promise<void>,
+    onNavState: (callback: (state: BrowserNavState) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, state: BrowserNavState) => callback(state);
+      ipcRenderer.on(IPC.BROWSER_NAV_STATE, handler);
+      return () => ipcRenderer.removeListener(IPC.BROWSER_NAV_STATE, handler);
+    },
+    onElementSelected: (callback: (data: { tabId: string; element: SelectedElementInfo }) => void) => {
+      const handler = (
+        _event: Electron.IpcRendererEvent,
+        data: { tabId: string; element: SelectedElementInfo },
+      ) => callback(data);
+      ipcRenderer.on(IPC.BROWSER_ELEMENT_SELECTED, handler);
+      return () => ipcRenderer.removeListener(IPC.BROWSER_ELEMENT_SELECTED, handler);
+    },
   },
 };
 

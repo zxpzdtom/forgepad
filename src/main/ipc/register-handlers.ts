@@ -10,8 +10,9 @@ import { resolveInsideRoot } from '@main/services/path-guard';
 import { PtyService } from '@main/services/pty-service';
 import { StateService } from '@main/services/state-service';
 import { IPC } from '@shared/ipc';
-import type { CreateBundleInput, PersistedAppState, WorkspaceChangeEvent } from '@shared/types';
+import type { CreateBundleInput, PersistedAppState, ViewBounds, WorkspaceChangeEvent } from '@shared/types';
 import { BrowserWindow, dialog, ipcMain, shell } from 'electron';
+import { getBrowserService } from '../index';
 
 export const ptyService = new PtyService();
 const execFileAsync = promisify(execFile);
@@ -339,5 +340,51 @@ export function registerIpcHandlers(hookPort?: number): void {
 
   ipcMain.handle(IPC.SHELL_OPEN_WITH_TERMINAL, async (_event, fullPath: string, terminalId: string) => {
     await openWithTerminal(fullPath, terminalId);
+  });
+
+  // ── Browser (WebContentsView) handlers ────────────────────────────────────
+  ipcMain.handle(IPC.BROWSER_CREATE, (_event, args: { url?: string }) => {
+    const tabId = getBrowserService().create(args?.url);
+    return { tabId };
+  });
+
+  ipcMain.handle(IPC.BROWSER_DESTROY, (_event, args: { tabId: string }) => {
+    getBrowserService().destroy(args.tabId);
+  });
+
+  ipcMain.handle(IPC.BROWSER_NAVIGATE, (_event, args: { tabId: string; url: string }) => {
+    getBrowserService().navigate(args.tabId, args.url);
+  });
+
+  ipcMain.handle(IPC.BROWSER_GO_BACK, (_event, args: { tabId: string }) => {
+    getBrowserService().goBack(args.tabId);
+  });
+
+  ipcMain.handle(IPC.BROWSER_GO_FORWARD, (_event, args: { tabId: string }) => {
+    getBrowserService().goForward(args.tabId);
+  });
+
+  ipcMain.handle(IPC.BROWSER_RELOAD, (_event, args: { tabId: string }) => {
+    getBrowserService().reload(args.tabId);
+  });
+
+  ipcMain.handle(IPC.BROWSER_STOP, (_event, args: { tabId: string }) => {
+    getBrowserService().stop(args.tabId);
+  });
+
+  ipcMain.handle(IPC.BROWSER_SET_BOUNDS, (_event, args: { tabId: string; bounds: ViewBounds }) => {
+    getBrowserService().setBounds(args.tabId, args.bounds);
+  });
+
+  ipcMain.handle(IPC.BROWSER_SET_VISIBLE, (_event, args: { tabId: string; visible: boolean }) => {
+    getBrowserService().setVisible(args.tabId, args.visible);
+  });
+
+  ipcMain.handle(IPC.BROWSER_START_SELECT, async (_event, args: { tabId: string }) => {
+    await getBrowserService().startSelectMode(args.tabId);
+  });
+
+  ipcMain.handle(IPC.BROWSER_STOP_SELECT, async (_event, args: { tabId: string }) => {
+    await getBrowserService().stopSelectMode(args.tabId);
   });
 }

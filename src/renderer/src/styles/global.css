@@ -40,6 +40,21 @@
     --animate-breathe: breathe 1s ease-in-out infinite;
 }
 
+@keyframes browser-loading {
+    0% {
+        width: 0%;
+        margin-left: 0;
+    }
+    50% {
+        width: 60%;
+        margin-left: 20%;
+    }
+    100% {
+        width: 0%;
+        margin-left: 100%;
+    }
+}
+
 @keyframes breathe {
     0%,
     100% {

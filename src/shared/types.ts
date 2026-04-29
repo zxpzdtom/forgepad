@@ -32,7 +32,53 @@ export type Tab =
       workspaceId: string;
       type: 'context-preview';
       bundleId?: string;
+    }
+  | {
+      id: string;
+      workspaceId: string;
+      type: 'browser';
+      url: string;
+      title: string;
+      isLoading: boolean;
+      canGoBack: boolean;
+      canGoForward: boolean;
     };
+
+/** Pixel rectangle relative to BrowserWindow's content area, used for WebContentsView positioning */
+export type ViewBounds = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
+/** Navigation state pushed from main → renderer after every navigation event */
+export type BrowserNavState = {
+  tabId: string;
+  url: string;
+  title: string;
+  isLoading: boolean;
+  canGoBack: boolean;
+  canGoForward: boolean;
+};
+
+/** Element selected via the in-browser element picker, sent from main → renderer */
+export type SelectedElementInfo = {
+  /** Unique CSS selector path for the element */
+  selector: string;
+  /** Tag name e.g. "BUTTON", "DIV" */
+  tagName: string;
+  /** Element's outerHTML, truncated to 500 chars */
+  outerHTML: string;
+  /** Bounding rect relative to the page viewport */
+  boundingRect: { x: number; y: number; width: number; height: number };
+  /** Base64-encoded PNG screenshot of the element region */
+  screenshotBase64: string;
+  /** Page URL at time of selection */
+  pageUrl: string;
+  /** Page title at time of selection */
+  pageTitle: string;
+};
 
 export type Project = {
   id: string;
