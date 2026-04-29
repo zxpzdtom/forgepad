@@ -1,26 +1,17 @@
-import { useCallback, useMemo, useState, type MouseEvent } from "react";
-import { Bot, Plus } from "lucide-react";
-import {
-  closestCenter,
-  DndContext,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-} from "@dnd-kit/core";
-import {
-  SortableContext,
-  horizontalListSortingStrategy,
-} from "@dnd-kit/sortable";
-import { useAppStore } from "@renderer/store/app-store";
-import { SortableTabItem } from "./SortableTabItem";
-import { TabContextMenu } from "./TabContextMenu";
-import { RenameModal } from "./RenameModal";
-import { agentPresetIcon } from "./AgentIcons";
-import type { Tab } from "@shared/types";
-import type { AgentStatus } from "@shared/agent-lifecycle";
+import { type MouseEvent, useCallback, useMemo, useState } from 'react';
+import { closestCenter, DndContext, type DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { horizontalListSortingStrategy, SortableContext } from '@dnd-kit/sortable';
+import { useAppStore } from '@renderer/store/app-store';
+import type { AgentStatus } from '@shared/agent-lifecycle';
+import type { Tab } from '@shared/types';
+import { Bot, Plus } from 'lucide-react';
 
-type TerminalTab = Extract<Tab, { type: "terminal" }>;
+import { agentPresetIcon } from './AgentIcons';
+import { RenameModal } from './RenameModal';
+import { SortableTabItem } from './SortableTabItem';
+import { TabContextMenu } from './TabContextMenu';
+
+type TerminalTab = Extract<Tab, { type: 'terminal' }>;
 
 function agentTabIcon(tab: TerminalTab, isWorking: boolean) {
   const inner = (() => {
@@ -31,22 +22,18 @@ function agentTabIcon(tab: TerminalTab, isWorking: boolean) {
     return <Bot size={13} />;
   })();
 
-  return (
-    <span className={`inline-flex${isWorking ? " animate-breathe" : ""}`}>
-      {inner}
-    </span>
-  );
+  return <span className={`inline-flex${isWorking ? 'animate-breathe' : ''}`}>{inner}</span>;
 }
 
 function StatusDot({ status }: { status: AgentStatus | undefined }) {
-  if (status === "review") {
+  if (status === 'review') {
     return (
       <span className="relative flex size-2 shrink-0">
         <span className="relative inline-flex size-2 rounded-full bg-ok" />
       </span>
     );
   }
-  if (status === "permission") {
+  if (status === 'permission') {
     return (
       <span className="relative flex size-2 shrink-0">
         <span className="absolute inline-flex size-full animate-ping rounded-full bg-warn opacity-75" />
@@ -72,9 +59,7 @@ export function AgentTabBar() {
   const reorderTabs = useAppStore((state) => state.reorderTabs);
   const renameTab = useAppStore((state) => state.renameTab);
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-  );
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
   const [contextMenu, setContextMenu] = useState<{
     tab: Tab;
@@ -82,13 +67,10 @@ export function AgentTabBar() {
     y: number;
   } | null>(null);
   const [renameTabId, setRenameTabId] = useState<string | null>(null);
-  const [renameValue, setRenameValue] = useState("");
+  const [renameValue, setRenameValue] = useState('');
 
   const agentTabs = tabs.filter(
-    (tab): tab is TerminalTab =>
-      tab.workspaceId === activeWorkspaceId &&
-      tab.type === "terminal" &&
-      tab.isAgent === true,
+    (tab): tab is TerminalTab => tab.workspaceId === activeWorkspaceId && tab.type === 'terminal' && tab.isAgent === true,
   );
 
   const activeId = activeAgentTabId ?? agentTabs[0]?.id;
@@ -111,25 +93,17 @@ export function AgentTabBar() {
   if (agentTabs.length === 0) return null;
 
   return (
-    <div className="column-tabbar flex h-9 shrink-0 items-center gap-1 border-b border-border bg-bg px-2">
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        onDragEnd={handleDragEnd}
-      >
-        <SortableContext
-          items={tabIds}
-          strategy={horizontalListSortingStrategy}
-        >
+    <div className="column-tabbar flex h-9 shrink-0 items-center gap-1 border-border border-b bg-bg px-2">
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <SortableContext items={tabIds} strategy={horizontalListSortingStrategy}>
           <div
-            className="tabs-scroll flex min-w-0 flex-1 items-center overflow-x-auto scrollbar-none scroll-mask-x"
+            className="tabs-scroll scrollbar-none scroll-mask-x flex min-w-0 flex-1 items-center overflow-x-auto"
             role="tablist"
           >
             {agentTabs.map((tab) => {
               const isExited = exitedPtyIds.has(tab.ptyId);
-              const status: AgentStatus | undefined =
-                agentStatuses[tab.ptyId] ?? (isExited ? undefined : "idle");
-              const isWorking = status === "working";
+              const status: AgentStatus | undefined = agentStatuses[tab.ptyId] ?? (isExited ? undefined : 'idle');
+              const isWorking = status === 'working';
 
               return (
                 <SortableTabItem
@@ -172,7 +146,7 @@ export function AgentTabBar() {
           onCloseToRight={closeTabsToRight}
           onRename={(id) => {
             const tab = agentTabs.find((t) => t.id === id);
-            setRenameValue(tab?.title ?? "");
+            setRenameValue(tab?.title ?? '');
             setRenameTabId(id);
           }}
         />

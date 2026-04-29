@@ -1,12 +1,12 @@
-import { execSync } from "node:child_process";
-import { existsSync, mkdirSync, unlinkSync, writeFileSync } from "node:fs";
-import { homedir } from "node:os";
-import { join } from "node:path";
-import { IPC } from "@shared/ipc";
-import type { WebContents } from "electron";
-import * as pty from "node-pty";
+import { execSync } from 'node:child_process';
+import { existsSync, mkdirSync, unlinkSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
+import { IPC } from '@shared/ipc';
+import type { WebContents } from 'electron';
+import * as pty from 'node-pty';
 
-const SESSIONS_DIR = join(homedir(), ".forgepad", "sessions");
+const SESSIONS_DIR = join(homedir(), '.forgepad', 'sessions');
 
 type PtyInstance = {
   process: pty.IPty;
@@ -18,8 +18,7 @@ type PtyInstance = {
 };
 
 const MAX_REPLAY_CHARS = 8_000_000;
-const FALLBACK_PATH =
-  "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin";
+const FALLBACK_PATH = '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin';
 
 /**
  * Resolve the user's login shell PATH by spawning a login shell.
@@ -31,9 +30,9 @@ let _resolvedUserPath: string | null = null;
 function getUserPath(): string {
   if (_resolvedUserPath !== null) return _resolvedUserPath;
   try {
-    const loginShell = process.env.SHELL || "/bin/zsh";
+    const loginShell = process.env.SHELL || '/bin/zsh';
     const result = execSync(`${loginShell} -ilc 'echo "___PATH___:$PATH"'`, {
-      encoding: "utf-8",
+      encoding: 'utf-8',
       timeout: 5000,
       env: { ...process.env, HOME: homedir() },
     });
@@ -45,9 +44,7 @@ function getUserPath(): string {
   } catch {
     // Fall through to process.env.PATH
   }
-  _resolvedUserPath = process.env.PATH
-    ? `${process.env.PATH}:${FALLBACK_PATH}`
-    : FALLBACK_PATH;
+  _resolvedUserPath = process.env.PATH ? `${process.env.PATH}:${FALLBACK_PATH}` : FALLBACK_PATH;
   return _resolvedUserPath;
 }
 
@@ -55,31 +52,19 @@ function appendReplay(instance: PtyInstance, data: string): void {
   if (!data) return;
   instance.replayChunks.push(data);
   instance.replayChars += data.length;
-  while (
-    instance.replayChars > MAX_REPLAY_CHARS &&
-    instance.replayChunks.length > 0
-  ) {
+  while (instance.replayChars > MAX_REPLAY_CHARS && instance.replayChunks.length > 0) {
     const removed = instance.replayChunks.shift();
     instance.replayChars -= removed?.length ?? 0;
   }
 }
 
 function splitCommand(input: string): string[] {
-  return (
-    input
-      .match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g)
-      ?.map((part) => part.replace(/^(['"])(.*)\1$/, "$2")) ?? []
-  );
+  return input.match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g)?.map((part) => part.replace(/^(['"])(.*)\1$/, '$2')) ?? [];
 }
 
 function defaultShellPath(): string {
-  const candidates = [
-    process.env.SHELL,
-    "/bin/zsh",
-    "/bin/bash",
-    "/bin/sh",
-  ].filter(Boolean) as string[];
-  return candidates.find((candidate) => existsSync(candidate)) ?? "/bin/sh";
+  const candidates = [process.env.SHELL, '/bin/zsh', '/bin/bash', '/bin/sh'].filter(Boolean) as string[];
+  return candidates.find((candidate) => existsSync(candidate)) ?? '/bin/sh';
 }
 
 function resolveShell(shell?: string): { file: string; args: string[] } {
@@ -114,11 +99,11 @@ export class PtyService {
     const env = {
       ...process.env,
       PATH: getUserPath(),
-      TERM: "xterm-256color",
-      COLORTERM: "truecolor",
+      TERM: 'xterm-256color',
+      COLORTERM: 'truecolor',
       FORGEPAD_PTY_ID: id,
-      FORGEPAD_CONTEXT_DIR: ".forgepad/context",
-      FORGEPAD_AGENT_COMMAND: commandText ?? "",
+      FORGEPAD_CONTEXT_DIR: '.forgepad/context',
+      FORGEPAD_AGENT_COMMAND: commandText ?? '',
       ...(this.hookPort > 0 ? { FORGEPAD_PORT: String(this.hookPort) } : {}),
       ...extraEnv,
     } as Record<string, string>;
@@ -126,17 +111,15 @@ export class PtyService {
     let proc: pty.IPty;
     try {
       proc = pty.spawn(shellConfig.file, args, {
-        name: "xterm-256color",
+        name: 'xterm-256color',
         cols: 100,
         rows: 30,
         cwd: worktreePath,
         env,
       });
     } catch (error) {
-      const detail = error instanceof Error ? error.message : "unknown error";
-      throw new Error(
-        `Failed to start terminal with ${shellConfig.file}: ${detail}`,
-      );
+      const detail = error instanceof Error ? error.message : 'unknown error';
+      throw new Error(`Failed to start terminal with ${shellConfig.file}: ${detail}`);
     }
 
     const instance: PtyInstance = {
@@ -155,10 +138,7 @@ export class PtyService {
       try {
         mkdirSync(SESSIONS_DIR, { recursive: true });
         sessionFile = join(SESSIONS_DIR, `${sessionId}.json`);
-        writeFileSync(
-          sessionFile,
-          JSON.stringify({ port: this.hookPort, ptyId: id }),
-        );
+        writeFileSync(sessionFile, JSON.stringify({ port: this.hookPort, ptyId: id }));
       } catch {
         // Non-critical — hooks won't fire but PTY still works
       }
@@ -182,11 +162,7 @@ export class PtyService {
         }
       }
       if (!instance.webContents.isDestroyed()) {
-        instance.webContents.send(
-          `${IPC.PTY_EXIT}:${id}`,
-          event.exitCode,
-          event.signal,
-        );
+        instance.webContents.send(`${IPC.PTY_EXIT}:${id}`, event.exitCode, event.signal);
       }
     });
 
@@ -234,13 +210,10 @@ export class PtyService {
     }
   }
 
-  reattach(
-    id: string,
-    webContents: WebContents,
-  ): { replay: string; alive: boolean } {
+  reattach(id: string, webContents: WebContents): { replay: string; alive: boolean } {
     const instance = this.ptys.get(id);
-    if (!instance) return { replay: "", alive: false };
+    if (!instance) return { replay: '', alive: false };
     instance.webContents = webContents;
-    return { replay: instance.replayChunks.join(""), alive: true };
+    return { replay: instance.replayChunks.join(''), alive: true };
   }
 }

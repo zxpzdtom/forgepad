@@ -1,5 +1,6 @@
-import { Monitor, Moon, Sun } from "lucide-react";
-import { SegmentedControl } from "./SegmentedControl";
+import { Monitor, Moon, Sun } from 'lucide-react';
+
+import { SegmentedControl } from './SegmentedControl';
 
 /**
  * Reusable theme picker with Follow / Dark / Light options.
@@ -10,8 +11,8 @@ import { SegmentedControl } from "./SegmentedControl";
  *   (for per-panel overrides that can defer to the app theme).
  */
 
-type AppThemeValue = "dark" | "light" | "system";
-type OverrideThemeValue = "follow" | "dark" | "light";
+type AppThemeValue = 'dark' | 'light' | 'system';
+type OverrideThemeValue = 'follow' | 'dark' | 'light';
 
 type ThemePickerProps =
   | {
@@ -34,11 +35,11 @@ export function ThemePicker(props: ThemePickerProps) {
         value={props.value}
         label={props.label}
         options={[
-          { value: "dark" as const, label: "Dark", icon: <Moon size={12} /> },
-          { value: "light" as const, label: "Light", icon: <Sun size={12} /> },
+          { value: 'dark' as const, label: 'Dark', icon: <Moon size={12} /> },
+          { value: 'light' as const, label: 'Light', icon: <Sun size={12} /> },
           {
-            value: "system" as const,
-            label: "System",
+            value: 'system' as const,
+            label: 'System',
             icon: <Monitor size={12} />,
           },
         ]}
@@ -53,12 +54,12 @@ export function ThemePicker(props: ThemePickerProps) {
       label={props.label}
       options={[
         {
-          value: "follow" as const,
-          label: "Follow",
+          value: 'follow' as const,
+          label: 'Follow',
           icon: <Monitor size={12} />,
         },
-        { value: "dark" as const, label: "Dark", icon: <Moon size={12} /> },
-        { value: "light" as const, label: "Light", icon: <Sun size={12} /> },
+        { value: 'dark' as const, label: 'Dark', icon: <Moon size={12} /> },
+        { value: 'light' as const, label: 'Light', icon: <Sun size={12} /> },
       ]}
       onChange={props.onChange}
     />

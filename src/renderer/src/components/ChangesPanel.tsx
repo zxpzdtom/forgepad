@@ -1,21 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  Check,
-  ChevronDown,
-  FolderOpen,
-  GitCommitHorizontal,
-  RefreshCw,
-  RotateCcw,
-  Trash2,
-} from "lucide-react";
-import type {
-  FileStatus,
-  GitBucket,
-  GitStatusKind,
-  Workspace,
-} from "@shared/types";
-import { useAppStore } from "@renderer/store/app-store";
-import { Spinner } from "./Spinner";
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useAppStore } from '@renderer/store/app-store';
+import type { FileStatus, GitBucket, GitStatusKind, Workspace } from '@shared/types';
+import { Check, ChevronDown, FolderOpen, GitCommitHorizontal, RefreshCw, RotateCcw, Trash2 } from 'lucide-react';
+
+import { Spinner } from './Spinner';
 
 function useActiveWorkspace(): Workspace | undefined {
   const workspaces = useAppStore((state) => state.workspaces);
@@ -28,17 +16,16 @@ function statusKey(status: FileStatus): string {
 }
 
 function bucketTitle(bucket: GitBucket): string {
-  if (bucket === "staged") return "Staged";
-  if (bucket === "untracked") return "Untracked";
-  return "Working Tree";
+  if (bucket === 'staged') return 'Staged';
+  if (bucket === 'untracked') return 'Untracked';
+  return 'Working Tree';
 }
 
 // --- Zed-style status indicator ---
 
 function StatusIndicator({ status }: { status: GitStatusKind }) {
-  const base =
-    "inline-flex size-3 shrink-0 items-center justify-center rounded-[2px] border leading-none";
-  if (status === "modified") {
+  const base = 'inline-flex size-3 shrink-0 items-center justify-center rounded-[2px] border leading-none';
+  if (status === 'modified') {
     return (
       <span className={`${base} border-warn text-warn`}>
         <svg width="6" height="6" viewBox="0 0 6 6" fill="currentColor">
@@ -47,56 +34,30 @@ function StatusIndicator({ status }: { status: GitStatusKind }) {
       </span>
     );
   }
-  if (status === "added" || status === "untracked") {
+  if (status === 'added' || status === 'untracked') {
     return (
       <span className={`${base} border-ok text-ok`}>
-        <svg
-          width="7"
-          height="7"
-          viewBox="0 0 7 7"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-        >
+        <svg width="7" height="7" viewBox="0 0 7 7" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
           <line x1="3.5" y1="1" x2="3.5" y2="6" />
           <line x1="1" y1="3.5" x2="6" y2="3.5" />
         </svg>
       </span>
     );
   }
-  if (status === "deleted") {
+  if (status === 'deleted') {
     return (
       <span className={`${base} border-danger text-danger`}>
-        <svg
-          width="7"
-          height="7"
-          viewBox="0 0 7 7"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          strokeLinecap="round"
-        >
+        <svg width="7" height="7" viewBox="0 0 7 7" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
           <line x1="1" y1="3.5" x2="6" y2="3.5" />
         </svg>
       </span>
     );
   }
-  if (status === "renamed") {
-    return (
-      <span
-        className={`${base} border-accent-2 text-accent-2 text-[7px] font-extrabold`}
-      >
-        R
-      </span>
-    );
+  if (status === 'renamed') {
+    return <span className={`${base} border-accent-2 font-extrabold text-[7px] text-accent-2`}>R</span>;
   }
   // conflicted
-  return (
-    <span className={`${base} border-warn text-warn text-[7px] font-extrabold`}>
-      !
-    </span>
-  );
+  return <span className={`${base} border-warn font-extrabold text-[7px] text-warn`}>!</span>;
 }
 
 // --- Tree data structure ---
@@ -114,16 +75,16 @@ type TreeNode = {
 };
 
 function buildTree(files: FileStatus[]): TreeNode[] {
-  const root: TreeNode = { name: "", path: "", isDir: true, children: [] };
+  const root: TreeNode = { name: '', path: '', isDir: true, children: [] };
 
   for (const file of files) {
-    const parts = file.path.split("/");
+    const parts = file.path.split('/');
     let current = root;
 
     for (let i = 0; i < parts.length; i++) {
       const part = parts[i];
       const isLast = i === parts.length - 1;
-      const partPath = parts.slice(0, i + 1).join("/");
+      const partPath = parts.slice(0, i + 1).join('/');
 
       if (isLast) {
         // leaf file
@@ -136,9 +97,7 @@ function buildTree(files: FileStatus[]): TreeNode[] {
         });
       } else {
         // directory
-        let dirNode = current.children.find(
-          (child) => child.isDir && child.name === part,
-        );
+        let dirNode = current.children.find((child) => child.isDir && child.name === part);
         if (!dirNode) {
           dirNode = { name: part, path: partPath, isDir: true, children: [] };
           current.children.push(dirNode);
@@ -154,7 +113,7 @@ function buildTree(files: FileStatus[]): TreeNode[] {
       if (a.isDir !== b.isDir) return a.isDir ? -1 : 1;
       return a.name.localeCompare(b.name, undefined, {
         numeric: true,
-        sensitivity: "base",
+        sensitivity: 'base',
       });
     });
     for (const child of node.children) {
@@ -183,17 +142,15 @@ function buildTree(files: FileStatus[]): TreeNode[] {
   // Compute aggregate status for directories
   const computeDirStatus = (node: TreeNode): GitStatusKind | undefined => {
     if (!node.isDir) return node.fileStatus?.status;
-    const childStatuses = node.children
-      .map(computeDirStatus)
-      .filter((s): s is GitStatusKind => s != null);
+    const childStatuses = node.children.map(computeDirStatus).filter((s): s is GitStatusKind => s != null);
     if (childStatuses.length === 0) return undefined;
     // Priority: deleted > modified > renamed > added > untracked > conflicted
-    if (childStatuses.includes("deleted")) return "deleted";
-    if (childStatuses.includes("modified")) return "modified";
-    if (childStatuses.includes("conflicted")) return "conflicted";
-    if (childStatuses.includes("renamed")) return "renamed";
-    if (childStatuses.includes("added")) return "added";
-    return "untracked";
+    if (childStatuses.includes('deleted')) return 'deleted';
+    if (childStatuses.includes('modified')) return 'modified';
+    if (childStatuses.includes('conflicted')) return 'conflicted';
+    if (childStatuses.includes('renamed')) return 'renamed';
+    if (childStatuses.includes('added')) return 'added';
+    return 'untracked';
   };
 
   const collapsed = collapse(root.children);
@@ -254,7 +211,7 @@ function TreeRow({
       {node.isDir ? (
         <span
           className={`inline-flex size-[18px] shrink-0 items-center justify-center text-muted transition-transform duration-100 ${
-            expanded ? "" : "-rotate-90"
+            expanded ? '' : '-rotate-90'
           }`}
         >
           <ChevronDown size={14} />
@@ -271,24 +228,18 @@ function TreeRow({
       ) : null}
 
       {/* Label */}
-      <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[13px]">
-        {node.name}
-      </span>
+      <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[13px]">{node.name}</span>
 
       {/* Trailing: stat counts + checkbox */}
       <span className="flex shrink-0 items-center gap-1.5">
         {!node.isDir && node.fileStatus && (
           <span className="inline-flex items-center gap-1 font-mono text-[11px]">
-            {node.fileStatus.additions != null &&
-              node.fileStatus.additions > 0 && (
-                <span className="text-ok">+{node.fileStatus.additions}</span>
-              )}
-            {node.fileStatus.deletions != null &&
-              node.fileStatus.deletions > 0 && (
-                <span className="text-danger">
-                  -{node.fileStatus.deletions}
-                </span>
-              )}
+            {node.fileStatus.additions != null && node.fileStatus.additions > 0 && (
+              <span className="text-ok">+{node.fileStatus.additions}</span>
+            )}
+            {node.fileStatus.deletions != null && node.fileStatus.deletions > 0 && (
+              <span className="text-danger">-{node.fileStatus.deletions}</span>
+            )}
           </span>
         )}
         <input
@@ -368,7 +319,7 @@ export function ChangesPanel() {
   const [statuses, setStatuses] = useState<FileStatus[]>([]);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
-  const [commitMessage, setCommitMessage] = useState("");
+  const [commitMessage, setCommitMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const addToast = useAppStore((state) => state.addToast);
   const openDiffTab = useAppStore((state) => state.openDiffTab);
@@ -376,35 +327,23 @@ export function ChangesPanel() {
   const gitRefreshEpoch = useAppStore((state) => state.gitRefreshEpoch);
   const spinnerStyle = useAppStore((state) => state.settings.spinnerStyle);
 
-  const prevSignature = useRef("");
+  const prevSignature = useRef('');
 
   const load = useCallback(
     async (silent?: boolean) => {
       if (!workspace) return;
       if (!silent) setLoading(true);
       try {
-        const next = await window.forgepad.git.getStatus(
-          workspace.worktreePath,
-        );
-        const sig = next.map((s) => statusKey(s)).join(",");
+        const next = await window.forgepad.git.getStatus(workspace.worktreePath);
+        const sig = next.map((s) => statusKey(s)).join(',');
         setStatuses(next);
-        setSelectedKeys(
-          (current) =>
-            new Set(
-              [...current].filter((key) =>
-                next.some((status) => statusKey(status) === key),
-              ),
-            ),
-        );
+        setSelectedKeys((current) => new Set([...current].filter((key) => next.some((status) => statusKey(status) === key))));
         if (sig !== prevSignature.current) {
           prevSignature.current = sig;
           if (silent) triggerGitRefresh();
         }
       } catch (error) {
-        addToast(
-          "error",
-          error instanceof Error ? error.message : "Failed to load git status.",
-        );
+        addToast('error', error instanceof Error ? error.message : 'Failed to load git status.');
       } finally {
         if (!silent) setLoading(false);
       }
@@ -429,10 +368,7 @@ export function ChangesPanel() {
     return () => clearInterval(timer);
   }, [workspace, load]);
 
-  const selected = useMemo(
-    () => statuses.filter((status) => selectedKeys.has(statusKey(status))),
-    [selectedKeys, statuses],
-  );
+  const selected = useMemo(() => statuses.filter((status) => selectedKeys.has(statusKey(status))), [selectedKeys, statuses]);
 
   const byBucket = useMemo(() => {
     const buckets: Record<GitBucket, FileStatus[]> = {
@@ -496,72 +432,53 @@ export function ChangesPanel() {
     [workspace, openDiffTab],
   );
 
-  const mutate = async (kind: "stage" | "unstage" | "discard" | "commit") => {
+  const mutate = async (kind: 'stage' | 'unstage' | 'discard' | 'commit') => {
     if (!workspace) return;
     try {
-      if (kind === "stage") {
+      if (kind === 'stage') {
         await window.forgepad.git.stage(
           workspace.worktreePath,
           selected.map((s) => s.path),
         );
-      } else if (kind === "unstage") {
+      } else if (kind === 'unstage') {
         await window.forgepad.git.unstage(
           workspace.worktreePath,
           selected.map((s) => s.path),
         );
-      } else if (kind === "discard") {
-        const ok = window.confirm(
-          "Discard selected changes? This cannot be undone.",
-        );
+      } else if (kind === 'discard') {
+        const ok = window.confirm('Discard selected changes? This cannot be undone.');
         if (!ok) return;
         await window.forgepad.git.discard(
           workspace.worktreePath,
           selected.map((s) => ({ path: s.path, bucket: s.bucket })),
         );
-      } else if (kind === "commit") {
+      } else if (kind === 'commit') {
         await window.forgepad.git.commit(workspace.worktreePath, commitMessage);
-        setCommitMessage("");
+        setCommitMessage('');
       }
       await load();
       triggerGitRefresh();
-      addToast("success", "Git operation completed.");
+      addToast('success', 'Git operation completed.');
     } catch (error) {
-      addToast(
-        "error",
-        error instanceof Error ? error.message : "Git operation failed.",
-      );
+      addToast('error', error instanceof Error ? error.message : 'Git operation failed.');
     }
   };
 
   if (!workspace) {
-    return (
-      <div className="grid min-h-[90px] place-items-center text-muted">
-        Open a project first
-      </div>
-    );
+    return <div className="grid min-h-[90px] place-items-center text-muted">Open a project first</div>;
   }
 
-  const bucketOrder: GitBucket[] = ["staged", "unstaged", "untracked"];
+  const bucketOrder: GitBucket[] = ['staged', 'unstaged', 'untracked'];
 
   return (
     <section className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-hidden p-2.5">
       {/* Toolbar */}
       <div className="flex min-h-8 items-center gap-2">
-        <button
-          className="secondary-button"
-          type="button"
-          disabled={selected.length === 0}
-          onClick={() => mutate("stage")}
-        >
+        <button className="secondary-button" type="button" disabled={selected.length === 0} onClick={() => mutate('stage')}>
           <Check size={15} />
           Stage
         </button>
-        <button
-          className="secondary-button"
-          type="button"
-          disabled={selected.length === 0}
-          onClick={() => mutate("unstage")}
-        >
+        <button className="secondary-button" type="button" disabled={selected.length === 0} onClick={() => mutate('unstage')}>
           <RotateCcw size={15} />
           Unstage
         </button>
@@ -570,37 +487,26 @@ export function ChangesPanel() {
           type="button"
           title="Discard selected"
           disabled={selected.length === 0}
-          onClick={() => mutate("discard")}
+          onClick={() => mutate('discard')}
         >
           <Trash2 size={15} />
         </button>
-        <button
-          className="icon-button"
-          type="button"
-          title="Refresh changes"
-          onClick={load}
-        >
+        <button className="icon-button" type="button" title="Refresh changes" onClick={load}>
           <RefreshCw size={15} />
         </button>
       </div>
 
       {/* Tree view */}
-      <div className="flex min-h-0 flex-1 flex-col gap-1 overflow-auto scrollbar-thin scroll-mask-y">
+      <div className="scrollbar-thin scroll-mask-y flex min-h-0 flex-1 flex-col gap-1 overflow-auto">
         {loading && (
           <div className="grid min-h-[52px] place-items-center text-muted">
             <span className="flex items-center gap-1.5 text-xs">
-              <Spinner
-                name={
-                  spinnerStyle as import("unicode-animations").BrailleSpinnerName
-                }
-              />
+              <Spinner name={spinnerStyle as import('unicode-animations').BrailleSpinnerName} />
             </span>
           </div>
         )}
         {!loading && statuses.length === 0 && (
-          <div className="grid min-h-[52px] place-items-center text-muted">
-            Clean working tree
-          </div>
+          <div className="grid min-h-[52px] place-items-center text-muted">Clean working tree</div>
         )}
         {bucketOrder.map((bucket) => {
           const trees = treesByBucket[bucket];
@@ -608,7 +514,7 @@ export function ChangesPanel() {
           const bucketFiles = byBucket[bucket];
           return (
             <div key={bucket} className="mb-1">
-              <div className="flex items-center justify-between px-1 py-1 text-xs text-muted">
+              <div className="flex items-center justify-between px-1 py-1 text-muted text-xs">
                 <span className="font-[510]">{bucketTitle(bucket)}</span>
                 <span>{bucketFiles.length}</span>
               </div>
@@ -627,19 +533,14 @@ export function ChangesPanel() {
       </div>
 
       {/* Commit area */}
-      <div className="grid gap-2 border-t border-border pt-2.5">
+      <div className="grid gap-2 border-border border-t pt-2.5">
         <textarea
           className="commit-textarea"
           value={commitMessage}
           onChange={(event) => setCommitMessage(event.currentTarget.value)}
           placeholder="Commit message"
         />
-        <button
-          className="primary-button w-full"
-          type="button"
-          disabled={!commitMessage.trim()}
-          onClick={() => mutate("commit")}
-        >
+        <button className="primary-button w-full" type="button" disabled={!commitMessage.trim()} onClick={() => mutate('commit')}>
           <GitCommitHorizontal size={16} />
           Commit Staged
         </button>

@@ -1,36 +1,19 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type MouseEvent,
-} from "react";
-import { Bot, ClipboardList, GitCompare, TerminalSquare } from "lucide-react";
-import {
-  closestCenter,
-  DndContext,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-} from "@dnd-kit/core";
-import { restrictToHorizontalAxis, restrictToParentElement } from "@dnd-kit/modifiers";
-import {
-  SortableContext,
-  horizontalListSortingStrategy,
-} from "@dnd-kit/sortable";
-import { getTabTitle, useAppStore } from "@renderer/store/app-store";
-import { SortableTabItem } from "./SortableTabItem";
-import { TabContextMenu } from "./TabContextMenu";
-import { FileIcon } from "./FileIcon";
-import type { Tab } from "@shared/types";
+import { type MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { closestCenter, DndContext, type DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { restrictToHorizontalAxis, restrictToParentElement } from '@dnd-kit/modifiers';
+import { horizontalListSortingStrategy, SortableContext } from '@dnd-kit/sortable';
+import { getTabTitle, useAppStore } from '@renderer/store/app-store';
+import type { Tab } from '@shared/types';
+import { Bot, ClipboardList, GitCompare, TerminalSquare } from 'lucide-react';
+
+import { FileIcon } from './FileIcon';
+import { SortableTabItem } from './SortableTabItem';
+import { TabContextMenu } from './TabContextMenu';
 
 function tabIcon(tab: Tab) {
-  if (tab.type === "terminal")
-    return tab.isAgent ? <Bot size={14} /> : <TerminalSquare size={14} />;
-  if (tab.type === "diff") return <GitCompare size={14} />;
-  if (tab.type === "context-preview") return <ClipboardList size={14} />;
+  if (tab.type === 'terminal') return tab.isAgent ? <Bot size={14} /> : <TerminalSquare size={14} />;
+  if (tab.type === 'diff') return <GitCompare size={14} />;
+  if (tab.type === 'context-preview') return <ClipboardList size={14} />;
   return <FileIcon filePath={tab.relPath} size={16} />;
 }
 
@@ -46,16 +29,10 @@ export function TabBar() {
   const closeTabsToRight = useAppStore((state) => state.closeTabsToRight);
   const reorderTabs = useAppStore((state) => state.reorderTabs);
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-  );
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
-  const workspaceTabs = tabs.filter(
-    (tab) => tab.workspaceId === activeWorkspaceId && tab.type !== "terminal",
-  );
-  const activeWorkspace = workspaces.find(
-    (workspace) => workspace.id === activeWorkspaceId,
-  );
+  const workspaceTabs = tabs.filter((tab) => tab.workspaceId === activeWorkspaceId && tab.type !== 'terminal');
+  const activeWorkspace = workspaces.find((workspace) => workspace.id === activeWorkspaceId);
   const [contextMenu, setContextMenu] = useState<{
     tab: Tab;
     x: number;
@@ -78,14 +55,12 @@ export function TabBar() {
   // Scroll the active file tab into view whenever it changes
   useEffect(() => {
     if (!activeFileTabId || !tabListRef.current) return;
-    const el = tabListRef.current.querySelector<HTMLElement>(
-      `[data-tab-id="${activeFileTabId}"]`,
-    );
+    const el = tabListRef.current.querySelector<HTMLElement>(`[data-tab-id="${activeFileTabId}"]`);
     if (el) {
       el.scrollIntoView({
-        block: "nearest",
-        inline: "nearest",
-        behavior: "smooth",
+        block: 'nearest',
+        inline: 'nearest',
+        behavior: 'smooth',
       });
     }
   }, [activeFileTabId]);
@@ -103,13 +78,10 @@ export function TabBar() {
         modifiers={[restrictToHorizontalAxis, restrictToParentElement]}
         onDragEnd={handleDragEnd}
       >
-        <SortableContext
-          items={tabIds}
-          strategy={horizontalListSortingStrategy}
-        >
+        <SortableContext items={tabIds} strategy={horizontalListSortingStrategy}>
           <div
             ref={tabListRef}
-            className="tabs-scroll flex min-w-0 flex-1 overflow-x-auto scrollbar-none scroll-mask-x"
+            className="tabs-scroll scrollbar-none scroll-mask-x flex min-w-0 flex-1 overflow-x-auto"
             role="tablist"
           >
             {workspaceTabs.map((tab) => (

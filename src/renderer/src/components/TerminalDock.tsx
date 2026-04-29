@@ -1,25 +1,16 @@
-import { useCallback, useMemo, useRef, useState, type MouseEvent } from "react";
-import { Bot, Minimize2, Plus, TerminalSquare } from "lucide-react";
-import {
-  closestCenter,
-  DndContext,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-} from "@dnd-kit/core";
-import {
-  SortableContext,
-  horizontalListSortingStrategy,
-} from "@dnd-kit/sortable";
-import { useAppStore } from "@renderer/store/app-store";
-import { SortableTabItem } from "./SortableTabItem";
-import { TerminalPanel } from "./TerminalPanel";
-import { TabContextMenu } from "./TabContextMenu";
-import { RenameModal } from "./RenameModal";
-import type { Tab, Workspace } from "@shared/types";
+import { type MouseEvent, useCallback, useMemo, useRef, useState } from 'react';
+import { closestCenter, DndContext, type DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { horizontalListSortingStrategy, SortableContext } from '@dnd-kit/sortable';
+import { useAppStore } from '@renderer/store/app-store';
+import type { Tab, Workspace } from '@shared/types';
+import { Bot, Minimize2, Plus, TerminalSquare } from 'lucide-react';
 
-type TerminalTab = Extract<Tab, { type: "terminal" }>;
+import { RenameModal } from './RenameModal';
+import { SortableTabItem } from './SortableTabItem';
+import { TabContextMenu } from './TabContextMenu';
+import { TerminalPanel } from './TerminalPanel';
+
+type TerminalTab = Extract<Tab, { type: 'terminal' }>;
 
 function terminalIcon(tab: TerminalTab) {
   return tab.isAgent ? <Bot size={13} /> : <TerminalSquare size={13} />;
@@ -36,16 +27,12 @@ export function TerminalDock() {
   const closeAllTabs = useAppStore((state) => state.closeAllTabs);
   const closeTabsToRight = useAppStore((state) => state.closeTabsToRight);
   const createTerminal = useAppStore((state) => state.createTerminal);
-  const setTerminalPanelOpen = useAppStore(
-    (state) => state.setTerminalPanelOpen,
-  );
+  const setTerminalPanelOpen = useAppStore((state) => state.setTerminalPanelOpen);
   const reorderTabs = useAppStore((state) => state.reorderTabs);
   const renameTab = useAppStore((state) => state.renameTab);
   const setFocusedColumn = useAppStore((state) => state.setFocusedColumn);
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-  );
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
   const [contextMenu, setContextMenu] = useState<{
     tab: Tab;
@@ -53,18 +40,13 @@ export function TerminalDock() {
     y: number;
   } | null>(null);
   const [renameTabId, setRenameTabId] = useState<string | null>(null);
-  const [renameValue, setRenameValue] = useState("");
+  const [renameValue, setRenameValue] = useState('');
 
   const terminalTabs = tabs.filter(
-    (tab): tab is TerminalTab =>
-      tab.workspaceId === activeWorkspaceId &&
-      tab.type === "terminal" &&
-      !tab.isAgent,
+    (tab): tab is TerminalTab => tab.workspaceId === activeWorkspaceId && tab.type === 'terminal' && !tab.isAgent,
   );
   const activeId = activeShellTabId ?? terminalTabs[0]?.id;
-  const activeWorkspace = workspaces.find(
-    (workspace) => workspace.id === activeWorkspaceId,
-  ) as Workspace | undefined;
+  const activeWorkspace = workspaces.find((workspace) => workspace.id === activeWorkspaceId) as Workspace | undefined;
 
   const handleContextMenu = useCallback((event: MouseEvent, tab: Tab) => {
     event.preventDefault();
@@ -87,14 +69,14 @@ export function TerminalDock() {
   const dragCounterRef = useRef(0);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
-    if (e.dataTransfer.types.includes("application/x-forgepad-path")) {
+    if (e.dataTransfer.types.includes('application/x-forgepad-path')) {
       e.preventDefault();
-      e.dataTransfer.dropEffect = "copy";
+      e.dataTransfer.dropEffect = 'copy';
     }
   }, []);
 
   const handleDragEnter = useCallback((e: React.DragEvent) => {
-    if (e.dataTransfer.types.includes("application/x-forgepad-path")) {
+    if (e.dataTransfer.types.includes('application/x-forgepad-path')) {
       e.preventDefault();
       dragCounterRef.current++;
       setDropHighlight(true);
@@ -115,9 +97,7 @@ export function TerminalDock() {
       dragCounterRef.current = 0;
       setDropHighlight(false);
 
-      const path =
-        e.dataTransfer.getData("application/x-forgepad-path") ||
-        e.dataTransfer.getData("text/plain");
+      const path = e.dataTransfer.getData('application/x-forgepad-path') || e.dataTransfer.getData('text/plain');
       if (!path) return;
 
       e.stopPropagation(); // prevent outer fallback handler from firing
@@ -133,25 +113,18 @@ export function TerminalDock() {
 
   return (
     <section
-      className={`flex size-full min-h-0 flex-col border-t border-border bg-surface-terminal${dropHighlight ? " drop-target-active" : ""}`}
-      onMouseDown={() => setFocusedColumn("agent")}
+      className={`flex size-full min-h-0 flex-col border-border border-t bg-surface-terminal${dropHighlight ? 'drop-target-active' : ''}`}
+      onMouseDown={() => setFocusedColumn('agent')}
       onDragOver={handleDragOver}
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      <div className="column-tabbar flex h-9 shrink-0 items-center gap-1 border-b border-border bg-bg px-2">
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragEnd={handleDragEnd}
-        >
-          <SortableContext
-            items={tabIds}
-            strategy={horizontalListSortingStrategy}
-          >
+      <div className="column-tabbar flex h-9 shrink-0 items-center gap-1 border-border border-b bg-bg px-2">
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={tabIds} strategy={horizontalListSortingStrategy}>
             <div
-              className="tabs-scroll flex min-w-0 flex-1 items-center overflow-x-auto scrollbar-none scroll-mask-x"
+              className="tabs-scroll scrollbar-none scroll-mask-x flex min-w-0 flex-1 items-center overflow-x-auto"
               role="tablist"
             >
               {terminalTabs.map((tab) => (
@@ -183,24 +156,14 @@ export function TerminalDock() {
         >
           <Plus size={14} />
         </button>
-        <button
-          className="icon-button small"
-          type="button"
-          title="Hide terminal"
-          onClick={() => setTerminalPanelOpen(false)}
-        >
+        <button className="icon-button small" type="button" title="Hide terminal" onClick={() => setTerminalPanelOpen(false)}>
           <Minimize2 size={13} />
         </button>
       </div>
 
       <div className="relative min-h-0 flex-1 overflow-hidden">
         {terminalTabs.map((tab) => (
-          <TerminalPanel
-            key={tab.id}
-            tab={tab}
-            workspace={activeWorkspace}
-            active={tab.id === activeId}
-          />
+          <TerminalPanel key={tab.id} tab={tab} workspace={activeWorkspace} active={tab.id === activeId} />
         ))}
       </div>
 
@@ -216,7 +179,7 @@ export function TerminalDock() {
           onCloseToRight={closeTabsToRight}
           onRename={(id) => {
             const tab = terminalTabs.find((t) => t.id === id);
-            setRenameValue(tab?.title ?? "");
+            setRenameValue(tab?.title ?? '');
             setRenameTabId(id);
           }}
         />

@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { ReactNode } from 'react';
 
 export function SegmentedControl<T extends string>({
   value,
@@ -19,7 +19,7 @@ export function SegmentedControl<T extends string>({
           type="button"
           role="radio"
           aria-checked={value === opt.value}
-          className={`flex items-center gap-1.5 ${value === opt.value ? "active" : ""}`}
+          className={`flex items-center gap-1.5 ${value === opt.value ? 'active' : ''}`}
           onClick={() => onChange(opt.value)}
         >
           {opt.icon}
