@@ -1,33 +1,26 @@
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
-import { Allotment } from "allotment";
-import { Bot, FolderOpen, GitBranch, TerminalSquare } from "lucide-react";
-import { Sidebar } from "@renderer/components/Sidebar";
-import { AgentColumn } from "@renderer/components/AgentColumn";
-import { AgentQuickBar } from "@renderer/components/AgentQuickBar";
-import { AgentTabBar } from "@renderer/components/AgentTabBar";
-import { useAgentLifecycle } from "@renderer/hooks/useAgentLifecycle";
-import { FileColumn } from "@renderer/components/FileColumn";
-import { QuickSearch } from "@renderer/components/QuickSearch";
-import { RightPanel } from "@renderer/components/RightPanel";
-import { TabBar } from "@renderer/components/TabBar";
-import { TerminalDock } from "@renderer/components/TerminalDock";
-import { TopBar } from "@renderer/components/TopBar";
-import { ToastStack } from "@renderer/components/ToastStack";
-import { SettingsPanel } from "@renderer/components/SettingsPanel";
-import { useAppStore } from "@renderer/store/app-store";
-import { useTheme, type ResolvedTheme } from "@renderer/hooks/useTheme";
-import { eventMatchesCombo } from "@renderer/lib/shortcut-utils";
-import type { ShortcutActionId } from "@shared/types";
-import { DEFAULT_SHORTCUTS } from "@shared/types";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { AgentColumn } from '@renderer/components/AgentColumn';
+import { AgentQuickBar } from '@renderer/components/AgentQuickBar';
+import { AgentTabBar } from '@renderer/components/AgentTabBar';
+import { FileColumn } from '@renderer/components/FileColumn';
+import { QuickSearch } from '@renderer/components/QuickSearch';
+import { RightPanel } from '@renderer/components/RightPanel';
+import { SettingsPanel } from '@renderer/components/SettingsPanel';
+import { Sidebar } from '@renderer/components/Sidebar';
+import { TabBar } from '@renderer/components/TabBar';
+import { TerminalDock } from '@renderer/components/TerminalDock';
+import { ToastStack } from '@renderer/components/ToastStack';
+import { TopBar } from '@renderer/components/TopBar';
+import { useAgentLifecycle } from '@renderer/hooks/useAgentLifecycle';
+import { type ResolvedTheme, useTheme } from '@renderer/hooks/useTheme';
+import { eventMatchesCombo } from '@renderer/lib/shortcut-utils';
+import { useAppStore } from '@renderer/store/app-store';
+import type { ShortcutActionId } from '@shared/types';
+import { DEFAULT_SHORTCUTS } from '@shared/types';
+import { Allotment } from 'allotment';
+import { Bot, FolderOpen, GitBranch, TerminalSquare } from 'lucide-react';
 
-export const ThemeContext = createContext<ResolvedTheme>("dark");
+export const ThemeContext = createContext<ResolvedTheme>('dark');
 export const useResolvedTheme = () => useContext(ThemeContext);
 
 export function App() {
@@ -74,10 +67,7 @@ export function App() {
   const settingsOpen = useAppStore((state) => state.settingsOpen);
   const addToast = useAppStore((state) => state.addToast);
   const keyboardShortcuts = useAppStore((s) => s.settings.keyboardShortcuts);
-  const shortcuts = useMemo(
-    () => ({ ...DEFAULT_SHORTCUTS, ...(keyboardShortcuts ?? {}) }),
-    [keyboardShortcuts],
-  );
+  const shortcuts = useMemo(() => ({ ...DEFAULT_SHORTCUTS, ...(keyboardShortcuts ?? {}) }), [keyboardShortcuts]);
   const toggleSidebar = useAppStore((s) => s.toggleSidebar);
   const toggleRightPanel = useAppStore((s) => s.toggleRightPanel);
   const rightPanelMode = useAppStore((s) => s.rightPanelMode);
@@ -91,14 +81,7 @@ export function App() {
       })
       .catch((error) => {
         useAppStore.getState().hydrate(null);
-        useAppStore
-          .getState()
-          .addToast(
-            "error",
-            error instanceof Error
-              ? error.message
-              : "Failed to load workspace state.",
-          );
+        useAppStore.getState().addToast('error', error instanceof Error ? error.message : 'Failed to load workspace state.');
       });
     return () => {
       disposed = true;
@@ -112,12 +95,7 @@ export function App() {
       if (saveTimer) window.clearTimeout(saveTimer);
       saveTimer = window.setTimeout(() => {
         window.forgepad.state.save(state.toPersistedState()).catch((error) => {
-          state.addToast(
-            "error",
-            error instanceof Error
-              ? error.message
-              : "Failed to save workspace state.",
-          );
+          state.addToast('error', error instanceof Error ? error.message : 'Failed to save workspace state.');
         });
       }, 400);
     });
@@ -144,43 +122,34 @@ export function App() {
         })),
       cycleTabForward: () => {
         const state = useAppStore.getState();
-        const wsTabs = state.tabs.filter(
-          (t) => t.workspaceId === state.activeWorkspaceId,
-        );
+        const wsTabs = state.tabs.filter((t) => t.workspaceId === state.activeWorkspaceId);
         let columnTabs;
-        if (focusedColumn === "agent") {
-          columnTabs = wsTabs.filter((t) => t.type === "terminal");
-        } else if (focusedColumn === "file") {
-          columnTabs = wsTabs.filter((t) => t.type !== "terminal");
+        if (focusedColumn === 'agent') {
+          columnTabs = wsTabs.filter((t) => t.type === 'terminal');
+        } else if (focusedColumn === 'file') {
+          columnTabs = wsTabs.filter((t) => t.type !== 'terminal');
         } else {
           columnTabs = wsTabs;
         }
         if (columnTabs.length <= 1) return;
-        const currentIdx = columnTabs.findIndex(
-          (t) => t.id === state.activeTabId,
-        );
+        const currentIdx = columnTabs.findIndex((t) => t.id === state.activeTabId);
         const nextIdx = (currentIdx + 1) % columnTabs.length;
         setActiveTab(columnTabs[nextIdx].id);
       },
       cycleTabBackward: () => {
         const state = useAppStore.getState();
-        const wsTabs = state.tabs.filter(
-          (t) => t.workspaceId === state.activeWorkspaceId,
-        );
+        const wsTabs = state.tabs.filter((t) => t.workspaceId === state.activeWorkspaceId);
         let columnTabs;
-        if (focusedColumn === "agent") {
-          columnTabs = wsTabs.filter((t) => t.type === "terminal");
-        } else if (focusedColumn === "file") {
-          columnTabs = wsTabs.filter((t) => t.type !== "terminal");
+        if (focusedColumn === 'agent') {
+          columnTabs = wsTabs.filter((t) => t.type === 'terminal');
+        } else if (focusedColumn === 'file') {
+          columnTabs = wsTabs.filter((t) => t.type !== 'terminal');
         } else {
           columnTabs = wsTabs;
         }
         if (columnTabs.length <= 1) return;
-        const currentIdx = columnTabs.findIndex(
-          (t) => t.id === state.activeTabId,
-        );
-        const nextIdx =
-          (currentIdx - 1 + columnTabs.length) % columnTabs.length;
+        const currentIdx = columnTabs.findIndex((t) => t.id === state.activeTabId);
+        const nextIdx = (currentIdx - 1 + columnTabs.length) % columnTabs.length;
         setActiveTab(columnTabs[nextIdx].id);
       },
       switchTab1: () => switchTabByIndex(0),
@@ -202,68 +171,60 @@ export function App() {
       toggleRightPanel: () => toggleRightPanel(),
       openRightPanelFiles: () => {
         const state = useAppStore.getState();
-        if (state.rightPanelOpen && state.rightPanelMode === "files") {
+        if (state.rightPanelOpen && state.rightPanelMode === 'files') {
           useAppStore.setState({ rightPanelOpen: false });
         } else {
-          setRightPanelMode("files");
+          setRightPanelMode('files');
         }
       },
       openRightPanelChanges: () => {
         const state = useAppStore.getState();
-        if (state.rightPanelOpen && state.rightPanelMode === "changes") {
+        if (state.rightPanelOpen && state.rightPanelMode === 'changes') {
           useAppStore.setState({ rightPanelOpen: false });
         } else {
-          setRightPanelMode("changes");
+          setRightPanelMode('changes');
         }
       },
       openRightPanelContext: () => {
         const state = useAppStore.getState();
-        if (state.rightPanelOpen && state.rightPanelMode === "context") {
+        if (state.rightPanelOpen && state.rightPanelMode === 'context') {
           useAppStore.setState({ rightPanelOpen: false });
         } else {
-          setRightPanelMode("context");
+          setRightPanelMode('context');
         }
       },
       copyPath: () => {
         const state = useAppStore.getState();
         const tab = state.tabs.find((t) => t.id === state.activeTabId);
-        if (!tab || tab.type !== "file") return;
+        if (!tab || tab.type !== 'file') return;
         const ws = state.workspaces.find((w) => w.id === tab.workspaceId);
         if (!ws) return;
         void navigator.clipboard.writeText(`${ws.worktreePath}/${tab.relPath}`);
-        state.addToast("info", "Path copied");
+        state.addToast('info', 'Path copied');
       },
       copyRelativePath: () => {
         const state = useAppStore.getState();
         const tab = state.tabs.find((t) => t.id === state.activeTabId);
-        if (!tab || tab.type !== "file") return;
+        if (!tab || tab.type !== 'file') return;
         void navigator.clipboard.writeText(tab.relPath);
-        state.addToast("info", "Relative path copied");
+        state.addToast('info', 'Relative path copied');
       },
     };
 
     function switchTabByIndex(idx: number) {
       const state = useAppStore.getState();
-      if (focusedColumn === "agent") {
+      if (focusedColumn === 'agent') {
         const agentTabs = state.tabs.filter(
-          (t) =>
-            t.workspaceId === state.activeWorkspaceId &&
-            t.type === "terminal" &&
-            t.isAgent,
+          (t) => t.workspaceId === state.activeWorkspaceId && t.type === 'terminal' && t.isAgent,
         );
         if (idx < agentTabs.length) setActiveTab(agentTabs[idx].id);
-      } else if (focusedColumn === "file") {
-        const fileTabs = state.tabs.filter(
-          (t) =>
-            t.workspaceId === state.activeWorkspaceId && t.type !== "terminal",
-        );
+      } else if (focusedColumn === 'file') {
+        const fileTabs = state.tabs.filter((t) => t.workspaceId === state.activeWorkspaceId && t.type !== 'terminal');
         if (idx < fileTabs.length) setActiveTab(fileTabs[idx].id);
       } else {
         const orderedIds: string[] = [];
         for (const project of state.projects) {
-          for (const ws of state.workspaces.filter(
-            (w) => w.projectId === project.id,
-          )) {
+          for (const ws of state.workspaces.filter((w) => w.projectId === project.id)) {
             orderedIds.push(ws.id);
           }
         }
@@ -285,8 +246,8 @@ export function App() {
       }
     };
 
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
   }, [
     activeTabId,
     activeWorkspaceId,
@@ -295,14 +256,11 @@ export function App() {
     createTerminal,
     focusedColumn,
     setActiveTab,
-    setActiveWorkspace,
     setRightPanelMode,
     toggleTerminalPanel,
     toggleSidebar,
     toggleRightPanel,
-    rightPanelMode,
     shortcuts,
-    tabs,
   ]);
 
   const activeWorkspace = useMemo(
@@ -335,12 +293,7 @@ export function App() {
         });
       })
       .catch((error) => {
-        addToast(
-          "error",
-          error instanceof Error
-            ? error.message
-            : "Failed to watch workspace changes.",
-        );
+        addToast('error', error instanceof Error ? error.message : 'Failed to watch workspace changes.');
       });
 
     return () => {
@@ -351,46 +304,33 @@ export function App() {
     };
   }, [activeWorkspace, addToast, triggerGitRefresh]);
 
-  const workspaceTabs = tabs.filter(
-    (tab) => tab.workspaceId === activeWorkspaceId,
-  );
-  const hasAgentTabs = workspaceTabs.some(
-    (tab) => tab.type === "terminal" && tab.isAgent,
-  );
-  const hasShellTabs = workspaceTabs.some(
-    (tab) => tab.type === "terminal" && !tab.isAgent,
-  );
+  const workspaceTabs = tabs.filter((tab) => tab.workspaceId === activeWorkspaceId);
+  const hasAgentTabs = workspaceTabs.some((tab) => tab.type === 'terminal' && tab.isAgent);
+  const hasShellTabs = workspaceTabs.some((tab) => tab.type === 'terminal' && !tab.isAgent);
   const hasTerminalTabs = hasAgentTabs || hasShellTabs;
-  const hasFileTabs = workspaceTabs.some((tab) => tab.type !== "terminal");
+  const hasFileTabs = workspaceTabs.some((tab) => tab.type !== 'terminal');
 
   // Animate sidebar & right panel toggle via transient CSS transition
   useEffect(() => {
-    const el = horizontalSplitRef.current
-      ? (document.querySelector(".app-horizontal-split") as HTMLElement | null)
-      : null;
+    const el = horizontalSplitRef.current ? (document.querySelector('.app-horizontal-split') as HTMLElement | null) : null;
     if (!el) return;
-    el.classList.add("panel-animating");
+    el.classList.add('panel-animating');
     if (sidebarOpen) {
       requestAnimationFrame(() => {
         horizontalSplitRef.current?.resize([sidebarWidthRef.current]);
       });
     }
-    const tid = window.setTimeout(
-      () => el.classList.remove("panel-animating"),
-      220,
-    );
+    const tid = window.setTimeout(() => el.classList.remove('panel-animating'), 220);
     return () => {
       window.clearTimeout(tid);
-      el?.classList.remove("panel-animating");
+      el?.classList.remove('panel-animating');
     };
   }, [sidebarOpen]);
 
   useEffect(() => {
-    const el = document.querySelector(
-      ".app-horizontal-split",
-    ) as HTMLElement | null;
+    const el = document.querySelector('.app-horizontal-split') as HTMLElement | null;
     if (!el) return;
-    el.classList.add("panel-animating");
+    el.classList.add('panel-animating');
     if (rightPanelOpen) {
       requestAnimationFrame(() => {
         const total = el.clientWidth;
@@ -399,13 +339,10 @@ export function App() {
         horizontalSplitRef.current?.resize([sw, total - sw - rw, rw]);
       });
     }
-    const tid = window.setTimeout(
-      () => el.classList.remove("panel-animating"),
-      220,
-    );
+    const tid = window.setTimeout(() => el.classList.remove('panel-animating'), 220);
     return () => {
       window.clearTimeout(tid);
-      el?.classList.remove("panel-animating");
+      el?.classList.remove('panel-animating');
     };
   }, [rightPanelOpen, sidebarOpen]);
 
@@ -416,12 +353,12 @@ export function App() {
     if (fw == null || !columnsSplitRef.current) return;
     // Wait for the outer allotment to finish its layout first.
     requestAnimationFrame(() => {
-      const container = document.querySelector<HTMLElement>(".columns-split");
+      const container = document.querySelector<HTMLElement>('.columns-split');
       if (!container || !columnsSplitRef.current) return;
       const total = container.clientWidth;
       columnsSplitRef.current.resize([total - fw, fw]);
     });
-  }, [sidebarOpen, rightPanelOpen]);
+  }, []);
 
   // Restore remembered terminal height when dock becomes visible
   const shellDockVisibleEarly = terminalPanelOpen && hasShellTabs;
@@ -430,9 +367,7 @@ export function App() {
       requestAnimationFrame(() => {
         const handle = verticalSplitRef.current;
         if (!handle) return;
-        const container = document.querySelector<HTMLElement>(
-          ".terminal-vertical-split",
-        );
+        const container = document.querySelector<HTMLElement>('.terminal-vertical-split');
         if (!container) return;
         const total = container.clientHeight;
         const termH = terminalHeightRef.current;
@@ -449,18 +384,11 @@ export function App() {
           <div className="grid size-14 place-items-center rounded-lg border border-border bg-panel-2 text-accent">
             <FolderOpen size={32} />
           </div>
-          <h1 className="m-0 text-[22px] font-semibold">
-            Open a repository to start
-          </h1>
-          <p className="m-0 max-w-[460px] leading-relaxed text-muted">
-            ForgePad keeps the agent loop terminal-first, with file context and
-            git diffs close at hand.
+          <h1 className="m-0 font-semibold text-[22px]">Open a repository to start</h1>
+          <p className="m-0 max-w-[460px] text-muted leading-relaxed">
+            ForgePad keeps the agent loop terminal-first, with file context and git diffs close at hand.
           </p>
-          <button
-            className="primary-button"
-            type="button"
-            onClick={openProject}
-          >
+          <button className="primary-button" type="button" onClick={openProject}>
             <FolderOpen size={16} />
             Open Project
           </button>
@@ -471,33 +399,23 @@ export function App() {
     return (
       <section className="flex size-full flex-col items-center justify-center gap-3.5 p-8 text-center">
         <TerminalSquare size={30} />
-        <h1 className="m-0 text-[22px] font-semibold">
-          {activeWorkspace?.name ?? "No workspace selected"}
-        </h1>
-        <p className="m-0 max-w-[460px] leading-relaxed text-muted flex items-center gap-[7px]">
+        <h1 className="m-0 font-semibold text-[22px]">{activeWorkspace?.name ?? 'No workspace selected'}</h1>
+        <p className="m-0 flex max-w-[460px] items-center gap-[7px] text-muted leading-relaxed">
           {activeWorkspace ? (
             <>
-              <GitBranch size={14} /> {activeWorkspace.branch || "detached"}
+              <GitBranch size={14} /> {activeWorkspace.branch || 'detached'}
             </>
           ) : (
-            "Pick a project from the sidebar."
+            'Pick a project from the sidebar.'
           )}
         </p>
         {activeWorkspace ? (
           <div className="flex gap-2">
-            <button
-              className="primary-button"
-              type="button"
-              onClick={() => createAgentTerminal(activeWorkspace.id)}
-            >
+            <button className="primary-button" type="button" onClick={() => createAgentTerminal(activeWorkspace.id)}>
               <Bot size={16} />
               New Agent
             </button>
-            <button
-              className="secondary-button"
-              type="button"
-              onClick={() => createTerminal(activeWorkspace.id)}
-            >
+            <button className="secondary-button" type="button" onClick={() => createTerminal(activeWorkspace.id)}>
               <TerminalSquare size={16} />
               Terminal
             </button>
@@ -510,7 +428,7 @@ export function App() {
   if (!hydrated) {
     return (
       <div className="flex size-full flex-col items-center justify-center gap-3.5 p-8 text-center">
-        <div className="text-[22px] font-bold">ForgePad</div>
+        <div className="font-bold text-[22px]">ForgePad</div>
         <div className="text-muted">Loading workspace</div>
       </div>
     );
@@ -522,10 +440,7 @@ export function App() {
   const renderWorkspaceArea = () => {
     if (!hasFileTabs) {
       return (
-        <main
-          className="flex size-full min-h-0 flex-col bg-bg"
-          onMouseDown={() => setFocusedColumn("agent")}
-        >
+        <main className="flex size-full min-h-0 flex-col bg-bg" onMouseDown={() => setFocusedColumn('agent')}>
           {renderEmptyState()}
         </main>
       );
@@ -548,11 +463,7 @@ export function App() {
             }
           }}
         >
-          <Allotment.Pane
-            preferredSize="50%"
-            minSize={280}
-            className={focusedColumn === "agent" ? "pane-focused" : ""}
-          >
+          <Allotment.Pane preferredSize="50%" minSize={280} className={focusedColumn === 'agent' ? 'pane-focused' : ''}>
             <div className="flex size-full min-h-0 flex-col">
               <AgentTabBar />
               <AgentQuickBar />
@@ -561,11 +472,7 @@ export function App() {
               </div>
             </div>
           </Allotment.Pane>
-          <Allotment.Pane
-            preferredSize="50%"
-            minSize={280}
-            className={focusedColumn === "file" ? "pane-focused" : ""}
-          >
+          <Allotment.Pane preferredSize="50%" minSize={280} className={focusedColumn === 'file' ? 'pane-focused' : ''}>
             <div className="flex size-full min-h-0 flex-col">
               <TabBar />
               <div className="relative min-h-0 flex-1 overflow-hidden">
@@ -580,9 +487,7 @@ export function App() {
     // Agent only (no file tabs)
     if (hasAgentTabs) {
       return (
-        <div
-          className={`flex size-full min-h-0 flex-col${focusedColumn === "agent" ? " pane-focused" : ""}`}
-        >
+        <div className={`flex size-full min-h-0 flex-col${focusedColumn === 'agent' ? 'pane-focused' : ''}`}>
           <AgentTabBar />
           <AgentQuickBar />
           <div className="relative min-h-0 flex-1 overflow-hidden">
@@ -613,40 +518,29 @@ export function App() {
   //    it to the active agent terminal so the user doesn't need the agent
   //    panel to be focused / visible. ──
   const handleWorkspaceDragOver = (e: React.DragEvent) => {
-    if (e.dataTransfer.types.includes("application/x-forgepad-path")) {
+    if (e.dataTransfer.types.includes('application/x-forgepad-path')) {
       e.preventDefault();
-      e.dataTransfer.dropEffect = "copy";
+      e.dataTransfer.dropEffect = 'copy';
     }
   };
 
   const handleWorkspaceDrop = (e: React.DragEvent) => {
-    const path =
-      e.dataTransfer.getData("application/x-forgepad-path") ||
-      e.dataTransfer.getData("text/plain");
+    const path = e.dataTransfer.getData('application/x-forgepad-path') || e.dataTransfer.getData('text/plain');
     if (!path) return;
     e.preventDefault();
 
     // Find the active agent terminal from the current store state
     const state = useAppStore.getState();
-    const agentTabs = state.tabs.filter(
-      (t) =>
-        t.workspaceId === state.activeWorkspaceId &&
-        t.type === "terminal" &&
-        t.isAgent,
-    );
+    const agentTabs = state.tabs.filter((t) => t.workspaceId === state.activeWorkspaceId && t.type === 'terminal' && t.isAgent);
     const agentTabId = state.activeAgentTabId ?? agentTabs[0]?.id;
     const agentTab = agentTabs.find((t) => t.id === agentTabId);
-    if (agentTab?.type === "terminal") {
+    if (agentTab?.type === 'terminal') {
       window.forgepad.pty.write(agentTab.ptyId, path);
     }
   };
 
   const renderWorkspaceFrame = () => (
-    <main
-      className="flex size-full min-h-0 flex-col bg-bg"
-      onDragOver={handleWorkspaceDragOver}
-      onDrop={handleWorkspaceDrop}
-    >
+    <main className="flex size-full min-h-0 flex-col bg-bg" onDragOver={handleWorkspaceDragOver} onDrop={handleWorkspaceDrop}>
       {!hasAgentTabs && !hasFileTabs && <AgentQuickBar />}
       <div className="min-h-0 flex-1 overflow-hidden">
         <Allotment
@@ -695,11 +589,7 @@ export function App() {
                 if (sidebarOpen && sizes[0] > 0) {
                   sidebarWidthRef.current = sizes[0];
                 }
-                if (
-                  rightPanelOpen &&
-                  sizes.length >= 3 &&
-                  sizes[sizes.length - 1] > 0
-                ) {
+                if (rightPanelOpen && sizes.length >= 3 && sizes[sizes.length - 1] > 0) {
                   rightPanelWidthRef.current = sizes[sizes.length - 1];
                 }
               }}
@@ -713,9 +603,7 @@ export function App() {
                 <Sidebar />
               </Allotment.Pane>
 
-              <Allotment.Pane minSize={hasAnyContent ? 460 : 420}>
-                {renderWorkspaceFrame()}
-              </Allotment.Pane>
+              <Allotment.Pane minSize={hasAnyContent ? 460 : 420}>{renderWorkspaceFrame()}</Allotment.Pane>
 
               <Allotment.Pane
                 preferredSize={rightPanelOpen ? rightPanelWidthRef.current : 0}
@@ -729,10 +617,7 @@ export function App() {
           </div>
         )}
 
-        <QuickSearch
-          open={quickSearchOpen}
-          onClose={() => setQuickSearchOpen(false)}
-        />
+        <QuickSearch open={quickSearchOpen} onClose={() => setQuickSearchOpen(false)} />
         <ToastStack />
       </div>
     </ThemeContext.Provider>

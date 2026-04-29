@@ -1,17 +1,11 @@
-import { useSortable } from "@dnd-kit/sortable";
-import { TabItem, type TabItemProps } from "./TabItem";
+import { useSortable } from '@dnd-kit/sortable';
+
+import { TabItem, type TabItemProps } from './TabItem';
 
 type SortableTabItemProps = TabItemProps & { id: string };
 
 export function SortableTabItem({ id, ...props }: SortableTabItemProps) {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
 
   // Lock to horizontal axis only and strip scale so the tab never
   // changes size or drifts vertically while being dragged.
@@ -22,13 +16,5 @@ export function SortableTabItem({ id, ...props }: SortableTabItemProps) {
     zIndex: isDragging ? 50 : undefined,
   };
 
-  return (
-    <TabItem
-      ref={setNodeRef}
-      style={style}
-      {...attributes}
-      {...listeners}
-      {...props}
-    />
-  );
+  return <TabItem ref={setNodeRef} style={style} {...attributes} {...listeners} {...props} />;
 }

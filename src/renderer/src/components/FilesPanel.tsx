@@ -1,15 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { CSSProperties } from "react";
-import {
-  FileTree,
-  useFileTree,
-  useFileTreeSelection,
-} from "@pierre/trees/react";
-import type { FileTreeContextMenuItem, GitStatusEntry } from "@pierre/trees";
-import type { FileNode, Workspace } from "@shared/types";
-import { useAppStore } from "@renderer/store/app-store";
-import { useResolvedTheme } from "@renderer/App";
-import { Spinner } from "./Spinner";
+import type { CSSProperties } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { FileTreeContextMenuItem, GitStatusEntry } from '@pierre/trees';
+import { FileTree, useFileTree, useFileTreeSelection } from '@pierre/trees/react';
+import { useResolvedTheme } from '@renderer/App';
+import { useAppStore } from '@renderer/store/app-store';
+import type { FileNode, Workspace } from '@shared/types';
+
+import { Spinner } from './Spinner';
 
 type TreeData = {
   paths: string[];
@@ -20,19 +17,16 @@ type TreeData = {
 function walk(nodes: FileNode[], rootPath: string, result: TreeData) {
   for (const node of nodes) {
     const rel = node.path.startsWith(rootPath)
-      ? node.path
-          .slice(rootPath.length)
-          .replace(/^\/+/, "")
-          .replaceAll("\\", "/")
+      ? node.path.slice(rootPath.length).replace(/^\/+/, '').replaceAll('\\', '/')
       : node.path;
-    if (node.type === "file" && rel) {
-      if (node.gitStatus === "deleted") continue;
+    if (node.type === 'file' && rel) {
+      if (node.gitStatus === 'deleted') continue;
       result.paths.push(rel);
       result.filePaths.add(rel);
       if (node.gitStatus) {
         result.gitStatus.push({
           path: rel,
-          status: node.gitStatus === "conflicted" ? "modified" : node.gitStatus,
+          status: node.gitStatus === 'conflicted' ? 'modified' : node.gitStatus,
         });
       }
     }
@@ -42,19 +36,15 @@ function walk(nodes: FileNode[], rootPath: string, result: TreeData) {
 
 function treeDataFromNodes(nodes: FileNode[], rootPath: string): TreeData {
   const result: TreeData = { paths: [], filePaths: new Set(), gitStatus: [] };
-  walk(nodes, rootPath.replace(/\/+$/, ""), result);
-  result.paths.sort((a, b) =>
-    a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }),
-  );
+  walk(nodes, rootPath.replace(/\/+$/, ''), result);
+  result.paths.sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
   return result;
 }
 
 function filesForTreePath(treeData: TreeData, treePath: string): string[] {
   if (treeData.filePaths.has(treePath)) return [treePath];
-  const prefix = treePath.replace(/\/+$/, "") + "/";
-  return [...treeData.filePaths].filter((filePath) =>
-    filePath.startsWith(prefix),
-  );
+  const prefix = `${treePath.replace(/\/+$/, '')}/`;
+  return [...treeData.filePaths].filter((filePath) => filePath.startsWith(prefix));
 }
 
 function filesForTreeSelection(treeData: TreeData, selectedPaths: string[]) {
@@ -64,9 +54,7 @@ function filesForTreeSelection(treeData: TreeData, selectedPaths: string[]) {
       files.add(filePath);
     }
   }
-  return [...files].sort((a, b) =>
-    a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }),
-  );
+  return [...files].sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
 }
 
 function sameStringArray(a: readonly string[], b: readonly string[]) {
@@ -81,44 +69,43 @@ function useActiveWorkspace(): Workspace | undefined {
 }
 
 const TREE_THEME_SHARED = {
-  "--trees-font-family-override":
-    'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-  "--trees-font-size-override": "13px",
-  "--trees-padding-inline-override": "10px",
-  "--trees-border-radius-override": "6px",
+  '--trees-font-family-override': 'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+  '--trees-font-size-override': '13px',
+  '--trees-padding-inline-override': '10px',
+  '--trees-border-radius-override': '6px',
 };
 
-const TREE_THEMES: Record<"dark" | "light", CSSProperties> = {
+const TREE_THEMES: Record<'dark' | 'light', CSSProperties> = {
   dark: {
-    colorScheme: "dark",
-    "--trees-bg-override": "oklch(20.5% 0 0)",
-    "--trees-fg-override": "oklch(98.5% 0 0)",
-    "--trees-fg-muted-override": "oklch(75% 0 0)",
-    "--trees-bg-muted-override": "oklch(26.9% 0 0)",
-    "--trees-search-fg-override": "oklch(85% 0 0)",
-    "--trees-search-bg-override": "oklch(20% 0 0)",
-    "--trees-border-color-override": "oklch(100% 0 0 / 0.12)",
-    "--trees-selected-fg-override": "oklch(97% 0.04 250)",
-    "--trees-selected-bg-override": "oklch(35% 0.08 250)",
-    "--trees-selected-border-color-override": "oklch(65% 0.2 250)",
-    "--trees-selected-focused-border-color-override": "oklch(75% 0.2 250)",
-    "--trees-focus-ring-color-override": "oklch(70% 0.15 250)",
+    colorScheme: 'dark',
+    '--trees-bg-override': 'oklch(20.5% 0 0)',
+    '--trees-fg-override': 'oklch(98.5% 0 0)',
+    '--trees-fg-muted-override': 'oklch(75% 0 0)',
+    '--trees-bg-muted-override': 'oklch(26.9% 0 0)',
+    '--trees-search-fg-override': 'oklch(85% 0 0)',
+    '--trees-search-bg-override': 'oklch(20% 0 0)',
+    '--trees-border-color-override': 'oklch(100% 0 0 / 0.12)',
+    '--trees-selected-fg-override': 'oklch(97% 0.04 250)',
+    '--trees-selected-bg-override': 'oklch(35% 0.08 250)',
+    '--trees-selected-border-color-override': 'oklch(65% 0.2 250)',
+    '--trees-selected-focused-border-color-override': 'oklch(75% 0.2 250)',
+    '--trees-focus-ring-color-override': 'oklch(70% 0.15 250)',
     ...TREE_THEME_SHARED,
   } as CSSProperties,
   light: {
-    colorScheme: "light",
-    "--trees-bg-override": "oklch(97% 0 0)",
-    "--trees-fg-override": "oklch(15% 0 0)",
-    "--trees-fg-muted-override": "oklch(45% 0 0)",
-    "--trees-bg-muted-override": "oklch(93% 0 0)",
-    "--trees-search-fg-override": "oklch(20% 0 0)",
-    "--trees-search-bg-override": "oklch(97% 0 0)",
-    "--trees-border-color-override": "oklch(0% 0 0 / 0.10)",
-    "--trees-selected-fg-override": "oklch(15% 0.04 250)",
-    "--trees-selected-bg-override": "oklch(90% 0.04 250)",
-    "--trees-selected-border-color-override": "oklch(60% 0.15 250)",
-    "--trees-selected-focused-border-color-override": "oklch(55% 0.2 250)",
-    "--trees-focus-ring-color-override": "oklch(55% 0.15 250)",
+    colorScheme: 'light',
+    '--trees-bg-override': 'oklch(97% 0 0)',
+    '--trees-fg-override': 'oklch(15% 0 0)',
+    '--trees-fg-muted-override': 'oklch(45% 0 0)',
+    '--trees-bg-muted-override': 'oklch(93% 0 0)',
+    '--trees-search-fg-override': 'oklch(20% 0 0)',
+    '--trees-search-bg-override': 'oklch(97% 0 0)',
+    '--trees-border-color-override': 'oklch(0% 0 0 / 0.10)',
+    '--trees-selected-fg-override': 'oklch(15% 0.04 250)',
+    '--trees-selected-bg-override': 'oklch(90% 0.04 250)',
+    '--trees-selected-border-color-override': 'oklch(60% 0.15 250)',
+    '--trees-selected-focused-border-color-override': 'oklch(55% 0.2 250)',
+    '--trees-focus-ring-color-override': 'oklch(55% 0.15 250)',
     ...TREE_THEME_SHARED,
   } as CSSProperties,
 };
@@ -145,27 +132,20 @@ export function FilesPanel() {
 
   const contextFileSet = useMemo(() => {
     return new Set(
-      contextItems
-        .filter(
-          (item) => item.type === "file" && item.workspaceId === workspace?.id,
-        )
-        .map((item) => item.relPath),
+      contextItems.filter((item) => item.type === 'file' && item.workspaceId === workspace?.id).map((item) => item.relPath),
     );
   }, [contextItems, workspace?.id]);
 
   const { model } = useFileTree({
-    id: workspace ? `tree-${workspace.id}` : "tree-empty",
+    id: workspace ? `tree-${workspace.id}` : 'tree-empty',
     paths: treeData.paths,
     gitStatus: treeData.gitStatus,
     initialExpansion: 1,
-    density: "default",
+    density: 'default',
     search: true,
     flattenEmptyDirectories: true,
-    icons: { set: "complete", colored: true },
-    renderRowDecoration: ({ item }) =>
-      contextFileSet.has(item.path)
-        ? { text: "", title: "In AI context" }
-        : null,
+    icons: { set: 'complete', colored: true },
+    renderRowDecoration: ({ item }) => (contextFileSet.has(item.path) ? { text: '', title: 'In AI context' } : null),
   });
 
   const selectedTreePaths = useFileTreeSelection(model);
@@ -191,14 +171,13 @@ export function FilesPanel() {
 
     const added = next.filter((p) => !prev.includes(p));
     const last = added.at(-1) ?? next.at(-1);
-    if (workspace && last && treeData.filePaths.has(last))
-      openFileTab(workspace.id, last);
+    if (workspace && last && treeData.filePaths.has(last)) openFileTab(workspace.id, last);
   }, [selectedTreePaths, openFileTab, treeData.filePaths, workspace]);
 
   // Reveal and select a file in the tree when triggered by a tab click
   const lastRevealEpochRef = useRef(0);
   useEffect(() => {
-    if (!revealFileInTree || rightPanelMode !== "files") return;
+    if (!revealFileInTree || rightPanelMode !== 'files') return;
     if (revealFileInTree.epoch === lastRevealEpochRef.current) return;
     lastRevealEpochRef.current = revealFileInTree.epoch;
 
@@ -224,15 +203,10 @@ export function FilesPanel() {
     if (!workspace) return;
     setLoading(true);
     try {
-      const nodes = await window.forgepad.fs.getTreeWithStatus(
-        workspace.worktreePath,
-      );
+      const nodes = await window.forgepad.fs.getTreeWithStatus(workspace.worktreePath);
       setTreeData(treeDataFromNodes(nodes, workspace.worktreePath));
     } catch (error) {
-      addToast(
-        "error",
-        error instanceof Error ? error.message : "Failed to load file tree.",
-      );
+      addToast('error', error instanceof Error ? error.message : 'Failed to load file tree.');
     } finally {
       setLoading(false);
     }
@@ -240,34 +214,25 @@ export function FilesPanel() {
 
   useEffect(() => {
     void load();
-  }, [load, gitRefreshEpoch]);
+  }, [load]);
 
   useEffect(() => {
     model.resetPaths(treeData.paths);
     model.setGitStatus(treeData.gitStatus);
   }, [model, treeData]);
 
-  const selectedContextFiles = useMemo(
-    () => filesForTreeSelection(treeData, selectedPaths),
-    [selectedPaths, treeData],
-  );
+  const selectedContextFiles = useMemo(() => filesForTreeSelection(treeData, selectedPaths), [selectedPaths, treeData]);
 
   const addFilesToContext = useCallback(
     (relPaths: string[]) => {
       if (!workspace || relPaths.length === 0) return;
       addContextFiles(workspace.id, relPaths);
-      addToast(
-        "success",
-        `Added ${relPaths.length} file${relPaths.length === 1 ? "" : "s"} to context.`,
-      );
+      addToast('success', `Added ${relPaths.length} file${relPaths.length === 1 ? '' : 's'} to context.`);
     },
     [addContextFiles, addToast, workspace],
   );
 
-  const renderContextMenu = (
-    item: FileTreeContextMenuItem,
-    context: { close: () => void },
-  ) => {
+  const renderContextMenu = (item: FileTreeContextMenuItem, context: { close: () => void }) => {
     if (!workspace) return null;
     const itemFiles = filesForTreePath(treeData, item.path);
     const closeAfter = (action: () => void) => {
@@ -275,14 +240,12 @@ export function FilesPanel() {
       context.close();
     };
     return (
-      <div className="min-w-[150px] grid gap-[3px] rounded-[7px] border border-border bg-panel-2 p-[5px] shadow-[0_14px_32px_rgba(0,0,0,0.22)]">
-        {item.kind === "file" ? (
+      <div className="grid min-w-[150px] gap-[3px] rounded-[7px] border border-border bg-panel-2 p-[5px] shadow-[0_14px_32px_rgba(0,0,0,0.22)]">
+        {item.kind === 'file' ? (
           <button
             type="button"
-            className="h-7 rounded-[5px] px-[9px] text-left bg-transparent text-text hover:bg-panel-3"
-            onClick={() =>
-              closeAfter(() => openFileTab(workspace.id, item.path))
-            }
+            className="h-7 rounded-[5px] bg-transparent px-[9px] text-left text-text hover:bg-panel-3"
+            onClick={() => closeAfter(() => openFileTab(workspace.id, item.path))}
           >
             Open
           </button>
@@ -290,21 +253,17 @@ export function FilesPanel() {
         <button
           type="button"
           disabled={itemFiles.length === 0}
-          className="h-7 rounded-[5px] px-[9px] text-left bg-transparent text-text hover:bg-panel-3 disabled:text-subtle disabled:cursor-not-allowed"
+          className="h-7 rounded-[5px] bg-transparent px-[9px] text-left text-text hover:bg-panel-3 disabled:cursor-not-allowed disabled:text-subtle"
           onClick={() => closeAfter(() => addFilesToContext(itemFiles))}
         >
-          {item.kind === "file"
-            ? "Add to Context"
-            : `Add Folder (${itemFiles.length})`}
+          {item.kind === 'file' ? 'Add to Context' : `Add Folder (${itemFiles.length})`}
         </button>
         <button
           type="button"
-          className="h-7 rounded-[5px] px-[9px] text-left bg-transparent text-text hover:bg-panel-3"
+          className="h-7 rounded-[5px] bg-transparent px-[9px] text-left text-text hover:bg-panel-3"
           onClick={() =>
             closeAfter(() => {
-              void navigator.clipboard.writeText(
-                `${workspace.worktreePath}/${item.path}`,
-              );
+              void navigator.clipboard.writeText(`${workspace.worktreePath}/${item.path}`);
             })
           }
         >
@@ -312,7 +271,7 @@ export function FilesPanel() {
         </button>
         <button
           type="button"
-          className="h-7 rounded-[5px] px-[9px] text-left bg-transparent text-text hover:bg-panel-3"
+          className="h-7 rounded-[5px] bg-transparent px-[9px] text-left text-text hover:bg-panel-3"
           onClick={() =>
             closeAfter(() => {
               void navigator.clipboard.writeText(item.path);
@@ -324,14 +283,6 @@ export function FilesPanel() {
       </div>
     );
   };
-
-  if (!workspace) {
-    return (
-      <div className="grid min-h-[90px] place-items-center text-muted">
-        Open a project first
-      </div>
-    );
-  }
 
   // ── Drag-to-terminal: drag file rows to paste relative path ──
   //
@@ -360,12 +311,10 @@ export function FilesPanel() {
 
     const THRESHOLD = 6;
 
-    const findItemRow = (
-      composedPath: EventTarget[],
-    ): { row: HTMLElement; path: string } | null => {
+    const findItemRow = (composedPath: EventTarget[]): { row: HTMLElement; path: string } | null => {
       for (const node of composedPath) {
         if (node instanceof HTMLElement) {
-          const p = node.getAttribute("data-item-path");
+          const p = node.getAttribute('data-item-path');
           if (p) return { row: node, path: p };
         }
       }
@@ -391,7 +340,7 @@ export function FilesPanel() {
       // Promote this row to draggable — the browser will fire dragstart
       // on the next pointer move because the element under the cursor is
       // now draggable.
-      pending.row.setAttribute("draggable", "true");
+      pending.row.setAttribute('draggable', 'true');
       activeDragRow = pending.row;
       pending = null;
     };
@@ -399,62 +348,55 @@ export function FilesPanel() {
     // (3) dragstart bubbles out of Shadow DOM — set the transfer data
     const onDragStart = (e: DragEvent) => {
       if (!activeDragRow || !e.dataTransfer) return;
-      const path = activeDragRow.getAttribute("data-item-path");
+      const path = activeDragRow.getAttribute('data-item-path');
       if (!path) {
         e.preventDefault();
         return;
       }
-      e.dataTransfer.setData("text/plain", path);
-      e.dataTransfer.setData("application/x-forgepad-path", path);
-      e.dataTransfer.effectAllowed = "copy";
+      e.dataTransfer.setData('text/plain', path);
+      e.dataTransfer.setData('application/x-forgepad-path', path);
+      e.dataTransfer.effectAllowed = 'copy';
     };
 
     // (4) Cleanup: remove draggable from the row
     const cleanup = () => {
       pending = null;
       if (activeDragRow) {
-        activeDragRow.removeAttribute("draggable");
+        activeDragRow.removeAttribute('draggable');
         activeDragRow = null;
       }
     };
 
-    container.addEventListener("mousedown", onMouseDown, true);
-    container.addEventListener("mousemove", onMouseMove, true);
-    container.addEventListener("dragstart", onDragStart);
-    container.addEventListener("dragend", cleanup);
-    container.addEventListener("mouseup", cleanup, true);
+    container.addEventListener('mousedown', onMouseDown, true);
+    container.addEventListener('mousemove', onMouseMove, true);
+    container.addEventListener('dragstart', onDragStart);
+    container.addEventListener('dragend', cleanup);
+    container.addEventListener('mouseup', cleanup, true);
     return () => {
-      container.removeEventListener("mousedown", onMouseDown, true);
-      container.removeEventListener("mousemove", onMouseMove, true);
-      container.removeEventListener("dragstart", onDragStart);
-      container.removeEventListener("dragend", cleanup);
-      container.removeEventListener("mouseup", cleanup, true);
+      container.removeEventListener('mousedown', onMouseDown, true);
+      container.removeEventListener('mousemove', onMouseMove, true);
+      container.removeEventListener('dragstart', onDragStart);
+      container.removeEventListener('dragend', cleanup);
+      container.removeEventListener('mouseup', cleanup, true);
       cleanup();
     };
   }, []);
 
+  if (!workspace) {
+    return <div className="grid min-h-[90px] place-items-center text-muted">Open a project first</div>;
+  }
+
   return (
     <section className="flex min-h-0 flex-1 flex-col overflow-hidden pt-2.5">
-      <div
-        ref={treeContainerRef}
-        className="relative min-h-0 flex-1 overflow-hidden"
-      >
+      <div ref={treeContainerRef} className="relative min-h-0 flex-1 overflow-hidden">
         {loading ? (
           <div className="absolute inset-0 z-2 grid min-h-0 place-items-center bg-bg/72">
-            <span className="flex items-center gap-1.5 text-xs text-muted">
-              <Spinner
-                name={
-                  spinnerStyle as import("unicode-animations").BrailleSpinnerName
-                }
-              />
+            <span className="flex items-center gap-1.5 text-muted text-xs">
+              <Spinner name={spinnerStyle as import('unicode-animations').BrailleSpinnerName} />
             </span>
           </div>
         ) : null}
-        <FileTree
-          model={model}
-          style={treeThemeStyle}
-          renderContextMenu={renderContextMenu}
-        />
+        <FileTree model={model} style={treeThemeStyle} renderContextMenu={renderContextMenu} />
       </div>
     </section>
   );

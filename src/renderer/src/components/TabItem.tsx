@@ -1,12 +1,5 @@
-import {
-  forwardRef,
-  type CSSProperties,
-  type HTMLAttributes,
-  type KeyboardEvent,
-  type MouseEvent,
-  type ReactNode,
-} from "react";
-import { X } from "lucide-react";
+import { type CSSProperties, forwardRef, type HTMLAttributes, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react';
+import { X } from 'lucide-react';
 
 export type TabItemProps = {
   /** Whether this tab is the currently active/selected tab. */
@@ -31,86 +24,61 @@ export type TabItemProps = {
   style?: CSSProperties;
 } & Omit<
   HTMLAttributes<HTMLDivElement>,
-  | "title"
-  | "className"
-  | "style"
-  | "onClick"
-  | "onKeyDown"
-  | "onContextMenu"
-  | "role"
-  | "tabIndex"
+  'title' | 'className' | 'style' | 'onClick' | 'onKeyDown' | 'onContextMenu' | 'role' | 'tabIndex'
 >;
 
-export const TabItem = forwardRef<HTMLDivElement, TabItemProps>(
-  function TabItem(
-    {
-      active,
-      icon,
-      title,
-      onSelect,
-      onClose,
-      onContextMenu,
-      suffix,
-      closeTitle = "Close tab",
-      className,
-      style,
-      ...rest
-    },
-    ref,
-  ) {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Enter" || event.key === " ") {
-        event.preventDefault();
-        onSelect();
-      }
-    };
+export const TabItem = forwardRef<HTMLDivElement, TabItemProps>(function TabItem(
+  { active, icon, title, onSelect, onClose, onContextMenu, suffix, closeTitle = 'Close tab', className, style, ...rest },
+  ref,
+) {
+  const handleKeyDown = (event: KeyboardEvent) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      onSelect();
+    }
+  };
 
-    return (
-      <div
-        ref={ref}
-        className={`group/tab relative flex h-9 shrink-0 cursor-pointer items-center gap-1.5 px-3 text-[13px] transition-colors select-none${
-          active ? " text-text" : " text-muted hover:text-text"
-        }${className ? ` ${className}` : ""}`}
-        role="tab"
-        tabIndex={0}
-        aria-selected={active}
-        title={title}
-        style={style}
-        onClick={onSelect}
-        onKeyDown={handleKeyDown}
-        onContextMenu={onContextMenu}
-        {...rest}
-      >
-        {icon}
-        <span className="max-w-[180px] overflow-hidden text-ellipsis whitespace-nowrap">
-          {title}
-        </span>
-        {suffix}
-        {onClose && (
-          <span
-            className="grid size-4 place-items-center rounded text-subtle opacity-0 transition-opacity hover:text-text group-hover/tab:opacity-100 focus:opacity-100"
-            role="button"
-            tabIndex={0}
-            title={closeTitle}
-            onClick={(event) => {
+  return (
+    <div
+      ref={ref}
+      className={`group/tab relative flex h-9 shrink-0 cursor-pointer items-center gap-1.5 px-3 text-[13px] transition-colors select-none${
+        active ? 'text-text' : 'text-muted hover:text-text'
+      }${className ? ` ${className}` : ''}`}
+      role="tab"
+      tabIndex={0}
+      aria-selected={active}
+      title={title}
+      style={style}
+      onClick={onSelect}
+      onKeyDown={handleKeyDown}
+      onContextMenu={onContextMenu}
+      {...rest}
+    >
+      {icon}
+      <span className="max-w-[180px] overflow-hidden text-ellipsis whitespace-nowrap">{title}</span>
+      {suffix}
+      {onClose && (
+        <span
+          className="grid size-4 place-items-center rounded text-subtle opacity-0 transition-opacity hover:text-text focus:opacity-100 group-hover/tab:opacity-100"
+          role="button"
+          tabIndex={0}
+          title={closeTitle}
+          onClick={(event) => {
+            event.stopPropagation();
+            onClose();
+          }}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
               event.stopPropagation();
               onClose();
-            }}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" || event.key === " ") {
-                event.preventDefault();
-                event.stopPropagation();
-                onClose();
-              }
-            }}
-          >
-            <X size={11} />
-          </span>
-        )}
-        {active && (
-          <span className="absolute bottom-0 left-3 right-3 h-[2px] rounded-full bg-accent" />
-        )}
-      </div>
-    );
-  },
-);
+            }
+          }}
+        >
+          <X size={11} />
+        </span>
+      )}
+      {active && <span className="absolute right-3 bottom-0 left-3 h-[2px] rounded-full bg-accent" />}
+    </div>
+  );
+});
