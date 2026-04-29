@@ -27,7 +27,7 @@ import type {
 import { DEFAULT_AGENT_PRESETS, DEFAULT_SETTINGS, DEFAULT_SHORTCUTS } from '@shared/types';
 import { create } from 'zustand';
 
-export type SettingsSection = 'general' | 'agent' | 'terminal' | 'changes' | 'advanced' | 'shortcuts';
+export type SettingsSection = 'general' | 'agent' | 'terminal' | 'changes' | 'advanced' | 'shortcuts' | 'appearance';
 
 type Toast = {
   id: string;
@@ -123,6 +123,9 @@ type AppState = {
   updateFileNote: (id: string, note: string) => void;
   updateFileIncludeContent: (id: string, includeContent: boolean) => void;
   sendContextToTerminal: () => Promise<void>;
+  addCustomTheme: (theme: import('@shared/types').ThemeDefinition) => void;
+  removeCustomTheme: (themeId: string) => void;
+  renameCustomTheme: (themeId: string, name: string) => void;
   updateSettings: (partial: Partial<AppSettings>) => void;
   updateShortcut: (actionId: ShortcutActionId, combo: ShortcutCombo) => void;
   resetShortcut: (actionId: ShortcutActionId) => void;
@@ -399,7 +402,13 @@ export const useAppStore = create<AppState>((set, get) => ({
       return;
     }
 
-    const rawSettings = { ...DEFAULT_SETTINGS, ...(state?.settings ?? {}) };
+    const rawSettings = {
+      ...DEFAULT_SETTINGS,
+      ...(state?.settings ?? {}),
+      // Ensure new theme fields are always present (migration for old persisted state)
+      themeId: (state?.settings as AppSettings | undefined)?.themeId ?? DEFAULT_SETTINGS.themeId,
+      customThemes: (state?.settings as AppSettings | undefined)?.customThemes ?? [],
+    };
     if (!rawSettings.agentPresets || rawSettings.agentPresets.length === 0) {
       rawSettings.agentPresets = [...DEFAULT_SETTINGS.agentPresets];
     } else {
@@ -1180,6 +1189,36 @@ export const useAppStore = create<AppState>((set, get) => ({
     }));
     get().addToast('success', `Sent context: ${bundle.relPath}`);
   },
+
+  addCustomTheme: (theme) =>
+    set((state) => ({
+      settings: {
+        ...state.settings,
+        customThemes: [...(state.settings.customThemes ?? []).filter((t) => t.id !== theme.id), theme],
+        themeId: theme.id,
+      },
+    })),
+
+  removeCustomTheme: (themeId) =>
+    set((state) => {
+      const customThemes = (state.settings.customThemes ?? []).filter((t) => t.id !== themeId);
+      const nextThemeId = state.settings.themeId === themeId ? 'dark' : state.settings.themeId;
+      return {
+        settings: {
+          ...state.settings,
+          customThemes,
+          themeId: nextThemeId,
+        },
+      };
+    }),
+
+  renameCustomTheme: (themeId, name) =>
+    set((state) => ({
+      settings: {
+        ...state.settings,
+        customThemes: (state.settings.customThemes ?? []).map((t) => (t.id === themeId ? { ...t, name } : t)),
+      },
+    })),
 
   updateSettings: (partial) => set((state) => ({ settings: { ...state.settings, ...partial } })),
 
