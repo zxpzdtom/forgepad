@@ -41,4 +41,5 @@ export const IPC = {
   AGENT_STATUS_UPDATE: "agent:status-update",
   AGENT_FOCUS_TAB: "agent:focus-tab",
   AGENT_RENAME_TAB: "agent:rename-tab",
+  MENU_OPEN_SETTINGS: "menu:open-settings",
 } as const;
