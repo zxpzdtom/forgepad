@@ -1,10 +1,113 @@
-import { app, BrowserWindow, shell } from "electron";
+import { app, BrowserWindow, Menu, shell } from "electron";
 import { join } from "node:path";
-import { registerIpcHandlers } from "./ipc/register-handlers";
+import { registerIpcHandlers, ptyService } from "./ipc/register-handlers";
 import { HookServer } from "./services/hook-server";
 import { AgentHooksService } from "./services/agent-hooks-service";
+import { IPC } from "@shared/ipc";
 
 let hookServer: HookServer | null = null;
+
+function buildAppMenu(): void {
+  const isMac = process.platform === "darwin";
+
+  const template: Electron.MenuItemConstructorOptions[] = [
+    // App menu (macOS only)
+    ...(isMac
+      ? [
+          {
+            label: app.name,
+            submenu: [
+              { role: "about" as const },
+              { type: "separator" as const },
+              {
+                label: "Settings…",
+                accelerator: "CmdOrCtrl+," as const,
+                click: () => {
+                  const win = BrowserWindow.getFocusedWindow();
+                  win?.webContents.send(IPC.MENU_OPEN_SETTINGS);
+                },
+              },
+              { type: "separator" as const },
+              { role: "services" as const },
+              { type: "separator" as const },
+              { role: "hide" as const },
+              { role: "hideOthers" as const },
+              { role: "unhide" as const },
+              { type: "separator" as const },
+              { role: "quit" as const },
+            ],
+          } satisfies Electron.MenuItemConstructorOptions,
+        ]
+      : []),
+    // File
+    {
+      label: "File",
+      submenu: [
+        {
+          label: "Open Project…",
+          accelerator: "CmdOrCtrl+O",
+        },
+        { type: "separator" },
+        isMac ? { role: "close" } : { role: "quit" },
+      ],
+    },
+    // Edit
+    {
+      label: "Edit",
+      submenu: [
+        { role: "undo" },
+        { role: "redo" },
+        { type: "separator" },
+        { role: "cut" },
+        { role: "copy" },
+        { role: "paste" },
+        { role: "selectAll" },
+        ...(!isMac
+          ? [
+              { type: "separator" as const },
+              {
+                label: "Settings",
+                accelerator: "Ctrl+,",
+                click: () => {
+                  const win = BrowserWindow.getFocusedWindow();
+                  win?.webContents.send(IPC.MENU_OPEN_SETTINGS);
+                },
+              },
+            ]
+          : []),
+      ],
+    },
+    // View
+    {
+      label: "View",
+      submenu: [
+        { role: "reload" },
+        { role: "forceReload" },
+        { role: "toggleDevTools" },
+        { type: "separator" },
+        { role: "resetZoom" },
+        { role: "zoomIn" },
+        { role: "zoomOut" },
+        { type: "separator" },
+        { role: "togglefullscreen" },
+      ],
+    },
+    // Window
+    {
+      label: "Window",
+      submenu: [
+        { role: "minimize" },
+        { role: "zoom" },
+        ...(isMac
+          ? [{ type: "separator" as const }, { role: "front" as const }]
+          : [{ role: "close" as const }]),
+      ],
+    },
+  ];
+
+  const menu = Menu.buildFromTemplate(template);
+  Menu.setApplicationMenu(menu);
+}
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
@@ -61,6 +164,7 @@ app.whenReady().then(async () => {
     console.error("[ForgePad] Failed to install agent hooks:", error);
   }
 
+  buildAppMenu();
   registerIpcHandlers(hookPort);
   createWindow();
 
@@ -74,5 +178,6 @@ app.on("window-all-closed", () => {
 });
 
 app.on("will-quit", () => {
+  ptyService.destroyAll();
   hookServer?.stop().catch(() => {});
 });

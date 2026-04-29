@@ -23,6 +23,9 @@ import { ToastStack } from "@renderer/components/ToastStack";
 import { SettingsPanel } from "@renderer/components/SettingsPanel";
 import { useAppStore } from "@renderer/store/app-store";
 import { useTheme, type ResolvedTheme } from "@renderer/hooks/useTheme";
+import { eventMatchesCombo } from "@renderer/lib/shortcut-utils";
+import type { ShortcutActionId } from "@shared/types";
+import { DEFAULT_SHORTCUTS } from "@shared/types";
 
 export const ThemeContext = createContext<ResolvedTheme>("dark");
 export const useResolvedTheme = () => useContext(ThemeContext);
@@ -33,6 +36,7 @@ export function App() {
   const [quickSearchOpen, setQuickSearchOpen] = useState(false);
   const terminalHeightRef = useRef(240);
   const sidebarWidthRef = useRef(260);
+  const rightPanelWidthRef = useRef(390);
   const horizontalSplitRef = useRef<{
     reset: () => void;
     resize: (sizes: number[]) => void;
@@ -41,6 +45,11 @@ export function App() {
     reset: () => void;
     resize: (sizes: number[]) => void;
   } | null>(null);
+  const columnsSplitRef = useRef<{
+    reset: () => void;
+    resize: (sizes: number[]) => void;
+  } | null>(null);
+  const fileColumnWidthRef = useRef<number | null>(null);
   const prevShellDockVisibleRef = useRef(false);
   const hydrated = useAppStore((state) => state.hydrated);
   const projects = useAppStore((state) => state.projects);
@@ -62,7 +71,16 @@ export function App() {
   const setFocusedColumn = useAppStore((state) => state.setFocusedColumn);
   const toggleTerminalPanel = useAppStore((state) => state.toggleTerminalPanel);
   const triggerGitRefresh = useAppStore((state) => state.triggerGitRefresh);
+  const settingsOpen = useAppStore((state) => state.settingsOpen);
   const addToast = useAppStore((state) => state.addToast);
+  const keyboardShortcuts = useAppStore((s) => s.settings.keyboardShortcuts);
+  const shortcuts = useMemo(
+    () => ({ ...DEFAULT_SHORTCUTS, ...(keyboardShortcuts ?? {}) }),
+    [keyboardShortcuts],
+  );
+  const toggleSidebar = useAppStore((s) => s.toggleSidebar);
+  const toggleRightPanel = useAppStore((s) => s.toggleRightPanel);
+  const rightPanelMode = useAppStore((s) => s.rightPanelMode);
 
   useEffect(() => {
     let disposed = false;
@@ -109,22 +127,22 @@ export function App() {
     };
   }, []);
 
+  // Listen for native menu "Settings" click
   useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      const isModifierShortcut = event.metaKey || event.ctrlKey;
-      if (!isModifierShortcut) return;
+    return window.forgepad.menu.onOpenSettings(() => {
+      useAppStore.setState({ settingsOpen: true });
+    });
+  }, []);
 
-      const key = event.key.toLowerCase();
-
-      if (!event.shiftKey && !event.altKey && key === "p") {
-        event.preventDefault();
-        setQuickSearchOpen(true);
-        return;
-      }
-
-      // Ctrl+Tab / Ctrl+Shift+Tab: cycle tabs in focused column
-      if (event.ctrlKey && key === "tab") {
-        event.preventDefault();
+  useEffect(() => {
+    // Build action handler map for configurable keyboard shortcuts
+    const handlers: Record<ShortcutActionId, () => void> = {
+      quickSearch: () => setQuickSearchOpen(true),
+      toggleSettings: () =>
+        useAppStore.setState((s) => ({
+          settingsOpen: !s.settingsOpen,
+        })),
+      cycleTabForward: () => {
         const state = useAppStore.getState();
         const wsTabs = state.tabs.filter(
           (t) => t.workspaceId === state.activeWorkspaceId,
@@ -141,94 +159,129 @@ export function App() {
         const currentIdx = columnTabs.findIndex(
           (t) => t.id === state.activeTabId,
         );
-        const dir = event.shiftKey ? -1 : 1;
-        const nextIdx =
-          (currentIdx + dir + columnTabs.length) % columnTabs.length;
+        const nextIdx = (currentIdx + 1) % columnTabs.length;
         setActiveTab(columnTabs[nextIdx].id);
-        return;
-      }
-
-      // Cmd+1~9: context-sensitive switch based on focused panel
-      if (
-        !event.shiftKey &&
-        !event.altKey &&
-        ["1", "2", "3", "4", "5", "6", "7", "8", "9"].includes(key)
-      ) {
-        event.preventDefault();
+      },
+      cycleTabBackward: () => {
         const state = useAppStore.getState();
-        const idx = parseInt(key, 10) - 1;
-
+        const wsTabs = state.tabs.filter(
+          (t) => t.workspaceId === state.activeWorkspaceId,
+        );
+        let columnTabs;
         if (focusedColumn === "agent") {
-          // Switch agent tabs by index
-          const agentTabs = state.tabs.filter(
-            (t) =>
-              t.workspaceId === state.activeWorkspaceId &&
-              t.type === "terminal" &&
-              t.isAgent,
-          );
-          if (idx < agentTabs.length) {
-            setActiveTab(agentTabs[idx].id);
-          }
+          columnTabs = wsTabs.filter((t) => t.type === "terminal");
         } else if (focusedColumn === "file") {
-          // Switch file tabs by index
-          const fileTabs = state.tabs.filter(
-            (t) =>
-              t.workspaceId === state.activeWorkspaceId &&
-              t.type !== "terminal",
-          );
-          if (idx < fileTabs.length) {
-            setActiveTab(fileTabs[idx].id);
-          }
+          columnTabs = wsTabs.filter((t) => t.type !== "terminal");
         } else {
-          // Switch workspace by global sidebar order
-          const orderedIds: string[] = [];
-          for (const project of state.projects) {
-            for (const ws of state.workspaces.filter(
-              (w) => w.projectId === project.id,
-            )) {
-              orderedIds.push(ws.id);
-            }
-          }
-          if (idx < orderedIds.length) {
-            state.setActiveWorkspace(orderedIds[idx]);
-          }
+          columnTabs = wsTabs;
         }
-        return;
-      }
-
-      if (key === "t") {
-        event.preventDefault();
-        if (event.shiftKey) {
-          void createAgentTerminal(activeWorkspaceId ?? undefined);
-        } else {
-          void createTerminal(activeWorkspaceId ?? undefined);
-        }
-        return;
-      }
-
-      if (key === "w") {
-        event.preventDefault();
+        if (columnTabs.length <= 1) return;
+        const currentIdx = columnTabs.findIndex(
+          (t) => t.id === state.activeTabId,
+        );
+        const nextIdx =
+          (currentIdx - 1 + columnTabs.length) % columnTabs.length;
+        setActiveTab(columnTabs[nextIdx].id);
+      },
+      switchTab1: () => switchTabByIndex(0),
+      switchTab2: () => switchTabByIndex(1),
+      switchTab3: () => switchTabByIndex(2),
+      switchTab4: () => switchTabByIndex(3),
+      switchTab5: () => switchTabByIndex(4),
+      switchTab6: () => switchTabByIndex(5),
+      switchTab7: () => switchTabByIndex(6),
+      switchTab8: () => switchTabByIndex(7),
+      switchTab9: () => switchTabByIndex(8),
+      newTerminal: () => void createTerminal(activeWorkspaceId ?? undefined),
+      newAgent: () => void createAgentTerminal(activeWorkspaceId ?? undefined),
+      closeTab: () => {
         if (activeTabId) closeTab(activeTabId);
-        return;
+      },
+      toggleTerminal: () => void toggleTerminalPanel(),
+      toggleSidebar: () => toggleSidebar(),
+      toggleRightPanel: () => toggleRightPanel(),
+      openRightPanelFiles: () => {
+        const state = useAppStore.getState();
+        if (state.rightPanelOpen && state.rightPanelMode === "files") {
+          useAppStore.setState({ rightPanelOpen: false });
+        } else {
+          setRightPanelMode("files");
+        }
+      },
+      openRightPanelChanges: () => {
+        const state = useAppStore.getState();
+        if (state.rightPanelOpen && state.rightPanelMode === "changes") {
+          useAppStore.setState({ rightPanelOpen: false });
+        } else {
+          setRightPanelMode("changes");
+        }
+      },
+      openRightPanelContext: () => {
+        const state = useAppStore.getState();
+        if (state.rightPanelOpen && state.rightPanelMode === "context") {
+          useAppStore.setState({ rightPanelOpen: false });
+        } else {
+          setRightPanelMode("context");
+        }
+      },
+      copyPath: () => {
+        const state = useAppStore.getState();
+        const tab = state.tabs.find((t) => t.id === state.activeTabId);
+        if (!tab || tab.type !== "file") return;
+        const ws = state.workspaces.find((w) => w.id === tab.workspaceId);
+        if (!ws) return;
+        void navigator.clipboard.writeText(`${ws.worktreePath}/${tab.relPath}`);
+        state.addToast("info", "Path copied");
+      },
+      copyRelativePath: () => {
+        const state = useAppStore.getState();
+        const tab = state.tabs.find((t) => t.id === state.activeTabId);
+        if (!tab || tab.type !== "file") return;
+        void navigator.clipboard.writeText(tab.relPath);
+        state.addToast("info", "Relative path copied");
+      },
+    };
+
+    function switchTabByIndex(idx: number) {
+      const state = useAppStore.getState();
+      if (focusedColumn === "agent") {
+        const agentTabs = state.tabs.filter(
+          (t) =>
+            t.workspaceId === state.activeWorkspaceId &&
+            t.type === "terminal" &&
+            t.isAgent,
+        );
+        if (idx < agentTabs.length) setActiveTab(agentTabs[idx].id);
+      } else if (focusedColumn === "file") {
+        const fileTabs = state.tabs.filter(
+          (t) =>
+            t.workspaceId === state.activeWorkspaceId && t.type !== "terminal",
+        );
+        if (idx < fileTabs.length) setActiveTab(fileTabs[idx].id);
+      } else {
+        const orderedIds: string[] = [];
+        for (const project of state.projects) {
+          for (const ws of state.workspaces.filter(
+            (w) => w.projectId === project.id,
+          )) {
+            orderedIds.push(ws.id);
+          }
+        }
+        if (idx < orderedIds.length) {
+          state.setActiveWorkspace(orderedIds[idx]);
+        }
       }
+    }
 
-      if (key === "j") {
-        event.preventDefault();
-        void toggleTerminalPanel();
-        return;
-      }
-
-      if (!event.shiftKey) return;
-
-      if (key === "e") {
-        event.preventDefault();
-        setRightPanelMode("files");
-      } else if (key === "g") {
-        event.preventDefault();
-        setRightPanelMode("changes");
-      } else if (key === "c") {
-        event.preventDefault();
-        setRightPanelMode("context");
+    const onKeyDown = (event: KeyboardEvent) => {
+      // Data-driven dispatch: iterate all shortcuts, find match
+      for (const [actionId, combo] of Object.entries(shortcuts)) {
+        if (eventMatchesCombo(event, combo)) {
+          event.preventDefault();
+          event.stopPropagation();
+          handlers[actionId as ShortcutActionId]?.();
+          return;
+        }
       }
     };
 
@@ -245,6 +298,10 @@ export function App() {
     setActiveWorkspace,
     setRightPanelMode,
     toggleTerminalPanel,
+    toggleSidebar,
+    toggleRightPanel,
+    rightPanelMode,
+    shortcuts,
     tabs,
   ]);
 
@@ -306,13 +363,65 @@ export function App() {
   const hasTerminalTabs = hasAgentTabs || hasShellTabs;
   const hasFileTabs = workspaceTabs.some((tab) => tab.type !== "terminal");
 
-  // Restore remembered sidebar width when sidebar opens
+  // Animate sidebar & right panel toggle via transient CSS transition
   useEffect(() => {
-    if (!sidebarOpen) return;
-    requestAnimationFrame(() => {
-      horizontalSplitRef.current?.resize([sidebarWidthRef.current]);
-    });
+    const el = horizontalSplitRef.current
+      ? (document.querySelector(".app-horizontal-split") as HTMLElement | null)
+      : null;
+    if (!el) return;
+    el.classList.add("panel-animating");
+    if (sidebarOpen) {
+      requestAnimationFrame(() => {
+        horizontalSplitRef.current?.resize([sidebarWidthRef.current]);
+      });
+    }
+    const tid = window.setTimeout(
+      () => el.classList.remove("panel-animating"),
+      220,
+    );
+    return () => {
+      window.clearTimeout(tid);
+      el?.classList.remove("panel-animating");
+    };
   }, [sidebarOpen]);
+
+  useEffect(() => {
+    const el = document.querySelector(
+      ".app-horizontal-split",
+    ) as HTMLElement | null;
+    if (!el) return;
+    el.classList.add("panel-animating");
+    if (rightPanelOpen) {
+      requestAnimationFrame(() => {
+        const total = el.clientWidth;
+        const sw = sidebarOpen ? sidebarWidthRef.current : 0;
+        const rw = rightPanelWidthRef.current;
+        horizontalSplitRef.current?.resize([sw, total - sw - rw, rw]);
+      });
+    }
+    const tid = window.setTimeout(
+      () => el.classList.remove("panel-animating"),
+      220,
+    );
+    return () => {
+      window.clearTimeout(tid);
+      el?.classList.remove("panel-animating");
+    };
+  }, [rightPanelOpen, sidebarOpen]);
+
+  // When sidebar or right-panel toggles, keep the File column at its previous
+  // width so the freed space goes entirely to the Agent column.
+  useEffect(() => {
+    const fw = fileColumnWidthRef.current;
+    if (fw == null || !columnsSplitRef.current) return;
+    // Wait for the outer allotment to finish its layout first.
+    requestAnimationFrame(() => {
+      const container = document.querySelector<HTMLElement>(".columns-split");
+      if (!container || !columnsSplitRef.current) return;
+      const total = container.clientWidth;
+      columnsSplitRef.current.resize([total - fw, fw]);
+    });
+  }, [sidebarOpen, rightPanelOpen]);
 
   // Restore remembered terminal height when dock becomes visible
   const shellDockVisibleEarly = terminalPanelOpen && hasShellTabs;
@@ -429,7 +538,16 @@ export function App() {
     // Horizontal split: Agent (left) | File (right)
     if (hasAgentTabs && hasFileTabs) {
       return (
-        <Allotment proportionalLayout={false} className="columns-split">
+        <Allotment
+          ref={columnsSplitRef}
+          proportionalLayout={false}
+          className="columns-split"
+          onChange={(sizes) => {
+            if (sizes.length === 2 && sizes[1] > 0) {
+              fileColumnWidthRef.current = sizes[1];
+            }
+          }}
+        >
           <Allotment.Pane
             preferredSize="50%"
             minSize={280}
@@ -444,6 +562,7 @@ export function App() {
             </div>
           </Allotment.Pane>
           <Allotment.Pane
+            preferredSize="50%"
             minSize={280}
             className={focusedColumn === "file" ? "pane-focused" : ""}
           >
@@ -489,8 +608,45 @@ export function App() {
     return renderWorkspaceArea();
   };
 
+  // ── Fallback drop handler: when a file path is dropped anywhere in the
+  //    workspace frame (but not caught by AgentColumn or TerminalDock), write
+  //    it to the active agent terminal so the user doesn't need the agent
+  //    panel to be focused / visible. ──
+  const handleWorkspaceDragOver = (e: React.DragEvent) => {
+    if (e.dataTransfer.types.includes("application/x-forgepad-path")) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "copy";
+    }
+  };
+
+  const handleWorkspaceDrop = (e: React.DragEvent) => {
+    const path =
+      e.dataTransfer.getData("application/x-forgepad-path") ||
+      e.dataTransfer.getData("text/plain");
+    if (!path) return;
+    e.preventDefault();
+
+    // Find the active agent terminal from the current store state
+    const state = useAppStore.getState();
+    const agentTabs = state.tabs.filter(
+      (t) =>
+        t.workspaceId === state.activeWorkspaceId &&
+        t.type === "terminal" &&
+        t.isAgent,
+    );
+    const agentTabId = state.activeAgentTabId ?? agentTabs[0]?.id;
+    const agentTab = agentTabs.find((t) => t.id === agentTabId);
+    if (agentTab?.type === "terminal") {
+      window.forgepad.pty.write(agentTab.ptyId, path);
+    }
+  };
+
   const renderWorkspaceFrame = () => (
-    <main className="flex size-full min-h-0 flex-col bg-bg">
+    <main
+      className="flex size-full min-h-0 flex-col bg-bg"
+      onDragOver={handleWorkspaceDragOver}
+      onDrop={handleWorkspaceDrop}
+    >
       {!hasAgentTabs && !hasFileTabs && <AgentQuickBar />}
       <div className="min-h-0 flex-1 overflow-hidden">
         <Allotment
@@ -522,43 +678,62 @@ export function App() {
     <ThemeContext.Provider value={resolvedTheme}>
       <div className="flex size-full flex-col bg-bg">
         <TopBar onOpenSearch={() => setQuickSearchOpen(true)} />
-        <div className="min-h-0 flex-1">
-          <Allotment
-            ref={horizontalSplitRef}
-            proportionalLayout={false}
-            className="size-full"
-            onChange={(sizes) => {
-              if (sidebarOpen && sizes[0] > 0) {
-                sidebarWidthRef.current = sizes[0];
-              }
-            }}
-          >
-            <Allotment.Pane
-              preferredSize={sidebarOpen ? sidebarWidthRef.current : 0}
-              minSize={sidebarOpen ? 220 : 0}
-              maxSize={sidebarOpen ? 360 : 0}
-              visible={sidebarOpen}
+
+        {settingsOpen ? (
+          /* ── Settings full-page view ── */
+          <div className="min-h-0 flex-1 overflow-hidden">
+            <SettingsPanel />
+          </div>
+        ) : (
+          /* ── Normal workspace layout ── */
+          <div className="min-h-0 flex-1">
+            <Allotment
+              ref={horizontalSplitRef}
+              proportionalLayout={false}
+              className="app-horizontal-split size-full"
+              onChange={(sizes) => {
+                if (sidebarOpen && sizes[0] > 0) {
+                  sidebarWidthRef.current = sizes[0];
+                }
+                if (
+                  rightPanelOpen &&
+                  sizes.length >= 3 &&
+                  sizes[sizes.length - 1] > 0
+                ) {
+                  rightPanelWidthRef.current = sizes[sizes.length - 1];
+                }
+              }}
             >
-              <Sidebar />
-            </Allotment.Pane>
+              <Allotment.Pane
+                preferredSize={sidebarOpen ? sidebarWidthRef.current : 0}
+                minSize={sidebarOpen ? 220 : 0}
+                maxSize={sidebarOpen ? 360 : 0}
+                visible={sidebarOpen}
+              >
+                <Sidebar />
+              </Allotment.Pane>
 
-            <Allotment.Pane minSize={hasAnyContent ? 460 : 420}>
-              {renderWorkspaceFrame()}
-            </Allotment.Pane>
+              <Allotment.Pane minSize={hasAnyContent ? 460 : 420}>
+                {renderWorkspaceFrame()}
+              </Allotment.Pane>
 
-            {rightPanelOpen && (
-              <Allotment.Pane preferredSize={390} minSize={320} maxSize={560}>
+              <Allotment.Pane
+                preferredSize={rightPanelOpen ? rightPanelWidthRef.current : 0}
+                minSize={rightPanelOpen ? 320 : 0}
+                maxSize={rightPanelOpen ? 560 : 0}
+                visible={rightPanelOpen}
+              >
                 <RightPanel />
               </Allotment.Pane>
-            )}
-          </Allotment>
-        </div>
+            </Allotment>
+          </div>
+        )}
+
         <QuickSearch
           open={quickSearchOpen}
           onClose={() => setQuickSearchOpen(false)}
         />
         <ToastStack />
-        <SettingsPanel />
       </div>
     </ThemeContext.Provider>
   );

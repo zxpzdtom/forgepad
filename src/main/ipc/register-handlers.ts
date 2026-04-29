@@ -17,7 +17,7 @@ import { resolveInsideRoot } from "@main/services/path-guard";
 import { PtyService } from "@main/services/pty-service";
 import { StateService } from "@main/services/state-service";
 
-const ptyService = new PtyService();
+export const ptyService = new PtyService();
 const execFileAsync = promisify(execFile);
 
 type FileWatch = {

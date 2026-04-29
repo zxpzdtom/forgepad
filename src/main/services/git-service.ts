@@ -182,9 +182,7 @@ export class GitService {
     }
   }
 
-  static async getBranchStats(
-    worktreePath: string,
-  ): Promise<{
+  static async getBranchStats(worktreePath: string): Promise<{
     ahead: number;
     behind: number;
     additions: number;
@@ -278,10 +276,13 @@ export class GitService {
           isBinary: true,
         };
       }
+      const newContent = buffer.toString("utf8");
       return {
         path: relPath,
         oldPath,
-        patch: syntheticAddedPatch(relPath, buffer.toString("utf8")),
+        patch: syntheticAddedPatch(relPath, newContent),
+        oldContent: "",
+        newContent,
         status,
         bucket,
         isBinary: false,
@@ -298,13 +299,48 @@ export class GitService {
       patch = "";
     }
 
+    const isBinary = patchIndicatesBinary(patch);
+    if (isBinary) {
+      return { path: relPath, oldPath, patch, status, bucket, isBinary: true };
+    }
+
+    // Fetch old and new file contents so the diff viewer can expand collapsed
+    // unchanged regions (pierre needs full file contents for isPartial=false).
+    let oldContent: string | undefined;
+    let newContent: string | undefined;
+    try {
+      // Old content: HEAD version (staged) or index version (unstaged)
+      const showRef = bucket === "staged" ? "HEAD" : "";
+      const showPath = oldPath ?? relPath;
+      oldContent = await git(["show", `${showRef}:${showPath}`], worktreePath);
+    } catch {
+      // File may not exist in the old version (newly added)
+      oldContent = "";
+    }
+    try {
+      if (status === "deleted") {
+        newContent = "";
+      } else if (bucket === "staged") {
+        // For staged changes, new content is the index version
+        newContent = await git(["show", `:${relPath}`], worktreePath);
+      } else {
+        // For unstaged changes, new content is the working tree version
+        const abs = await resolveInsideRoot(worktreePath, relPath);
+        newContent = (await readFile(abs)).toString("utf8");
+      }
+    } catch {
+      newContent = undefined;
+    }
+
     return {
       path: relPath,
       oldPath,
       patch,
+      oldContent,
+      newContent,
       status,
       bucket,
-      isBinary: patchIndicatesBinary(patch),
+      isBinary: false,
     };
   }
 

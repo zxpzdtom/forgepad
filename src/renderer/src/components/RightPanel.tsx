@@ -20,20 +20,31 @@ export function RightPanel() {
   const setMode = useAppStore((state) => state.setRightPanelMode);
 
   return (
-    <aside className="flex h-full min-h-0 flex-col border-l border-border bg-panel">
-      <div className="flex min-h-10 items-center border-b border-border bg-panel">
-        <div className="flex min-w-0 flex-1">
+    <aside className="flex h-full min-h-0 flex-col border-l border-border bg-bg">
+      <div className="flex min-h-9 items-center border-b border-border bg-bg">
+        <div className="flex min-w-0 flex-1" role="tablist">
           {modes.map(({ mode: nextMode, label, icon: Icon }) => (
-            <button
-              className={`flex h-10 items-center gap-1.5 whitespace-nowrap border-b-2 border-transparent px-3 text-[13px] bg-transparent cursor-pointer${nextMode === mode ? " border-b-accent text-text" : " text-muted hover:text-text hover:bg-panel-2"}`}
+            <div
+              className={`relative flex h-9 cursor-pointer items-center gap-1.5 whitespace-nowrap px-3 text-[13px] transition-colors select-none${nextMode === mode ? " text-text" : " text-muted hover:text-text"}`}
               key={nextMode}
-              type="button"
+              role="tab"
+              tabIndex={0}
+              aria-selected={nextMode === mode}
               title={label}
               onClick={() => setMode(nextMode)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  setMode(nextMode);
+                }
+              }}
             >
               <Icon size={14} />
               <span>{label}</span>
-            </button>
+              {nextMode === mode && (
+                <span className="absolute bottom-0 left-3 right-3 h-[2px] rounded-full bg-accent" />
+              )}
+            </div>
           ))}
         </div>
       </div>

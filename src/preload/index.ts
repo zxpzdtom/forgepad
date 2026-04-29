@@ -225,6 +225,15 @@ const api = {
       };
     },
   },
+  menu: {
+    onOpenSettings: (callback: () => void) => {
+      const handler = () => callback();
+      ipcRenderer.on(IPC.MENU_OPEN_SETTINGS, handler);
+      return () => {
+        ipcRenderer.removeListener(IPC.MENU_OPEN_SETTINGS, handler);
+      };
+    },
+  },
   shell: {
     openPath: (fullPath: string) =>
       ipcRenderer.invoke(IPC.SHELL_OPEN_PATH, fullPath) as Promise<void>,

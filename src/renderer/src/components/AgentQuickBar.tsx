@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Bot, Play, Settings, TerminalSquare } from "lucide-react";
+import { Bot, Play, TerminalSquare } from "lucide-react";
 import { useAppStore } from "@renderer/store/app-store";
 import { agentPresetIcon } from "./AgentIcons";
 import { RunSetupDialog } from "./RunSetupDialog";
@@ -62,15 +62,6 @@ export function AgentQuickBar() {
   return (
     <>
       <div className="agent-quickbar flex h-9 shrink-0 items-center gap-1.5 border-b border-border bg-surface-toolbar px-3">
-        <button
-          className="icon-button small border-transparent"
-          type="button"
-          title="设置"
-          onClick={() => useAppStore.setState({ settingsOpen: true })}
-        >
-          <Settings size={15} />
-        </button>
-
         <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto scrollbar-none scroll-mask-x">
           {enabledPresets.map((preset) => (
             <button

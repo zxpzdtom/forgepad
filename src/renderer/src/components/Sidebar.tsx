@@ -22,7 +22,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { FolderOpen, FolderPlus } from "lucide-react";
+import { FolderOpen, FolderPlus, Settings } from "lucide-react";
 import { useAppStore } from "@renderer/store/app-store";
 import { Spinner } from "./Spinner";
 import type { AgentStatus } from "@shared/agent-lifecycle";
@@ -211,16 +211,16 @@ function CancelIcon({ className }: { className?: string }) {
 /* ── Project avatar (colored square + first letter) ───────────── */
 
 const AVATAR_COLORS = [
-  "bg-[#6366f1]", // indigo
-  "bg-[#8b5cf6]", // violet
-  "bg-[#ec4899]", // pink
-  "bg-[#f43f5e]", // rose
-  "bg-[#f97316]", // orange
-  "bg-[#eab308]", // yellow
-  "bg-[#22c55e]", // green
-  "bg-[#14b8a6]", // teal
-  "bg-[#06b6d4]", // cyan
-  "bg-[#3b82f6]", // blue
+  "bg-[#5e6ad2]", // brand indigo
+  "bg-[#7170ff]", // accent violet
+  "bg-[#828fff]", // accent hover
+  "bg-[#7a7fad]", // security lavender
+  "bg-[#62666d]", // quaternary gray
+  "bg-[#8a8f98]", // tertiary gray
+  "bg-[#4a4d55]", // dark gray
+  "bg-[#3e3e44]", // border tertiary
+  "bg-[#34343a]", // border secondary
+  "bg-[#23252a]", // border primary
 ];
 
 function ProjectAvatar({ name }: { name: string }) {
@@ -233,7 +233,7 @@ function ProjectAvatar({ name }: { name: string }) {
   const colorClass = AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
   return (
     <span
-      className={`flex size-5 shrink-0 items-center justify-center rounded text-[11px] font-bold text-white ${colorClass}`}
+      className={`flex size-5 shrink-0 items-center justify-center rounded text-[11px] font-[590] text-[#f7f8f8] ${colorClass}`}
     >
       {letter}
     </span>
@@ -308,11 +308,15 @@ function WorkspaceStatusDot({
   isActive: boolean;
   agentStatus: AgentStatus | undefined;
 }) {
+  const spinnerStyle = useAppStore((state) => state.settings.spinnerStyle);
+
   // Working → unicode braille spinner
   if (agentStatus === "working") {
     return (
       <span className="text-[14px] text-accent leading-none">
-        <Spinner name="braille" />
+        <Spinner
+          name={spinnerStyle as import("unicode-animations").BrailleSpinnerName}
+        />
       </span>
     );
   }
@@ -396,7 +400,7 @@ function SortableProjectGroup({
         {...listeners}
       >
         <ProjectAvatar name={name} />
-        <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[13px] font-[620]">
+        <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[13px] font-[510]">
           {name}
         </span>
         <button
@@ -472,7 +476,7 @@ function SortableWorkspaceRow({
     <div
       ref={setNodeRef}
       style={style}
-      className={`group/sidebar-workspace relative flex w-full min-w-0 cursor-grab items-start gap-2 rounded-md border border-border/60 bg-workspace-card-bg px-3 py-2 text-left transition-[background,box-shadow,border-color] duration-150 active:cursor-grabbing${isActive ? " border-accent/30 !bg-accent-surface" : " hover:bg-panel-2 hover:border-border/80"}${isDragging ? " shadow-[0_14px_28px_rgba(0,0,0,0.26)] ring-1 ring-accent/20" : ""}`}
+      className={`group/sidebar-workspace relative flex w-full min-w-0 cursor-grab items-start gap-2 rounded-md px-2 py-1.5 text-left transition-colors duration-150 active:cursor-grabbing${isActive ? "" : " hover:bg-panel-2"}${isDragging ? " bg-panel-2 ring-1 ring-accent/20" : ""}`}
       role="button"
       tabIndex={0}
       onClick={onClick}
@@ -481,11 +485,11 @@ function SortableWorkspaceRow({
       {...listeners}
     >
       {isActive && (
-        <span className="absolute bottom-1 left-1 top-1 w-[3px] rounded-full bg-accent" />
+        <span className="absolute left-0 top-1 bottom-1 w-[3px] rounded-full bg-accent" />
       )}
       {onDelete && (
         <div
-          className="absolute right-1.5 top-1.5 hidden size-5 items-center justify-center rounded text-subtle hover:text-danger hover:bg-panel-3 group-hover/sidebar-workspace:flex cursor-pointer"
+          className="absolute right-1 top-1 hidden size-5 items-center justify-center rounded text-subtle hover:text-danger group-hover/sidebar-workspace:flex cursor-pointer"
           onClick={(e) => {
             e.stopPropagation();
             onDelete();
@@ -503,7 +507,9 @@ function SortableWorkspaceRow({
       </div>
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <div className="flex min-w-0 items-center gap-2">
-          <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap font-mono text-[13px] font-medium">
+          <span
+            className={`min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap font-mono text-[13px] font-[510]${isActive ? " text-text" : ""}`}
+          >
             {workspace.branch || "detached"}
           </span>
           {hasDiffStats && (
@@ -544,19 +550,13 @@ function SidebarSkeleton() {
         <div className="h-3 w-[45%] animate-pulse rounded bg-border" />
         <div className="h-2.5 w-5 animate-pulse rounded bg-border" />
       </div>
-      <div className="flex items-center gap-2.5 py-2 pl-[22px] pr-2">
-        <div className="size-3.5 shrink-0 animate-pulse rounded-full bg-border" />
-        <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <div className="h-3 w-[60%] animate-pulse rounded bg-border" />
-          <div className="h-2.5 w-[35%] animate-pulse rounded bg-border" />
-        </div>
+      <div className="flex flex-col gap-1 px-2 py-1.5">
+        <div className="h-3 w-[60%] animate-pulse rounded bg-border" />
+        <div className="h-2.5 w-[35%] animate-pulse rounded bg-border" />
       </div>
-      <div className="flex items-center gap-2.5 py-2 pl-[22px] pr-2">
-        <div className="size-3.5 shrink-0 animate-pulse rounded-full bg-border" />
-        <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <div className="h-3 w-[75%] animate-pulse rounded bg-border" />
-          <div className="h-2.5 w-[45%] animate-pulse rounded bg-border" />
-        </div>
+      <div className="flex flex-col gap-1 px-2 py-1.5">
+        <div className="h-3 w-[75%] animate-pulse rounded bg-border" />
+        <div className="h-2.5 w-[45%] animate-pulse rounded bg-border" />
       </div>
     </div>
   );
@@ -725,7 +725,7 @@ function NewWorktreeDialog({
 
   return (
     <div
-      className="fixed inset-0 z-[60] grid place-items-center bg-black/40"
+      className="fixed inset-0 z-[60] grid place-items-center bg-black/85"
       onMouseDown={onClose}
     >
       <div
@@ -733,7 +733,7 @@ function NewWorktreeDialog({
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-border px-4 py-3">
-          <span className="text-[14px] font-semibold text-text">
+          <span className="text-[14px] font-[590] text-text">
             New Worktree — {projectName}
           </span>
         </div>
@@ -832,7 +832,7 @@ function DeleteWorktreeDialog({
 
   return (
     <div
-      className="fixed inset-0 z-[60] grid place-items-center bg-black/40"
+      className="fixed inset-0 z-[60] grid place-items-center bg-black/85"
       onMouseDown={onClose}
     >
       <div
@@ -840,14 +840,14 @@ function DeleteWorktreeDialog({
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-border px-4 py-3">
-          <span className="text-[14px] font-semibold text-text">
+          <span className="text-[14px] font-[590] text-text">
             Delete Worktree
           </span>
         </div>
         <div className="px-4 py-4 text-[13px] text-subtle leading-relaxed">
           Are you sure you want to delete worktree{" "}
-          <span className="font-mono font-semibold text-text">{branch}</span>?
-          This will remove the worktree directory and delete the local branch.
+          <span className="font-mono font-[590] text-text">{branch}</span>? This
+          will remove the worktree directory and delete the local branch.
         </div>
         <div className="flex justify-end gap-2 border-t border-border px-4 py-3">
           <button
@@ -893,7 +893,6 @@ export function Sidebar() {
   const projects = useAppStore((state) => state.projects);
   const workspaces = useAppStore((state) => state.workspaces);
   const activeWorkspaceId = useAppStore((state) => state.activeWorkspaceId);
-  const sidebarOpen = useAppStore((state) => state.sidebarOpen);
   const hydrated = useAppStore((state) => state.hydrated);
   const openProject = useAppStore((state) => state.openProject);
   const setActiveWorkspace = useAppStore((state) => state.setActiveWorkspace);
@@ -965,15 +964,24 @@ export function Sidebar() {
     }
   };
 
-  if (!sidebarOpen) {
-    return null;
-  }
-
   return (
     <aside
       className="flex h-full min-h-0 min-w-0 flex-col border-r border-border bg-sidebar-bg"
       onMouseDown={() => setFocusedColumn("sidebar")}
     >
+      <div className="flex h-9 shrink-0 items-center justify-between border-b border-border px-3">
+        <span className="text-[11px] font-semibold uppercase tracking-wider text-muted">
+          Workspaces
+        </span>
+        <button
+          className="icon-button small border-transparent"
+          type="button"
+          title="设置"
+          onClick={() => useAppStore.setState({ settingsOpen: true })}
+        >
+          <Settings size={15} />
+        </button>
+      </div>
       <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-0.5 overflow-y-auto overflow-x-hidden px-2 py-1.5 scrollbar-thin scroll-mask-y">
         {!hydrated ? (
           <SidebarSkeleton />
@@ -1043,7 +1051,7 @@ export function Sidebar() {
                             items={wsIds}
                             strategy={verticalListSortingStrategy}
                           >
-                            <div className="grid gap-0.5 pb-1">
+                            <div className="flex flex-col pb-1">
                               {projectWorkspaces.map((workspace) => (
                                 <SortableWorkspaceRow
                                   key={workspace.id}

@@ -54,62 +54,71 @@
 
 :root {
     color-scheme: dark;
-    --bg: #0f1115;
-    --panel: #151820;
-    --panel-2: #1a1e27;
-    --panel-3: #202633;
-    --border: #2b303b;
-    --border-soft: #232833;
-    --text: #e2e7ef;
-    --muted: #8d96a6;
-    --subtle: #636d7d;
-    --accent: #67d5b5;
-    --accent-2: #83b6ff;
+    /* Background surfaces — luminance stepping from deepest to elevated */
+    --bg: #08090a;
+    --panel: #0f1011;
+    --panel-2: #191a1b;
+    --panel-3: #28282c;
+    /* Borders — semi-transparent white on dark surfaces */
+    --border: rgba(255, 255, 255, 0.08);
+    --border-soft: rgba(255, 255, 255, 0.05);
+    /* Text — achromatic hierarchy */
+    --text: #f7f8f8;
+    --muted: #8a8f98;
+    --subtle: #62666d;
+    /* Brand — indigo-violet, the only chromatic color */
+    --accent: #5e6ad2;
+    --accent-2: #7170ff;
+    /* Status */
     --warn: #e9bd61;
     --danger: #ff7777;
-    --ok: #89d985;
-    --shadow: rgba(0, 0, 0, 0.22);
+    --ok: #27a644;
+    --shadow: rgba(0, 0, 0, 0.4);
     /* Semantic surface tokens */
-    --surface-inset: #0c0d10;
-    --surface-input: #10131a;
-    --surface-toolbar: #141414;
-    --surface-search: #1a1a1a;
-    --surface-dialog: #181715;
-    --surface-card: #11151c;
-    --surface-footer: #12161d;
-    --surface-terminal: #0d0f13;
-    --surface-markdown: #101218;
-    --accent-surface: #172424;
-    --focus-border: #3f756f;
-    --accent-contrast: #071110;
+    --surface-inset: #010102;
+    --surface-input: rgba(255, 255, 255, 0.02);
+    --surface-toolbar: #0f1011;
+    --surface-search: #191a1b;
+    --surface-dialog: #191a1b;
+    --surface-card: rgba(255, 255, 255, 0.02);
+    --surface-footer: #0f1011;
+    --surface-terminal: #08090a;
+    --surface-markdown: #0f1011;
+    --accent-surface: rgba(94, 106, 210, 0.08);
+    --focus-border: #5e6ad2;
+    --accent-contrast: #ffffff;
     /* Semantic text tokens */
-    --text-addition: #34d399;
+    --text-addition: #27a644;
     --text-deletion: #f87171;
     --text-warning-status: #f59e0b;
-    --text-code-inline: #f1d897;
-    --text-code-block: #d7deeb;
-    --text-heading: #f1f5fb;
+    --text-code-inline: #828fff;
+    --text-code-block: #d0d6e0;
+    --text-heading: #f7f8f8;
     /* Semantic border tokens */
-    --toast-border-success: #2f6f58;
-    --toast-border-error: #783d45;
-    --blockquote-border: #3a5362;
-    --checkbox-bg: #11151c;
-    --checkbox-border: #566070;
-    --code-header-bg: #14171e;
-    --code-copy-hover: rgba(255, 255, 255, 0.06);
-    --checkbox-check-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23071110' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'%3E%3C/polyline%3E%3C/svg%3E");
-    --sidebar-bg: oklch(23.5% 0 0);
-    --workspace-card-bg: oklch(21.5% 0 0);
+    --toast-border-success: rgba(39, 166, 68, 0.4);
+    --toast-border-error: rgba(255, 119, 119, 0.4);
+    --blockquote-border: rgba(255, 255, 255, 0.08);
+    --checkbox-bg: rgba(255, 255, 255, 0.02);
+    --checkbox-border: rgba(255, 255, 255, 0.08);
+    --code-header-bg: #191a1b;
+    --code-copy-hover: rgba(255, 255, 255, 0.05);
+    --checkbox-check-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'%3E%3C/polyline%3E%3C/svg%3E");
+    --sidebar-bg: #0f1011;
+    --workspace-card-bg: rgba(255, 255, 255, 0.02);
+    /* Typography — Inter Variable with Linear's OpenType features */
     font-family:
+        "Inter Variable",
         Inter,
-        ui-sans-serif,
-        system-ui,
+        "SF Pro Display",
         -apple-system,
-        BlinkMacSystemFont,
+        system-ui,
         "Segoe UI",
+        Roboto,
         sans-serif;
+    font-feature-settings: "cv01", "ss03";
     font-synthesis: none;
     text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
 }
 
 [data-theme="light"] {
@@ -123,8 +132,8 @@
     --text: #1a1c20;
     --muted: #6b7080;
     --subtle: #8e93a3;
-    --accent: #0e8a6d;
-    --accent-2: #2563eb;
+    --accent: #5e6ad2;
+    --accent-2: #5e6ad2;
     --warn: #b45309;
     --danger: #dc2626;
     --ok: #16a34a;
@@ -139,14 +148,14 @@
     --surface-footer: #f0f1f4;
     --surface-terminal: #f8f9fa;
     --surface-markdown: #fafbfc;
-    --accent-surface: #e6f5f0;
-    --focus-border: #0e8a6d;
+    --accent-surface: #eef0ff;
+    --focus-border: #5e6ad2;
     --accent-contrast: #ffffff;
     /* Semantic text tokens */
     --text-addition: #16a34a;
     --text-deletion: #dc2626;
     --text-warning-status: #b45309;
-    --text-code-inline: #9a3412;
+    --text-code-inline: #5e6ad2;
     --text-code-block: #1e293b;
     --text-heading: #0f172a;
     /* Semantic border tokens */
@@ -226,10 +235,13 @@ textarea {
     visibility: visible;
 }
 
+.xterm-scrollable-element {
+    padding: 20px;
+}
+
 .terminal-host {
     width: 100%;
     height: 100%;
-    padding: 8px;
 }
 
 .editor-panel,
@@ -298,7 +310,7 @@ textarea {
 }
 
 .markdown-preview {
-    width: min(860px, 100%);
+    width: 100%;
     padding: 24px 28px 40px;
     color: var(--text);
     font-size: 14px;
@@ -514,6 +526,82 @@ textarea {
     border-radius: 8px;
 }
 
+/* Markdown table — horizontal-scroll wrapper */
+.markdown-preview .table-wrapper {
+    overflow-x: auto;
+    margin: 0 0 14px;
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
+    @apply scroll-mask-x;
+}
+
+.markdown-preview table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    line-height: 1.5;
+    /* prevent table from shrinking below content width */
+    min-width: max-content;
+}
+
+.markdown-preview thead {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+.markdown-preview th {
+    padding: 8px 12px;
+    font-weight: 600;
+    font-size: 12px;
+    letter-spacing: 0.02em;
+    text-align: left;
+    white-space: nowrap;
+    color: var(--text-heading);
+    background: var(--surface-inset);
+    border-bottom: 1px solid var(--border-soft);
+}
+
+.markdown-preview td {
+    padding: 8px 12px;
+    color: var(--text);
+    border-bottom: 1px solid var(--border-soft);
+    vertical-align: top;
+}
+
+/* Zebra striping */
+.markdown-preview tbody tr:nth-child(even) {
+    background: var(--surface-inset);
+}
+
+/* Hover state */
+.markdown-preview tbody tr:hover {
+    background: var(--accent-surface);
+}
+
+/* Remove bottom border on last row */
+.markdown-preview tbody tr:last-child td {
+    border-bottom: none;
+}
+
+/* Alignment support (GFM text-align) */
+.markdown-preview th[align="center"],
+.markdown-preview td[align="center"] {
+    text-align: center;
+}
+
+.markdown-preview th[align="right"],
+.markdown-preview td[align="right"] {
+    text-align: right;
+}
+
+/* Inline code inside table cells */
+.markdown-preview td code,
+.markdown-preview th code {
+    font-size: 0.88em;
+    padding: 1px 4px;
+}
+
 /* Search highlights */
 ::highlight(forgepad-file-search) {
     color: inherit;
@@ -577,7 +665,7 @@ textarea {
     padding: 0 12px;
     color: var(--accent-contrast);
     background: var(--accent);
-    font-weight: 650;
+    font-weight: 590;
 }
 
 .secondary-button {
@@ -839,6 +927,7 @@ textarea {
 .sidebar > :first-child button,
 .sidebar > :first-child .toolbar-actions,
 .tabbar button,
+.tabbar [role="tab"],
 .tabbar .tabs-scroll,
 .tabbar .toolbar-select,
 .tabbar .tabbar-actions,
@@ -846,6 +935,7 @@ textarea {
 .right-panel > :first-child .right-panel-tabs,
 .right-panel > :first-child .right-panel-actions,
 .column-tabbar button,
+.column-tabbar [role="tab"],
 .column-tabbar .tabs-scroll,
 .column-tabbar .tabbar-actions,
 .surface-toolbar button,
@@ -861,6 +951,13 @@ textarea {
     > .allotment-module_sashContainer__fzwJF
     .allotment-module_sash__QA-2t {
     background: transparent;
+}
+
+/* Panel toggle animation — applied transiently during sidebar / right-panel open/close */
+.panel-animating
+    > .allotment-module_splitViewContainer__rQnVa
+    > .allotment-module_splitViewView__MGZ6O {
+    transition: width 200ms ease-out;
 }
 
 /* Agent | File columns split – visible sash */
@@ -884,17 +981,25 @@ textarea {
 .anchor-menu {
     position: fixed;
     z-index: 50;
-    min-width: 210px;
-    border-radius: 10px;
+    min-width: 180px;
+    border-radius: 8px;
     border: 1px solid var(--border);
     background: var(--panel-2);
-    padding: 6px;
-    box-shadow: 0 18px 38px rgba(0, 0, 0, 0.38);
-    transition:
-        opacity 150ms ease,
-        display 150ms ease allow-discrete;
-    @starting-style {
+    padding: 4px;
+    box-shadow:
+        0 0 0 1px rgba(0, 0, 0, 0.15),
+        0 4px 12px rgba(0, 0, 0, 0.3);
+    animation: menu-in 120ms ease-out;
+}
+
+@keyframes menu-in {
+    from {
         opacity: 0;
+        transform: scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
     }
 }
 
@@ -911,7 +1016,9 @@ textarea {
     border: 1px solid var(--border);
     background: var(--panel-2);
     padding: 6px;
-    box-shadow: 0 14px 28px rgba(0, 0, 0, 0.32);
+    box-shadow:
+        rgba(0, 0, 0, 0.2) 0px 0px 0px 1px,
+        rgba(0, 0, 0, 0.4) 0px 2px 4px;
     transition:
         opacity 120ms ease,
         display 120ms ease allow-discrete;
@@ -1552,4 +1659,11 @@ textarea {
                 calc(100% - var(--tw-scroll-mask-b-size)) 100%;
         }
     }
+}
+
+/* ── Drop target highlight for file drag-and-drop ── */
+.drop-target-active {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+    border-radius: 4px;
 }

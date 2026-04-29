@@ -342,7 +342,7 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
               <span className="grid size-4 place-items-center">
                 {selectedIcon}
               </span>
-              <span className="font-semibold">Open</span>
+              <span className="font-[590]">Open</span>
             </button>
 
             {/* Right: chevron trigger (anchor for dropdown) */}
