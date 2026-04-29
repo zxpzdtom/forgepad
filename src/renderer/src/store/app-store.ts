@@ -14,6 +14,8 @@ import type {
   FileStatus,
   GitBucket,
   GitStatusKind,
+  NotificationSettings,
+  NotificationSound,
   PersistedAppState,
   Project,
   RightPanelMode,
@@ -24,10 +26,10 @@ import type {
   TaskStatus,
   Workspace,
 } from '@shared/types';
-import { DEFAULT_AGENT_PRESETS, DEFAULT_SETTINGS, DEFAULT_SHORTCUTS } from '@shared/types';
+import { DEFAULT_AGENT_PRESETS, DEFAULT_NOTIFICATION_SETTINGS, DEFAULT_SETTINGS, DEFAULT_SHORTCUTS } from '@shared/types';
 import { create } from 'zustand';
 
-export type SettingsSection = 'general' | 'agent' | 'terminal' | 'changes' | 'advanced' | 'shortcuts';
+export type SettingsSection = 'general' | 'agent' | 'terminal' | 'changes' | 'notifications' | 'advanced' | 'shortcuts';
 
 type Toast = {
   id: string;
@@ -145,6 +147,10 @@ type AppState = {
   removeWorkspace: (workspaceId: string) => void;
   deleteWorktree: (workspaceId: string) => Promise<void>;
   createWorktree: (projectId: string, branch: string, trackRemote?: boolean) => Promise<void>;
+  updateNotificationSettings: (partial: Partial<NotificationSettings>) => void;
+  addCustomSound: (sound: NotificationSound) => void;
+  removeCustomSound: (soundId: string) => void;
+  renameCustomSound: (soundId: string, name: string) => void;
 };
 
 function id(): string {
@@ -423,6 +429,15 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (matchingDefaultPreset) {
       rawSettings.defaultAgentCommand = matchingDefaultPreset.command;
     }
+
+    // Schema migration: safely merge notification settings with defaults
+    rawSettings.notifications = {
+      ...DEFAULT_NOTIFICATION_SETTINGS,
+      ...(rawSettings.notifications ?? {}),
+      // Ensure customSounds is always an array
+      customSounds: rawSettings.notifications?.customSounds ?? [],
+    };
+
     const settings = rawSettings;
     const projects = state?.projects ?? [];
     const workspaces = state?.workspaces ?? [];
@@ -1502,6 +1517,47 @@ export const useAppStore = create<AppState>((set, get) => ({
     );
     set((s) => ({ branchStats: { ...s.branchStats, ...updates } }));
   },
+
+  updateNotificationSettings: (partial) =>
+    set((state) => ({
+      settings: {
+        ...state.settings,
+        notifications: { ...state.settings.notifications, ...partial },
+      },
+    })),
+
+  addCustomSound: (sound) =>
+    set((state) => ({
+      settings: {
+        ...state.settings,
+        notifications: {
+          ...state.settings.notifications,
+          customSounds: [...state.settings.notifications.customSounds, sound],
+        },
+      },
+    })),
+
+  removeCustomSound: (soundId) =>
+    set((state) => ({
+      settings: {
+        ...state.settings,
+        notifications: {
+          ...state.settings.notifications,
+          customSounds: state.settings.notifications.customSounds.filter((s) => s.id !== soundId),
+        },
+      },
+    })),
+
+  renameCustomSound: (soundId, name) =>
+    set((state) => ({
+      settings: {
+        ...state.settings,
+        notifications: {
+          ...state.settings.notifications,
+          customSounds: state.settings.notifications.customSounds.map((s) => (s.id === soundId ? { ...s, name } : s)),
+        },
+      },
+    })),
 }));
 
 export function getTabTitle(tab: Tab): string {

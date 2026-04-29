@@ -6,6 +6,7 @@ import type { AgentPreset, ShortcutCategory } from '@shared/types';
 import { DEFAULT_SETTINGS, DEFAULT_SHORTCUTS, SHORTCUT_DEFINITIONS } from '@shared/types';
 import {
   ArrowLeft,
+  Bell,
   Bot,
   Check,
   ChevronDown,
@@ -25,6 +26,7 @@ import {
 import { type BrailleSpinnerName, spinners } from 'unicode-animations';
 
 import { agentPresetIcon } from './AgentIcons';
+import { NotificationsSection } from './NotificationsSection';
 import { SegmentedControl } from './SegmentedControl';
 import { ShortcutRecorder } from './ShortcutRecorder';
 import { Spinner } from './Spinner';
@@ -61,6 +63,7 @@ const NAV_ITEMS: { id: SectionId; label: string; icon: React.ReactNode }[] = [
   { id: 'agent', label: 'Agent', icon: <Bot size={15} /> },
   { id: 'terminal', label: 'Terminal', icon: <Terminal size={15} /> },
   { id: 'changes', label: 'Changes', icon: <Rows2 size={15} /> },
+  { id: 'notifications', label: 'Notifications', icon: <Bell size={15} /> },
   { id: 'advanced', label: 'Advanced', icon: <Settings size={15} /> },
   { id: 'shortcuts', label: 'Shortcuts', icon: <Keyboard size={15} /> },
 ];
@@ -772,6 +775,7 @@ const SECTIONS: Record<SectionId, React.ComponentType> = {
   agent: AgentSection,
   terminal: TerminalSection,
   changes: ChangesSection,
+  notifications: NotificationsSection,
   advanced: AdvancedSection,
   shortcuts: ShortcutsSection,
 };

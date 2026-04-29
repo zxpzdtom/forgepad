@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process';
 import type { FSWatcher } from 'node:fs';
 import { watch as watchFs } from 'node:fs';
+import { copyFile, mkdir, readFile, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import { ContextService } from '@main/services/context-service';
@@ -11,7 +12,7 @@ import { PtyService } from '@main/services/pty-service';
 import { StateService } from '@main/services/state-service';
 import { IPC } from '@shared/ipc';
 import type { CreateBundleInput, PersistedAppState, WorkspaceChangeEvent } from '@shared/types';
-import { BrowserWindow, dialog, ipcMain, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
 
 export const ptyService = new PtyService();
 const execFileAsync = promisify(execFile);
@@ -339,5 +340,63 @@ export function registerIpcHandlers(hookPort?: number): void {
 
   ipcMain.handle(IPC.SHELL_OPEN_WITH_TERMINAL, async (_event, fullPath: string, terminalId: string) => {
     await openWithTerminal(fullPath, terminalId);
+  });
+
+  // ─── Notification audio handlers ───
+
+  ipcMain.handle(IPC.NOTIFICATION_PICK_AUDIO, async () => {
+    const result = await dialog.showOpenDialog({
+      title: 'Select Audio File',
+      properties: ['openFile'],
+      filters: [{ name: 'Audio Files', extensions: ['mp3', 'wav', 'ogg'] }],
+    });
+    if (result.canceled || !result.filePaths[0]) return null;
+
+    const srcPath = result.filePaths[0];
+    const ext = path.extname(srcPath).toLowerCase();
+    const soundsDir = path.join(app.getPath('userData'), 'notification-sounds');
+    await mkdir(soundsDir, { recursive: true });
+
+    // Generate a unique filename to avoid collisions
+    const baseName = path.basename(srcPath, ext);
+    const sanitized = baseName.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 60);
+    const uniqueName = `${sanitized}_${Date.now()}${ext}`;
+    const destPath = path.join(soundsDir, uniqueName);
+
+    await copyFile(srcPath, destPath);
+
+    // Read as data URL for renderer playback (CSP-safe)
+    const buffer = await readFile(destPath);
+    const mimeMap: Record<string, string> = { '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.ogg': 'audio/ogg' };
+    const mime = mimeMap[ext] ?? 'audio/mpeg';
+    const dataUrl = `data:${mime};base64,${buffer.toString('base64')}`;
+
+    return { fileName: uniqueName, assetPath: destPath, dataUrl };
+  });
+
+  ipcMain.handle(IPC.NOTIFICATION_DELETE_AUDIO, async (_event, assetPath: string) => {
+    // Only allow deleting from the notification-sounds directory
+    const soundsDir = path.join(app.getPath('userData'), 'notification-sounds');
+    const resolved = path.resolve(assetPath);
+    if (!resolved.startsWith(path.resolve(soundsDir))) {
+      throw new Error('Invalid path: outside notification-sounds directory');
+    }
+    try {
+      await unlink(resolved);
+    } catch {
+      // File may already be gone; ignore
+    }
+  });
+
+  ipcMain.handle(IPC.APP_IS_FOCUSED, () => {
+    return BrowserWindow.getFocusedWindow() !== null;
+  });
+
+  ipcMain.on(IPC.APP_FOCUS_WINDOW, () => {
+    const win = BrowserWindow.getAllWindows()[0];
+    if (win) {
+      if (win.isMinimized()) win.restore();
+      win.focus();
+    }
   });
 }

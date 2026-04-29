@@ -1,9 +1,9 @@
 import http from 'node:http';
 import { URL } from 'node:url';
-import type { AgentStatus, AgentStatusUpdate } from '@shared/agent-lifecycle';
+import type { AgentStatusUpdate } from '@shared/agent-lifecycle';
 import { mapEventToStatus } from '@shared/agent-lifecycle';
 import { IPC } from '@shared/ipc';
-import { BrowserWindow, Notification } from 'electron';
+import { BrowserWindow } from 'electron';
 
 export class HookServer {
   private server: http.Server | null = null;
@@ -137,32 +137,7 @@ export class HookServer {
         win.webContents.send(IPC.AGENT_STATUS_UPDATE, update);
       }
     }
-
-    this.showNotification(update.ptyId, update.status);
-  }
-
-  private showNotification(ptyId: string, status: AgentStatus): void {
-    if (status !== 'review' && status !== 'permission') return;
-
-    // Skip notification if the app window is focused
-    const focusedWin = BrowserWindow.getFocusedWindow();
-    if (focusedWin) return;
-
-    const title = status === 'review' ? 'Agent completed' : 'Agent needs input';
-    const body = status === 'review' ? 'The agent has finished its task.' : 'The agent is waiting for your approval.';
-
-    const notification = new Notification({ title, body });
-    notification.on('click', () => {
-      // Focus the main window and tell the renderer to switch to this agent tab
-      const win = BrowserWindow.getAllWindows()[0];
-      if (win) {
-        if (win.isMinimized()) win.restore();
-        win.focus();
-        if (!win.webContents.isDestroyed()) {
-          win.webContents.send(IPC.AGENT_FOCUS_TAB, ptyId);
-        }
-      }
-    });
-    notification.show();
+    // Desktop notifications and sounds are now handled by the renderer
+    // (useAgentLifecycle hook) based on user settings.
   }
 }
