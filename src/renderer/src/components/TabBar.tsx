@@ -1,5 +1,6 @@
 import { type MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { closestCenter, DndContext, type DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { restrictToHorizontalAxis, restrictToParentElement } from '@dnd-kit/modifiers';
 import { horizontalListSortingStrategy, SortableContext } from '@dnd-kit/sortable';
 import { getTabTitle, useAppStore } from '@renderer/store/app-store';
 import type { Tab } from '@shared/types';
@@ -70,8 +71,13 @@ export function TabBar() {
   }, []);
 
   return (
-    <div className="workspace-tabbar tabbar relative flex h-9 shrink-0 items-center border-border border-b bg-bg">
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+    <div className="workspace-tabbar tabbar relative flex h-9 shrink-0 items-center border-b border-border bg-bg">
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        modifiers={[restrictToHorizontalAxis, restrictToParentElement]}
+        onDragEnd={handleDragEnd}
+      >
         <SortableContext items={tabIds} strategy={horizontalListSortingStrategy}>
           <div
             ref={tabListRef}
