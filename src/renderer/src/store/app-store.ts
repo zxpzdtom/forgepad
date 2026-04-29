@@ -3,6 +3,7 @@ import type { AgentStatus } from '@shared/agent-lifecycle';
 import type {
   AgentPreset,
   AppSettings,
+  BrowserNavState,
   CodeSelectionItem,
   ContextBundleResult,
   ContextDiffItem,
@@ -17,6 +18,7 @@ import type {
   PersistedAppState,
   Project,
   RightPanelMode,
+  SelectedElementInfo,
   ShortcutActionId,
   ShortcutCombo,
   Tab,
@@ -68,6 +70,12 @@ type AppState = {
   agentStatuses: Record<string, AgentStatus>;
   /** ptyIds whose process has exited */
   exitedPtyIds: Set<string>;
+  /** Browser select mode active state, keyed by tabId */
+  browserSelectMode: Record<string, boolean>;
+  /** Whether the browser feedback modal is open */
+  feedbackModalOpen: boolean;
+  /** Pending element selection for feedback modal */
+  pendingFeedback: { tabId: string; element: SelectedElementInfo } | null;
   handleAgentStatusUpdate: (ptyId: string, status: AgentStatus) => void;
   clearAgentStatus: (ptyId: string) => void;
   markPtyExited: (ptyId: string) => void;
@@ -145,6 +153,13 @@ type AppState = {
   removeWorkspace: (workspaceId: string) => void;
   deleteWorktree: (workspaceId: string) => Promise<void>;
   createWorktree: (projectId: string, branch: string, trackRemote?: boolean) => Promise<void>;
+  // Browser tab actions
+  createBrowserTab: (url?: string) => Promise<void>;
+  updateBrowserNavState: (state: BrowserNavState) => void;
+  setBrowserSelectMode: (tabId: string, active: boolean) => void;
+  openFeedbackModal: (tabId: string, element: SelectedElementInfo) => void;
+  closeFeedbackModal: () => void;
+  submitBrowserFeedback: (comment: string) => void;
 };
 
 function id(): string {
@@ -159,6 +174,7 @@ function tabTitle(tab: Tab): string {
   if (tab.type === 'terminal') return tab.title;
   if (tab.type === 'diff') return 'Changes';
   if (tab.type === 'context-preview') return 'Context';
+  if (tab.type === 'browser') return tab.title || 'Browser';
   return tab.relPath.split('/').pop() || tab.relPath;
 }
 
@@ -180,7 +196,10 @@ function serializeForSave(state: AppState): PersistedAppState {
     projects: state.projects,
     workspaces: state.workspaces,
     tasks: state.tasks,
-    tabs: state.tabs.filter((tab) => tab.type !== 'terminal' || (tab.isAgent && tab.sessionId && tab.sessionConfirmed)),
+    tabs: state.tabs.filter(
+      (tab) =>
+        tab.type !== 'browser' && (tab.type !== 'terminal' || (tab.isAgent && tab.sessionId && tab.sessionConfirmed)),
+    ),
     activeWorkspaceId: state.activeWorkspaceId,
     activeTabId: state.tabs.find((tab) => tab.id === state.activeTabId)?.type === 'terminal' ? null : state.activeTabId,
     workspaceActiveAgentTabIds,
@@ -306,6 +325,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   gitRefreshEpoch: 0,
   agentStatuses: {},
   exitedPtyIds: new Set<string>(),
+  browserSelectMode: {},
+  feedbackModalOpen: false,
+  pendingFeedback: null,
   handleAgentStatusUpdate: (ptyId, status) => {
     // Reset the working-timeout whenever we receive any hook event.
     // If status is "working", start a timeout that auto-clears to "idle"
@@ -683,6 +705,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   closeTab: (tabId) => {
     const tab = get().tabs.find((item) => item.id === tabId);
     if (tab?.type === 'terminal') window.forgepad.pty.destroy(tab.ptyId);
+    if (tab?.type === 'browser') void window.forgepad.browser.destroy(tab.id);
     set((state) => {
       const tabs = state.tabs.filter((item) => item.id !== tabId);
       const wsTabs = tabs.filter((item) => item.workspaceId === state.activeWorkspaceId);
@@ -1501,6 +1524,109 @@ export const useAppStore = create<AppState>((set, get) => ({
       }),
     );
     set((s) => ({ branchStats: { ...s.branchStats, ...updates } }));
+  },
+
+  // ── Browser tab actions ──────────────────────────────────────────────────
+
+  createBrowserTab: async (url) => {
+    const state = get();
+    const workspaceId = state.activeWorkspaceId;
+    if (!workspaceId) return;
+    try {
+      const { tabId } = await window.forgepad.browser.create(url);
+      const tab: Tab = {
+        id: tabId,
+        workspaceId,
+        type: 'browser',
+        url: url || 'about:blank',
+        title: 'Browser',
+        isLoading: true,
+        canGoBack: false,
+        canGoForward: false,
+      };
+      get().addTab(tab);
+    } catch (error) {
+      get().addToast('error', error instanceof Error ? error.message : 'Failed to open browser.');
+    }
+  },
+
+  updateBrowserNavState: (navState) => {
+    set((state) => ({
+      tabs: state.tabs.map((tab) =>
+        tab.id === navState.tabId && tab.type === 'browser'
+          ? {
+              ...tab,
+              url: navState.url,
+              title: navState.title || navState.url,
+              isLoading: navState.isLoading,
+              canGoBack: navState.canGoBack,
+              canGoForward: navState.canGoForward,
+            }
+          : tab,
+      ),
+    }));
+  },
+
+  setBrowserSelectMode: (tabId, active) => {
+    if (active) {
+      void window.forgepad.browser.startSelect(tabId);
+    } else {
+      void window.forgepad.browser.stopSelect(tabId);
+    }
+    set((state) => ({
+      browserSelectMode: { ...state.browserSelectMode, [tabId]: active },
+    }));
+  },
+
+  openFeedbackModal: (tabId, element) => {
+    set({
+      pendingFeedback: { tabId, element },
+      feedbackModalOpen: true,
+      browserSelectMode: (() => {
+        const current = get().browserSelectMode;
+        return { ...current, [tabId]: false };
+      })(),
+    });
+  },
+
+  closeFeedbackModal: () => {
+    set({ feedbackModalOpen: false, pendingFeedback: null });
+  },
+
+  submitBrowserFeedback: (comment) => {
+    const state = get();
+    const { pendingFeedback } = state;
+    if (!pendingFeedback || !comment.trim()) return;
+
+    const { element } = pendingFeedback;
+
+    // Find the active agent tab's ptyId
+    const activeAgentTab = state.tabs.find(
+      (tab) =>
+        tab.id === state.activeAgentTabId &&
+        tab.type === 'terminal' &&
+        tab.isAgent,
+    );
+
+    if (activeAgentTab?.type === 'terminal') {
+      const prompt = [
+        `[Browser Feedback] ${element.pageUrl}`,
+        '',
+        `Element: ${element.tagName} | Selector: \`${element.selector}\``,
+        '```html',
+        element.outerHTML,
+        '```',
+        '',
+        `Feedback: ${comment.trim()}`,
+        '',
+      ].join('\n');
+
+      window.forgepad.pty.write(activeAgentTab.ptyId, prompt);
+    } else {
+      get().addToast('error', 'No active agent terminal. Please open an agent tab first.');
+    }
+
+    get().closeFeedbackModal();
   },
 }));
 

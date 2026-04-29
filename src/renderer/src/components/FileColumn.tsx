@@ -1,6 +1,7 @@
 import { useAppStore } from '@renderer/store/app-store';
 import type { Workspace } from '@shared/types';
 
+import { BrowserTab } from './BrowserTab';
 import { ContextPreview } from './ContextPreview';
 import { DiffViewer } from './DiffViewer';
 import { FileEditor } from './FileEditor';
@@ -12,7 +13,9 @@ export function FileColumn() {
   const workspaces = useAppStore((state) => state.workspaces);
   const setFocusedColumn = useAppStore((state) => state.setFocusedColumn);
 
-  const fileTabs = tabs.filter((tab) => tab.workspaceId === activeWorkspaceId && tab.type !== 'terminal');
+  const fileTabs = tabs.filter(
+    (tab) => tab.workspaceId === activeWorkspaceId && tab.type !== 'terminal',
+  );
 
   const columnActiveId = activeFileTabId ?? fileTabs[0]?.id;
   const activeFileTab = fileTabs.find((t) => t.id === columnActiveId);
@@ -36,6 +39,9 @@ export function FileColumn() {
           }
           if (tab.type === 'context-preview') {
             return <ContextPreview key={tab.id} />;
+          }
+          if (tab.type === 'browser') {
+            return <BrowserTab key={tab.id} tab={tab} />;
           }
           return null;
         })}

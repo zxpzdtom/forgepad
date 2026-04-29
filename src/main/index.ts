@@ -4,9 +4,16 @@ import { app, BrowserWindow, Menu, shell } from 'electron';
 
 import { ptyService, registerIpcHandlers } from './ipc/register-handlers';
 import { AgentHooksService } from './services/agent-hooks-service';
+import { BrowserService } from './services/browser-service';
 import { HookServer } from './services/hook-server';
 
 let hookServer: HookServer | null = null;
+let browserService: BrowserService | null = null;
+
+export function getBrowserService(): BrowserService {
+  if (!browserService) throw new Error('BrowserService not initialized');
+  return browserService;
+}
 
 function buildAppMenu(): void {
   const isMac = process.platform === 'darwin';
@@ -127,8 +134,16 @@ function createWindow(): void {
     },
   });
 
+  // Initialize browser service for embedded WebContentsView management
+  browserService = new BrowserService(mainWindow);
+
   mainWindow.on('ready-to-show', () => {
     mainWindow.show();
+  });
+
+  mainWindow.on('closed', () => {
+    browserService?.destroyAll();
+    browserService = null;
   });
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {

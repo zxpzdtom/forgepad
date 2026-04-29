@@ -112,6 +112,20 @@ export function App() {
     });
   }, []);
 
+  // Subscribe to browser navigation state changes and element selection events
+  useEffect(() => {
+    const unsubNav = window.forgepad.browser.onNavState((state) => {
+      useAppStore.getState().updateBrowserNavState(state);
+    });
+    const unsubSelect = window.forgepad.browser.onElementSelected(({ tabId, element }) => {
+      useAppStore.getState().openFeedbackModal(tabId, element);
+    });
+    return () => {
+      unsubNav();
+      unsubSelect();
+    };
+  }, []);
+
   useEffect(() => {
     // Build action handler map for configurable keyboard shortcuts
     const handlers: Record<ShortcutActionId, () => void> = {
