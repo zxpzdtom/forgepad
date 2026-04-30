@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process';
 import type { FSWatcher } from 'node:fs';
 import { watch as watchFs } from 'node:fs';
+import { copyFile, mkdir, readFile, unlink } from 'node:fs/promises';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import { ContextService } from '@main/services/context-service';
@@ -11,7 +12,7 @@ import { PtyService } from '@main/services/pty-service';
 import { StateService } from '@main/services/state-service';
 import { IPC } from '@shared/ipc';
 import type { CreateBundleInput, PersistedAppState, WorkspaceChangeEvent } from '@shared/types';
-import { BrowserWindow, dialog, ipcMain, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, shell, webContents } from 'electron';
 
 export const ptyService = new PtyService();
 const execFileAsync = promisify(execFile);
@@ -246,6 +247,15 @@ export function registerIpcHandlers(hookPort?: number): void {
     };
   });
 
+  ipcMain.handle(IPC.APP_PICK_DIRECTORY, async (_event, title?: string) => {
+    const result = await dialog.showOpenDialog({
+      properties: ['openDirectory', 'createDirectory'],
+      title: title ?? 'Choose Directory',
+    });
+    if (result.canceled || !result.filePaths[0]) return null;
+    return result.filePaths[0];
+  });
+
   ipcMain.handle(IPC.STATE_LOAD, async () => StateService.load());
   ipcMain.handle(IPC.STATE_SAVE, async (_event, state: PersistedAppState) => StateService.save(state));
 
@@ -263,11 +273,15 @@ export function registerIpcHandlers(hookPort?: number): void {
   ipcMain.handle(IPC.GIT_COMMIT, async (_event, worktreePath: string, message: string) =>
     GitService.commit(worktreePath, message),
   );
-  ipcMain.handle(IPC.GIT_WORKTREE_ADD, async (_event, repoPath: string, branch: string, trackRemote?: boolean) =>
-    GitService.addWorktree(repoPath, branch, trackRemote),
+  ipcMain.handle(
+    IPC.GIT_WORKTREE_ADD,
+    async (_event, repoPath: string, branch: string, trackRemote?: boolean, worktreeBaseDir?: string) =>
+      GitService.addWorktree(repoPath, branch, trackRemote, worktreeBaseDir),
   );
-  ipcMain.handle(IPC.GIT_WORKTREE_REMOVE, async (_event, repoPath: string, worktreePath: string, branch: string) =>
-    GitService.removeWorktree(repoPath, worktreePath, branch),
+  ipcMain.handle(
+    IPC.GIT_WORKTREE_REMOVE,
+    async (_event, repoPath: string, worktreePath: string, branch: string, deleteBranch?: boolean) =>
+      GitService.removeWorktree(repoPath, worktreePath, branch, deleteBranch),
   );
   ipcMain.handle(IPC.GIT_FETCH, async (_event, repoPath: string) => GitService.fetch(repoPath));
   ipcMain.handle(IPC.GIT_REMOTE_BRANCHES, async (_event, repoPath: string) => GitService.listRemoteBranches(repoPath));
@@ -339,5 +353,236 @@ export function registerIpcHandlers(hookPort?: number): void {
 
   ipcMain.handle(IPC.SHELL_OPEN_WITH_TERMINAL, async (_event, fullPath: string, terminalId: string) => {
     await openWithTerminal(fullPath, terminalId);
+  });
+
+  // ── Browser (<webview>) handlers ──────────────────────────────────────────
+  ipcMain.handle(
+    IPC.BROWSER_CAPTURE_SCREENSHOT,
+    async (
+      _event,
+      args: {
+        webContentsId: number;
+        rect: { x: number; y: number; width: number; height: number };
+      },
+    ) => {
+      const wc = webContents.fromId(args.webContentsId);
+      if (!wc || wc.isDestroyed()) return '';
+      try {
+        const w = Math.max(1, Math.round(args.rect.width));
+        const h = Math.max(1, Math.round(args.rect.height));
+        const image = await wc.capturePage({
+          x: Math.round(args.rect.x),
+          y: Math.round(args.rect.y),
+          width: w,
+          height: h,
+        });
+        return image.toPNG().toString('base64');
+      } catch {
+        return '';
+      }
+    },
+  );
+
+  // ── CDP debugger lifecycle management ─────────────────────────────────
+  // Track which features need the debugger attached per webContentsId.
+  // Only detach when no feature needs it anymore.
+  const cdpUsers = new Map<number, Set<string>>();
+
+  function ensureDebugger(wcId: number): void {
+    const wc = webContents.fromId(wcId);
+    if (!wc || wc.isDestroyed()) return;
+    const dbg = wc.debugger;
+    if (!dbg.isAttached()) {
+      dbg.attach('1.3');
+    }
+  }
+
+  function addCdpUser(wcId: number, feature: string): void {
+    let users = cdpUsers.get(wcId);
+    if (!users) {
+      users = new Set();
+      cdpUsers.set(wcId, users);
+    }
+    users.add(feature);
+  }
+
+  function removeCdpUser(wcId: number, feature: string): void {
+    const users = cdpUsers.get(wcId);
+    if (!users) return;
+    users.delete(feature);
+    if (users.size === 0) {
+      cdpUsers.delete(wcId);
+      try {
+        const wc = webContents.fromId(wcId);
+        if (wc && !wc.isDestroyed() && wc.debugger.isAttached()) {
+          wc.debugger.detach();
+        }
+      } catch {
+        // ignore
+      }
+    }
+  }
+
+  // Enable/disable touch emulation via Chrome DevTools Protocol
+  ipcMain.handle(IPC.BROWSER_SET_TOUCH_EMULATION, async (_event, args: { webContentsId: number; enabled: boolean }) => {
+    const wc = webContents.fromId(args.webContentsId);
+    if (!wc || wc.isDestroyed()) {
+      console.warn('[touch-emu] webContents not found or destroyed:', args.webContentsId);
+      return;
+    }
+    try {
+      ensureDebugger(args.webContentsId);
+      if (args.enabled) {
+        addCdpUser(args.webContentsId, 'touch');
+      }
+      const dbg = wc.debugger;
+      await dbg.sendCommand('Emulation.setTouchEmulationEnabled', {
+        enabled: args.enabled,
+        maxTouchPoints: args.enabled ? 5 : 1,
+      });
+      await dbg.sendCommand('Emulation.setEmitTouchEventsForMouse', {
+        enabled: args.enabled,
+        configuration: args.enabled ? 'mobile' : 'desktop',
+      });
+      if (!args.enabled) {
+        removeCdpUser(args.webContentsId, 'touch');
+      }
+    } catch (err) {
+      console.error('[touch-emu] failed:', err);
+    }
+  });
+
+  // ── CDP console capture ──────────────────────────────────────────────
+  // Structured console output via Runtime.consoleAPICalled — provides
+  // full object previews, argument types, and stack traces.
+  //
+  // The handler is attached to the debugger exactly once per webContentsId.
+  // Subsequent enableConsole calls only re-run Runtime.enable (idempotent)
+  // to pick up new execution contexts after navigation, without adding
+  // duplicate listeners.
+  ipcMain.handle(IPC.BROWSER_ENABLE_CONSOLE, async (_event, args: { webContentsId: number }) => {
+    const wc = webContents.fromId(args.webContentsId);
+    if (!wc || wc.isDestroyed()) return;
+    try {
+      ensureDebugger(args.webContentsId);
+      addCdpUser(args.webContentsId, 'console');
+      const dbg = wc.debugger;
+
+      // Always re-enable Runtime domain — this is idempotent and ensures
+      // new execution contexts (after navigation) are covered.
+      await dbg.sendCommand('Runtime.enable');
+
+      // Only attach the message handler once. If a handler already exists,
+      // skip — it will keep forwarding events from the new context.
+      if ((dbg as unknown as Record<string, unknown>).__consoleHandler) {
+        return;
+      }
+
+      // Forward Runtime.consoleAPICalled events to the renderer.
+      // Capture the parent window's webContents now (the IPC sender) so
+      // we can route events even though the debugger callback doesn't
+      // give us a webContents reference.
+      const senderWc = _event.sender;
+      const handler = (_evt: Electron.Event, method: string, params: Record<string, unknown>) => {
+        if (method !== 'Runtime.consoleAPICalled') return;
+        if (senderWc.isDestroyed()) return;
+        senderWc.send(IPC.BROWSER_CONSOLE_EVENT, {
+          webContentsId: args.webContentsId,
+          type: params.type,
+          args: params.args,
+          timestamp: params.timestamp,
+          stackTrace: params.stackTrace,
+        });
+      };
+
+      (dbg as unknown as Record<string, unknown>).__consoleHandler = handler;
+      dbg.on('message', handler);
+    } catch (err) {
+      console.error('[console-cdp] enable failed:', err);
+    }
+  });
+
+  ipcMain.handle(IPC.BROWSER_DISABLE_CONSOLE, async (_event, args: { webContentsId: number }) => {
+    const wc = webContents.fromId(args.webContentsId);
+    if (!wc || wc.isDestroyed()) {
+      cdpUsers.delete(args.webContentsId);
+      return;
+    }
+    try {
+      const dbg = wc.debugger;
+      const handler = (dbg as unknown as Record<string, unknown>).__consoleHandler as ((...a: unknown[]) => void) | undefined;
+      if (handler) {
+        dbg.removeListener('message', handler);
+        delete (dbg as unknown as Record<string, unknown>).__consoleHandler;
+      }
+      if (dbg.isAttached()) {
+        await dbg.sendCommand('Runtime.disable').catch(() => {});
+      }
+    } catch {
+      // ignore
+    }
+    removeCdpUser(args.webContentsId, 'console');
+  });
+
+  // ─── Notification audio handlers ───
+
+  ipcMain.handle(IPC.NOTIFICATION_PICK_AUDIO, async () => {
+    const result = await dialog.showOpenDialog({
+      title: 'Select Audio File',
+      properties: ['openFile'],
+      filters: [{ name: 'Audio Files', extensions: ['mp3', 'wav', 'ogg'] }],
+    });
+    if (result.canceled || !result.filePaths[0]) return null;
+
+    const srcPath = result.filePaths[0];
+    const ext = path.extname(srcPath).toLowerCase();
+    const soundsDir = path.join(app.getPath('userData'), 'notification-sounds');
+    await mkdir(soundsDir, { recursive: true });
+
+    // Generate a unique filename to avoid collisions
+    const baseName = path.basename(srcPath, ext);
+    const sanitized = baseName.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 60);
+    const uniqueName = `${sanitized}_${Date.now()}${ext}`;
+    const destPath = path.join(soundsDir, uniqueName);
+
+    await copyFile(srcPath, destPath);
+
+    // Read as data URL for renderer playback (CSP-safe)
+    const buffer = await readFile(destPath);
+    const mimeMap: Record<string, string> = {
+      '.mp3': 'audio/mpeg',
+      '.wav': 'audio/wav',
+      '.ogg': 'audio/ogg',
+    };
+    const mime = mimeMap[ext] ?? 'audio/mpeg';
+    const dataUrl = `data:${mime};base64,${buffer.toString('base64')}`;
+
+    return { fileName: uniqueName, assetPath: destPath, dataUrl };
+  });
+
+  ipcMain.handle(IPC.NOTIFICATION_DELETE_AUDIO, async (_event, assetPath: string) => {
+    // Only allow deleting from the notification-sounds directory
+    const soundsDir = path.join(app.getPath('userData'), 'notification-sounds');
+    const resolved = path.resolve(assetPath);
+    if (!resolved.startsWith(path.resolve(soundsDir))) {
+      throw new Error('Invalid path: outside notification-sounds directory');
+    }
+    try {
+      await unlink(resolved);
+    } catch {
+      // File may already be gone; ignore
+    }
+  });
+
+  ipcMain.handle(IPC.APP_IS_FOCUSED, () => {
+    return BrowserWindow.getFocusedWindow() !== null;
+  });
+
+  ipcMain.on(IPC.APP_FOCUS_WINDOW, () => {
+    const win = BrowserWindow.getAllWindows()[0];
+    if (win) {
+      if (win.isMinimized()) win.restore();
+      win.focus();
+    }
   });
 }

@@ -375,11 +375,20 @@ export class GitService {
     repoPath: string,
     branch: string,
     trackRemote?: boolean,
+    worktreeBaseDir?: string,
   ): Promise<{ worktreePath: string; branch: string }> {
-    const homeDir = process.env.HOME || process.env.USERPROFILE || '';
     const repoName = path.basename(repoPath);
-    const worktreesDir = path.join(homeDir, '.forgepad', 'worktrees', repoName);
-    const worktreePath = path.join(worktreesDir, branch);
+
+    // Resolve base directory: custom setting → default (~/.forgepad/worktrees)
+    let baseDir: string;
+    if (worktreeBaseDir && worktreeBaseDir.trim()) {
+      baseDir = path.join(worktreeBaseDir.trim(), repoName);
+    } else {
+      const homeDir = process.env.HOME || process.env.USERPROFILE || '';
+      baseDir = path.join(homeDir, '.forgepad', 'worktrees', repoName);
+    }
+
+    const worktreePath = path.join(baseDir, branch);
     await mkdir(path.dirname(worktreePath), { recursive: true });
 
     if (trackRemote) {
@@ -402,12 +411,14 @@ export class GitService {
     return { worktreePath, branch };
   }
 
-  static async removeWorktree(repoPath: string, worktreePath: string, branch: string): Promise<void> {
+  static async removeWorktree(repoPath: string, worktreePath: string, branch: string, deleteBranch = true): Promise<void> {
     await git(['worktree', 'remove', '--force', worktreePath], repoPath);
     // Prune stale worktree refs so git no longer considers the branch checked-out
     await git(['worktree', 'prune'], repoPath).catch(() => '');
-    // Delete the branch
-    await git(['branch', '-D', branch], repoPath).catch(() => '');
+    // Delete the branch (unless user opted to keep it)
+    if (deleteBranch) {
+      await git(['branch', '-D', branch], repoPath).catch(() => '');
+    }
   }
 
   static hasPath(worktreePath: string, relPath: string): boolean {

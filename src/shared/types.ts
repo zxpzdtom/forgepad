@@ -34,6 +34,23 @@ export type Tab =
       bundleId?: string;
     };
 
+/** Element selected via the in-browser element picker */
+export type SelectedElementInfo = {
+  /** Unique CSS selector path for the element */
+  selector: string;
+  /** Tag name e.g. "BUTTON", "DIV" */
+  tagName: string;
+  /** Element's outerHTML, truncated to 500 chars */
+  outerHTML: string;
+  /** Bounding rect relative to the page viewport */
+  boundingRect: { x: number; y: number; width: number; height: number };
+  /** Base64-encoded PNG screenshot of the element region */
+  screenshotBase64: string;
+  /** Page URL at time of selection */
+  pageUrl: string;
+  /** Page title at time of selection */
+  pageTitle: string;
+};
 export type Project = {
   id: string;
   name: string;
@@ -190,6 +207,416 @@ export type PersistedAppState = {
 
 export type ThemePreference = 'dark' | 'light' | 'system';
 export type TerminalThemeMode = 'follow' | 'dark' | 'light';
+
+/* ─── Theme System ─── */
+
+export type ThemeMode = 'dark' | 'light' | 'system';
+
+/** All CSS variable tokens a ThemeDefinition can override */
+export type ThemeTokens = {
+  // App surfaces
+  bg?: string;
+  panel?: string;
+  'panel-2'?: string;
+  'panel-3'?: string;
+  // Borders
+  border?: string;
+  'border-soft'?: string;
+  // Text hierarchy
+  text?: string;
+  muted?: string;
+  subtle?: string;
+  // Brand / accent
+  accent?: string;
+  'accent-2'?: string;
+  // Semantic status
+  warn?: string;
+  danger?: string;
+  ok?: string;
+  // Semantic surfaces
+  'surface-inset'?: string;
+  'surface-input'?: string;
+  'surface-toolbar'?: string;
+  'surface-search'?: string;
+  'surface-dialog'?: string;
+  'surface-card'?: string;
+  'surface-footer'?: string;
+  'surface-terminal'?: string;
+  'surface-markdown'?: string;
+  'accent-surface'?: string;
+  'focus-border'?: string;
+  'accent-contrast'?: string;
+  // Semantic text
+  'text-addition'?: string;
+  'text-deletion'?: string;
+  'text-warning-status'?: string;
+  'text-code-inline'?: string;
+  'text-code-block'?: string;
+  'text-heading'?: string;
+  // Toast borders
+  'toast-border-success'?: string;
+  'toast-border-error'?: string;
+  // Sidebar
+  'sidebar-bg'?: string;
+  'workspace-card-bg'?: string;
+};
+
+export type TerminalThemeTokens = {
+  background?: string;
+  foreground?: string;
+  cursor?: string;
+  cursorAccent?: string;
+  selectionBackground?: string;
+  // ANSI colors
+  black?: string;
+  red?: string;
+  green?: string;
+  yellow?: string;
+  blue?: string;
+  magenta?: string;
+  cyan?: string;
+  white?: string;
+  brightBlack?: string;
+  brightRed?: string;
+  brightGreen?: string;
+  brightYellow?: string;
+  brightBlue?: string;
+  brightMagenta?: string;
+  brightCyan?: string;
+  brightWhite?: string;
+};
+
+export type SyntaxThemeTokens = {
+  keyword?: string;
+  string?: string;
+  number?: string;
+  comment?: string;
+  function?: string;
+  variable?: string;
+  type?: string;
+  operator?: string;
+  punctuation?: string;
+  tag?: string;
+  attribute?: string;
+  constant?: string;
+};
+
+export type MarkdownThemeTokens = {
+  blockquoteBorder?: string;
+  codeHeaderBg?: string;
+  checkboxBg?: string;
+  checkboxBorder?: string;
+};
+
+export type DiffThemeTokens = {
+  addedBg?: string;
+  deletedBg?: string;
+  addedText?: string;
+  deletedText?: string;
+};
+
+export const THEME_SCHEMA_VERSION = 1;
+
+export type ThemeDefinition = {
+  /** Schema version for migration */
+  schemaVersion: number;
+  id: string;
+  name: string;
+  author?: string;
+  mode: ThemeMode;
+  version?: string;
+  /** Main UI token overrides */
+  tokens: ThemeTokens;
+  /** Terminal / xterm color palette */
+  terminal?: TerminalThemeTokens;
+  /** Syntax highlight palette */
+  syntax?: SyntaxThemeTokens;
+  /** Markdown rendering tokens */
+  markdown?: MarkdownThemeTokens;
+  /** Diff viewer tokens */
+  diff?: DiffThemeTokens;
+  /** Whether this is a built-in theme (cannot be deleted) */
+  builtIn?: boolean;
+};
+
+/* ─── Built-in Themes ─── */
+
+export const BUILTIN_THEME_SYSTEM: ThemeDefinition = {
+  schemaVersion: THEME_SCHEMA_VERSION,
+  id: 'system',
+  name: 'System',
+  author: 'ForgePad',
+  mode: 'system',
+  tokens: {},
+  builtIn: true,
+};
+
+export const BUILTIN_THEME_DARK: ThemeDefinition = {
+  schemaVersion: THEME_SCHEMA_VERSION,
+  id: 'dark',
+  name: 'Dark',
+  author: 'ForgePad',
+  mode: 'dark',
+  tokens: {},
+  terminal: {
+    background: '#08090a',
+    foreground: '#f7f8f8',
+    cursor: '#5e6ad2',
+    cursorAccent: '#08090a',
+    selectionBackground: 'rgba(94,106,210,0.25)',
+    black: '#1a1b1c',
+    red: '#ff7777',
+    green: '#27a644',
+    yellow: '#e9bd61',
+    blue: '#5e6ad2',
+    magenta: '#a855f7',
+    cyan: '#22d3ee',
+    white: '#8a8f98',
+    brightBlack: '#3f4147',
+    brightRed: '#ff9999',
+    brightGreen: '#4ade80',
+    brightYellow: '#fcd34d',
+    brightBlue: '#7170ff',
+    brightMagenta: '#c084fc',
+    brightCyan: '#67e8f9',
+    brightWhite: '#f7f8f8',
+  },
+  builtIn: true,
+};
+
+export const BUILTIN_THEME_LIGHT: ThemeDefinition = {
+  schemaVersion: THEME_SCHEMA_VERSION,
+  id: 'light',
+  name: 'Light',
+  author: 'ForgePad',
+  mode: 'light',
+  tokens: {
+    bg: '#f5f5f7',
+    panel: '#ffffff',
+    'panel-2': '#f0f0f2',
+    'panel-3': '#e4e4e8',
+    border: 'rgba(0,0,0,0.08)',
+    'border-soft': 'rgba(0,0,0,0.05)',
+    text: '#0f0f10',
+    muted: '#6b7280',
+    subtle: '#9ca3af',
+    accent: '#4f46e5',
+    'accent-2': '#6366f1',
+    warn: '#b45309',
+    danger: '#dc2626',
+    ok: '#16a34a',
+    'surface-inset': '#e8e8ec',
+    'surface-input': 'rgba(0,0,0,0.03)',
+    'surface-toolbar': '#ffffff',
+    'surface-search': '#f0f0f2',
+    'surface-dialog': '#ffffff',
+    'surface-card': 'rgba(0,0,0,0.02)',
+    'surface-footer': '#ffffff',
+    'surface-terminal': '#f5f5f7',
+    'surface-markdown': '#ffffff',
+    'accent-surface': 'rgba(79,70,229,0.08)',
+    'focus-border': '#4f46e5',
+    'accent-contrast': '#ffffff',
+    'text-addition': '#16a34a',
+    'text-deletion': '#dc2626',
+    'text-warning-status': '#b45309',
+    'text-code-inline': '#4338ca',
+    'text-code-block': '#374151',
+    'text-heading': '#0f0f10',
+    'toast-border-success': 'rgba(22,163,74,0.3)',
+    'toast-border-error': 'rgba(220,38,38,0.3)',
+    'sidebar-bg': '#ffffff',
+    'workspace-card-bg': 'rgba(0,0,0,0.02)',
+  },
+  terminal: {
+    background: '#f5f5f7',
+    foreground: '#0f0f10',
+    cursor: '#4f46e5',
+    cursorAccent: '#ffffff',
+    selectionBackground: 'rgba(79,70,229,0.2)',
+    black: '#1f2937',
+    red: '#dc2626',
+    green: '#16a34a',
+    yellow: '#ca8a04',
+    blue: '#2563eb',
+    magenta: '#9333ea',
+    cyan: '#0891b2',
+    white: '#6b7280',
+    brightBlack: '#374151',
+    brightRed: '#ef4444',
+    brightGreen: '#22c55e',
+    brightYellow: '#eab308',
+    brightBlue: '#3b82f6',
+    brightMagenta: '#a855f7',
+    brightCyan: '#06b6d4',
+    brightWhite: '#0f0f10',
+  },
+  builtIn: true,
+};
+
+export const BUILTIN_THEME_MONOKAI: ThemeDefinition = {
+  schemaVersion: THEME_SCHEMA_VERSION,
+  id: 'monokai',
+  name: 'Monokai',
+  author: 'ForgePad',
+  mode: 'dark',
+  version: '1.0.0',
+  tokens: {
+    bg: '#272822',
+    panel: '#2d2e27',
+    'panel-2': '#3e3d32',
+    'panel-3': '#49483e',
+    border: 'rgba(255,255,255,0.08)',
+    'border-soft': 'rgba(255,255,255,0.04)',
+    text: '#f8f8f2',
+    muted: '#908d80',
+    subtle: '#75715e',
+    accent: '#a6e22e',
+    'accent-2': '#66d9e8',
+    warn: '#e6db74',
+    danger: '#f92672',
+    ok: '#a6e22e',
+    'surface-inset': '#1e1f18',
+    'surface-input': 'rgba(255,255,255,0.03)',
+    'surface-toolbar': '#2d2e27',
+    'surface-search': '#3e3d32',
+    'surface-dialog': '#3e3d32',
+    'surface-card': 'rgba(255,255,255,0.03)',
+    'surface-footer': '#2d2e27',
+    'surface-terminal': '#272822',
+    'surface-markdown': '#2d2e27',
+    'accent-surface': 'rgba(166,226,46,0.1)',
+    'focus-border': '#a6e22e',
+    'accent-contrast': '#272822',
+    'text-addition': '#a6e22e',
+    'text-deletion': '#f92672',
+    'text-warning-status': '#e6db74',
+    'text-code-inline': '#66d9e8',
+    'text-code-block': '#f8f8f2',
+    'text-heading': '#f8f8f2',
+    'toast-border-success': 'rgba(166,226,46,0.35)',
+    'toast-border-error': 'rgba(249,38,114,0.35)',
+    'sidebar-bg': '#2d2e27',
+    'workspace-card-bg': 'rgba(255,255,255,0.03)',
+  },
+  terminal: {
+    background: '#272822',
+    foreground: '#f8f8f2',
+    cursor: '#f8f8f0',
+    cursorAccent: '#272822',
+    selectionBackground: 'rgba(73,72,62,0.6)',
+    black: '#272822',
+    red: '#f92672',
+    green: '#a6e22e',
+    yellow: '#f4bf75',
+    blue: '#66d9e8',
+    magenta: '#ae81ff',
+    cyan: '#a1efe4',
+    white: '#f8f8f2',
+    brightBlack: '#75715e',
+    brightRed: '#f92672',
+    brightGreen: '#a6e22e',
+    brightYellow: '#f4bf75',
+    brightBlue: '#66d9e8',
+    brightMagenta: '#ae81ff',
+    brightCyan: '#a1efe4',
+    brightWhite: '#f9f8f5',
+  },
+  syntax: {
+    keyword: '#f92672',
+    string: '#e6db74',
+    number: '#ae81ff',
+    comment: '#75715e',
+    function: '#a6e22e',
+    variable: '#f8f8f2',
+    type: '#66d9e8',
+    operator: '#f92672',
+    punctuation: '#f8f8f2',
+    tag: '#f92672',
+    attribute: '#a6e22e',
+    constant: '#ae81ff',
+  },
+  builtIn: true,
+};
+
+export const BUILTIN_THEME_DIM: ThemeDefinition = {
+  schemaVersion: THEME_SCHEMA_VERSION,
+  id: 'dim',
+  name: 'Dim',
+  author: 'ForgePad',
+  mode: 'dark',
+  version: '1.0.0',
+  tokens: {
+    bg: '#1a1e2e',
+    panel: '#1f2437',
+    'panel-2': '#252b3d',
+    'panel-3': '#2e3549',
+    border: 'rgba(255,255,255,0.06)',
+    'border-soft': 'rgba(255,255,255,0.03)',
+    text: '#cdd6f4',
+    muted: '#7c85a8',
+    subtle: '#585d77',
+    accent: '#89b4fa',
+    'accent-2': '#b4befe',
+    warn: '#f9e2af',
+    danger: '#f38ba8',
+    ok: '#a6e3a1',
+    'surface-inset': '#141726',
+    'surface-input': 'rgba(255,255,255,0.02)',
+    'surface-toolbar': '#1f2437',
+    'surface-search': '#252b3d',
+    'surface-dialog': '#252b3d',
+    'surface-card': 'rgba(255,255,255,0.02)',
+    'surface-footer': '#1f2437',
+    'surface-terminal': '#1a1e2e',
+    'surface-markdown': '#1f2437',
+    'accent-surface': 'rgba(137,180,250,0.08)',
+    'focus-border': '#89b4fa',
+    'accent-contrast': '#1a1e2e',
+    'text-addition': '#a6e3a1',
+    'text-deletion': '#f38ba8',
+    'text-warning-status': '#f9e2af',
+    'text-code-inline': '#cba6f7',
+    'text-code-block': '#cdd6f4',
+    'text-heading': '#cdd6f4',
+    'toast-border-success': 'rgba(166,227,161,0.3)',
+    'toast-border-error': 'rgba(243,139,168,0.3)',
+    'sidebar-bg': '#1f2437',
+    'workspace-card-bg': 'rgba(255,255,255,0.02)',
+  },
+  terminal: {
+    background: '#1a1e2e',
+    foreground: '#cdd6f4',
+    cursor: '#89b4fa',
+    cursorAccent: '#1a1e2e',
+    selectionBackground: 'rgba(137,180,250,0.2)',
+    black: '#45475a',
+    red: '#f38ba8',
+    green: '#a6e3a1',
+    yellow: '#f9e2af',
+    blue: '#89b4fa',
+    magenta: '#f5c2e7',
+    cyan: '#94e2d5',
+    white: '#bac2de',
+    brightBlack: '#585b70',
+    brightRed: '#f38ba8',
+    brightGreen: '#a6e3a1',
+    brightYellow: '#f9e2af',
+    brightBlue: '#89b4fa',
+    brightMagenta: '#f5c2e7',
+    brightCyan: '#94e2d5',
+    brightWhite: '#a6adc8',
+  },
+  builtIn: true,
+};
+
+export const BUILTIN_THEMES: ThemeDefinition[] = [
+  BUILTIN_THEME_SYSTEM,
+  BUILTIN_THEME_DARK,
+  BUILTIN_THEME_LIGHT,
+  BUILTIN_THEME_MONOKAI,
+  BUILTIN_THEME_DIM,
+];
 
 export type DiffViewStyle = 'split' | 'unified';
 export type DiffIndicators = 'classic' | 'bars' | 'none';
@@ -357,8 +784,60 @@ export const SHORTCUT_DEFINITIONS: ShortcutDefinition[] = [
   { id: 'copyRelativePath', label: 'Copy Relative Path', category: 'other' },
 ];
 
+/* ─── Notification types ─── */
+
+export type NotificationSound = {
+  id: string;
+  name: string;
+  subtitle: string;
+  durationMs: number;
+  source: 'built-in' | 'custom';
+  /** For custom sounds: the userData file path (used as key for deletion) */
+  assetPath?: string;
+  /** For custom sounds: data URL for playback */
+  dataUrl?: string;
+  createdAt: number;
+};
+
+export type NotificationSettings = {
+  /** Master toggle: play sounds at all */
+  enabled: boolean;
+  /** Volume 0–100 */
+  volume: number;
+  /** ID of the selected built-in or custom sound */
+  selectedSoundId: string;
+  /** User-imported custom sounds */
+  customSounds: NotificationSound[];
+  /** Play sound even when app window is focused */
+  playWhenAppFocused: boolean;
+  /** Show OS desktop notification banners */
+  desktopNotificationEnabled: boolean;
+  /** Trigger when agent finishes (review status) */
+  notifyOnAgentDone: boolean;
+  /** Trigger when agent waits for user approval */
+  notifyOnAgentNeedsApproval: boolean;
+  /** Trigger when a Task status changes to done */
+  notifyOnTaskDone: boolean;
+};
+
+export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
+  enabled: true,
+  volume: 70,
+  selectedSoundId: 'ping',
+  customSounds: [],
+  playWhenAppFocused: false,
+  desktopNotificationEnabled: true,
+  notifyOnAgentDone: true,
+  notifyOnAgentNeedsApproval: true,
+  notifyOnTaskDone: false,
+};
+
 export type AppSettings = {
   theme: ThemePreference;
+  /** Active theme id — one of the built-in ids or a custom theme id */
+  themeId: string;
+  /** User-imported custom themes */
+  customThemes: ThemeDefinition[];
   defaultShell: string;
   defaultAgentCommand: string;
   agentPresets: AgentPreset[];
@@ -378,10 +857,24 @@ export type AppSettings = {
   spinnerStyle: string;
   keyboardShortcuts?: KeyboardShortcuts;
   lastSettingsTab?: string;
+  notifications: NotificationSettings;
+  // ── Git ──
+  /** Custom base directory for worktrees. Empty string = default (~/.forgepad/worktrees) */
+  worktreeBaseDir: string;
+  /** Pre-select "Track remote branch" in New Worktree dialog */
+  worktreeTrackRemoteByDefault: boolean;
+  /** Delete local branch when removing a worktree */
+  worktreeAutoDeleteBranch: boolean;
+  /** Periodically fetch remote refs */
+  autoFetchEnabled: boolean;
+  /** Minutes between automatic fetches (1–60) */
+  autoFetchIntervalMinutes: number;
 };
 
 export const DEFAULT_SETTINGS: AppSettings = {
   theme: 'dark',
+  themeId: 'dark',
+  customThemes: [],
   defaultShell: '',
   defaultAgentCommand: DEFAULT_AGENT_PRESETS[0].command,
   agentPresets: [...DEFAULT_AGENT_PRESETS],
@@ -398,6 +891,12 @@ export const DEFAULT_SETTINGS: AppSettings = {
   sendAndClearComments: false,
   defaultOpenWith: 'finder',
   spinnerStyle: 'braille',
+  notifications: { ...DEFAULT_NOTIFICATION_SETTINGS },
+  worktreeBaseDir: '',
+  worktreeTrackRemoteByDefault: false,
+  worktreeAutoDeleteBranch: true,
+  autoFetchEnabled: false,
+  autoFetchIntervalMinutes: 5,
 };
 
 export type OpenProjectResult = {

@@ -1,5 +1,6 @@
 export const IPC = {
   APP_OPEN_PROJECT: 'app:open-project',
+  APP_PICK_DIRECTORY: 'app:pick-directory',
   STATE_LOAD: 'state:load',
   STATE_SAVE: 'state:save',
   GIT_CURRENT_BRANCH: 'git:current-branch',
@@ -42,4 +43,14 @@ export const IPC = {
   AGENT_FOCUS_TAB: 'agent:focus-tab',
   AGENT_RENAME_TAB: 'agent:rename-tab',
   MENU_OPEN_SETTINGS: 'menu:open-settings',
+  // Browser (<webview>)
+  BROWSER_CAPTURE_SCREENSHOT: 'browser:capture-screenshot',
+  BROWSER_SET_TOUCH_EMULATION: 'browser:set-touch-emulation',
+  BROWSER_ENABLE_CONSOLE: 'browser:enable-console',
+  BROWSER_DISABLE_CONSOLE: 'browser:disable-console',
+  BROWSER_CONSOLE_EVENT: 'browser:console-event',
+  NOTIFICATION_PICK_AUDIO: 'notification:pick-audio',
+  NOTIFICATION_DELETE_AUDIO: 'notification:delete-audio',
+  APP_IS_FOCUSED: 'app:is-focused',
+  APP_FOCUS_WINDOW: 'app:focus-window',
 } as const;

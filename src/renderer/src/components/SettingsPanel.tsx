@@ -6,11 +6,14 @@ import type { AgentPreset, ShortcutCategory } from '@shared/types';
 import { DEFAULT_SETTINGS, DEFAULT_SHORTCUTS, SHORTCUT_DEFINITIONS } from '@shared/types';
 import {
   ArrowLeft,
+  Bell,
   Bot,
   Check,
   ChevronDown,
   ChevronUp,
   Columns2,
+  FolderOpen,
+  GitBranch,
   GripVertical,
   Keyboard,
   Paintbrush,
@@ -18,6 +21,7 @@ import {
   RotateCcw,
   Rows2,
   Settings,
+  SwatchBook,
   Terminal,
   Trash2,
   X,
@@ -25,6 +29,8 @@ import {
 import { type BrailleSpinnerName, spinners } from 'unicode-animations';
 
 import { agentPresetIcon } from './AgentIcons';
+import { AppearancePanel } from './AppearancePanel';
+import { NotificationsSection } from './NotificationsSection';
 import { SegmentedControl } from './SegmentedControl';
 import { ShortcutRecorder } from './ShortcutRecorder';
 import { Spinner } from './Spinner';
@@ -58,9 +64,12 @@ type SectionId = SettingsSection;
 
 const NAV_ITEMS: { id: SectionId; label: string; icon: React.ReactNode }[] = [
   { id: 'general', label: 'General', icon: <Paintbrush size={15} /> },
+  { id: 'appearance', label: 'Appearance', icon: <SwatchBook size={15} /> },
   { id: 'agent', label: 'Agent', icon: <Bot size={15} /> },
   { id: 'terminal', label: 'Terminal', icon: <Terminal size={15} /> },
   { id: 'changes', label: 'Changes', icon: <Rows2 size={15} /> },
+  { id: 'notifications', label: 'Notifications', icon: <Bell size={15} /> },
+  { id: 'git', label: 'Git', icon: <GitBranch size={15} /> },
   { id: 'advanced', label: 'Advanced', icon: <Settings size={15} /> },
   { id: 'shortcuts', label: 'Shortcuts', icon: <Keyboard size={15} /> },
 ];
@@ -765,13 +774,110 @@ function ShortcutsSection() {
   );
 }
 
+/* ─── Git Section ─── */
+
+function GitSection() {
+  const settings = useAppStore((state) => state.settings);
+  const updateSettings = useAppStore((state) => state.updateSettings);
+
+  const handleBrowse = async () => {
+    const dir = await window.forgepad.app.pickDirectory('Choose Worktree Base Directory');
+    if (dir) {
+      updateSettings({ worktreeBaseDir: dir });
+    }
+  };
+
+  return (
+    <div>
+      <SectionHeader title="Git" />
+
+      {/* ── Worktrees ── */}
+      <div className="mb-1 font-[510] text-[13px] text-text">Worktrees</div>
+      <div className="mb-3 text-[11px] text-subtle leading-tight">Configure how git worktrees are created and managed</div>
+
+      {/* Worktree Base Directory — full-width layout for long paths */}
+      <div className="py-2">
+        <div className="font-[510] text-[13px] text-text">Worktree Base Directory</div>
+        <div className="mt-0.5 mb-2 text-[11px] text-subtle leading-tight">
+          Parent directory for all worktrees. Each repo gets a subdirectory inside this path.
+        </div>
+        <div className="flex gap-2">
+          <input
+            className="h-8 min-w-0 flex-1 rounded-md border border-border bg-panel-2 px-3 font-mono text-[12px] text-text outline-none placeholder:text-muted focus:border-accent/60 focus:ring-1 focus:ring-accent/30"
+            value={settings.worktreeBaseDir}
+            placeholder="~/.forgepad/worktrees"
+            onChange={(e) => updateSettings({ worktreeBaseDir: e.currentTarget.value })}
+          />
+          <button className="secondary-button small shrink-0" type="button" onClick={() => void handleBrowse()}>
+            <FolderOpen size={13} />
+            Browse…
+          </button>
+        </div>
+        {settings.worktreeBaseDir && (
+          <button
+            className="mt-1.5 text-[11px] text-subtle hover:text-text transition-colors"
+            type="button"
+            onClick={() => updateSettings({ worktreeBaseDir: '' })}
+          >
+            Reset to default
+          </button>
+        )}
+      </div>
+
+      <SettingRow label="Track Remote by Default" description="Pre-select 'Track remote branch' when creating new worktrees">
+        <Toggle
+          checked={settings.worktreeTrackRemoteByDefault}
+          onChange={(v) => updateSettings({ worktreeTrackRemoteByDefault: v })}
+          label="Track remote by default"
+        />
+      </SettingRow>
+
+      <SettingRow label="Delete Branch on Removal" description="Automatically delete the local branch when removing a worktree">
+        <Toggle
+          checked={settings.worktreeAutoDeleteBranch}
+          onChange={(v) => updateSettings({ worktreeAutoDeleteBranch: v })}
+          label="Auto-delete branch"
+        />
+      </SettingRow>
+
+      <Divider />
+
+      {/* ── Remote ── */}
+      <div className="mb-1 font-[510] text-[13px] text-text">Remote</div>
+      <div className="mb-3 text-[11px] text-subtle leading-tight">Configure automatic fetching of remote changes</div>
+
+      <SettingRow label="Auto-Fetch" description="Periodically fetch remote refs to keep branches up to date">
+        <Toggle
+          checked={settings.autoFetchEnabled}
+          onChange={(v) => updateSettings({ autoFetchEnabled: v })}
+          label="Auto-fetch"
+        />
+      </SettingRow>
+
+      {settings.autoFetchEnabled && (
+        <SettingRow label="Fetch Interval" description="Minutes between automatic fetches">
+          <NumberStepper
+            value={settings.autoFetchIntervalMinutes}
+            min={1}
+            max={60}
+            onChange={(v) => updateSettings({ autoFetchIntervalMinutes: v })}
+          />
+        </SettingRow>
+      )}
+    </div>
+  );
+}
+
 /* ─── Main Settings Page ─── */
 
 const SECTIONS: Record<SectionId, React.ComponentType> = {
   general: GeneralSection,
+  appearance: AppearancePanel,
   agent: AgentSection,
   terminal: TerminalSection,
   changes: ChangesSection,
+  notifications: NotificationsSection,
+  git: GitSection,
   advanced: AdvancedSection,
   shortcuts: ShortcutsSection,
 };
