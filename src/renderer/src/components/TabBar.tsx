@@ -1,7 +1,9 @@
-import { type MouseEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { type MouseEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { closestCenter, DndContext, type DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { restrictToHorizontalAxis, restrictToParentElement } from '@dnd-kit/modifiers';
 import { horizontalListSortingStrategy, SortableContext } from '@dnd-kit/sortable';
+import { useHorizontalScroll } from '@renderer/hooks/useHorizontalScroll';
+import { getDroppedPaths, hasDraggableFiles, isInternalDrop } from '@renderer/lib/drag-utils';
 import { getTabTitle, useAppStore } from '@renderer/store/app-store';
 import type { Tab } from '@shared/types';
 import { Bot, ClipboardList, GitCompare, Globe, TerminalSquare } from 'lucide-react';
@@ -29,16 +31,20 @@ export function TabBar() {
   const closeAllTabs = useAppStore((state) => state.closeAllTabs);
   const closeTabsToRight = useAppStore((state) => state.closeTabsToRight);
   const reorderTabs = useAppStore((state) => state.reorderTabs);
+  const createBrowserTab = useAppStore((state) => state.createBrowserTab);
+  const openFileTab = useAppStore((state) => state.openFileTab);
+  const openExternalFileTab = useAppStore((state) => state.openExternalFileTab);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
+  // tabListRef is also used by the scrollIntoView effect below
+  const { ref: tabListRef, onWheel } = useHorizontalScroll<HTMLDivElement>();
+
   const workspaceTabs = tabs.filter((tab) => tab.workspaceId === activeWorkspaceId && tab.type !== 'terminal');
   const activeWorkspace = workspaces.find((workspace) => workspace.id === activeWorkspaceId);
-  const [contextMenu, setContextMenu] = useState<{
-    tab: Tab;
-    x: number;
-    y: number;
-  } | null>(null);
+
+  const [contextMenu, setContextMenu] = useState<{ tab: Tab; x: number; y: number } | null>(null);
+  const [dropHighlight, setDropHighlight] = useState(false);
 
   const tabIds = useMemo(() => workspaceTabs.map((t) => t.id), [workspaceTabs]);
 
@@ -51,30 +57,73 @@ export function TabBar() {
     [reorderTabs],
   );
 
-  const tabListRef = useRef<HTMLDivElement>(null);
-
   // Scroll the active file tab into view whenever it changes
   useEffect(() => {
     if (!activeFileTabId || !tabListRef.current) return;
     const el = tabListRef.current.querySelector<HTMLElement>(`[data-tab-id="${activeFileTabId}"]`);
     if (el) {
-      el.scrollIntoView({
-        block: 'nearest',
-        inline: 'nearest',
-        behavior: 'smooth',
-      });
+      el.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
     }
-  }, [activeFileTabId]);
+  }, [activeFileTabId, tabListRef]);
 
   const handleContextMenu = useCallback((event: MouseEvent, tab: Tab) => {
     event.preventDefault();
     setContextMenu({ tab, x: event.clientX, y: event.clientY });
   }, []);
 
-  const createBrowserTab = useAppStore((state) => state.createBrowserTab);
+  // ── External file drop: open as file tabs ──────────────────────────────
+  const handleFileDragOver = useCallback((e: React.DragEvent) => {
+    if (!isInternalDrop(e) && hasDraggableFiles(e)) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'copy';
+    }
+  }, []);
+
+  const handleFileDragEnter = useCallback((e: React.DragEvent) => {
+    if (!isInternalDrop(e) && hasDraggableFiles(e)) {
+      e.preventDefault();
+      setDropHighlight(true);
+    }
+  }, []);
+
+  const handleFileDragLeave = useCallback(() => {
+    setDropHighlight(false);
+  }, []);
+
+  const handleFileDrop = useCallback(
+    (e: React.DragEvent) => {
+      if (isInternalDrop(e)) return;
+
+      const paths = getDroppedPaths(e);
+      if (paths.length === 0) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+      setDropHighlight(false);
+
+      if (!activeWorkspace) return;
+
+      for (const absPath of paths) {
+        if (absPath.startsWith(activeWorkspace.worktreePath + '/')) {
+          const relPath = absPath.slice(activeWorkspace.worktreePath.length + 1);
+          openFileTab(activeWorkspace.id, relPath);
+        } else {
+          openExternalFileTab(activeWorkspace.id, absPath);
+        }
+      }
+    },
+    [activeWorkspace, openFileTab, openExternalFileTab],
+  );
+  // ───────────────────────────────────────────────────────────────────────
 
   return (
-    <div className="workspace-tabbar tabbar relative flex h-9 shrink-0 items-center border-b border-border bg-bg">
+    <div
+      className={`workspace-tabbar tabbar relative flex h-9 shrink-0 items-center border-b border-border bg-bg ${dropHighlight ? 'drop-target-active' : ''}`}
+      onDragOver={handleFileDragOver}
+      onDragEnter={handleFileDragEnter}
+      onDragLeave={handleFileDragLeave}
+      onDrop={handleFileDrop}
+    >
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
@@ -86,6 +135,7 @@ export function TabBar() {
             ref={tabListRef}
             className="tabs-scroll scrollbar-none scroll-mask-x flex min-w-0 flex-1 overflow-x-auto"
             role="tablist"
+            onWheel={onWheel}
           >
             {workspaceTabs.map((tab) => (
               <SortableTabItem

@@ -286,6 +286,8 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
   const addCodeSelection = useAppStore((state) => state.addCodeSelection);
   const contextItems = useAppStore((state) => state.contextItems);
   const editorFontSize = useAppStore((state) => state.settings.editorFontSize);
+  /** True when this tab was opened from outside the workspace (read-only, no context actions). */
+  const isExternal = Boolean(tab.absPath);
   const markdownFile = useMemo(() => isMarkdownPath(tab.relPath), [tab.relPath]);
   const isImage = useMemo(() => isImageFile(tab.relPath), [tab.relPath]);
   const markdownText = useMemo(() => (markdownFile ? renderFrontmatterAsTable(fileText) : fileText), [markdownFile, fileText]);
@@ -324,7 +326,7 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
       lineHoverHighlight: 'both' as const,
       unsafeCSS: SEARCH_HIGHLIGHT_CSS,
       onLineSelectionEnd: (range: SelectedLineRange | null) => {
-        if (range) {
+        if (range && !isExternal) {
           setSelectedRange(range);
           setPendingSelection({
             startLine: Math.min(range.start, range.end),
@@ -357,8 +359,10 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
     setImageUrl('');
 
     if (isImage) {
-      window.forgepad.fs
-        .readFileAsDataUrl(workspace.worktreePath, tab.relPath)
+      const imagePromise = tab.absPath
+        ? window.forgepad.fs.readAbsFileAsDataUrl(tab.absPath)
+        : window.forgepad.fs.readFileAsDataUrl(workspace.worktreePath, tab.relPath);
+      imagePromise
         .then((dataUrl) => {
           if (!disposed) setImageUrl(dataUrl);
         })
@@ -368,8 +372,10 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
         });
     }
 
-    window.forgepad.fs
-      .readFile(workspace.worktreePath, tab.relPath)
+    const textPromise = tab.absPath
+      ? window.forgepad.fs.readAbsFile(tab.absPath)
+      : window.forgepad.fs.readFile(workspace.worktreePath, tab.relPath);
+    textPromise
       .then((text) => {
         if (disposed) return;
         setFileText(text);
@@ -386,7 +392,7 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
     return () => {
       disposed = true;
     };
-  }, [addToast, tab.relPath, workspace.worktreePath, isImage]);
+  }, [addToast, tab.relPath, tab.absPath, workspace.worktreePath, isImage]);
 
   useEffect(() => {
     setMarkdownMode('rendered');
@@ -694,9 +700,11 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
               </button>
             </div>
           ) : null}
-          <button className="secondary-button" type="button" onClick={() => addContextFiles(workspace.id, [tab.relPath])}>
-            Add Context
-          </button>
+          {!isExternal && (
+            <button className="secondary-button" type="button" onClick={() => addContextFiles(workspace.id, [tab.relPath])}>
+              Add Context
+            </button>
+          )}
           {searchable ? (
             <button className="icon-button" type="button" title="Search file" onClick={openSearch}>
               <Search size={16} />

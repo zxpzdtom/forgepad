@@ -25,6 +25,8 @@ export type Tab =
       type: 'file';
       relPath: string;
       unsaved?: boolean;
+      /** Absolute path for files outside the workspace (read-only preview). */
+      absPath?: string;
     }
   | { id: string; workspaceId: string; type: 'diff'; activePath?: string }
   | {
@@ -32,7 +34,26 @@ export type Tab =
       workspaceId: string;
       type: 'context-preview';
       bundleId?: string;
+    }
+  | {
+      id: string;
+      workspaceId: string;
+      type: 'browser';
+      url: string;
+      title: string;
+      isLoading: boolean;
+      canGoBack: boolean;
+      canGoForward: boolean;
     };
+
+/** A URL visited in the browser tab, stored for history/autocomplete */
+export type BrowserHistoryEntry = {
+  url: string;
+  title: string;
+  /** Google favicon API URL, empty string if unavailable */
+  favicon: string;
+  visitedAt: number;
+};
 
 /** Element selected via the in-browser element picker */
 export type SelectedElementInfo = {
@@ -203,6 +224,7 @@ export type PersistedAppState = {
   contextItems: ContextItem[];
   composerText: string;
   settings: AppSettings;
+  browserHistory?: BrowserHistoryEntry[];
 };
 
 export type ThemePreference = 'dark' | 'light' | 'system';

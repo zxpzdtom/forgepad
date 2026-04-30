@@ -124,6 +124,7 @@ function createWindow(): void {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
+      webviewTag: true,
     },
   });
 
@@ -134,6 +135,12 @@ function createWindow(): void {
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     void shell.openExternal(url);
     return { action: 'deny' };
+  });
+
+  // Allow external files to be dragged into the renderer.
+  // Without this Electron intercepts the drop and tries to navigate to file://.
+  mainWindow.webContents.on('will-navigate', (e, url) => {
+    if (url.startsWith('file://')) e.preventDefault();
   });
 
   if (!app.isPackaged && process.env.ELECTRON_RENDERER_URL) {

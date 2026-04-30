@@ -82,6 +82,8 @@ type AppState = {
   exitedPtyIds: Set<string>;
   /** Browser select mode active state, keyed by tabId */
   browserSelectMode: Record<string, boolean>;
+  /** Browser URL history for autocomplete, most recent first */
+  browserHistory: import('@shared/types').BrowserHistoryEntry[];
   /** Whether the browser feedback modal is open */
   feedbackModalOpen: boolean;
   /** Pending element selection for feedback modal */
@@ -105,6 +107,7 @@ type AppState = {
   closeTabsToRight: (tabId: string) => void;
   setActiveTab: (tabId: string | null) => void;
   openFileTab: (workspaceId: string, relPath: string) => void;
+  openExternalFileTab: (workspaceId: string, absPath: string) => void;
   openDiffTab: (workspaceId: string, activePath?: string) => void;
   openContextPreviewTab: (workspaceId?: string) => void;
   setRightPanelMode: (mode: RightPanelMode) => void;
@@ -168,6 +171,8 @@ type AppState = {
   createWorktree: (projectId: string, branch: string, trackRemote?: boolean) => Promise<void>;
   // Browser tab actions
   createBrowserTab: (url?: string) => void;
+  addBrowserHistoryEntry: (url: string, title: string, favicon?: string) => void;
+  clearBrowserHistory: () => void;
   updateBrowserNavState: (state: {
     tabId: string;
     url: string;
@@ -236,6 +241,7 @@ function serializeForSave(state: AppState): PersistedAppState {
     contextItems: state.contextItems,
     composerText: state.composerText,
     settings: state.settings,
+    browserHistory: state.browserHistory,
   };
 }
 
@@ -352,6 +358,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   agentStatuses: {},
   exitedPtyIds: new Set<string>(),
   browserSelectMode: {},
+  browserHistory: [],
   feedbackModalOpen: false,
   pendingFeedback: null,
   handleAgentStatusUpdate: (ptyId, status) => {
@@ -535,6 +542,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       contextItems,
       composerText: state?.composerText ?? '',
       settings,
+      browserHistory: state?.browserHistory ?? [],
       hydrated: true,
     });
 
@@ -899,6 +907,18 @@ export const useAppStore = create<AppState>((set, get) => ({
       return;
     }
     get().addTab({ id: id(), workspaceId, type: 'file', relPath });
+  },
+
+  openExternalFileTab: (workspaceId, absPath) => {
+    const existing = get().tabs.find(
+      (tab) => tab.workspaceId === workspaceId && tab.type === 'file' && tab.absPath === absPath,
+    );
+    if (existing) {
+      get().setActiveTab(existing.id);
+      return;
+    }
+    const fileName = absPath.split('/').pop() ?? absPath;
+    get().addTab({ id: id(), workspaceId, type: 'file', relPath: fileName, absPath });
   },
 
   openDiffTab: (workspaceId, activePath) => {
@@ -1624,11 +1644,34 @@ export const useAppStore = create<AppState>((set, get) => ({
       type: 'browser',
       url: url || 'about:blank',
       title: 'Browser',
-      isLoading: true,
+      isLoading: false,
       canGoBack: false,
       canGoForward: false,
     };
     get().addTab(tab);
+  },
+
+  addBrowserHistoryEntry: (url, title, favicon = '') => {
+    if (!url || url === 'about:blank') return;
+    set((state) => {
+      const existing = state.browserHistory.findIndex((h) => h.url === url);
+      // Preserve existing favicon if no new one is provided
+      const prevFavicon = existing !== -1 ? state.browserHistory[existing].favicon : '';
+      const entry = { url, title: title || url, favicon: favicon || prevFavicon, visitedAt: Date.now() };
+      let next: import('@shared/types').BrowserHistoryEntry[];
+      if (existing !== -1) {
+        // Move to front with updated title/visitedAt
+        next = [entry, ...state.browserHistory.filter((_, i) => i !== existing)];
+      } else {
+        next = [entry, ...state.browserHistory];
+        if (next.length > 500) next = next.slice(0, 500);
+      }
+      return { browserHistory: next };
+    });
+  },
+
+  clearBrowserHistory: () => {
+    set({ browserHistory: [] });
   },
 
   updateBrowserNavState: (navState) => {
@@ -1646,6 +1689,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           : tab,
       ),
     }));
+    // Record history when navigation completes (not mid-load)
   },
 
   setBrowserSelectMode: (tabId, active) => {

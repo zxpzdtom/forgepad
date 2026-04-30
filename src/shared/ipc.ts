@@ -53,4 +53,6 @@ export const IPC = {
   NOTIFICATION_DELETE_AUDIO: 'notification:delete-audio',
   APP_IS_FOCUSED: 'app:is-focused',
   APP_FOCUS_WINDOW: 'app:focus-window',
+  FS_READ_ABS_FILE: 'fs:read-abs-file',
+  FS_READ_ABS_FILE_DATA_URL: 'fs:read-abs-file-data-url',
 } as const;
