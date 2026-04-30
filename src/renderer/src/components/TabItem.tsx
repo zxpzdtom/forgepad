@@ -6,8 +6,10 @@ export type TabItemProps = {
   active: boolean;
   /** Icon element rendered before the title. */
   icon: ReactNode;
-  /** Tab display title — also used for the native tooltip. */
+  /** Tab display title — also used for the native tooltip unless `tooltip` is set. */
   title: string;
+  /** Override the native tooltip text (defaults to `title`). */
+  tooltip?: string;
   /** Called when the tab body is clicked or activated via keyboard. */
   onSelect: () => void;
   /** Called when the close button is clicked. Omit to hide the close button. */
@@ -28,7 +30,7 @@ export type TabItemProps = {
 >;
 
 export const TabItem = forwardRef<HTMLDivElement, TabItemProps>(function TabItem(
-  { active, icon, title, onSelect, onClose, onContextMenu, suffix, closeTitle = 'Close tab', className, style, ...rest },
+  { active, icon, title, tooltip, onSelect, onClose, onContextMenu, suffix, closeTitle = 'Close tab', className, style, ...rest },
   ref,
 ) {
   const handleKeyDown = (event: KeyboardEvent) => {
@@ -47,7 +49,7 @@ export const TabItem = forwardRef<HTMLDivElement, TabItemProps>(function TabItem
       role="tab"
       tabIndex={0}
       aria-selected={active}
-      title={title}
+      title={tooltip ?? title}
       style={style}
       onClick={onSelect}
       onKeyDown={handleKeyDown}
