@@ -32,13 +32,19 @@ export function TabContextMenu({
   onRename,
 }: TabContextMenuProps) {
   const keyboardShortcuts = useAppStore((s) => s.settings.keyboardShortcuts);
+  const addToast = useAppStore((s) => s.addToast);
   const shortcuts = { ...DEFAULT_SHORTCUTS, ...(keyboardShortcuts ?? {}) };
 
   const sc = (id: keyof typeof shortcuts) => comboToDisplay(shortcuts[id]);
 
   const isFileType = tab.type === 'file';
   const isTerminalType = tab.type === 'terminal';
-  const fullPath = workspacePath && isFileType ? `${workspacePath}/${tab.relPath}` : null;
+  const isExternal = isFileType && Boolean(tab.absPath);
+  const fullPath = isExternal
+    ? tab.absPath!
+    : workspacePath && isFileType
+      ? `${workspacePath}/${tab.relPath}`
+      : null;
 
   const sections: ContextMenuSection[] = [];
 
@@ -91,18 +97,27 @@ export function TabContextMenu({
       label: 'Copy Path',
       shortcut: sc('copyPath'),
       action: () => {
-        if (fullPath) void navigator.clipboard.writeText(fullPath);
+        if (fullPath) {
+          void navigator.clipboard.writeText(fullPath);
+          addToast('info', 'Path copied');
+        }
         onClose();
       },
     });
-    sections.push({
-      label: 'Copy Relative Path',
-      shortcut: sc('copyRelativePath'),
-      action: () => {
-        void navigator.clipboard.writeText(tab.relPath);
-        onClose();
-      },
-    });
+
+    // "Copy Relative Path" only makes sense for workspace files
+    if (!isExternal) {
+      sections.push({
+        label: 'Copy Relative Path',
+        shortcut: sc('copyRelativePath'),
+        action: () => {
+          void navigator.clipboard.writeText(tab.relPath);
+          addToast('info', 'Relative path copied');
+          onClose();
+        },
+      });
+    }
+
     sections.push({
       label: 'Reveal in Finder',
       action: () => {

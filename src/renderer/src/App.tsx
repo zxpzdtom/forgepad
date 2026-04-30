@@ -196,17 +196,20 @@ export function App() {
       },
       copyPath: () => {
         const state = useAppStore.getState();
-        const tab = state.tabs.find((t) => t.id === state.activeTabId);
+        const tab = state.tabs.find((t) => t.id === state.activeFileTabId);
         if (!tab || tab.type !== 'file') return;
-        const ws = state.workspaces.find((w) => w.id === tab.workspaceId);
-        if (!ws) return;
-        void navigator.clipboard.writeText(`${ws.worktreePath}/${tab.relPath}`);
+        const path = tab.absPath ?? (() => {
+          const ws = state.workspaces.find((w) => w.id === tab.workspaceId);
+          return ws ? `${ws.worktreePath}/${tab.relPath}` : null;
+        })();
+        if (!path) return;
+        void navigator.clipboard.writeText(path);
         state.addToast('info', 'Path copied');
       },
       copyRelativePath: () => {
         const state = useAppStore.getState();
-        const tab = state.tabs.find((t) => t.id === state.activeTabId);
-        if (!tab || tab.type !== 'file') return;
+        const tab = state.tabs.find((t) => t.id === state.activeFileTabId);
+        if (!tab || tab.type !== 'file' || tab.absPath) return;
         void navigator.clipboard.writeText(tab.relPath);
         state.addToast('info', 'Relative path copied');
       },
