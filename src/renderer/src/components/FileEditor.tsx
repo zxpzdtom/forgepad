@@ -6,7 +6,7 @@ import { File as PierreFile } from '@pierre/diffs/react';
 import { useResolvedTheme } from '@renderer/App';
 import { useAppStore } from '@renderer/store/app-store';
 import type { CodeSelectionItem, Tab, Workspace } from '@shared/types';
-import { ChevronDown, ChevronUp, Code, Copy, FileCode, Image, MessageSquarePlus, Search, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, Code, Copy, FileCode, FileVideo, Image, MessageSquarePlus, Music, Search, X } from 'lucide-react';
 import { code as streamdownCode } from '@streamdown/code';
 import { createMermaidPlugin } from '@streamdown/mermaid';
 import { Streamdown } from 'streamdown';
@@ -41,10 +41,27 @@ type PendingCodeSelection = {
 type AnnotationMeta = { kind: 'pending' } | { kind: 'comment'; comment: CodeSelectionItem };
 
 const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'ico', 'svg', 'avif']);
+const AUDIO_EXTENSIONS = new Set(['mp3', 'wav', 'ogg', 'flac', 'aac', 'm4a', 'wma']);
+const VIDEO_EXTENSIONS = new Set(['mp4', 'webm', 'mov', 'avi', 'mkv']);
+
+function getExt(relPath: string): string {
+  return relPath.split('.').pop()?.toLowerCase() ?? '';
+}
 
 function isImageFile(relPath: string): boolean {
-  const ext = relPath.split('.').pop()?.toLowerCase() ?? '';
-  return IMAGE_EXTENSIONS.has(ext);
+  return IMAGE_EXTENSIONS.has(getExt(relPath));
+}
+
+function isAudioFile(relPath: string): boolean {
+  return AUDIO_EXTENSIONS.has(getExt(relPath));
+}
+
+function isVideoFile(relPath: string): boolean {
+  return VIDEO_EXTENSIONS.has(getExt(relPath));
+}
+
+function isPdfFile(relPath: string): boolean {
+  return getExt(relPath) === 'pdf';
 }
 
 function isMarkdownPath(path: string): boolean {
@@ -278,8 +295,8 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
   const [activeMatchIndex, setActiveMatchIndex] = useState(0);
   const [pendingSelection, setPendingSelection] = useState<PendingCodeSelection | null>(null);
   const [selectedRange, setSelectedRange] = useState<SelectedLineRange | null>(null);
-  const [imageUrl, setImageUrl] = useState('');
-  const [imageViewMode, setImageViewMode] = useState<'preview' | 'raw'>('preview');
+  const [mediaUrl, setMediaUrl] = useState('');
+  const [mediaViewMode, setMediaViewMode] = useState<'preview' | 'raw'>('preview');
   const resolvedTheme = useResolvedTheme();
   const addToast = useAppStore((state) => state.addToast);
   const addContextFiles = useAppStore((state) => state.addContextFiles);
@@ -290,11 +307,16 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
   const isExternal = Boolean(tab.absPath);
   const markdownFile = useMemo(() => isMarkdownPath(tab.relPath), [tab.relPath]);
   const isImage = useMemo(() => isImageFile(tab.relPath), [tab.relPath]);
+  const isAudio = useMemo(() => isAudioFile(tab.relPath), [tab.relPath]);
+  const isVideo = useMemo(() => isVideoFile(tab.relPath), [tab.relPath]);
+  const isPdf = useMemo(() => isPdfFile(tab.relPath), [tab.relPath]);
+  /** Any file type that requires loading a data URL for preview */
+  const isMediaFile = isImage || isAudio || isVideo || isPdf;
   const markdownText = useMemo(() => (markdownFile ? renderFrontmatterAsTable(fileText) : fileText), [markdownFile, fileText]);
   const showRenderedMarkdown = markdownFile && markdownMode === 'rendered';
-  const showImagePreview = isImage && imageViewMode === 'preview';
+  const showMediaPreview = isMediaFile && mediaViewMode === 'preview';
   // showCodeViewer is computed later but we need it for search; mirror the logic here.
-  const showCodeViewer = !loading && !showImagePreview && !showRenderedMarkdown && fileText;
+  const showCodeViewer = !loading && !showMediaPreview && !showRenderedMarkdown && fileText;
   const searchable = showRenderedMarkdown || !!showCodeViewer;
   const searchTargetRef = showRenderedMarkdown ? previewRef : codeViewerRef;
   const searchScrollRef = showRenderedMarkdown ? scrollRef : codeViewerRef;
@@ -356,49 +378,56 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
     setSearchRanges([]);
     setPendingSelection(null);
     setSelectedRange(null);
-    setImageUrl('');
+    setMediaUrl('');
 
-    if (isImage) {
-      const imagePromise = tab.absPath
+    if (isMediaFile) {
+      const mediaPromise = tab.absPath
         ? window.forgepad.fs.readAbsFileAsDataUrl(tab.absPath)
         : window.forgepad.fs.readFileAsDataUrl(workspace.worktreePath, tab.relPath);
-      imagePromise
+      mediaPromise
         .then((dataUrl) => {
-          if (!disposed) setImageUrl(dataUrl);
+          if (!disposed) setMediaUrl(dataUrl);
         })
-        .catch((error) => addToast('error', error instanceof Error ? error.message : 'Failed to load image.'))
+        .catch((error) => addToast('error', error instanceof Error ? error.message : 'Failed to load file preview.'))
         .finally(() => {
           if (!disposed) setLoading(false);
         });
     }
 
-    const textPromise = tab.absPath
-      ? window.forgepad.fs.readAbsFile(tab.absPath)
-      : window.forgepad.fs.readFile(workspace.worktreePath, tab.relPath);
-    textPromise
-      .then((text) => {
-        if (disposed) return;
-        setFileText(text);
-        setLineCount(text.split('\n').length);
-      })
-      .catch((error) => {
-        if (isImage) return;
-        addToast('error', error instanceof Error ? error.message : 'Failed to load file.');
-      })
-      .finally(() => {
-        if (!disposed) setLoading(false);
-      });
+    // For media files (except PDF where there's no useful text fallback),
+    // still try loading as text so "Raw" mode works (shows base64 / binary).
+    // For PDF skip the text load entirely.
+    if (!isPdf) {
+      const textPromise = tab.absPath
+        ? window.forgepad.fs.readAbsFile(tab.absPath)
+        : window.forgepad.fs.readFile(workspace.worktreePath, tab.relPath);
+      textPromise
+        .then((text) => {
+          if (disposed) return;
+          setFileText(text);
+          setLineCount(text.split('\n').length);
+        })
+        .catch((error) => {
+          if (isMediaFile) return; // media preview already handles errors above
+          addToast('error', error instanceof Error ? error.message : 'Failed to load file.');
+        })
+        .finally(() => {
+          if (!disposed && !isMediaFile) setLoading(false);
+        });
+    } else {
+      // PDF: nothing to load as text, just wait for data URL
+    }
 
     return () => {
       disposed = true;
     };
-  }, [addToast, tab.relPath, tab.absPath, workspace.worktreePath, isImage]);
+  }, [addToast, tab.relPath, tab.absPath, workspace.worktreePath, isMediaFile, isPdf]);
 
   useEffect(() => {
     setMarkdownMode('rendered');
     setPendingSelection(null);
     setSelectedRange(null);
-    setImageViewMode('preview');
+    setMediaViewMode('preview');
   }, []);
 
   useEffect(() => {
@@ -651,28 +680,28 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
         >
           <FileCode size={14} className="text-muted" />
           {tab.relPath}
-          <span className="text-muted">{lineCount} lines</span>
+          {!isMediaFile && <span className="text-muted">{lineCount} lines</span>}
         </div>
         <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
-          {isImage ? (
-            <div className="view-mode-toggle" role="radiogroup" aria-label="Image view">
+          {(isImage || isAudio || isVideo) ? (
+            <div className="view-mode-toggle" role="radiogroup" aria-label="Media view">
               <button
-                className={`view-mode-btn ${imageViewMode === 'preview' ? 'active' : ''}`}
+                className={`view-mode-btn ${mediaViewMode === 'preview' ? 'active' : ''}`}
                 type="button"
                 role="radio"
-                aria-checked={imageViewMode === 'preview'}
+                aria-checked={mediaViewMode === 'preview'}
                 title="Preview"
-                onClick={() => setImageViewMode('preview')}
+                onClick={() => setMediaViewMode('preview')}
               >
-                <Image size={14} />
+                {isAudio ? <Music size={14} /> : isVideo ? <FileVideo size={14} /> : <Image size={14} />}
               </button>
               <button
-                className={`view-mode-btn ${imageViewMode === 'raw' ? 'active' : ''}`}
+                className={`view-mode-btn ${mediaViewMode === 'raw' ? 'active' : ''}`}
                 type="button"
                 role="radio"
-                aria-checked={imageViewMode === 'raw'}
+                aria-checked={mediaViewMode === 'raw'}
                 title="Raw"
-                onClick={() => setImageViewMode('raw')}
+                onClick={() => setMediaViewMode('raw')}
               >
                 <Code size={14} />
               </button>
@@ -700,7 +729,7 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
               </button>
             </div>
           ) : null}
-          {!isExternal && (
+          {!isExternal && !isMediaFile && (
             <button className="secondary-button" type="button" onClick={() => addContextFiles(workspace.id, [tab.relPath])}>
               Add Context
             </button>
@@ -763,10 +792,25 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
       {/* Content area */}
       {loading ? (
         <div className="grid min-h-[90px] place-items-center text-muted">Loading file</div>
-      ) : showImagePreview && imageUrl ? (
+      ) : showMediaPreview && isImage && mediaUrl ? (
         <div className="scrollbar-thin scroll-mask flex min-h-0 flex-1 items-center justify-center overflow-auto bg-surface-inset p-6">
-          <img className="max-h-full max-w-full rounded object-contain" src={imageUrl} alt={tab.relPath} />
+          <img className="max-h-full max-w-full rounded object-contain" src={mediaUrl} alt={tab.relPath} />
         </div>
+      ) : showMediaPreview && isAudio && mediaUrl ? (
+        <div className="flex min-h-0 flex-1 items-center justify-center bg-surface-inset p-8">
+          <audio controls className="w-full max-w-2xl" src={mediaUrl} />
+        </div>
+      ) : showMediaPreview && isVideo && mediaUrl ? (
+        <div className="flex min-h-0 flex-1 items-center justify-center bg-surface-inset p-4">
+          <video controls className="max-h-full max-w-full rounded" src={mediaUrl} />
+        </div>
+      ) : showMediaPreview && isPdf && mediaUrl ? (
+        <iframe
+          className="min-h-0 flex-1 border-none"
+          src={mediaUrl}
+          title={tab.relPath}
+          style={{ width: '100%', height: '100%' }}
+        />
       ) : showRenderedMarkdown ? (
         <div className="markdown-viewer-scroll scrollbar-thin scroll-mask-y min-h-0 flex-1 overflow-auto" ref={scrollRef}>
           <div ref={previewRef} className="markdown-preview">
