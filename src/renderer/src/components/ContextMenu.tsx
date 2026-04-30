@@ -1,0 +1,131 @@
+import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
+
+export type ContextMenuItem = {
+  label: string;
+  icon?: ReactNode;
+  shortcut?: string;
+  danger?: boolean;
+  disabled?: boolean;
+  action: () => void;
+};
+
+export type ContextMenuSection = ContextMenuItem | 'divider';
+
+type ContextMenuProps = {
+  sections: ContextMenuSection[];
+  x: number;
+  y: number;
+  onClose: () => void;
+};
+
+export function ContextMenu({ sections, x, y, onClose }: ContextMenuProps) {
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [focusIndex, setFocusIndex] = useState(-1);
+
+  const actionItems = sections.filter((s): s is ContextMenuItem => s !== 'divider' && !s.disabled);
+
+  // Click outside
+  const handleClickOutside = useCallback(
+    (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        onClose();
+      }
+    },
+    [onClose],
+  );
+
+  useEffect(() => {
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [handleClickOutside]);
+
+  // Keyboard navigation
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+        return;
+      }
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setFocusIndex((prev) => (prev < actionItems.length - 1 ? prev + 1 : 0));
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setFocusIndex((prev) => (prev > 0 ? prev - 1 : actionItems.length - 1));
+      }
+      if (e.key === 'Enter' && focusIndex >= 0) {
+        e.preventDefault();
+        actionItems[focusIndex]?.action();
+      }
+    };
+    document.addEventListener('keydown', handleKey);
+    return () => document.removeEventListener('keydown', handleKey);
+  }, [onClose, focusIndex, actionItems]);
+
+  // Viewport boundary detection
+  const [pos, setPos] = useState({ left: x, top: y });
+  useEffect(() => {
+    const menu = menuRef.current;
+    if (!menu) return;
+    const rect = menu.getBoundingClientRect();
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    let left = x;
+    let top = y;
+    if (x + rect.width > vw - 8) left = x - rect.width;
+    if (y + rect.height > vh - 8) top = y - rect.height;
+    if (left < 4) left = 4;
+    if (top < 4) top = 4;
+    setPos({ left, top });
+  }, [x, y]);
+
+  let actionIndex = -1;
+
+  return (
+    <div
+      ref={menuRef}
+      className="fixed z-50 grid min-w-[150px] gap-[3px] rounded-[7px] border border-border bg-panel-2 p-[5px] shadow-[0_14px_32px_rgba(0,0,0,0.22)] [animation:menu-in_120ms_ease-out]"
+      style={{ left: pos.left, top: pos.top }}
+    >
+      {sections.map((item, i) => {
+        if (item === 'divider') {
+          return <div key={`d-${i}`} className="mx-1 my-1 h-px bg-border" />;
+        }
+
+        if (item.disabled) return null;
+
+        actionIndex++;
+        const idx = actionIndex;
+        const isFocused = idx === focusIndex;
+
+        return (
+          <button
+            key={item.label}
+            type="button"
+            className={`flex h-7 w-full items-center gap-[7px] rounded-[5px] px-[9px] text-left${
+              item.danger
+                ? isFocused
+                  ? ' bg-panel-3 text-danger'
+                  : ' bg-transparent text-danger hover:bg-panel-3'
+                : isFocused
+                  ? ' bg-panel-3 text-text'
+                  : ' bg-transparent text-text hover:bg-panel-3'
+            }`}
+            onClick={item.action}
+            onMouseEnter={() => setFocusIndex(idx)}
+            onMouseLeave={() => setFocusIndex(-1)}
+          >
+            {item.icon && (
+              <span className={`flex size-4 shrink-0 items-center justify-center${item.danger ? ' text-danger' : ' text-subtle'}`}>
+                {item.icon}
+              </span>
+            )}
+            <span className="flex-1 text-[13px]">{item.label}</span>
+            {item.shortcut && <span className="shrink-0 text-[11px] text-subtle">{item.shortcut}</span>}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
