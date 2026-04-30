@@ -306,6 +306,7 @@ export function FilesPanel() {
           onClick={() =>
             closeAfter(() => {
               void navigator.clipboard.writeText(`${workspace.worktreePath}/${item.path}`);
+              addToast('info', 'Path copied');
             })
           }
         >
@@ -318,6 +319,7 @@ export function FilesPanel() {
           onClick={() =>
             closeAfter(() => {
               void navigator.clipboard.writeText(item.path);
+              addToast('info', 'Relative path copied');
             })
           }
         >

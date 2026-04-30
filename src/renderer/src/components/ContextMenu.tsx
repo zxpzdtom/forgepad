@@ -1,4 +1,7 @@
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
+import { DEFAULT_SHORTCUTS } from '@shared/types';
+import { useAppStore } from '@renderer/store/app-store';
+import { comboToDisplay, eventMatchesCombo } from '@renderer/lib/shortcut-utils';
 
 export type ContextMenuItem = {
   label: string;
@@ -39,7 +42,11 @@ export function ContextMenu({ sections, x, y, onClose }: ContextMenuProps) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [handleClickOutside]);
 
-  // Keyboard navigation
+  // Build a map from display shortcut string → action item index
+  const keyboardShortcuts = useAppStore((s) => s.settings.keyboardShortcuts);
+  const resolvedShortcuts = { ...DEFAULT_SHORTCUTS, ...(keyboardShortcuts ?? {}) };
+
+  // Keyboard navigation + shortcut interception
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
@@ -49,19 +56,41 @@ export function ContextMenu({ sections, x, y, onClose }: ContextMenuProps) {
       if (e.key === 'ArrowDown') {
         e.preventDefault();
         setFocusIndex((prev) => (prev < actionItems.length - 1 ? prev + 1 : 0));
+        return;
       }
       if (e.key === 'ArrowUp') {
         e.preventDefault();
         setFocusIndex((prev) => (prev > 0 ? prev - 1 : actionItems.length - 1));
+        return;
       }
       if (e.key === 'Enter' && focusIndex >= 0) {
         e.preventDefault();
         actionItems[focusIndex]?.action();
+        return;
+      }
+
+      // Match keyboard event against menu items that have a shortcut
+      for (const [, combo] of Object.entries(resolvedShortcuts)) {
+        if (!eventMatchesCombo(e, combo)) continue;
+        const display = comboToDisplay(combo);
+        const matchIdx = actionItems.findIndex((item) => item.shortcut === display);
+        if (matchIdx < 0) continue;
+
+        // Intercept: prevent the global handler from also firing
+        e.preventDefault();
+        e.stopPropagation();
+
+        // Flash highlight then execute
+        setFocusIndex(matchIdx);
+        setTimeout(() => {
+          actionItems[matchIdx]?.action();
+        }, 120);
+        return;
       }
     };
-    document.addEventListener('keydown', handleKey);
-    return () => document.removeEventListener('keydown', handleKey);
-  }, [onClose, focusIndex, actionItems]);
+    document.addEventListener('keydown', handleKey, true); // capture phase to beat global handler
+    return () => document.removeEventListener('keydown', handleKey, true);
+  }, [onClose, focusIndex, actionItems, resolvedShortcuts]);
 
   // Viewport boundary detection
   const [pos, setPos] = useState({ left: x, top: y });
