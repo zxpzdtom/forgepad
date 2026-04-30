@@ -14,9 +14,12 @@ import type {
   FileStatus,
   GitBucket,
   GitStatusKind,
+  NotificationSettings,
+  NotificationSound,
   PersistedAppState,
   Project,
   RightPanelMode,
+  SelectedElementInfo,
   ShortcutActionId,
   ShortcutCombo,
   Tab,
@@ -24,10 +27,19 @@ import type {
   TaskStatus,
   Workspace,
 } from '@shared/types';
-import { DEFAULT_AGENT_PRESETS, DEFAULT_SETTINGS, DEFAULT_SHORTCUTS } from '@shared/types';
+import { DEFAULT_AGENT_PRESETS, DEFAULT_NOTIFICATION_SETTINGS, DEFAULT_SETTINGS, DEFAULT_SHORTCUTS } from '@shared/types';
 import { create } from 'zustand';
 
-export type SettingsSection = 'general' | 'agent' | 'terminal' | 'changes' | 'advanced' | 'shortcuts';
+export type SettingsSection =
+  | 'general'
+  | 'agent'
+  | 'terminal'
+  | 'changes'
+  | 'notifications'
+  | 'git'
+  | 'advanced'
+  | 'shortcuts'
+  | 'appearance';
 
 type Toast = {
   id: string;
@@ -68,6 +80,12 @@ type AppState = {
   agentStatuses: Record<string, AgentStatus>;
   /** ptyIds whose process has exited */
   exitedPtyIds: Set<string>;
+  /** Browser select mode active state, keyed by tabId */
+  browserSelectMode: Record<string, boolean>;
+  /** Whether the browser feedback modal is open */
+  feedbackModalOpen: boolean;
+  /** Pending element selection for feedback modal */
+  pendingFeedback: { tabId: string; element: SelectedElementInfo } | null;
   handleAgentStatusUpdate: (ptyId: string, status: AgentStatus) => void;
   clearAgentStatus: (ptyId: string) => void;
   markPtyExited: (ptyId: string) => void;
@@ -123,6 +141,9 @@ type AppState = {
   updateFileNote: (id: string, note: string) => void;
   updateFileIncludeContent: (id: string, includeContent: boolean) => void;
   sendContextToTerminal: () => Promise<void>;
+  addCustomTheme: (theme: import('@shared/types').ThemeDefinition) => void;
+  removeCustomTheme: (themeId: string) => void;
+  renameCustomTheme: (themeId: string, name: string) => void;
   updateSettings: (partial: Partial<AppSettings>) => void;
   updateShortcut: (actionId: ShortcutActionId, combo: ShortcutCombo) => void;
   resetShortcut: (actionId: ShortcutActionId) => void;
@@ -145,6 +166,24 @@ type AppState = {
   removeWorkspace: (workspaceId: string) => void;
   deleteWorktree: (workspaceId: string) => Promise<void>;
   createWorktree: (projectId: string, branch: string, trackRemote?: boolean) => Promise<void>;
+  // Browser tab actions
+  createBrowserTab: (url?: string) => void;
+  updateBrowserNavState: (state: {
+    tabId: string;
+    url: string;
+    title: string;
+    isLoading: boolean;
+    canGoBack: boolean;
+    canGoForward: boolean;
+  }) => void;
+  setBrowserSelectMode: (tabId: string, active: boolean) => void;
+  openFeedbackModal: (tabId: string, element: SelectedElementInfo) => void;
+  closeFeedbackModal: () => void;
+  submitBrowserFeedback: (comment: string) => void;
+  updateNotificationSettings: (partial: Partial<NotificationSettings>) => void;
+  addCustomSound: (sound: NotificationSound) => void;
+  removeCustomSound: (soundId: string) => void;
+  renameCustomSound: (soundId: string, name: string) => void;
 };
 
 function id(): string {
@@ -159,6 +198,7 @@ function tabTitle(tab: Tab): string {
   if (tab.type === 'terminal') return tab.title;
   if (tab.type === 'diff') return 'Changes';
   if (tab.type === 'context-preview') return 'Context';
+  if (tab.type === 'browser') return tab.title || 'Browser';
   return tab.relPath.split('/').pop() || tab.relPath;
 }
 
@@ -180,7 +220,12 @@ function serializeForSave(state: AppState): PersistedAppState {
     projects: state.projects,
     workspaces: state.workspaces,
     tasks: state.tasks,
-    tabs: state.tabs.filter((tab) => tab.type !== 'terminal' || (tab.isAgent && tab.sessionId && tab.sessionConfirmed)),
+    tabs: state.tabs.filter(
+      (tab) =>
+        tab.type === 'browser' ||
+        tab.type !== 'terminal' ||
+        (tab.type === 'terminal' && tab.isAgent && tab.sessionId && tab.sessionConfirmed),
+    ),
     activeWorkspaceId: state.activeWorkspaceId,
     activeTabId: state.tabs.find((tab) => tab.id === state.activeTabId)?.type === 'terminal' ? null : state.activeTabId,
     workspaceActiveAgentTabIds,
@@ -306,6 +351,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   gitRefreshEpoch: 0,
   agentStatuses: {},
   exitedPtyIds: new Set<string>(),
+  browserSelectMode: {},
+  feedbackModalOpen: false,
+  pendingFeedback: null,
   handleAgentStatusUpdate: (ptyId, status) => {
     // Reset the working-timeout whenever we receive any hook event.
     // If status is "working", start a timeout that auto-clears to "idle"
@@ -399,7 +447,13 @@ export const useAppStore = create<AppState>((set, get) => ({
       return;
     }
 
-    const rawSettings = { ...DEFAULT_SETTINGS, ...(state?.settings ?? {}) };
+    const rawSettings = {
+      ...DEFAULT_SETTINGS,
+      ...(state?.settings ?? {}),
+      // Ensure new theme fields are always present (migration for old persisted state)
+      themeId: (state?.settings as AppSettings | undefined)?.themeId ?? DEFAULT_SETTINGS.themeId,
+      customThemes: (state?.settings as AppSettings | undefined)?.customThemes ?? [],
+    };
     if (!rawSettings.agentPresets || rawSettings.agentPresets.length === 0) {
       rawSettings.agentPresets = [...DEFAULT_SETTINGS.agentPresets];
     } else {
@@ -423,6 +477,15 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (matchingDefaultPreset) {
       rawSettings.defaultAgentCommand = matchingDefaultPreset.command;
     }
+
+    // Schema migration: safely merge notification settings with defaults
+    rawSettings.notifications = {
+      ...DEFAULT_NOTIFICATION_SETTINGS,
+      ...(rawSettings.notifications ?? {}),
+      // Ensure customSounds is always an array
+      customSounds: rawSettings.notifications?.customSounds ?? [],
+    };
+
     const settings = rawSettings;
     const projects = state?.projects ?? [];
     const workspaces = state?.workspaces ?? [];
@@ -435,7 +498,12 @@ export const useAppStore = create<AppState>((set, get) => ({
       state?.activeWorkspaceId && workspaces.some((workspace) => workspace.id === state.activeWorkspaceId)
         ? state.activeWorkspaceId
         : (workspaces[0]?.id ?? null);
-    const tabs = (state?.tabs ?? []).filter((tab) => workspaces.some((workspace) => workspace.id === tab.workspaceId));
+    const tabs = (state?.tabs ?? [])
+      .filter((tab) => workspaces.some((workspace) => workspace.id === tab.workspaceId))
+      .map((tab) =>
+        // Reset browser tab transient state on restore
+        tab.type === 'browser' ? { ...tab, isLoading: false } : tab,
+      );
     const contextItems = (state?.contextItems ?? []).filter((item) => {
       if (!workspaces.some((workspace) => workspace.id === item.workspaceId)) return false;
       if (item.type === 'task') return tasks.some((task) => task.id === item.taskId);
@@ -1181,6 +1249,36 @@ export const useAppStore = create<AppState>((set, get) => ({
     get().addToast('success', `Sent context: ${bundle.relPath}`);
   },
 
+  addCustomTheme: (theme) =>
+    set((state) => ({
+      settings: {
+        ...state.settings,
+        customThemes: [...(state.settings.customThemes ?? []).filter((t) => t.id !== theme.id), theme],
+        themeId: theme.id,
+      },
+    })),
+
+  removeCustomTheme: (themeId) =>
+    set((state) => {
+      const customThemes = (state.settings.customThemes ?? []).filter((t) => t.id !== themeId);
+      const nextThemeId = state.settings.themeId === themeId ? 'dark' : state.settings.themeId;
+      return {
+        settings: {
+          ...state.settings,
+          customThemes,
+          themeId: nextThemeId,
+        },
+      };
+    }),
+
+  renameCustomTheme: (themeId, name) =>
+    set((state) => ({
+      settings: {
+        ...state.settings,
+        customThemes: (state.settings.customThemes ?? []).map((t) => (t.id === themeId ? { ...t, name } : t)),
+      },
+    })),
+
   updateSettings: (partial) => set((state) => ({ settings: { ...state.settings, ...partial } })),
 
   updateShortcut: (actionId, combo) =>
@@ -1437,7 +1535,12 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (!project) return;
 
     try {
-      await window.forgepad.git.removeWorktree(project.repoPath, workspace.worktreePath, workspace.branch);
+      await window.forgepad.git.removeWorktree(
+        project.repoPath,
+        workspace.worktreePath,
+        workspace.branch,
+        state.settings.worktreeAutoDeleteBranch,
+      );
     } catch (error) {
       get().addToast('error', `Failed to remove worktree: ${error instanceof Error ? error.message : String(error)}`);
       return;
@@ -1456,7 +1559,13 @@ export const useAppStore = create<AppState>((set, get) => ({
     }));
 
     try {
-      const result = await window.forgepad.git.addWorktree(project.repoPath, branch, trackRemote);
+      const settings = get().settings;
+      const result = await window.forgepad.git.addWorktree(
+        project.repoPath,
+        branch,
+        trackRemote,
+        settings.worktreeBaseDir || undefined,
+      );
 
       const workspace: Workspace = {
         id: workspaceId,
@@ -1502,6 +1611,140 @@ export const useAppStore = create<AppState>((set, get) => ({
     );
     set((s) => ({ branchStats: { ...s.branchStats, ...updates } }));
   },
+
+  // ── Browser tab actions ──────────────────────────────────────────────────
+
+  createBrowserTab: (url) => {
+    const state = get();
+    const workspaceId = state.activeWorkspaceId;
+    if (!workspaceId) return;
+    const tab: Tab = {
+      id: id(),
+      workspaceId,
+      type: 'browser',
+      url: url || 'about:blank',
+      title: 'Browser',
+      isLoading: true,
+      canGoBack: false,
+      canGoForward: false,
+    };
+    get().addTab(tab);
+  },
+
+  updateBrowserNavState: (navState) => {
+    set((state) => ({
+      tabs: state.tabs.map((tab) =>
+        tab.id === navState.tabId && tab.type === 'browser'
+          ? {
+              ...tab,
+              url: navState.url,
+              title: navState.title || navState.url,
+              isLoading: navState.isLoading,
+              canGoBack: navState.canGoBack,
+              canGoForward: navState.canGoForward,
+            }
+          : tab,
+      ),
+    }));
+  },
+
+  setBrowserSelectMode: (tabId, active) => {
+    set((state) => ({
+      browserSelectMode: { ...state.browserSelectMode, [tabId]: active },
+    }));
+  },
+
+  openFeedbackModal: (tabId, element) => {
+    set({
+      pendingFeedback: { tabId, element },
+      feedbackModalOpen: true,
+      browserSelectMode: (() => {
+        const current = get().browserSelectMode;
+        return { ...current, [tabId]: false };
+      })(),
+    });
+  },
+
+  closeFeedbackModal: () => {
+    set({ feedbackModalOpen: false, pendingFeedback: null });
+  },
+
+  submitBrowserFeedback: (comment) => {
+    const state = get();
+    const { pendingFeedback } = state;
+    if (!pendingFeedback || !comment.trim()) return;
+
+    const { element } = pendingFeedback;
+
+    // Find the active agent tab's ptyId.
+    // First try the explicitly-active agent tab, then fall back to any agent
+    // tab in the current workspace (the user may have focus in the browser tab
+    // so activeAgentTabId might be stale or null).
+    const activeAgentTab =
+      state.tabs.find((tab) => tab.id === state.activeAgentTabId && tab.type === 'terminal' && tab.isAgent) ??
+      state.tabs.find((tab) => tab.workspaceId === state.activeWorkspaceId && tab.type === 'terminal' && tab.isAgent);
+
+    if (activeAgentTab?.type === 'terminal') {
+      const prompt = [
+        `[Browser Feedback] ${element.pageUrl}`,
+        '',
+        `Element: ${element.tagName} | Selector: \`${element.selector}\``,
+        '```html',
+        element.outerHTML,
+        '```',
+        '',
+        `Feedback: ${comment.trim()}`,
+        '',
+      ].join('\n');
+
+      window.forgepad.pty.write(activeAgentTab.ptyId, prompt);
+    } else {
+      get().addToast('error', 'No active agent terminal. Please open an agent tab first.');
+    }
+
+    get().closeFeedbackModal();
+  },
+
+  updateNotificationSettings: (partial) =>
+    set((state) => ({
+      settings: {
+        ...state.settings,
+        notifications: { ...state.settings.notifications, ...partial },
+      },
+    })),
+
+  addCustomSound: (sound) =>
+    set((state) => ({
+      settings: {
+        ...state.settings,
+        notifications: {
+          ...state.settings.notifications,
+          customSounds: [...state.settings.notifications.customSounds, sound],
+        },
+      },
+    })),
+
+  removeCustomSound: (soundId) =>
+    set((state) => ({
+      settings: {
+        ...state.settings,
+        notifications: {
+          ...state.settings.notifications,
+          customSounds: state.settings.notifications.customSounds.filter((s) => s.id !== soundId),
+        },
+      },
+    })),
+
+  renameCustomSound: (soundId, name) =>
+    set((state) => ({
+      settings: {
+        ...state.settings,
+        notifications: {
+          ...state.settings.notifications,
+          customSounds: state.settings.notifications.customSounds.map((s) => (s.id === soundId ? { ...s, name } : s)),
+        },
+      },
+    })),
 }));
 
 export function getTabTitle(tab: Tab): string {

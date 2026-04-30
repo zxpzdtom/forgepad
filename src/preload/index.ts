@@ -142,6 +142,19 @@ const api = {
     openWithTerminal: (fullPath: string, terminalId: string) =>
       ipcRenderer.invoke(IPC.SHELL_OPEN_WITH_TERMINAL, fullPath, terminalId) as Promise<void>,
   },
+  notification: {
+    pickAudio: () =>
+      ipcRenderer.invoke(IPC.NOTIFICATION_PICK_AUDIO) as Promise<{
+        fileName: string;
+        assetPath: string;
+        dataUrl: string;
+      } | null>,
+    deleteAudio: (assetPath: string) => ipcRenderer.invoke(IPC.NOTIFICATION_DELETE_AUDIO, assetPath) as Promise<void>,
+  },
+  app2: {
+    isFocused: () => ipcRenderer.invoke(IPC.APP_IS_FOCUSED) as Promise<boolean>,
+    focusWindow: () => ipcRenderer.send(IPC.APP_FOCUS_WINDOW),
+  },
 };
 
 contextBridge.exposeInMainWorld('forgepad', api);

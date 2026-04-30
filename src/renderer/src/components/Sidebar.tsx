@@ -559,8 +559,9 @@ function NewWorktreeDialog({
   onClose: () => void;
   onCreate: (branch: string, trackRemote: boolean) => void;
 }) {
+  const worktreeTrackRemoteByDefault = useAppStore((s) => s.settings.worktreeTrackRemoteByDefault);
   const [branch, setBranch] = useState('');
-  const [trackRemote, setTrackRemote] = useState(false);
+  const [trackRemote, setTrackRemote] = useState(worktreeTrackRemoteByDefault);
   const [loading, setLoading] = useState(false);
   const [remoteStatus, setRemoteStatus] = useState<'idle' | 'checking' | 'exists' | 'not-found'>('idle');
   const inputRef = useRef<HTMLInputElement>(null);

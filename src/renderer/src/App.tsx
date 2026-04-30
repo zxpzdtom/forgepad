@@ -358,7 +358,7 @@ export function App() {
       const total = container.clientWidth;
       columnsSplitRef.current.resize([total - fw, fw]);
     });
-  }, []);
+  }, [sidebarOpen, rightPanelOpen]);
 
   // Restore remembered terminal height when dock becomes visible
   const shellDockVisibleEarly = terminalPanelOpen && hasShellTabs;
@@ -487,7 +487,7 @@ export function App() {
     // Agent only (no file tabs)
     if (hasAgentTabs) {
       return (
-        <div className={`flex size-full min-h-0 flex-col${focusedColumn === 'agent' ? 'pane-focused' : ''}`}>
+        <div className={`flex size-full min-h-0 flex-col bg-bg${focusedColumn === 'agent' ? ' pane-focused' : ''}`}>
           <AgentTabBar />
           <AgentQuickBar />
           <div className="relative min-h-0 flex-1 overflow-hidden">

@@ -1,5 +1,10 @@
 @import "tailwindcss";
 
+@source "../../../../node_modules/streamdown/dist/*.js";
+@source "../../../../node_modules/@streamdown/code/dist/*.js";
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
 @theme {
     --color-bg: var(--bg);
     --color-panel: var(--panel);
@@ -38,6 +43,64 @@
     --color-sidebar-bg: var(--sidebar-bg);
     --color-workspace-card-bg: var(--workspace-card-bg);
     --animate-breathe: breathe 1s ease-in-out infinite;
+    /* Streamdown / shadcn-ui color tokens */
+    --color-background: var(--background);
+    --color-foreground: var(--foreground);
+    --color-card: var(--card);
+    --color-card-foreground: var(--card-foreground);
+    --color-muted-foreground: var(--muted-foreground);
+    --color-sidebar: var(--sidebar);
+    --color-primary: var(--primary);
+    --color-primary-foreground: var(--primary-foreground);
+    --color-input: var(--input);
+}
+
+@keyframes browser-loading {
+    0% {
+        width: 0%;
+        margin-left: 0;
+    }
+    50% {
+        width: 60%;
+        margin-left: 20%;
+    }
+    100% {
+        width: 0%;
+        margin-left: 100%;
+    }
+}
+
+/* ── Console error badge (t-badge pattern) ──────────────────────────── */
+@keyframes badge-in {
+    0% {
+        transform: scale(0);
+        opacity: 0;
+    }
+    50% {
+        transform: scale(1.15);
+    }
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+@keyframes badge-pulse {
+    0%,
+    100% {
+        box-shadow: 0 0 0 0 color-mix(in srgb, var(--danger) 45%, transparent);
+    }
+    50% {
+        box-shadow: 0 0 0 4px color-mix(in srgb, var(--danger) 0%, transparent);
+    }
+}
+
+.console-badge {
+    animation: badge-in 250ms ease-out both;
+}
+
+.console-badge-pulse {
+    animation: badge-pulse 1.8s ease-in-out 1;
 }
 
 @keyframes breathe {
@@ -105,6 +168,17 @@
     --checkbox-check-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'%3E%3C/polyline%3E%3C/svg%3E");
     --sidebar-bg: #0f1011;
     --workspace-card-bg: rgba(255, 255, 255, 0.02);
+    /* Streamdown / shadcn design tokens mapped to ForgePad palette */
+    --background: #08090a;
+    --foreground: #f7f8f8;
+    --card: #0f1011;
+    --card-foreground: #f7f8f8;
+    --muted-foreground: #8a8f98;
+    --sidebar: #131416;
+    --input: rgba(255, 255, 255, 0.08);
+    --primary: #5e6ad2;
+    --primary-foreground: #ffffff;
+    --radius: 0.5rem;
     /* Typography — Inter Variable with Linear's OpenType features */
     font-family:
         "Inter Variable",
@@ -169,6 +243,17 @@
     --checkbox-check-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='20 6 9 17 4 12'%3E%3C/polyline%3E%3C/svg%3E");
     --sidebar-bg: #e5e6ea;
     --workspace-card-bg: #f0f1f4;
+    /* Streamdown / shadcn design tokens mapped to ForgePad palette */
+    --background: #f5f5f7;
+    --foreground: #1a1c20;
+    --card: #ffffff;
+    --card-foreground: #1a1c20;
+    --muted-foreground: #6b7080;
+    --sidebar: #eaebed;
+    --input: #c8c9ce;
+    --primary: #5e6ad2;
+    --primary-foreground: #ffffff;
+    --radius: 0.5rem;
 }
 
 * {
@@ -415,7 +500,8 @@ textarea {
     margin-bottom: 0;
 }
 
-.markdown-preview code {
+/* Inline code only — fenced code blocks are styled by Streamdown */
+.markdown-preview :not(pre) > code {
     border: 1px solid var(--border-soft);
     border-radius: 5px;
     padding: 1px 5px;
@@ -425,91 +511,6 @@ textarea {
         ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
         "Liberation Mono", monospace;
     font-size: 0.92em;
-}
-
-.markdown-preview pre {
-    overflow: auto;
-    border: 1px solid var(--border-soft);
-    border-radius: 8px;
-    padding: 12px 14px;
-    background: var(--surface-inset);
-    @apply scroll-mask-x;
-}
-
-.markdown-preview pre code {
-    border: 0;
-    padding: 0;
-    color: var(--text-code-block);
-    background: transparent;
-}
-
-/* Markdown code blocks with header + copy */
-.md-code-block {
-    position: relative;
-    margin: 0 0 14px;
-    border: 1px solid var(--border-soft);
-    border-radius: 8px;
-    overflow: hidden;
-    background: var(--surface-inset);
-}
-
-.md-code-block pre {
-    margin: 0;
-    border: 0;
-    border-radius: 0;
-    padding: 12px 14px;
-    overflow: auto;
-    @apply scroll-mask-x;
-}
-
-.md-code-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 4px 10px;
-    background: var(--code-header-bg);
-    border-bottom: 1px solid var(--border-soft);
-}
-
-.md-code-lang {
-    font-size: 11px;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    color: var(--muted);
-}
-
-.md-code-copy {
-    display: grid;
-    place-items: center;
-    width: 24px;
-    height: 24px;
-    border: none;
-    border-radius: 4px;
-    background: transparent;
-    color: var(--muted);
-    cursor: pointer;
-}
-
-.md-code-copy:hover {
-    background: var(--code-copy-hover);
-    color: var(--text);
-}
-
-/* Mermaid diagram */
-.mermaid-container {
-    margin: 0 0 14px;
-    padding: 16px;
-    border: 1px solid var(--border-soft);
-    border-radius: 8px;
-    background: var(--surface-inset);
-    overflow: auto;
-    text-align: center;
-    @apply scroll-mask;
-}
-
-.mermaid-container svg {
-    max-width: 100%;
-    height: auto;
 }
 
 .markdown-preview a {
@@ -526,15 +527,7 @@ textarea {
     border-radius: 8px;
 }
 
-/* Markdown table — horizontal-scroll wrapper */
-.markdown-preview .table-wrapper {
-    overflow-x: auto;
-    margin: 0 0 14px;
-    border: 1px solid var(--border-soft);
-    border-radius: 8px;
-    @apply scroll-mask-x;
-}
-
+/* Markdown table */
 .markdown-preview table {
     width: 100%;
     border-collapse: collapse;
@@ -600,6 +593,69 @@ textarea {
 .markdown-preview th code {
     font-size: 0.88em;
     padding: 1px 4px;
+}
+
+/* Streamdown overrides — remap shadcn tokens inside markdown preview */
+.markdown-preview {
+    --muted: var(--panel-2);
+    --sidebar: var(--panel-2);
+    --background: var(--panel);
+}
+
+/* Streamdown overrides — blockquote: boost text contrast in dark mode */
+.markdown-preview [data-streamdown="blockquote"] {
+    color: #b0b5bd;
+}
+
+[data-theme="light"] .markdown-preview [data-streamdown="blockquote"] {
+    color: #4b5563;
+}
+
+/* Streamdown overrides — text selection: higher-contrast highlight */
+.markdown-preview ::selection {
+    background: rgba(120, 140, 255, 0.38);
+    color: #ffffff;
+}
+
+[data-theme="light"] .markdown-preview ::selection {
+    background: rgba(94, 106, 210, 0.25);
+    color: #000000;
+}
+
+/* Streamdown overrides — code/mermaid action buttons: remove border */
+.markdown-preview [data-streamdown="code-block-actions"],
+.markdown-preview [data-streamdown="mermaid-block-actions"] {
+    border: none;
+    backdrop-filter: none;
+}
+
+/* Streamdown overrides — mermaid: make SVG area taller */
+.markdown-preview [data-streamdown="mermaid"] > div {
+    min-height: 280px;
+}
+
+/* Streamdown overrides — fullscreen table dialog: center + frosted glass */
+[data-streamdown="table-fullscreen"] {
+    background-color: rgba(8, 9, 10, 0.38) !important;
+    backdrop-filter: blur(10px) saturate(40%);
+    -webkit-backdrop-filter: blur(10px) saturate(40%);
+}
+
+/* Inner presentation wrapper — center the table vertically */
+[data-streamdown="table-fullscreen"] > [role="presentation"] {
+    max-width: 90vw;
+    margin: 0 auto;
+    justify-content: center;
+}
+
+/* Table scroll area inside fullscreen — don't stretch to fill, center instead */
+[data-streamdown="table-fullscreen"] > [role="presentation"] > .flex-1 {
+    flex: 0 1 auto;
+    max-height: 80vh;
+}
+
+[data-theme="light"] [data-streamdown="table-fullscreen"] {
+    background-color: rgba(245, 245, 247, 0.92) !important;
 }
 
 /* Search highlights */
@@ -720,7 +776,8 @@ textarea {
     background: var(--surface-input);
 }
 
-.segmented-control button {
+.segmented-control button,
+.segmented-control > span {
     height: 24px;
     border-radius: 4px;
     padding: 0 9px;
@@ -728,9 +785,14 @@ textarea {
     background: transparent;
     cursor: pointer;
     font-size: 12px;
+    display: inline-flex;
+    align-items: center;
+    white-space: nowrap;
+    user-select: none;
 }
 
-.segmented-control button.active {
+.segmented-control button.active,
+.segmented-control > span.active {
     color: var(--text);
     background: var(--panel-3);
 }
@@ -941,6 +1003,10 @@ textarea {
 .surface-toolbar button,
 .surface-toolbar .toolbar-actions,
 .surface-toolbar select,
+.surface-toolbar input,
+.surface-toolbar [role="radio"],
+.surface-toolbar [role="button"],
+.surface-toolbar [role="radiogroup"],
 .boot-screen button,
 .empty-workspace button {
     -webkit-app-region: no-drag;

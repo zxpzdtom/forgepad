@@ -1,17 +1,16 @@
-import { type ComponentPropsWithoutRef, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { SelectedLineRange } from '@pierre/diffs';
-import { type BundledLanguage, type DiffsHighlighter, getFiletypeFromFileName, getSharedHighlighter } from '@pierre/diffs';
+import { getFiletypeFromFileName } from '@pierre/diffs';
 import type { FileOptions, LineAnnotation } from '@pierre/diffs/react';
 import { File as PierreFile } from '@pierre/diffs/react';
 import { useResolvedTheme } from '@renderer/App';
 import { useAppStore } from '@renderer/store/app-store';
 import type { CodeSelectionItem, Tab, Workspace } from '@shared/types';
-import { Check, ChevronDown, ChevronUp, Code, Copy, FileCode, Image, MessageSquarePlus, Search, X } from 'lucide-react';
-import mermaid from 'mermaid';
-import ReactMarkdown from 'react-markdown';
-import rehypeRaw from 'rehype-raw';
-import rehypeSanitize from 'rehype-sanitize';
-import remarkGfm from 'remark-gfm';
+import { ChevronDown, ChevronUp, Code, Copy, FileCode, Image, MessageSquarePlus, Search, X } from 'lucide-react';
+import { code as streamdownCode } from '@streamdown/code';
+import { createMermaidPlugin } from '@streamdown/mermaid';
+import { Streamdown } from 'streamdown';
+import 'streamdown/styles.css';
 
 type FileTab = Extract<Tab, { type: 'file' }>;
 
@@ -53,75 +52,45 @@ function isMarkdownPath(path: string): boolean {
   return lower.endsWith('.md') || lower.endsWith('.markdown');
 }
 
-// --- Markdown code block highlighting ---
+// --- Streamdown plugins ---
 
-const MD_LANG_MAP: Record<string, BundledLanguage> = {
-  typescript: 'typescript',
-  ts: 'typescript',
-  tsx: 'tsx',
-  javascript: 'javascript',
-  js: 'javascript',
-  jsx: 'jsx',
-  json: 'json',
-  css: 'css',
-  scss: 'scss',
-  less: 'less',
-  html: 'html',
-  python: 'python',
-  py: 'python',
-  go: 'go',
-  rust: 'rust',
-  rs: 'rust',
-  shell: 'shellscript',
-  sh: 'shellscript',
-  bash: 'shellscript',
-  zsh: 'shellscript',
-  yaml: 'yaml',
-  yml: 'yaml',
-  toml: 'toml',
-  xml: 'xml',
-  sql: 'sql',
-  graphql: 'graphql',
-  java: 'java',
-  c: 'c',
-  cpp: 'cpp',
-  ruby: 'ruby',
-  rb: 'ruby',
-  php: 'php',
-  swift: 'swift',
-  kotlin: 'kotlin',
-  kt: 'kotlin',
-  scala: 'scala',
-  dart: 'dart',
-  lua: 'lua',
-  r: 'r',
-  perl: 'perl',
-  elixir: 'elixir',
-  dockerfile: 'dockerfile',
-  makefile: 'makefile',
-  markdown: 'markdown',
-  md: 'markdown',
-  mdx: 'mdx',
-  vue: 'html',
-  svelte: 'html',
-};
+const mermaidDark = createMermaidPlugin({ config: { theme: 'dark' } });
+const mermaidLight = createMermaidPlugin({ config: { theme: 'default' } });
+const streamdownPluginsDark = { code: streamdownCode, mermaid: mermaidDark };
+const streamdownPluginsLight = { code: streamdownCode, mermaid: mermaidLight };
 
-const MD_ALL_LANGS: BundledLanguage[] = [...new Set(Object.values(MD_LANG_MAP))];
+// --- YAML frontmatter → Markdown table conversion ---
 
-let hlPromise: Promise<DiffsHighlighter> | null = null;
+const FRONTMATTER_RE = /^---\r?\n([\s\S]*?)\r?\n---(\r?\n|$)/;
 
-function getHl(): Promise<DiffsHighlighter> {
-  if (!hlPromise) {
-    hlPromise = getSharedHighlighter({
-      themes: ['pierre-dark', 'pierre-light'],
-      langs: MD_ALL_LANGS,
-    });
+/**
+ * If the markdown starts with a YAML frontmatter block (`---\n…\n---`),
+ * parse simple `key: value` pairs and render them as a Markdown table,
+ * similar to how GitHub renders frontmatter.
+ */
+function renderFrontmatterAsTable(md: string): string {
+  const match = md.match(FRONTMATTER_RE);
+  if (!match) return md;
+
+  const raw = match[1];
+  const rest = md.slice(match[0].length);
+
+  const rows: [string, string][] = [];
+  for (const line of raw.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
+    const idx = trimmed.indexOf(':');
+    if (idx <= 0) continue;
+    const key = trimmed.slice(0, idx).trim();
+    const value = trimmed.slice(idx + 1).trim();
+    rows.push([key, value]);
   }
-  return hlPromise;
-}
 
-function getShikiTheme(resolvedTheme: 'dark' | 'light'): string {
-  return resolvedTheme === 'dark' ? 'pierre-dark' : 'pierre-light';
+  if (rows.length === 0) return md;
+
+  const tableLines = ['| Property | Value |', '|----------|-------|', ...rows.map(([k, v]) => `| ${k} | ${v} |`)];
+
+  return `${tableLines.join('\n')}\n\n${rest}`;
 }
 
 // --- Search helpers (used for find-in-file in markdown/raw modes) ---
@@ -284,118 +253,6 @@ function findScrollableAncestor(node: Node, boundary: HTMLElement): HTMLElement 
   return boundary;
 }
 
-// --- Mermaid ---
-
-mermaid.initialize({ startOnLoad: false, theme: 'dark' });
-
-function getMermaidTheme(resolvedTheme: 'dark' | 'light'): string {
-  return resolvedTheme === 'dark' ? 'dark' : 'default';
-}
-
-let mermaidCounter = 0;
-
-// --- Markdown code block component ---
-
-function MarkdownCodeBlock({ className, children, ...rest }: ComponentPropsWithoutRef<'code'>) {
-  const [copied, setCopied] = useState(false);
-  const [highlighted, setHighlighted] = useState('');
-  const [mermaidSvg, setMermaidSvg] = useState('');
-  const resolvedTheme = useResolvedTheme();
-
-  const lang = (className?.replace('language-', '') ?? '').toLowerCase();
-  const code = String(children).replace(/\n$/, '');
-  const isInline = !className;
-
-  const copy = useCallback(async () => {
-    try {
-      await navigator.clipboard.writeText(code);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch {}
-  }, [code]);
-
-  useEffect(() => {
-    if (isInline || lang === 'mermaid') return;
-    let disposed = false;
-    getHl().then((hl) => {
-      if (disposed) return;
-      const resolved = (hl.getLoadedLanguages() as string[]).includes(MD_LANG_MAP[lang] ?? lang)
-        ? (MD_LANG_MAP[lang] ?? lang)
-        : 'text';
-      const html = hl.codeToHtml(code, {
-        lang: resolved as BundledLanguage,
-        theme: getShikiTheme(resolvedTheme),
-      });
-      setHighlighted(html);
-    });
-    return () => {
-      disposed = true;
-    };
-  }, [code, lang, isInline, resolvedTheme]);
-
-  useEffect(() => {
-    if (lang !== 'mermaid') return;
-    let disposed = false;
-    mermaid.initialize({
-      startOnLoad: false,
-      theme: getMermaidTheme(resolvedTheme),
-    });
-    const id = `mermaid-${++mermaidCounter}`;
-    mermaid
-      .render(id, code)
-      .then(({ svg }) => {
-        if (!disposed) setMermaidSvg(svg);
-      })
-      .catch(() => {
-        if (!disposed) setMermaidSvg(`<p style="color:#e55;font-size:13px">Mermaid render error</p>`);
-      });
-    return () => {
-      disposed = true;
-    };
-  }, [code, lang, resolvedTheme]);
-
-  if (lang === 'mermaid' && mermaidSvg) {
-    return <div className="mermaid-container" dangerouslySetInnerHTML={{ __html: mermaidSvg }} />;
-  }
-
-  if (isInline) {
-    return <code {...rest}>{children}</code>;
-  }
-
-  return (
-    <div className="md-code-block">
-      <div className="md-code-header">
-        <span className="md-code-lang">{lang || 'text'}</span>
-        <button type="button" className="md-code-copy" onClick={copy} title="Copy code">
-          {copied ? <Check size={13} /> : <Copy size={13} />}
-        </button>
-      </div>
-      {highlighted ? (
-        <div dangerouslySetInnerHTML={{ __html: highlighted }} />
-      ) : (
-        <pre>
-          <code {...rest} className={className}>
-            {children}
-          </code>
-        </pre>
-      )}
-    </div>
-  );
-}
-
-const MarkdownComponents = {
-  code(props: ComponentPropsWithoutRef<'code'>) {
-    return <MarkdownCodeBlock {...props} />;
-  },
-  table(props: ComponentPropsWithoutRef<'table'>) {
-    return (
-      <div className="table-wrapper">
-        <table {...props} />
-      </div>
-    );
-  },
-};
-
 // --- Helpers ---
 
 /** Extract lines from file text by 1-based line numbers (inclusive). */
@@ -431,6 +288,7 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
   const editorFontSize = useAppStore((state) => state.settings.editorFontSize);
   const markdownFile = useMemo(() => isMarkdownPath(tab.relPath), [tab.relPath]);
   const isImage = useMemo(() => isImageFile(tab.relPath), [tab.relPath]);
+  const markdownText = useMemo(() => (markdownFile ? renderFrontmatterAsTable(fileText) : fileText), [markdownFile, fileText]);
   const showRenderedMarkdown = markdownFile && markdownMode === 'rendered';
   const showImagePreview = isImage && imageViewMode === 'preview';
   // showCodeViewer is computed later but we need it for search; mirror the logic here.
@@ -904,13 +762,9 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
       ) : showRenderedMarkdown ? (
         <div className="markdown-viewer-scroll scrollbar-thin scroll-mask-y min-h-0 flex-1 overflow-auto" ref={scrollRef}>
           <div ref={previewRef} className="markdown-preview">
-            <ReactMarkdown
-              remarkPlugins={[remarkGfm]}
-              rehypePlugins={[rehypeRaw, rehypeSanitize]}
-              components={MarkdownComponents}
-            >
-              {fileText}
-            </ReactMarkdown>
+            <Streamdown plugins={resolvedTheme === 'dark' ? streamdownPluginsDark : streamdownPluginsLight}>
+              {markdownText}
+            </Streamdown>
           </div>
         </div>
       ) : (
