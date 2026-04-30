@@ -1,5 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Tab } from '@shared/types';
+import { DEFAULT_SHORTCUTS } from '@shared/types';
+import { useAppStore } from '@renderer/store/app-store';
+import { comboToDisplay } from '@renderer/lib/shortcut-utils';
+import { ContextMenu, type ContextMenuSection } from './ContextMenu';
+
+/* ── Component ─── */
 
 type TabContextMenuProps = {
   tab: Tab;
@@ -14,13 +19,6 @@ type TabContextMenuProps = {
   onRename?: (id: string) => void;
 };
 
-type MenuAction = {
-  label: string;
-  shortcut?: string;
-  danger?: boolean;
-  action: () => void;
-};
-
 export function TabContextMenu({
   tab,
   workspacePath,
@@ -33,17 +31,18 @@ export function TabContextMenu({
   onCloseToRight,
   onRename,
 }: TabContextMenuProps) {
-  const menuRef = useRef<HTMLDivElement>(null);
-  const [focusIndex, setFocusIndex] = useState(-1);
+  const keyboardShortcuts = useAppStore((s) => s.settings.keyboardShortcuts);
+  const shortcuts = { ...DEFAULT_SHORTCUTS, ...(keyboardShortcuts ?? {}) };
+
+  const sc = (id: keyof typeof shortcuts) => comboToDisplay(shortcuts[id]);
 
   const isFileType = tab.type === 'file';
   const isTerminalType = tab.type === 'terminal';
   const fullPath = workspacePath && isFileType ? `${workspacePath}/${tab.relPath}` : null;
 
-  // Build menu sections
-  const sections: (MenuAction | 'divider')[] = [];
+  const sections: ContextMenuSection[] = [];
 
-  if (tab.type === 'terminal' && onRename) {
+  if (isTerminalType && onRename) {
     sections.push({
       label: 'Rename',
       action: () => {
@@ -57,7 +56,7 @@ export function TabContextMenu({
   sections.push(
     {
       label: 'Close',
-      shortcut: '⌘W',
+      shortcut: sc('closeTab'),
       action: () => {
         onCloseTab(tab.id);
         onClose();
@@ -90,6 +89,7 @@ export function TabContextMenu({
     sections.push('divider');
     sections.push({
       label: 'Copy Path',
+      shortcut: sc('copyPath'),
       action: () => {
         if (fullPath) void navigator.clipboard.writeText(fullPath);
         onClose();
@@ -97,8 +97,9 @@ export function TabContextMenu({
     });
     sections.push({
       label: 'Copy Relative Path',
+      shortcut: sc('copyRelativePath'),
       action: () => {
-        if (isFileType) void navigator.clipboard.writeText(tab.relPath);
+        void navigator.clipboard.writeText(tab.relPath);
         onClose();
       },
     });
@@ -111,94 +112,5 @@ export function TabContextMenu({
     });
   }
 
-  const actionItems = sections.filter((s): s is MenuAction => s !== 'divider');
-
-  // Click outside
-  const handleClickOutside = useCallback(
-    (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        onClose();
-      }
-    },
-    [onClose],
-  );
-
-  useEffect(() => {
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [handleClickOutside]);
-
-  // Keyboard navigation
-  useEffect(() => {
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
-        return;
-      }
-      if (e.key === 'ArrowDown') {
-        e.preventDefault();
-        setFocusIndex((prev) => (prev < actionItems.length - 1 ? prev + 1 : 0));
-      }
-      if (e.key === 'ArrowUp') {
-        e.preventDefault();
-        setFocusIndex((prev) => (prev > 0 ? prev - 1 : actionItems.length - 1));
-      }
-      if (e.key === 'Enter' && focusIndex >= 0) {
-        e.preventDefault();
-        actionItems[focusIndex]?.action();
-      }
-    };
-    document.addEventListener('keydown', handleKey);
-    return () => document.removeEventListener('keydown', handleKey);
-  }, [onClose, focusIndex, actionItems]);
-
-  // Viewport boundary detection — flip if overflowing
-  const [pos, setPos] = useState({ left: x, top: y });
-  useEffect(() => {
-    const menu = menuRef.current;
-    if (!menu) return;
-    const rect = menu.getBoundingClientRect();
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    let left = x;
-    let top = y;
-    if (x + rect.width > vw - 8) left = x - rect.width;
-    if (y + rect.height > vh - 8) top = y - rect.height;
-    if (left < 4) left = 4;
-    if (top < 4) top = 4;
-    setPos({ left, top });
-  }, [x, y]);
-
-  let actionIndex = -1;
-
-  return (
-    <div ref={menuRef} className="anchor-menu" style={{ left: pos.left, top: pos.top }}>
-      {sections.map((item, i) => {
-        if (item === 'divider') {
-          return <div key={`d-${i}`} className="mx-1 my-1 h-px bg-border" />;
-        }
-        actionIndex++;
-        const idx = actionIndex;
-        return (
-          <button
-            key={item.label}
-            type="button"
-            className={`flex w-full items-center rounded-[5px] border-none px-2 py-[5px] text-left text-[12px] transition-colors cursor-pointer${
-              item.danger
-                ? 'text-danger hover:bg-danger/10'
-                : idx === focusIndex
-                  ? 'bg-panel-3 text-text'
-                  : 'bg-transparent text-text hover:bg-panel-3'
-            }`}
-            onClick={item.action}
-            onMouseEnter={() => setFocusIndex(idx)}
-            onMouseLeave={() => setFocusIndex(-1)}
-          >
-            <span className="flex-1">{item.label}</span>
-            {item.shortcut && <span className="ml-4 text-[11px] text-subtle">{item.shortcut}</span>}
-          </button>
-        );
-      })}
-    </div>
-  );
+  return <ContextMenu sections={sections} x={x} y={y} onClose={onClose} />;
 }

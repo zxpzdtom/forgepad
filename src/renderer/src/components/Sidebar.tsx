@@ -1,4 +1,4 @@
-import { type KeyboardEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { type KeyboardEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { closestCenter, DndContext, type DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -7,12 +7,14 @@ import type { AgentStatus } from '@shared/agent-lifecycle';
 import type { Project } from '@shared/types';
 import { FolderOpen, FolderPlus, Settings } from 'lucide-react';
 
+import { ContextMenu, type ContextMenuSection } from './ContextMenu';
 import { Spinner } from './Spinner';
 
 type SidebarWorkspace = {
   id: string;
   name: string;
   branch: string;
+  worktreePath: string;
   createdAt: number;
   isRoot: boolean;
 };
@@ -333,12 +335,14 @@ function SortableWorkspaceRow({
   isActive,
   onClick,
   onDelete,
+  onContextMenu,
 }: {
   workspace: SidebarWorkspace;
   globalIndex: number;
   isActive: boolean;
   onClick: () => void;
   onDelete?: () => void;
+  onContextMenu?: (e: React.MouseEvent) => void;
 }) {
   const branchStats = useAppStore((state) => state.branchStats[workspace.id]);
   const stats = branchStats ?? {
@@ -380,6 +384,7 @@ function SortableWorkspaceRow({
       tabIndex={0}
       onClick={onClick}
       onKeyDown={handleKeyDown}
+      onContextMenu={onContextMenu}
       {...attributes}
       {...listeners}
     >
@@ -468,82 +473,79 @@ function ProjectContextMenu({
   onNewWorktree: () => void;
   onCloseProject: () => void;
 }) {
-  const menuRef = useRef<HTMLDivElement>(null);
-
-  const handleClickOutside = useCallback(
-    (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        onClose();
-      }
+  const sections: ContextMenuSection[] = [
+    {
+      label: 'Open in Finder',
+      icon: <FolderIcon className="size-4" />,
+      action: () => { void window.forgepad.shell.openPath(project.repoPath); onClose(); },
     },
-    [onClose],
-  );
+    {
+      label: 'Copy Path',
+      icon: <ClipboardCopyIcon className="size-4" />,
+      action: () => { void navigator.clipboard.writeText(project.repoPath); onClose(); },
+    },
+    {
+      label: 'New Worktree',
+      icon: <FolderTreeIcon className="size-4" />,
+      action: () => { onClose(); onNewWorktree(); },
+    },
+    'divider',
+    {
+      label: 'Close Project',
+      icon: <CancelIcon className="size-4" />,
+      danger: true,
+      action: () => { onClose(); onCloseProject(); },
+    },
+  ];
 
-  useEffect(() => {
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [handleClickOutside]);
+  return <ContextMenu sections={sections} x={x} y={y} onClose={onClose} />;
+}
 
-  useEffect(() => {
-    const handleKey = (e: globalThis.KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    document.addEventListener('keydown', handleKey);
-    return () => document.removeEventListener('keydown', handleKey);
-  }, [onClose]);
+/* ── Workspace context menu ───────────────────────────────────── */
 
-  const itemClass =
-    'flex items-center gap-2 h-7 rounded-[5px] px-[9px] text-[12px] bg-transparent text-text hover:bg-panel-3 cursor-pointer w-full';
+function WorkspaceContextMenu({
+  workspace,
+  x,
+  y,
+  onClose,
+  onDelete,
+}: {
+  workspace: SidebarWorkspace;
+  x: number;
+  y: number;
+  onClose: () => void;
+  onDelete?: () => void;
+}) {
+  const sections: ContextMenuSection[] = [
+    {
+      label: 'Open in Finder',
+      icon: <FolderIcon className="size-4" />,
+      action: () => { void window.forgepad.shell.openPath(workspace.worktreePath); onClose(); },
+    },
+    {
+      label: 'Copy Project Path',
+      icon: <ClipboardCopyIcon className="size-4" />,
+      action: () => { void navigator.clipboard.writeText(workspace.worktreePath); onClose(); },
+    },
+    {
+      label: 'Copy Branch Name',
+      icon: <GitMergeIcon className="size-4" />,
+      action: () => { void navigator.clipboard.writeText(workspace.branch); onClose(); },
+    },
+    ...(onDelete
+      ? [
+          'divider' as const,
+          {
+            label: 'Delete Worktree',
+            icon: <CancelIcon className="size-4" />,
+            danger: true,
+            action: () => { onClose(); onDelete(); },
+          },
+        ]
+      : []),
+  ];
 
-  return (
-    <div
-      ref={menuRef}
-      className="fixed z-50 grid w-max min-w-[140px] gap-[2px] rounded-[7px] border border-border bg-panel-2 p-[5px] shadow-[0_14px_32px_rgba(0,0,0,0.3)]"
-      style={{ left: x, top: y }}
-    >
-      <div
-        className={itemClass}
-        onClick={() => {
-          void window.forgepad.shell.openPath(project.repoPath);
-          onClose();
-        }}
-      >
-        <FolderIcon className="shrink-0 text-subtle" />
-        Open in Finder
-      </div>
-      <div
-        className={itemClass}
-        onClick={() => {
-          void navigator.clipboard.writeText(project.repoPath);
-          onClose();
-        }}
-      >
-        <ClipboardCopyIcon className="shrink-0 text-subtle" />
-        Copy Path
-      </div>
-      <div
-        className={itemClass}
-        onClick={() => {
-          onClose();
-          onNewWorktree();
-        }}
-      >
-        <FolderTreeIcon className="shrink-0 text-subtle" />
-        New Worktree
-      </div>
-      <div className="mx-[5px] my-[3px] h-px bg-border" />
-      <div
-        className="flex h-7 w-full cursor-pointer items-center gap-2 rounded-[5px] bg-transparent px-[9px] text-[12px] text-danger hover:bg-panel-3"
-        onClick={() => {
-          onClose();
-          onCloseProject();
-        }}
-      >
-        <CancelIcon className="shrink-0 text-subtle" />
-        Close Project
-      </div>
-    </div>
-  );
+  return <ContextMenu sections={sections} x={x} y={y} onClose={onClose} />;
 }
 
 /* ── New worktree dialog ──────────────────────────────────────── */
@@ -740,6 +742,11 @@ export function Sidebar() {
     x: number;
     y: number;
   } | null>(null);
+  const [workspaceContextMenu, setWorkspaceContextMenu] = useState<{
+    workspace: SidebarWorkspace;
+    x: number;
+    y: number;
+  } | null>(null);
   const [worktreeDialog, setWorktreeDialog] = useState<{
     projectId: string;
     projectName: string;
@@ -905,6 +912,14 @@ export function Sidebar() {
                                             branch: workspace.branch,
                                           })
                                   }
+                                  onContextMenu={(e) => {
+                                    e.preventDefault();
+                                    setWorkspaceContextMenu({
+                                      workspace,
+                                      x: e.clientX,
+                                      y: e.clientY,
+                                    });
+                                  }}
                                 />
                               ))}
                             </div>
@@ -948,6 +963,26 @@ export function Sidebar() {
             const confirmed = window.confirm(`Remove ${contextMenu.project.name} from ForgePad? Files stay on disk.`);
             if (confirmed) removeProject(contextMenu.project.id);
           }}
+        />
+      )}
+
+      {workspaceContextMenu && (
+        <WorkspaceContextMenu
+          workspace={workspaceContextMenu.workspace}
+          x={workspaceContextMenu.x}
+          y={workspaceContextMenu.y}
+          onClose={() => setWorkspaceContextMenu(null)}
+          onDelete={
+            workspaceContextMenu.workspace.isRoot
+              ? undefined
+              : () => {
+                  setWorkspaceContextMenu(null);
+                  setDeleteDialog({
+                    workspaceId: workspaceContextMenu.workspace.id,
+                    branch: workspaceContextMenu.workspace.branch,
+                  });
+                }
+          }
         />
       )}
 

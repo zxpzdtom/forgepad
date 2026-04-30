@@ -8,6 +8,44 @@ import type { FileNode, Workspace } from '@shared/types';
 
 import { Spinner } from './Spinner';
 
+/* ── Context-menu icons ─────────────────────────────────────── */
+
+function IconFile() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M14 2v6h6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function IconContext() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none">
+      <path d="M2 9l10-6 10 6-10 6L2 9z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+      <path d="M2 15l10 6 10-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function IconClipboard() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none">
+      <path d="M11.502 13h9M13.502 10s-3 2.21-3 3 3 3 3 3M13.998 2h-5a1.5 1.5 0 0 0 0 3h5a1.5 1.5 0 1 0 0-3z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M15.498 3.5c1.554.047 2.48.22 3.121.862.828.827.876 2.129.879 4.638m-12-5.5c-1.553.047-2.48.22-3.121.862-.879.878-.879 2.293-.879 5.121V16c0 2.828 0 4.242.879 5.121C5.255 22 6.67 22 9.498 22h4c2.829 0 4.243 0 5.121-.879.769-.768.865-1.946.877-4.12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function IconFolder() {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none">
+      <path d="M2 19V7.549c0-1.444 0-2.166.243-2.733a3 3 0 0 1 1.573-1.573C4.383 3 5.098 3 6.55 3h.494a2 2 0 0 1 1.557.745L10.418 6m0 0H16c1.4 0 2.1 0 2.635.272a2.5 2.5 0 0 1 1.092 1.093C20 7.9 20 8.6 20 10v1m-9.582-5H7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M3.158 15.514l.298-.742c.734-1.827 1.101-2.74 1.866-3.256C6.088 11 7.076 11 9.052 11h8.06c2.688 0 4.033 0 4.63.879.598.879.098 2.121-.9 4.607l-.298.742c-.734 1.827-1.101 2.74-1.866 3.256-.766.516-1.754.516-3.73.516h-8.06c-2.688 0-4.033 0-4.63-.879-.598-.878-.098-2.121.9-4.607z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 type TreeData = {
   paths: string[];
   filePaths: Set<string>;
@@ -240,45 +278,51 @@ export function FilesPanel() {
       context.close();
     };
     return (
-      <div className="grid min-w-[150px] gap-[3px] rounded-[7px] border border-border bg-panel-2 p-[5px] shadow-[0_14px_32px_rgba(0,0,0,0.22)]">
+      <div className="grid w-max min-w-[160px] gap-[3px] rounded-[7px] border border-border bg-panel-2 p-[5px] shadow-[0_14px_32px_rgba(0,0,0,0.22)]">
         {item.kind === 'file' ? (
           <button
             type="button"
-            className="h-7 rounded-[5px] bg-transparent px-[9px] text-left text-text hover:bg-panel-3"
+            className="flex h-7 items-center gap-[7px] rounded-[5px] bg-transparent px-[9px] text-left text-text hover:bg-panel-3"
             onClick={() => closeAfter(() => openFileTab(workspace.id, item.path))}
           >
-            Open
+            <span className="flex size-4 shrink-0 items-center justify-center text-subtle"><IconFile /></span>
+            <span className="text-[13px]">Open</span>
           </button>
         ) : null}
         <button
           type="button"
           disabled={itemFiles.length === 0}
-          className="h-7 rounded-[5px] bg-transparent px-[9px] text-left text-text hover:bg-panel-3 disabled:cursor-not-allowed disabled:text-subtle"
+          className="flex h-7 items-center gap-[7px] rounded-[5px] bg-transparent px-[9px] text-left text-text hover:bg-panel-3 disabled:cursor-not-allowed disabled:text-subtle"
           onClick={() => closeAfter(() => addFilesToContext(itemFiles))}
         >
-          {item.kind === 'file' ? 'Add to Context' : `Add Folder (${itemFiles.length})`}
+          <span className="flex size-4 shrink-0 items-center justify-center text-subtle">
+            {item.kind === 'file' ? <IconContext /> : <IconFolder />}
+          </span>
+          <span className="text-[13px]">{item.kind === 'file' ? 'Add to Context' : `Add Folder (${itemFiles.length})`}</span>
         </button>
         <button
           type="button"
-          className="h-7 rounded-[5px] bg-transparent px-[9px] text-left text-text hover:bg-panel-3"
+          className="flex h-7 items-center gap-[7px] rounded-[5px] bg-transparent px-[9px] text-left text-text hover:bg-panel-3"
           onClick={() =>
             closeAfter(() => {
               void navigator.clipboard.writeText(`${workspace.worktreePath}/${item.path}`);
             })
           }
         >
-          Copy Path
+          <span className="flex size-4 shrink-0 items-center justify-center text-subtle"><IconClipboard /></span>
+          <span className="text-[13px]">Copy Path</span>
         </button>
         <button
           type="button"
-          className="h-7 rounded-[5px] bg-transparent px-[9px] text-left text-text hover:bg-panel-3"
+          className="flex h-7 items-center gap-[7px] rounded-[5px] bg-transparent px-[9px] text-left text-text hover:bg-panel-3"
           onClick={() =>
             closeAfter(() => {
               void navigator.clipboard.writeText(item.path);
             })
           }
         >
-          Copy Relative Path
+          <span className="flex size-4 shrink-0 items-center justify-center text-subtle"><IconClipboard /></span>
+          <span className="text-[13px]">Copy Relative Path</span>
         </button>
       </div>
     );
