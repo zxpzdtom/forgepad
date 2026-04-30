@@ -202,4 +202,28 @@ export class FileService {
     const buffer = await readFile(abs);
     return `data:${mime};base64,${buffer.toString('base64')}`;
   }
+
+  /** Read any absolute path (for files dragged in from outside the workspace). Read-only. */
+  static async readAbsFile(absPath: string): Promise<string> {
+    const stats = await stat(absPath);
+    if (stats.size > 2 * 1024 * 1024) {
+      throw new Error(`File too large for editor: ${(stats.size / 1024 / 1024).toFixed(1)} MB`);
+    }
+    return readFile(absPath, 'utf8');
+  }
+
+  static async readAbsFileAsDataUrl(absPath: string): Promise<string> {
+    const stats = await stat(absPath);
+    if (stats.size > 10 * 1024 * 1024) {
+      throw new Error(`File too large for preview: ${(stats.size / 1024 / 1024).toFixed(1)} MB`);
+    }
+    const ext = absPath.split('.').pop()?.toLowerCase() ?? '';
+    const mime = MIME_MAP[ext] ?? 'application/octet-stream';
+    if (mime === 'image/svg+xml') {
+      const text = await readFile(absPath, 'utf8');
+      return `data:${mime};utf8,${encodeURIComponent(text)}`;
+    }
+    const buffer = await readFile(absPath);
+    return `data:${mime};base64,${buffer.toString('base64')}`;
+  }
 }

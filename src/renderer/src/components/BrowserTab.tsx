@@ -7,6 +7,7 @@ import { BrowserConsolePanel } from './BrowserConsolePanel';
 import { BrowserFeedbackModal } from './BrowserFeedbackModal';
 import type { ConsoleEntry } from './console-utils';
 import { stringifyConsoleArgs } from './console-utils';
+import { UrlBar } from './UrlBar';
 
 type BrowserTabProps = {
   tab: Extract<import('@shared/types').Tab, { type: 'browser' }>;
@@ -143,6 +144,24 @@ function friendlyErrorMessage(code: number, desc: string, url: string): { title:
   }
 }
 
+/** Serialize a JS execution result into a ConsoleArg for display */
+function serializeResult(value: unknown): import('./console-utils').ConsoleArg {
+  if (value === null) return { type: 'object', subtype: 'null' };
+  if (value === undefined) return { type: 'undefined' };
+  const t = typeof value;
+  if (t === 'string') return { type: 'string', value };
+  if (t === 'number') return { type: 'number', value };
+  if (t === 'boolean') return { type: 'boolean', value };
+  if (t === 'object') {
+    try {
+      return { type: 'object', description: JSON.stringify(value, null, 2) };
+    } catch {
+      return { type: 'object', description: '[object Object]' };
+    }
+  }
+  return { type: 'string', value: String(value) };
+}
+
 function normalizeUrl(url: string): string {
   if (url === 'about:blank') return url;
   if (/^https?:\/\//i.test(url)) return url;
@@ -160,6 +179,8 @@ export function BrowserTab({ tab }: BrowserTabProps) {
   const updateBrowserNavState = useAppStore((s) => s.updateBrowserNavState);
   const openFeedbackModal = useAppStore((s) => s.openFeedbackModal);
   const addToast = useAppStore((s) => s.addToast);
+  const browserHistory = useAppStore((s) => s.browserHistory);
+  const addBrowserHistoryEntry = useAppStore((s) => s.addBrowserHistoryEntry);
 
   // Console panel state
   const [consoleEntries, setConsoleEntries] = useState<ConsoleEntry[]>([]);
@@ -228,6 +249,13 @@ export function BrowserTab({ tab }: BrowserTabProps) {
       sendNavState();
       // Apply or remove touch emulation + mobile scrollbar based on current mode
       const isMobile = viewportModeRef.current === 'mobile';
+      // Ensure UA is in sync (covers cases where setUserAgent was called before dom-ready)
+      try {
+        const preset = VIEWPORT_PRESETS[viewportModeRef.current];
+        wv.setUserAgent(preset.userAgent || '');
+      } catch {
+        // webview may not be ready
+      }
       try {
         const wcId = wv.getWebContentsId();
         window.forgepad.browser.setTouchEmulation(wcId, isMobile).catch(() => {});
@@ -272,9 +300,58 @@ export function BrowserTab({ tab }: BrowserTabProps) {
       }
     };
 
+    // On load complete: sync nav state AND capture favicon as data URL
+    const handleDidStopLoading = () => {
+      sendNavState();
+      const url = (() => { try { return wv.getURL(); } catch { return ''; } })();
+      const title = (() => { try { return wv.getTitle(); } catch { return ''; } })();
+      if (!url || url === 'about:blank') return;
+
+      // Run inside the webview to grab the best favicon <link> and convert to data URL
+      const faviconScript = `
+        (() => {
+          const links = [
+            ...document.querySelectorAll('link[rel~="icon"], link[rel~="shortcut"]'),
+          ].sort((a, b) => {
+            // Prefer apple-touch-icon > icon > shortcut icon; prefer larger sizes
+            const score = (el) => {
+              const rel = el.rel || '';
+              const s = rel.includes('apple') ? 3 : rel.includes('shortcut') ? 1 : 2;
+              const size = parseInt((el.sizes && el.sizes[0]) || '0', 10) || 0;
+              return s * 1000 + size;
+            };
+            return score(b) - score(a);
+          });
+          const href = links[0]?.href || '/favicon.ico';
+          return new Promise((resolve) => {
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            img.onload = () => {
+              try {
+                const canvas = document.createElement('canvas');
+                canvas.width = img.naturalWidth || 16;
+                canvas.height = img.naturalHeight || 16;
+                canvas.getContext('2d').drawImage(img, 0, 0);
+                resolve(canvas.toDataURL());
+              } catch { resolve(''); }
+            };
+            img.onerror = () => resolve('');
+            img.src = href;
+          });
+        })()
+      `;
+      wv.executeJavaScript(faviconScript)
+        .then((dataUrl: unknown) => {
+          addBrowserHistoryEntry(url, title, typeof dataUrl === 'string' ? dataUrl : '');
+        })
+        .catch(() => {
+          addBrowserHistoryEntry(url, title, '');
+        });
+    };
+
     wv.addEventListener('dom-ready', handleDomReady);
     wv.addEventListener('did-start-loading', handleDidStartLoading);
-    wv.addEventListener('did-stop-loading', sendNavState);
+    wv.addEventListener('did-stop-loading', handleDidStopLoading);
     wv.addEventListener('did-navigate', sendNavState);
     wv.addEventListener('did-navigate-in-page', sendNavState);
     wv.addEventListener('page-title-updated', sendNavState);
@@ -285,14 +362,14 @@ export function BrowserTab({ tab }: BrowserTabProps) {
       domReadyRef.current = false;
       wv.removeEventListener('dom-ready', handleDomReady);
       wv.removeEventListener('did-start-loading', handleDidStartLoading);
-      wv.removeEventListener('did-stop-loading', sendNavState);
+      wv.removeEventListener('did-stop-loading', handleDidStopLoading);
       wv.removeEventListener('did-navigate', sendNavState);
       wv.removeEventListener('did-navigate-in-page', sendNavState);
       wv.removeEventListener('page-title-updated', sendNavState);
       wv.removeEventListener('did-fail-load', handleDidFailLoad);
       wv.removeEventListener('new-window', handleNewWindow);
     };
-  }, [tab.id, updateBrowserNavState]);
+  }, [tab.id, updateBrowserNavState, addBrowserHistoryEntry]);
 
   // ── Element selection via console-message ──────────────────────────────
   useEffect(() => {
@@ -502,6 +579,100 @@ export function BrowserTab({ tab }: BrowserTabProps) {
     setConsoleEntries([]);
   }, []);
 
+  const handleExecuteScript = useCallback(async (script: string) => {
+    const wv = webviewRef.current;
+    if (!wv) return;
+
+    // Show input line immediately
+    const inputEntry: ConsoleEntry = {
+      id: ++consoleIdRef.current,
+      level: 'log',
+      args: [{ type: 'string', value: script }],
+      timestamp: Date.now(),
+      source: 'input',
+    };
+    setConsoleEntries((prev) => [...prev, inputEntry]);
+
+    // Wrap the user script inside the webview so that:
+    // 1. JS errors are caught and returned as { __error } — not thrown into Electron IPC
+    // 2. Uncloneable values (window, DOM nodes, functions) are serialized to strings
+    //    before crossing the IPC boundary, avoiding "object could not be cloned"
+    const wrapped = `
+      (() => {
+        try {
+          const __result = eval(${JSON.stringify(script)});
+          const __t = typeof __result;
+          if (__result === null)      return { __type: 'null' };
+          if (__result === undefined) return { __type: 'undefined' };
+          if (__t === 'string')   return { __type: 'string',  __value: __result };
+          if (__t === 'number')   return { __type: 'number',  __value: __result };
+          if (__t === 'boolean')  return { __type: 'boolean', __value: __result };
+          if (__t === 'function') return { __type: 'function', __desc: __result.toString().slice(0, 200) };
+          // Object / Array — try structured-clone-safe path first, fallback to JSON
+          try {
+            // Test if it can survive structured clone by round-tripping through JSON
+            const __json = JSON.stringify(__result, null, 2);
+            return { __type: 'object', __json: __json };
+          } catch {
+            return { __type: 'object', __desc: String(__result) };
+          }
+        } catch (e) {
+          return { __error: true, __message: e instanceof Error ? e.message : String(e), __name: e instanceof Error ? e.name : 'Error' };
+        }
+      })()
+    `;
+
+    try {
+      const envelope = await wv.executeJavaScript(wrapped);
+
+      if (envelope?.__error) {
+        // JS runtime error inside the page
+        const desc = `${envelope.__name ?? 'Error'}: ${envelope.__message ?? String(envelope)}`;
+        const errorEntry: ConsoleEntry = {
+          id: ++consoleIdRef.current,
+          level: 'error',
+          args: [{ type: 'object', subtype: 'error', description: desc }],
+          timestamp: Date.now(),
+          source: 'error',
+        };
+        setConsoleEntries((prev) => [...prev, errorEntry]);
+        return;
+      }
+
+      // Deserialize the envelope back into a ConsoleArg
+      let arg: import('./console-utils').ConsoleArg;
+      switch (envelope?.__type) {
+        case 'null':      arg = { type: 'object', subtype: 'null' }; break;
+        case 'undefined': arg = { type: 'undefined' }; break;
+        case 'string':    arg = { type: 'string', value: envelope.__value }; break;
+        case 'number':    arg = { type: 'number', value: envelope.__value }; break;
+        case 'boolean':   arg = { type: 'boolean', value: envelope.__value }; break;
+        case 'function':  arg = { type: 'function', description: envelope.__desc ?? 'function()' }; break;
+        case 'object':    arg = { type: 'object', description: envelope.__json ?? envelope.__desc ?? '[object Object]' }; break;
+        default:          arg = serializeResult(envelope); break;
+      }
+
+      const resultEntry: ConsoleEntry = {
+        id: ++consoleIdRef.current,
+        level: 'log',
+        args: [arg],
+        timestamp: Date.now(),
+        source: 'result',
+      };
+      setConsoleEntries((prev) => [...prev, resultEntry]);
+    } catch (err) {
+      // Unexpected Electron/IPC-level error (should be rare after wrapping)
+      const errorEntry: ConsoleEntry = {
+        id: ++consoleIdRef.current,
+        level: 'error',
+        args: [{ type: 'object', subtype: 'error', description: String(err) }],
+        timestamp: Date.now(),
+        source: 'error',
+      };
+      setConsoleEntries((prev) => [...prev, errorEntry]);
+    }
+  }, []);
+
   // ── Viewport mode: apply user-agent when toggling ──────────────────────
   // Touch emulation + scrollbar CSS are applied in the dom-ready handler above.
   // This effect only changes UA and triggers a reload.
@@ -527,17 +698,6 @@ export function BrowserTab({ tab }: BrowserTabProps) {
   }, [viewportMode]);
 
   // ── Navigation handlers ───────────────────────────────────────────────
-  const handleNavigate = useCallback(
-    (e: React.FormEvent) => {
-      e.preventDefault();
-      const url = urlInput.trim();
-      if (!url) return;
-      setLoadError(null);
-      webviewRef.current?.loadURL(normalizeUrl(url));
-    },
-    [urlInput],
-  );
-
   const handleBack = useCallback(() => webviewRef.current?.goBack(), []);
   const handleForward = useCallback(() => webviewRef.current?.goForward(), []);
   const handleReloadOrStop = useCallback(() => {
@@ -636,16 +796,15 @@ export function BrowserTab({ tab }: BrowserTabProps) {
         </button>
 
         {/* URL bar */}
-        <form onSubmit={handleNavigate} className="min-w-0 flex-1">
-          <input
-            type="text"
-            value={urlInput}
-            onChange={(e) => setUrlInput(e.target.value)}
-            onFocus={(e) => e.currentTarget.select()}
-            placeholder="Enter URL..."
-            className="h-7 w-full rounded border border-border bg-panel-2 px-2.5 text-text text-xs transition-colors placeholder:text-subtle focus:border-accent focus:outline-none focus:ring-accent/30 focus:ring-1"
-          />
-        </form>
+        <UrlBar
+          value={urlInput}
+          onChange={setUrlInput}
+          onNavigate={(url) => {
+            setLoadError(null);
+            webviewRef.current?.loadURL(normalizeUrl(url));
+          }}
+          history={browserHistory}
+        />
 
         {/* Viewport mode toggle (PC / H5) */}
         <button
@@ -747,6 +906,7 @@ export function BrowserTab({ tab }: BrowserTabProps) {
                 <webview
                   ref={webviewRef}
                   src={tab.url || 'about:blank'}
+                  useragent={VIEWPORT_PRESETS[viewportMode].userAgent || ''}
                   style={{
                     width: '100%',
                     height: '100%',
@@ -760,6 +920,7 @@ export function BrowserTab({ tab }: BrowserTabProps) {
                 <webview
                   ref={webviewRef}
                   src={tab.url || 'about:blank'}
+                  useragent={VIEWPORT_PRESETS[viewportMode].userAgent || ''}
                   style={{
                     position: 'absolute',
                     inset: 0,
@@ -784,7 +945,7 @@ export function BrowserTab({ tab }: BrowserTabProps) {
         </Allotment.Pane>
 
         <Allotment.Pane preferredSize={200} minSize={consoleOpen ? 80 : 0} visible={consoleOpen}>
-          <BrowserConsolePanel entries={consoleEntries} onClear={handleConsoleClear} onSendToAgent={handleSendToAgent} />
+          <BrowserConsolePanel entries={consoleEntries} onClear={handleConsoleClear} onSendToAgent={handleSendToAgent} onExecuteScript={handleExecuteScript} />
         </Allotment.Pane>
       </Allotment>
 

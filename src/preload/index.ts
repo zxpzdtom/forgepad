@@ -11,7 +11,7 @@ import type {
   PersistedAppState,
   WorkspaceChangeEvent,
 } from '@shared/types';
-import { contextBridge, ipcRenderer } from 'electron';
+import { contextBridge, ipcRenderer, webUtils } from 'electron';
 
 const api = {
   app: {
@@ -55,6 +55,10 @@ const api = {
       ipcRenderer.invoke(IPC.FS_READ_FILE, worktreePath, relPath) as Promise<string>,
     readFileAsDataUrl: (worktreePath: string, relPath: string) =>
       ipcRenderer.invoke(IPC.FS_READ_FILE_DATA_URL, worktreePath, relPath) as Promise<string>,
+    readAbsFile: (absPath: string) =>
+      ipcRenderer.invoke(IPC.FS_READ_ABS_FILE, absPath) as Promise<string>,
+    readAbsFileAsDataUrl: (absPath: string) =>
+      ipcRenderer.invoke(IPC.FS_READ_ABS_FILE_DATA_URL, absPath) as Promise<string>,
     writeFile: (worktreePath: string, relPath: string, content: string) =>
       ipcRenderer.invoke(IPC.FS_WRITE_FILE, worktreePath, relPath, content) as Promise<void>,
     watchWorkspace: (worktreePath: string) => ipcRenderer.invoke(IPC.FS_WATCH, worktreePath) as Promise<string>,
@@ -154,6 +158,25 @@ const api = {
   app2: {
     isFocused: () => ipcRenderer.invoke(IPC.APP_IS_FOCUSED) as Promise<boolean>,
     focusWindow: () => ipcRenderer.send(IPC.APP_FOCUS_WINDOW),
+  },
+  nativeFiles: {
+    /** Returns the absolute filesystem path for a File object from an external drag-and-drop. */
+    getPath: (file: File): string => webUtils.getPathForFile(file),
+  },
+  browser: {
+    captureScreenshot: (webContentsId: number, rect: { x: number; y: number; width: number; height: number }) =>
+      ipcRenderer.invoke(IPC.BROWSER_CAPTURE_SCREENSHOT, webContentsId, rect) as Promise<string>,
+    setTouchEmulation: (webContentsId: number, enabled: boolean) =>
+      ipcRenderer.invoke(IPC.BROWSER_SET_TOUCH_EMULATION, webContentsId, enabled) as Promise<void>,
+    enableConsole: (webContentsId: number) =>
+      ipcRenderer.invoke(IPC.BROWSER_ENABLE_CONSOLE, webContentsId) as Promise<void>,
+    disableConsole: (webContentsId: number) =>
+      ipcRenderer.invoke(IPC.BROWSER_DISABLE_CONSOLE, webContentsId) as Promise<void>,
+    onConsoleEvent: (callback: (raw: unknown) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, raw: unknown) => callback(raw);
+      ipcRenderer.on(IPC.BROWSER_CONSOLE_EVENT, handler);
+      return () => ipcRenderer.removeListener(IPC.BROWSER_CONSOLE_EVENT, handler);
+    },
   },
 };
 

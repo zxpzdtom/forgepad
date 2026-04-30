@@ -23,6 +23,8 @@ export type ConsoleEntry = {
   level: 'log' | 'warn' | 'error' | 'debug';
   args: ConsoleArg[];
   timestamp: number;
+  /** Origin of the entry: page log, user input, script result, or script error */
+  source?: 'page' | 'input' | 'result' | 'error';
 };
 
 /** Render a single CDP RemoteObject arg as a readable string. */

@@ -297,6 +297,12 @@ export function registerIpcHandlers(hookPort?: number): void {
   ipcMain.handle(IPC.FS_WRITE_FILE, async (_event, worktreePath: string, relPath: string, content: string) =>
     FileService.writeFile(worktreePath, relPath, content),
   );
+  ipcMain.handle(IPC.FS_READ_ABS_FILE, async (_event, absPath: string) =>
+    FileService.readAbsFile(absPath),
+  );
+  ipcMain.handle(IPC.FS_READ_ABS_FILE_DATA_URL, async (_event, absPath: string) =>
+    FileService.readAbsFileAsDataUrl(absPath),
+  );
   ipcMain.handle(IPC.FS_WATCH, async (_event, worktreePath: string) => {
     const rootPath = await resolveInsideRoot(worktreePath);
     const win = BrowserWindow.fromWebContents(_event.sender);

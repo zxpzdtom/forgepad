@@ -1,4 +1,6 @@
 import { type MouseEvent, useCallback, useMemo, useRef, useState } from 'react';
+import { useHorizontalScroll } from '@renderer/hooks/useHorizontalScroll';
+import { getDroppedPaths, hasDraggableFiles } from '@renderer/lib/drag-utils';
 import { closestCenter, DndContext, type DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { horizontalListSortingStrategy, SortableContext } from '@dnd-kit/sortable';
 import { useAppStore } from '@renderer/store/app-store';
@@ -33,6 +35,8 @@ export function TerminalDock() {
   const setFocusedColumn = useAppStore((state) => state.setFocusedColumn);
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+
+  const { ref: tabListRef, onWheel } = useHorizontalScroll<HTMLDivElement>();
 
   const [contextMenu, setContextMenu] = useState<{
     tab: Tab;
@@ -69,14 +73,14 @@ export function TerminalDock() {
   const dragCounterRef = useRef(0);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
-    if (e.dataTransfer.types.includes('application/x-forgepad-path')) {
+    if (hasDraggableFiles(e)) {
       e.preventDefault();
       e.dataTransfer.dropEffect = 'copy';
     }
   }, []);
 
   const handleDragEnter = useCallback((e: React.DragEvent) => {
-    if (e.dataTransfer.types.includes('application/x-forgepad-path')) {
+    if (hasDraggableFiles(e)) {
       e.preventDefault();
       dragCounterRef.current++;
       setDropHighlight(true);
@@ -97,13 +101,13 @@ export function TerminalDock() {
       dragCounterRef.current = 0;
       setDropHighlight(false);
 
-      const path = e.dataTransfer.getData('application/x-forgepad-path') || e.dataTransfer.getData('text/plain');
-      if (!path) return;
+      const paths = getDroppedPaths(e);
+      if (paths.length === 0) return;
 
       e.stopPropagation(); // prevent outer fallback handler from firing
       const activeTab = terminalTabs.find((t) => t.id === activeId);
       if (activeTab) {
-        window.forgepad.pty.write(activeTab.ptyId, path);
+        window.forgepad.pty.write(activeTab.ptyId, paths.join(' '));
       }
     },
     [terminalTabs, activeId],
@@ -124,8 +128,10 @@ export function TerminalDock() {
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <SortableContext items={tabIds} strategy={horizontalListSortingStrategy}>
             <div
+              ref={tabListRef}
               className="tabs-scroll scrollbar-none scroll-mask-x flex min-w-0 flex-1 items-center overflow-x-auto"
               role="tablist"
+              onWheel={onWheel}
             >
               {terminalTabs.map((tab) => (
                 <SortableTabItem

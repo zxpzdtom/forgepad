@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { ConsoleArg, ConsoleEntry } from './console-utils';
 import { parseStyledConsole, sanitizeConsoleStyle, stringifyArg, stringifyConsoleArgs } from './console-utils';
@@ -11,6 +11,7 @@ type Props = {
   entries: ConsoleEntry[];
   onClear: () => void;
   onSendToAgent: (entries: ConsoleEntry[]) => void;
+  onExecuteScript: (script: string) => void;
 };
 
 const LEVEL_STYLE: Record<ConsoleEntry['level'], { color: string; bg: string }> = {
@@ -112,6 +113,88 @@ function ConsoleArgs({ args }: { args: ConsoleArg[] }) {
   );
 }
 
+// ── Console script input ─────────────────────────────────────────────────
+
+function ConsoleInput({ onExecute }: { onExecute: (script: string) => void }) {
+  const [value, setValue] = useState('');
+  const historyRef = useRef<string[]>([]);
+  const historyIdxRef = useRef(-1);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const commit = useCallback(() => {
+    const script = value.trim();
+    if (!script) return;
+    historyRef.current = [script, ...historyRef.current.slice(0, 99)];
+    historyIdxRef.current = -1;
+    setValue('');
+    onExecute(script);
+  }, [value, onExecute]);
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        commit();
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        const next = Math.min(historyIdxRef.current + 1, historyRef.current.length - 1);
+        historyIdxRef.current = next;
+        setValue(historyRef.current[next] ?? '');
+        return;
+      }
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        const next = historyIdxRef.current - 1;
+        if (next < 0) {
+          historyIdxRef.current = -1;
+          setValue('');
+        } else {
+          historyIdxRef.current = next;
+          setValue(historyRef.current[next] ?? '');
+        }
+      }
+    },
+    [commit],
+  );
+
+  // Auto-focus input when the panel mounts
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
+  return (
+    <div className="flex h-[34px] shrink-0 items-center gap-1.5 border-border border-t bg-panel px-2">
+      <span className="select-none font-mono text-[13px] text-accent">›</span>
+      <input
+        ref={inputRef}
+        type="text"
+        value={value}
+        onChange={(e) => {
+          historyIdxRef.current = -1;
+          setValue(e.target.value);
+        }}
+        onKeyDown={handleKeyDown}
+        placeholder="Enter script and press Enter to run..."
+        spellCheck={false}
+        className="min-w-0 flex-1 bg-transparent font-mono text-[12px] text-text outline-none placeholder:text-subtle"
+      />
+      <button
+        type="button"
+        onClick={commit}
+        disabled={!value.trim()}
+        title="Run script (Enter)"
+        className="flex h-[22px] items-center rounded px-1.5 text-[11px] text-subtle transition-colors hover:text-muted disabled:opacity-30"
+      >
+        <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+          <path d="M4 3l9 5-9 5V3z" fill="currentColor" />
+        </svg>
+      </button>
+    </div>
+  );
+}
+
 // ── Level badge ──────────────────────────────────────────────────────────
 
 function LevelBadge({ level }: { level: ConsoleEntry['level'] }) {
@@ -131,7 +214,7 @@ function LevelBadge({ level }: { level: ConsoleEntry['level'] }) {
 
 // ── Main panel ───────────────────────────────────────────────────────────
 
-export function BrowserConsolePanel({ entries, onClear, onSendToAgent }: Props) {
+export function BrowserConsolePanel({ entries, onClear, onSendToAgent, onExecuteScript }: Props) {
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [levelFilter, setLevelFilter] = useState<LevelFilter>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -377,29 +460,46 @@ export function BrowserConsolePanel({ entries, onClear, onSendToAgent }: Props) 
           filteredEntries.map((entry) => {
             const isSelected = selectedIds.has(entry.id);
             const { bg } = LEVEL_STYLE[entry.level];
+            const isInput = entry.source === 'input';
+            const isResult = entry.source === 'result';
+            const isScriptEntry = isInput || isResult;
             return (
               <div
                 key={entry.id}
-                onClick={() => toggleSelect(entry.id)}
+                onClick={() => !isScriptEntry && toggleSelect(entry.id)}
                 className={[
-                  'group flex cursor-pointer items-baseline gap-1.5 border-border/40 border-b px-2 py-[4px] font-mono text-[12px] leading-[18px] transition-colors',
-                  isSelected ? 'bg-accent/[0.08]' : `hover:bg-white/[0.03] ${bg}`,
+                  'group flex items-baseline gap-1.5 border-border/40 border-b px-2 py-[4px] font-mono text-[12px] leading-[18px] transition-colors',
+                  isScriptEntry
+                    ? 'bg-accent/[0.03]'
+                    : isSelected
+                      ? 'cursor-pointer bg-accent/[0.08]'
+                      : `cursor-pointer hover:bg-white/[0.03] ${bg}`,
                 ].join(' ')}
               >
-                {/* Checkbox — fixed size to prevent alignment shift */}
-                <div
-                  className={[
-                    'relative top-[2px] flex size-[14px] shrink-0 items-center justify-center rounded-[3px] border transition-colors',
-                    isSelected ? 'border-accent bg-accent' : 'border-subtle/40 group-hover:border-muted',
-                  ].join(' ')}
-                >
-                  <svg width="8" height="8" viewBox="0 0 10 10" fill="none" className={isSelected ? 'opacity-100' : 'opacity-0'}>
-                    <path d="M2 5.5l2.5 2.5L8 3" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </div>
+                {/* Checkbox (hidden for script i/o entries) */}
+                {isScriptEntry ? (
+                  <span className="flex size-[14px] shrink-0 items-center justify-center" />
+                ) : (
+                  <div
+                    className={[
+                      'relative top-[2px] flex size-[14px] shrink-0 items-center justify-center rounded-[3px] border transition-colors',
+                      isSelected ? 'border-accent bg-accent' : 'border-subtle/40 group-hover:border-muted',
+                    ].join(' ')}
+                  >
+                    <svg width="8" height="8" viewBox="0 0 10 10" fill="none" className={isSelected ? 'opacity-100' : 'opacity-0'}>
+                      <path d="M2 5.5l2.5 2.5L8 3" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </div>
+                )}
 
-                {/* Level badge */}
-                <LevelBadge level={entry.level} />
+                {/* Prefix: › for input, ‹ for result, badge for page logs */}
+                {isInput ? (
+                  <span className="inline-flex w-[28px] shrink-0 justify-center font-mono text-[13px] font-semibold text-accent">›</span>
+                ) : isResult ? (
+                  <span className="inline-flex w-[28px] shrink-0 justify-center font-mono text-[13px] text-subtle">‹</span>
+                ) : (
+                  <LevelBadge level={entry.level} />
+                )}
 
                 {/* Message content */}
                 <ConsoleArgs args={entry.args} />
@@ -417,6 +517,9 @@ export function BrowserConsolePanel({ entries, onClear, onSendToAgent }: Props) 
           })
         )}
       </div>
+
+      {/* ── Script input ─────────────────────────────────────────────── */}
+      <ConsoleInput onExecute={onExecuteScript} />
     </section>
   );
 }

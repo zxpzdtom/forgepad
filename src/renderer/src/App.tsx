@@ -13,6 +13,7 @@ import { ToastStack } from '@renderer/components/ToastStack';
 import { TopBar } from '@renderer/components/TopBar';
 import { useAgentLifecycle } from '@renderer/hooks/useAgentLifecycle';
 import { type ResolvedTheme, useTheme } from '@renderer/hooks/useTheme';
+import { getDroppedPaths, hasDraggableFiles, isInternalDrop } from '@renderer/lib/drag-utils';
 import { eventMatchesCombo } from '@renderer/lib/shortcut-utils';
 import { useAppStore } from '@renderer/store/app-store';
 import type { ShortcutActionId } from '@shared/types';
@@ -513,29 +514,51 @@ export function App() {
     return renderWorkspaceArea();
   };
 
-  // ── Fallback drop handler: when a file path is dropped anywhere in the
-  //    workspace frame (but not caught by AgentColumn or TerminalDock), write
-  //    it to the active agent terminal so the user doesn't need the agent
-  //    panel to be focused / visible. ──
+  // ── Fallback drop handler ────────────────────────────────────────────────
+  // Handles both internal (file-tree) and external (Finder/Explorer) drops.
+  //
+  // Routing logic for external files:
+  //   • File is inside the active workspace  → open as a file tab (preview)
+  //   • File is outside the workspace        → write absolute path to agent pty
+  //
+  // Internal drops (application/x-forgepad-path) always write to the agent,
+  // consistent with the existing behaviour.
+  // ─────────────────────────────────────────────────────────────────────────
   const handleWorkspaceDragOver = (e: React.DragEvent) => {
-    if (e.dataTransfer.types.includes('application/x-forgepad-path')) {
+    if (hasDraggableFiles(e)) {
       e.preventDefault();
       e.dataTransfer.dropEffect = 'copy';
     }
   };
 
   const handleWorkspaceDrop = (e: React.DragEvent) => {
-    const path = e.dataTransfer.getData('application/x-forgepad-path') || e.dataTransfer.getData('text/plain');
-    if (!path) return;
+    const paths = getDroppedPaths(e);
+    if (paths.length === 0) return;
     e.preventDefault();
 
-    // Find the active agent terminal from the current store state
     const state = useAppStore.getState();
-    const agentTabs = state.tabs.filter((t) => t.workspaceId === state.activeWorkspaceId && t.type === 'terminal' && t.isAgent);
-    const agentTabId = state.activeAgentTabId ?? agentTabs[0]?.id;
-    const agentTab = agentTabs.find((t) => t.id === agentTabId);
-    if (agentTab?.type === 'terminal') {
-      window.forgepad.pty.write(agentTab.ptyId, path);
+    const activeWs = state.workspaces.find((w) => w.id === state.activeWorkspaceId);
+
+    // Internal drop (file-tree) → always write to agent pty
+    if (isInternalDrop(e)) {
+      const agentTabs = state.tabs.filter((t) => t.workspaceId === state.activeWorkspaceId && t.type === 'terminal' && t.isAgent);
+      const agentTabId = state.activeAgentTabId ?? agentTabs[0]?.id;
+      const agentTab = agentTabs.find((t) => t.id === agentTabId);
+      if (agentTab?.type === 'terminal') {
+        window.forgepad.pty.write(agentTab.ptyId, paths.join(' '));
+      }
+      return;
+    }
+
+    // External drop anywhere outside Agent/Terminal → open as file preview
+    if (!activeWs) return;
+    for (const absPath of paths) {
+      if (absPath.startsWith(activeWs.worktreePath + '/')) {
+        const relPath = absPath.slice(activeWs.worktreePath.length + 1);
+        state.openFileTab(activeWs.id, relPath);
+      } else {
+        state.openExternalFileTab(activeWs.id, absPath);
+      }
     }
   };
 

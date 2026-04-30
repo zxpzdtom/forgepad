@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import { useAppStore } from '@renderer/store/app-store';
+import { getDroppedPaths, hasDraggableFiles } from '@renderer/lib/drag-utils';
 import type { Workspace } from '@shared/types';
 
 import { TerminalPanel } from './TerminalPanel';
@@ -22,14 +23,14 @@ export function AgentColumn() {
   const handleMouseDown = () => setFocusedColumn('agent');
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
-    if (e.dataTransfer.types.includes('application/x-forgepad-path')) {
+    if (hasDraggableFiles(e)) {
       e.preventDefault();
       e.dataTransfer.dropEffect = 'copy';
     }
   }, []);
 
   const handleDragEnter = useCallback((e: React.DragEvent) => {
-    if (e.dataTransfer.types.includes('application/x-forgepad-path')) {
+    if (hasDraggableFiles(e)) {
       e.preventDefault();
       dragCounterRef.current++;
       setDropHighlight(true);
@@ -50,14 +51,14 @@ export function AgentColumn() {
       dragCounterRef.current = 0;
       setDropHighlight(false);
 
-      const path = e.dataTransfer.getData('application/x-forgepad-path') || e.dataTransfer.getData('text/plain');
-      if (!path) return;
+      const paths = getDroppedPaths(e);
+      if (paths.length === 0) return;
 
-      // Write path to the active agent terminal (no Enter — user decides)
+      // Write path(s) to the active agent terminal (no Enter — user decides)
       e.stopPropagation(); // prevent outer fallback handler from firing
       const activeTab = terminalTabs.find((t) => t.id === columnActiveId);
       if (activeTab?.type === 'terminal') {
-        window.forgepad.pty.write(activeTab.ptyId, path);
+        window.forgepad.pty.write(activeTab.ptyId, paths.join(' '));
       }
     },
     [terminalTabs, columnActiveId],
@@ -67,7 +68,7 @@ export function AgentColumn() {
 
   return (
     <div
-      className={`flex size-full min-h-0 min-w-0 flex-col bg-bg relative${dropHighlight ? 'drop-target-active' : ''}`}
+      className={`flex size-full min-h-0 min-w-0 flex-col bg-bg relative ${dropHighlight ? 'drop-target-active' : ''}`}
       onMouseDown={handleMouseDown}
       onDragOver={handleDragOver}
       onDragEnter={handleDragEnter}

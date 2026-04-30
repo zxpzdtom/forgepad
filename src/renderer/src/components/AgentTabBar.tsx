@@ -1,4 +1,5 @@
 import { type MouseEvent, useCallback, useMemo, useState } from 'react';
+import { useHorizontalScroll } from '@renderer/hooks/useHorizontalScroll';
 import { closestCenter, DndContext, type DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { horizontalListSortingStrategy, SortableContext } from '@dnd-kit/sortable';
 import { useAppStore } from '@renderer/store/app-store';
@@ -61,6 +62,8 @@ export function AgentTabBar() {
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
+  const { ref: tabListRef, onWheel } = useHorizontalScroll<HTMLDivElement>();
+
   const [contextMenu, setContextMenu] = useState<{
     tab: Tab;
     x: number;
@@ -97,8 +100,10 @@ export function AgentTabBar() {
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={tabIds} strategy={horizontalListSortingStrategy}>
           <div
+            ref={tabListRef}
             className="tabs-scroll scrollbar-none scroll-mask-x flex min-w-0 flex-1 items-center overflow-x-auto"
             role="tablist"
+            onWheel={onWheel}
           >
             {agentTabs.map((tab) => {
               const isExited = exitedPtyIds.has(tab.ptyId);

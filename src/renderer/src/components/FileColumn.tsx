@@ -1,5 +1,6 @@
-import { Component, type ErrorInfo, type ReactNode } from 'react';
+import { Component, type ErrorInfo, type ReactNode, useCallback, useRef, useState } from 'react';
 
+import { getDroppedPaths, hasDraggableFiles, isInternalDrop } from '@renderer/lib/drag-utils';
 import { useAppStore } from '@renderer/store/app-store';
 import type { Workspace } from '@shared/types';
 
@@ -55,6 +56,8 @@ export function FileColumn() {
   const activeFileTabId = useAppStore((state) => state.activeFileTabId);
   const workspaces = useAppStore((state) => state.workspaces);
   const setFocusedColumn = useAppStore((state) => state.setFocusedColumn);
+  const openFileTab = useAppStore((state) => state.openFileTab);
+  const openExternalFileTab = useAppStore((state) => state.openExternalFileTab);
 
   const fileTabs = tabs.filter((tab) => tab.workspaceId === activeWorkspaceId && tab.type !== 'terminal');
 
@@ -65,10 +68,80 @@ export function FileColumn() {
 
   const handleMouseDown = () => setFocusedColumn('file');
 
-  if (fileTabs.length === 0 || !activeWorkspace) return null;
+  // ── External file drop: open files as tabs ────────────────────────────
+  const dragCounterRef = useRef(0);
+  const [dropHighlight, setDropHighlight] = useState(false);
 
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    // Only accept external OS files here — internal tree drags go to AgentColumn
+    if (!isInternalDrop(e) && hasDraggableFiles(e)) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'copy';
+    }
+  }, []);
+
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    if (!isInternalDrop(e) && hasDraggableFiles(e)) {
+      e.preventDefault();
+      dragCounterRef.current++;
+      setDropHighlight(true);
+    }
+  }, []);
+
+  const handleDragLeave = useCallback(() => {
+    dragCounterRef.current--;
+    if (dragCounterRef.current <= 0) {
+      dragCounterRef.current = 0;
+      setDropHighlight(false);
+    }
+  }, []);
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      // Internal drags (file tree) are not handled here
+      if (isInternalDrop(e)) return;
+
+      const paths = getDroppedPaths(e);
+      if (paths.length === 0) return;
+
+      e.preventDefault();
+      e.stopPropagation(); // prevent App-level fallback from also handling this
+
+      dragCounterRef.current = 0;
+      setDropHighlight(false);
+
+      if (!activeWorkspace) return;
+
+      // All external files open as file tabs regardless of whether they are
+      // inside or outside the workspace.
+      for (const absPath of paths) {
+        if (absPath.startsWith(activeWorkspace.worktreePath + '/')) {
+          // Inside workspace → use relPath so the tab title and tooling work normally
+          const relPath = absPath.slice(activeWorkspace.worktreePath.length + 1);
+          openFileTab(activeWorkspace.id, relPath);
+        } else {
+          // Outside workspace → open as read-only external file tab
+          openExternalFileTab(activeWorkspace.id, absPath);
+        }
+      }
+    },
+    [activeWorkspace, openFileTab, openExternalFileTab],
+  );
+  // ─────────────────────────────────────────────────────────────────────
+
+  if (!activeWorkspace) return null;
+
+  // When there are no file tabs yet, still render the drop target so the user
+  // can drag files in to open the first tab.
   return (
-    <div className="relative flex size-full min-h-0 min-w-0 flex-col bg-bg" onMouseDown={handleMouseDown}>
+    <div
+      className={`relative flex size-full min-h-0 min-w-0 flex-col bg-bg ${dropHighlight ? 'drop-target-active' : ''}`}
+      onMouseDown={handleMouseDown}
+      onDragOver={handleDragOver}
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
       <div className="relative min-h-0 flex-1 overflow-hidden">
         {fileTabs.map((tab) => {
           const isActive = tab.id === activeFileTab?.id;
