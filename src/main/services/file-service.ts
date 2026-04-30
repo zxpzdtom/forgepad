@@ -7,6 +7,7 @@ import type { FileNode, FileStatus } from '@shared/types';
 import { normalizeRelPath, resolveInsideRoot } from './path-guard';
 
 const MIME_MAP: Record<string, string> = {
+  // Images
   png: 'image/png',
   jpg: 'image/jpeg',
   jpeg: 'image/jpeg',
@@ -16,6 +17,22 @@ const MIME_MAP: Record<string, string> = {
   ico: 'image/x-icon',
   svg: 'image/svg+xml',
   avif: 'image/avif',
+  // Audio
+  mp3: 'audio/mpeg',
+  wav: 'audio/wav',
+  ogg: 'audio/ogg',
+  flac: 'audio/flac',
+  aac: 'audio/aac',
+  m4a: 'audio/mp4',
+  wma: 'audio/x-ms-wma',
+  // Video
+  mp4: 'video/mp4',
+  webm: 'video/webm',
+  mov: 'video/quicktime',
+  avi: 'video/x-msvideo',
+  mkv: 'video/x-matroska',
+  // PDF
+  pdf: 'application/pdf',
 };
 
 import { GitService } from './git-service';
@@ -190,11 +207,13 @@ export class FileService {
     const relPath = normalizeRelPath(relPathInput);
     const abs = await resolveInsideRoot(rootPath, relPath);
     const stats = await stat(abs);
-    if (stats.size > 10 * 1024 * 1024) {
-      throw new Error(`File too large for preview: ${(stats.size / 1024 / 1024).toFixed(1)} MB`);
-    }
     const ext = relPath.split('.').pop()?.toLowerCase() ?? '';
     const mime = MIME_MAP[ext] ?? 'application/octet-stream';
+    const isMedia = mime.startsWith('audio/') || mime.startsWith('video/') || mime === 'application/pdf';
+    const maxSize = isMedia ? 500 * 1024 * 1024 : 10 * 1024 * 1024;
+    if (stats.size > maxSize) {
+      throw new Error(`File too large for preview: ${(stats.size / 1024 / 1024).toFixed(1)} MB`);
+    }
     if (mime === 'image/svg+xml') {
       const text = await readFile(abs, 'utf8');
       return `data:${mime};utf8,${encodeURIComponent(text)}`;
@@ -214,11 +233,13 @@ export class FileService {
 
   static async readAbsFileAsDataUrl(absPath: string): Promise<string> {
     const stats = await stat(absPath);
-    if (stats.size > 10 * 1024 * 1024) {
-      throw new Error(`File too large for preview: ${(stats.size / 1024 / 1024).toFixed(1)} MB`);
-    }
     const ext = absPath.split('.').pop()?.toLowerCase() ?? '';
     const mime = MIME_MAP[ext] ?? 'application/octet-stream';
+    const isMedia = mime.startsWith('audio/') || mime.startsWith('video/') || mime === 'application/pdf';
+    const maxSize = isMedia ? 500 * 1024 * 1024 : 10 * 1024 * 1024;
+    if (stats.size > maxSize) {
+      throw new Error(`File too large for preview: ${(stats.size / 1024 / 1024).toFixed(1)} MB`);
+    }
     if (mime === 'image/svg+xml') {
       const text = await readFile(absPath, 'utf8');
       return `data:${mime};utf8,${encodeURIComponent(text)}`;
