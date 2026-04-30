@@ -6,7 +6,7 @@ import { useHorizontalScroll } from '@renderer/hooks/useHorizontalScroll';
 import { getDroppedPaths, hasDraggableFiles, isInternalDrop } from '@renderer/lib/drag-utils';
 import { getTabTitle, useAppStore } from '@renderer/store/app-store';
 import type { Tab } from '@shared/types';
-import { Bot, ClipboardList, GitCompare, Globe, TerminalSquare } from 'lucide-react';
+import { Bot, ClipboardList, ExternalLink, GitCompare, Globe, TerminalSquare } from 'lucide-react';
 
 import { FileIcon } from './FileIcon';
 import { SortableTabItem } from './SortableTabItem';
@@ -137,20 +137,29 @@ export function TabBar() {
             role="tablist"
             onWheel={onWheel}
           >
-            {workspaceTabs.map((tab) => (
-              <SortableTabItem
-                key={tab.id}
-                id={tab.id}
-                active={tab.id === activeFileTabId}
-                icon={tabIcon(tab)}
-                title={getTabTitle(tab)}
-                onSelect={() => setActiveTab(tab.id)}
-                onClose={() => closeTab(tab.id)}
-                onContextMenu={(event) => handleContextMenu(event, tab)}
-                className="min-w-[80px] max-w-[240px]"
-                data-tab-id={tab.id}
-              />
-            ))}
+            {workspaceTabs.map((tab) => {
+              const isExternal = tab.type === 'file' && Boolean(tab.absPath);
+              return (
+                <SortableTabItem
+                  key={tab.id}
+                  id={tab.id}
+                  active={tab.id === activeFileTabId}
+                  icon={tabIcon(tab)}
+                  title={getTabTitle(tab)}
+                  tooltip={isExternal ? tab.absPath : undefined}
+                  onSelect={() => setActiveTab(tab.id)}
+                  onClose={() => closeTab(tab.id)}
+                  onContextMenu={(event) => handleContextMenu(event, tab)}
+                  className="min-w-[80px] max-w-[240px]"
+                  data-tab-id={tab.id}
+                  suffix={
+                    isExternal ? (
+                      <ExternalLink size={10} className="shrink-0 text-subtle" />
+                    ) : undefined
+                  }
+                />
+              );
+            })}
           </div>
         </SortableContext>
       </DndContext>
