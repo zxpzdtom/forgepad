@@ -7,6 +7,7 @@ import { promisify } from 'node:util';
 import { ContextService } from '@main/services/context-service';
 import { FileService } from '@main/services/file-service';
 import { GitService } from '@main/services/git-service';
+import { LspService } from '@main/services/lsp-service';
 import { resolveInsideRoot } from '@main/services/path-guard';
 import { PtyService } from '@main/services/pty-service';
 import { StateService } from '@main/services/state-service';
@@ -591,4 +592,9 @@ export function registerIpcHandlers(hookPort?: number): void {
       win.focus();
     }
   });
+
+  // ── LSP (text-based symbol search) ──────────────────────────────────────
+  ipcMain.handle(IPC.LSP_GET_DEFINITION, async (_event, worktreePath: string, token: string) =>
+    LspService.getDefinition(worktreePath, token),
+  );
 }
