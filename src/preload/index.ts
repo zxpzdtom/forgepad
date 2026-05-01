@@ -165,13 +165,13 @@ const api = {
   },
   browser: {
     captureScreenshot: (webContentsId: number, rect: { x: number; y: number; width: number; height: number }) =>
-      ipcRenderer.invoke(IPC.BROWSER_CAPTURE_SCREENSHOT, webContentsId, rect) as Promise<string>,
+      ipcRenderer.invoke(IPC.BROWSER_CAPTURE_SCREENSHOT, { webContentsId, rect }) as Promise<string>,
     setTouchEmulation: (webContentsId: number, enabled: boolean) =>
-      ipcRenderer.invoke(IPC.BROWSER_SET_TOUCH_EMULATION, webContentsId, enabled) as Promise<void>,
+      ipcRenderer.invoke(IPC.BROWSER_SET_TOUCH_EMULATION, { webContentsId, enabled }) as Promise<void>,
     enableConsole: (webContentsId: number) =>
-      ipcRenderer.invoke(IPC.BROWSER_ENABLE_CONSOLE, webContentsId) as Promise<void>,
+      ipcRenderer.invoke(IPC.BROWSER_ENABLE_CONSOLE, { webContentsId }) as Promise<void>,
     disableConsole: (webContentsId: number) =>
-      ipcRenderer.invoke(IPC.BROWSER_DISABLE_CONSOLE, webContentsId) as Promise<void>,
+      ipcRenderer.invoke(IPC.BROWSER_DISABLE_CONSOLE, { webContentsId }) as Promise<void>,
     onConsoleEvent: (callback: (raw: unknown) => void) => {
       const handler = (_event: Electron.IpcRendererEvent, raw: unknown) => callback(raw);
       ipcRenderer.on(IPC.BROWSER_CONSOLE_EVENT, handler);
