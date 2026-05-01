@@ -27,6 +27,8 @@ export type Tab =
       unsaved?: boolean;
       /** Absolute path for files outside the workspace (read-only preview). */
       absPath?: string;
+      /** 1-based line number to scroll to after opening (cleared after scroll). */
+      targetLine?: number;
     }
   | { id: string; workspaceId: string; type: 'diff'; activePath?: string }
   | {
