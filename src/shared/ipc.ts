@@ -39,6 +39,7 @@ export const IPC = {
   SHELL_OPEN_WITH_IDE: 'shell:open-with-ide',
   SHELL_DETECT_TERMINALS: 'shell:detect-terminals',
   SHELL_OPEN_WITH_TERMINAL: 'shell:open-with-terminal',
+  SHELL_OPEN_EXTERNAL: 'shell:open-external',
   AGENT_STATUS_UPDATE: 'agent:status-update',
   AGENT_FOCUS_TAB: 'agent:focus-tab',
   AGENT_RENAME_TAB: 'agent:rename-tab',

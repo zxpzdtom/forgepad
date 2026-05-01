@@ -90,6 +90,7 @@ type AppState = {
   pendingFeedback: { tabId: string; element: SelectedElementInfo } | null;
   handleAgentStatusUpdate: (ptyId: string, status: AgentStatus) => void;
   clearAgentStatus: (ptyId: string) => void;
+  notifyAgentInput: (ptyId: string) => void;
   markPtyExited: (ptyId: string) => void;
   triggerGitRefresh: () => void;
   hydrate: (state: Partial<PersistedAppState> | null) => void;
@@ -327,6 +328,8 @@ function activeIdsAfterRemoval(
 
 /** Per-pty timeout handles for auto-clearing stale "working" status. */
 const agentWorkingTimers = new Map<string, ReturnType<typeof setTimeout>>();
+/** Per-pty timeout handles for cancel-detection (user pressed ESC / Ctrl+C). */
+const agentCancelTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
 export const useAppStore = create<AppState>((set, get) => ({
   projects: [],
@@ -371,6 +374,14 @@ export const useAppStore = create<AppState>((set, get) => ({
     // clearing.
     const prev = agentWorkingTimers.get(ptyId);
     if (prev) clearTimeout(prev);
+
+    // A new hook event arrived — agent is still active, cancel any
+    // pending cancel-detection timer.
+    const cancelTimer = agentCancelTimers.get(ptyId);
+    if (cancelTimer) {
+      clearTimeout(cancelTimer);
+      agentCancelTimers.delete(ptyId);
+    }
 
     if (status === 'working') {
       agentWorkingTimers.set(
@@ -424,17 +435,51 @@ export const useAppStore = create<AppState>((set, get) => ({
       clearTimeout(t);
       agentWorkingTimers.delete(ptyId);
     }
+    const ct = agentCancelTimers.get(ptyId);
+    if (ct) {
+      clearTimeout(ct);
+      agentCancelTimers.delete(ptyId);
+    }
     set((state) => {
       if (!state.agentStatuses[ptyId]) return state;
       const { [ptyId]: _, ...rest } = state.agentStatuses;
       return { agentStatuses: rest };
     });
   },
+  notifyAgentInput: (ptyId) => {
+    // Called when the user types into an agent terminal (e.g. ESC / Ctrl+C).
+    // If the agent is currently "working", start a short cancel-detection
+    // timeout.  If no new hook event arrives within 3 s the agent was
+    // likely interrupted, so we clear the working indicator.
+    const status = get().agentStatuses[ptyId];
+    if (status !== 'working') return;
+
+    const prev = agentCancelTimers.get(ptyId);
+    if (prev) clearTimeout(prev);
+
+    agentCancelTimers.set(
+      ptyId,
+      setTimeout(() => {
+        agentCancelTimers.delete(ptyId);
+        if (get().agentStatuses[ptyId] === 'working') {
+          set((s) => {
+            const { [ptyId]: _, ...rest } = s.agentStatuses;
+            return { agentStatuses: rest };
+          });
+        }
+      }, 3_000),
+    );
+  },
   markPtyExited: (ptyId) => {
     const t = agentWorkingTimers.get(ptyId);
     if (t) {
       clearTimeout(t);
       agentWorkingTimers.delete(ptyId);
+    }
+    const ct = agentCancelTimers.get(ptyId);
+    if (ct) {
+      clearTimeout(ct);
+      agentCancelTimers.delete(ptyId);
     }
     set((state) => {
       const exitedPtyIds = new Set(state.exitedPtyIds);

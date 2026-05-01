@@ -213,7 +213,14 @@ export function TerminalPanel({ tab, workspace, active }: TerminalPanelProps) {
     });
     const fitAddon = new FitAddon();
     terminal.loadAddon(fitAddon);
-    terminal.loadAddon(new WebLinksAddon());
+    terminal.loadAddon(
+      new WebLinksAddon((event, url) => {
+        // Only open links on Cmd+Click (Mac) or Ctrl+Click (Windows/Linux)
+        if (event.metaKey || event.ctrlKey) {
+          void window.forgepad.shell.openExternal(url);
+        }
+      }),
+    );
 
     // Let Cmd/Ctrl shortcuts bubble to the window so app-level
     // keybindings still work while the terminal is focused.
@@ -251,7 +258,15 @@ export function TerminalPanel({ tab, workspace, active }: TerminalPanelProps) {
     resizeObserver.observe(host);
     window.setTimeout(fitAndResize, 0);
 
-    const dataDisposable = terminal.onData((data) => window.forgepad.pty.write(tab.ptyId, data));
+    const dataDisposable = terminal.onData((data) => {
+      window.forgepad.pty.write(tab.ptyId, data);
+      // When the user types into an agent terminal, notify the store so
+      // it can start a cancel-detection timer (handles ESC / Ctrl+C
+      // interrupts where the Stop hook may not fire).
+      if (tab.isAgent) {
+        useAppStore.getState().notifyAgentInput(tab.ptyId);
+      }
+    });
 
     // Click-to-move-cursor: clicking on the prompt line sends arrow-key sequences.
     // Works for shell prompts and TUIs like Claude Code (Ink uses normal buffer).

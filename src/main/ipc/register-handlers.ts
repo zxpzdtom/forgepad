@@ -361,6 +361,10 @@ export function registerIpcHandlers(hookPort?: number): void {
     await openWithTerminal(fullPath, terminalId);
   });
 
+  ipcMain.handle(IPC.SHELL_OPEN_EXTERNAL, async (_event, url: string) => {
+    await shell.openExternal(url);
+  });
+
   // ── Browser (<webview>) handlers ──────────────────────────────────────────
   ipcMain.handle(
     IPC.BROWSER_CAPTURE_SCREENSHOT,
