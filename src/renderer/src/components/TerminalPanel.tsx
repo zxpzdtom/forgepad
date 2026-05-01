@@ -6,7 +6,7 @@ import type { ShortcutCombo, Tab, Workspace } from '@shared/types';
 import { DEFAULT_SHORTCUTS } from '@shared/types';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
-import type { ITheme } from '@xterm/xterm';
+import type { ILink, ILinkProvider, ITheme } from '@xterm/xterm';
 import { Terminal } from '@xterm/xterm';
 
 /**
@@ -173,6 +173,109 @@ function tryExtractSessionId(data: string): string | null {
   return null;
 }
 
+// ── File-path link provider ─────────────────────────────────────────────
+// Detects file paths in terminal output and makes them Cmd+Click-able
+// to open in the app's built-in editor.
+
+const FILE_EXT = 'ts|tsx|js|jsx|mjs|cjs|json|jsonc|css|scss|less|html|htm|md|mdx|py|go|rs|toml|yaml|yml|sh|bash|zsh|vue|svelte|rb|java|kt|c|cpp|h|hpp|cs|swift|php|sql|graphql|gql|xml|svg|txt|env|lock|cfg|ini|conf|dockerfile|makefile';
+
+// Match file paths with known extensions, optionally followed by :line or :line:col
+// Supports: src/foo.ts, ./foo/bar.tsx, ../utils.js, /abs/path/file.go, foo.ts:42, foo.ts:42:10
+const FILE_PATH_RE = new RegExp(
+  `(?:^|[\\s"'(\`[{,;=])` +                       // boundary before path
+  `((?:\\./|\\.\\.(?:/|(?=[^.]))|/|[a-zA-Z0-9@_])` + // path start: ./ ../ / or word char
+  `[^\\s"')\`\\]},;:]*\\.(?:${FILE_EXT})` +        // path body with known extension
+  `(?::\\d+(?::\\d+)?)?)` +                          // optional :line:col
+  `(?=[\\s"')\`\\]},;:]|$)`,                        // boundary after path
+  'gi',
+);
+
+/**
+ * Strip ANSI escape sequences from a string so regex matching works on
+ * the visible text only.
+ */
+function stripAnsi(str: string): string {
+  // eslint-disable-next-line no-control-regex
+  return str.replace(/\x1b\[[0-9;]*[a-zA-Z]|\x1b\].*?(?:\x1b\\|\x07)|\x1b[()][AB012]/g, '');
+}
+
+function createFilePathLinkProvider(
+  terminal: Terminal,
+  workspaceId: string,
+  worktreePath: string,
+): ILinkProvider {
+  return {
+    provideLinks(bufferLineNumber: number, callback: (links: ILink[] | undefined) => void): void {
+      const line = terminal.buffer.active.getLine(bufferLineNumber - 1);
+      if (!line) {
+        callback(undefined);
+        return;
+      }
+
+      const lineText = line.translateToString(true);
+      if (!lineText.trim()) {
+        callback(undefined);
+        return;
+      }
+
+      // Match against ANSI-stripped text to get correct visual positions
+      const cleanText = stripAnsi(lineText);
+      const links: ILink[] = [];
+      FILE_PATH_RE.lastIndex = 0;
+
+      let match: RegExpExecArray | null;
+      while ((match = FILE_PATH_RE.exec(cleanText)) !== null) {
+        const filePath = match[1];
+        if (!filePath) continue;
+
+        // Find the position of the captured group in the clean text
+        const startIndex = match.index + match[0].indexOf(filePath);
+        const endIndex = startIndex + filePath.length;
+
+        // Strip :line:col suffix to get the actual file path
+        const pathOnly = filePath.replace(/:\d+(?::\d+)?$/, '');
+
+        // Resolve to relative path within the workspace
+        let relPath: string;
+        let absPath: string | undefined;
+        if (pathOnly.startsWith('/')) {
+          // Absolute path — check if it's within the workspace
+          if (pathOnly.startsWith(worktreePath + '/')) {
+            relPath = pathOnly.slice(worktreePath.length + 1);
+          } else {
+            absPath = pathOnly;
+            relPath = pathOnly.split('/').pop() ?? pathOnly;
+          }
+        } else {
+          // Relative path — strip leading ./ if present
+          relPath = pathOnly.replace(/^\.\//, '');
+        }
+
+        links.push({
+          range: {
+            start: { x: startIndex + 1, y: bufferLineNumber },
+            end: { x: endIndex, y: bufferLineNumber },
+          },
+          text: filePath,
+          decorations: { pointerCursor: true, underline: true },
+          activate(event: MouseEvent) {
+            // Only open on Cmd+Click (Mac) or Ctrl+Click (Windows/Linux)
+            if (!event.metaKey && !event.ctrlKey) return;
+            const store = useAppStore.getState();
+            if (absPath) {
+              store.openExternalFileTab(workspaceId, absPath);
+            } else {
+              store.openFileTab(workspaceId, relPath);
+            }
+          },
+        });
+      }
+
+      callback(links.length > 0 ? links : undefined);
+    },
+  };
+}
+
 export function TerminalPanel({ tab, workspace, active }: TerminalPanelProps) {
   const hostRef = useRef<HTMLDivElement | null>(null);
   const terminalRef = useRef<Terminal | null>(null);
@@ -220,6 +323,11 @@ export function TerminalPanel({ tab, workspace, active }: TerminalPanelProps) {
           void window.forgepad.shell.openExternal(url);
         }
       }),
+    );
+
+    // File-path link provider: Cmd+Click on file paths opens them in the editor
+    const filePathLinkDisposable = terminal.registerLinkProvider(
+      createFilePathLinkProvider(terminal, workspace.id, workspace.worktreePath),
     );
 
     // Let Cmd/Ctrl shortcuts bubble to the window so app-level
@@ -306,6 +414,7 @@ export function TerminalPanel({ tab, workspace, active }: TerminalPanelProps) {
     return () => {
       resizeObserver.disconnect();
       dataDisposable.dispose();
+      filePathLinkDisposable.dispose();
       cleanupClickToMove();
       removeDataListener();
       removeExitListener();
