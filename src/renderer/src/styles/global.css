@@ -1863,3 +1863,20 @@ textarea {
     outline-offset: -2px;
     border-radius: 4px;
 }
+
+/* ── LSP Symbol Peek Panel ── */
+.symbol-peek-panel {
+    box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.15);
+    animation: peek-slide-up 0.15s ease-out;
+}
+
+@keyframes peek-slide-up {
+    from {
+        transform: translateY(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}

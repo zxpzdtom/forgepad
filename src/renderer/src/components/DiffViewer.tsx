@@ -4,6 +4,7 @@ import { processFile } from '@pierre/diffs';
 import type { DiffLineAnnotation } from '@pierre/diffs/react';
 import { FileDiff, PatchDiff } from '@pierre/diffs/react';
 import { useResolvedTheme } from '@renderer/App';
+import { useLspTokenNavigation } from '@renderer/hooks/useLspTokenNavigation';
 import { useAppStore } from '@renderer/store/app-store';
 import type { DiffCommentItem, DiffFileData, FileStatus, Tab, Workspace } from '@shared/types';
 import { MessageSquarePlus, RefreshCw } from 'lucide-react';
@@ -108,15 +109,24 @@ function DiffFileEntry({
   ) => void;
 }) {
   const isThisFilePending = pending?.file.path === file.path && pending.file.bucket === file.bucket;
+  const { onTokenClick, onTokenEnter, onTokenLeave } = useLspTokenNavigation(
+    workspace.worktreePath,
+    file.path,
+    workspace.id,
+    'diff',
+  );
 
   const options: FileDiffOptions<AnnotationMeta> = useMemo(
     () => ({
       ...diffOptions,
+      onTokenClick,
+      onTokenEnter,
+      onTokenLeave,
       onLineSelectionEnd: (range: SelectedLineRange | null) => {
         if (range) setPending({ file, range, text: '' });
       },
     }),
-    [diffOptions, file, setPending],
+    [diffOptions, file, setPending, onTokenClick, onTokenEnter, onTokenLeave],
   );
 
   const lineAnnotations = useMemo(() => {

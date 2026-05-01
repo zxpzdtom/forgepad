@@ -4,6 +4,7 @@ import { getFiletypeFromFileName } from '@pierre/diffs';
 import type { FileOptions, LineAnnotation } from '@pierre/diffs/react';
 import { File as PierreFile } from '@pierre/diffs/react';
 import { useResolvedTheme } from '@renderer/App';
+import { useLspTokenNavigation } from '@renderer/hooks/useLspTokenNavigation';
 import { useAppStore } from '@renderer/store/app-store';
 import type { CodeSelectionItem, Tab, Workspace } from '@shared/types';
 import { code as streamdownCode } from '@streamdown/code';
@@ -604,6 +605,12 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
   const editorFontSize = useAppStore((state) => state.settings.editorFontSize);
   /** True when this tab was opened from outside the workspace (read-only, no context actions). */
   const isExternal = Boolean(tab.absPath);
+  const { onTokenClick, onTokenEnter, onTokenLeave } = useLspTokenNavigation(
+    workspace.worktreePath,
+    tab.relPath,
+    workspace.id,
+    'file',
+  );
   const markdownFile = useMemo(() => isMarkdownPath(tab.relPath), [tab.relPath]);
   const isImage = useMemo(() => isImageFile(tab.relPath), [tab.relPath]);
   const isAudio = useMemo(() => isAudioFile(tab.relPath), [tab.relPath]);
@@ -726,6 +733,9 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
       enableLineSelection: true,
       lineHoverHighlight: 'both' as const,
       unsafeCSS: SEARCH_HIGHLIGHT_CSS,
+      onTokenClick,
+      onTokenEnter,
+      onTokenLeave,
       onLineSelectionEnd: (range: SelectedLineRange | null) => {
         if (range && !isExternal) {
           setSelectedRange(range);
@@ -737,7 +747,7 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
         }
       },
     }),
-    [resolvedTheme],
+    [resolvedTheme, onTokenClick, onTokenEnter, onTokenLeave],
   );
 
   // --- File data for @pierre/diffs File component ---

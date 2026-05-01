@@ -955,3 +955,26 @@ export type CreateBundleInput = {
   comments: Array<Omit<DiffCommentItem, 'id' | 'type' | 'workspaceId' | 'addedAt'>>;
   selections: Array<Omit<CodeSelectionItem, 'id' | 'type' | 'workspaceId' | 'addedAt'>>;
 };
+
+/* ─── LSP / Symbol Navigation ─── */
+
+export type LspLocation = {
+  /** Relative path within workspace */
+  filePath: string;
+  /** 1-based line number */
+  lineNumber: number;
+  /** 0-based column offset */
+  charStart: number;
+  /** The text of the matching line (for preview) */
+  lineText: string;
+};
+
+export type LspSymbolPeekState = {
+  locations: LspLocation[];
+  token: string;
+  kind: 'definition';
+  /** File where Cmd+Click originated */
+  originFile?: string;
+  /** Line number in origin file */
+  originLine?: number;
+} | null;
