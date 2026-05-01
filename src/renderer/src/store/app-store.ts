@@ -110,7 +110,7 @@ type AppState = {
   closeAllTabs: (workspaceId: string, type: 'terminal' | 'file') => void;
   closeTabsToRight: (tabId: string) => void;
   setActiveTab: (tabId: string | null) => void;
-  openFileTab: (workspaceId: string, relPath: string) => void;
+  openFileTab: (workspaceId: string, relPath: string, lineNumber?: number) => void;
   openExternalFileTab: (workspaceId: string, absPath: string) => void;
   openDiffTab: (workspaceId: string, activePath?: string) => void;
   openContextPreviewTab: (workspaceId?: string) => void;
@@ -191,6 +191,7 @@ type AppState = {
   submitBrowserFeedback: (comment: string) => void;
   openSymbolPeek: (peek: NonNullable<LspSymbolPeekState>) => void;
   closeSymbolPeek: () => void;
+  clearTabTargetLine: (tabId: string) => void;
   updateNotificationSettings: (partial: Partial<NotificationSettings>) => void;
   addCustomSound: (sound: NotificationSound) => void;
   removeCustomSound: (soundId: string) => void;
@@ -231,12 +232,14 @@ function serializeForSave(state: AppState): PersistedAppState {
     projects: state.projects,
     workspaces: state.workspaces,
     tasks: state.tasks,
-    tabs: state.tabs.filter(
-      (tab) =>
-        tab.type === 'browser' ||
-        tab.type !== 'terminal' ||
-        (tab.type === 'terminal' && tab.isAgent && tab.sessionId && tab.sessionConfirmed),
-    ),
+    tabs: state.tabs
+      .filter(
+        (tab) =>
+          tab.type === 'browser' ||
+          tab.type !== 'terminal' ||
+          (tab.type === 'terminal' && tab.isAgent && tab.sessionId && tab.sessionConfirmed),
+      )
+      .map((tab) => (tab.type === 'file' ? { ...tab, targetLine: undefined } : tab)),
     activeWorkspaceId: state.activeWorkspaceId,
     activeTabId: state.tabs.find((tab) => tab.id === state.activeTabId)?.type === 'terminal' ? null : state.activeTabId,
     workspaceActiveAgentTabIds,
@@ -956,13 +959,16 @@ export const useAppStore = create<AppState>((set, get) => ({
     });
   },
 
-  openFileTab: (workspaceId, relPath) => {
+  openFileTab: (workspaceId, relPath, lineNumber?) => {
     const existing = get().tabs.find((tab) => tab.workspaceId === workspaceId && tab.type === 'file' && tab.relPath === relPath);
     if (existing) {
+      if (lineNumber) {
+        set({ tabs: get().tabs.map((t) => (t.id === existing.id && t.type === 'file' ? { ...t, targetLine: lineNumber } : t)) });
+      }
       get().setActiveTab(existing.id);
       return;
     }
-    get().addTab({ id: id(), workspaceId, type: 'file', relPath });
+    get().addTab({ id: id(), workspaceId, type: 'file', relPath, targetLine: lineNumber });
   },
 
   openExternalFileTab: (workspaceId, absPath) => {
@@ -1811,6 +1817,10 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   closeSymbolPeek: () => {
     set({ symbolPeek: null });
+  },
+
+  clearTabTargetLine: (tabId) => {
+    set({ tabs: get().tabs.map((t) => (t.id === tabId && t.type === 'file' ? { ...t, targetLine: undefined } : t)) });
   },
 
   updateNotificationSettings: (partial) =>
