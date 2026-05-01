@@ -8,10 +8,11 @@ import { useAppStore } from '@renderer/store/app-store';
 import type { CodeSelectionItem, Tab, Workspace } from '@shared/types';
 import { code as streamdownCode } from '@streamdown/code';
 import { createMermaidPlugin } from '@streamdown/mermaid';
-import { Check, ChevronDown, ChevronUp, Code, Copy, FileCode, FileVideo, Image, List, MessageSquarePlus, Music, Search, X } from 'lucide-react';
+import { Check, ChevronDown, ChevronUp, Code, Copy, FileVideo, Image, List, MessageSquarePlus, Music, Search, X } from 'lucide-react';
 import type { Components } from 'streamdown';
 import { Streamdown } from 'streamdown';
 import 'streamdown/styles.css';
+import { FileIcon } from './FileIcon';
 
 type FileTab = Extract<Tab, { type: 'file' }>;
 
@@ -1058,7 +1059,7 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
           className="flex min-w-0 items-center gap-[7px] overflow-hidden text-ellipsis whitespace-nowrap font-[510] text-[13px]"
           title={tab.relPath}
         >
-          <FileCode size={14} className="text-muted" />
+          <FileIcon filePath={tab.relPath} size={14} />
           {tab.relPath}
           {!isMediaFile && <span className="text-muted">{lineCount} lines</span>}
         </div>
