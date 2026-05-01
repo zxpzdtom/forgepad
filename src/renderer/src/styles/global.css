@@ -658,6 +658,117 @@ textarea {
     background-color: rgba(245, 245, 247, 0.92) !important;
 }
 
+/* Markdown TOC sidebar */
+.markdown-toc {
+    position: relative;
+    width: 200px;
+    min-width: 200px;
+    overflow-y: auto;
+    padding: 12px 4px 24px;
+    background: var(--surface-markdown);
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    flex-shrink: 0;
+    opacity: 1;
+    transition: width 0.25s ease, min-width 0.25s ease, opacity 0.2s ease, padding 0.25s ease;
+}
+
+.markdown-toc.collapsed {
+    width: 0;
+    min-width: 0;
+    padding: 0;
+    opacity: 0;
+    overflow: hidden;
+    pointer-events: none;
+}
+
+.markdown-toc-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--muted);
+    user-select: none;
+    flex-shrink: 0;
+}
+
+/* SVG rail overlaid on top of items */
+.markdown-toc-rail {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    pointer-events: none;
+    overflow: visible;
+}
+
+.markdown-toc-rail-track {
+    fill: none;
+    stroke: var(--border-soft);
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.markdown-toc-rail-active {
+    fill: none;
+    stroke: var(--accent-2);
+    stroke-width: 1.5;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    transition: stroke-dasharray 0.3s ease;
+}
+
+.markdown-toc-rail-dot {
+    fill: var(--accent-2);
+    transition: cx 0.3s ease, cy 0.3s ease;
+}
+
+.markdown-toc-item {
+    position: relative;
+    width: 100%;
+    padding: 3px 10px;
+    border: none;
+    border-radius: 4px;
+    background: none;
+    text-align: left;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--muted);
+    cursor: pointer;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    word-break: break-all;
+    transition: color 0.15s;
+    flex-shrink: 0;
+}
+
+.markdown-toc-item:hover {
+    color: var(--text);
+}
+
+.markdown-toc-item.active {
+    color: var(--accent-2);
+    font-weight: 510;
+}
+
+/* Heading anchor scroll offset */
+.markdown-preview h1[id],
+.markdown-preview h2[id],
+.markdown-preview h3[id],
+.markdown-preview h4[id],
+.markdown-preview h5[id],
+.markdown-preview h6[id] {
+    scroll-margin-top: 8px;
+}
+
 /* Search highlights */
 ::highlight(forgepad-file-search) {
     color: inherit;
@@ -758,6 +869,25 @@ textarea {
     cursor: not-allowed;
     opacity: 0.48;
     filter: none;
+}
+
+/* Icon swap animation (copy → check etc.) */
+.icon-button .icon-swap {
+    display: inline-flex;
+    animation: icon-pop-in 0.15s ease-out both;
+}
+
+@keyframes icon-pop-in {
+    from {
+        opacity: 0;
+        scale: 0.8;
+        filter: blur(2px);
+    }
+    to {
+        opacity: 1;
+        scale: 1;
+        filter: blur(0px);
+    }
 }
 
 .danger,

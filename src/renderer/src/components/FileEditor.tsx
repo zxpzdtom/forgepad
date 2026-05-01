@@ -6,9 +6,10 @@ import { File as PierreFile } from '@pierre/diffs/react';
 import { useResolvedTheme } from '@renderer/App';
 import { useAppStore } from '@renderer/store/app-store';
 import type { CodeSelectionItem, Tab, Workspace } from '@shared/types';
-import { ChevronDown, ChevronUp, Code, Copy, FileCode, FileVideo, Image, MessageSquarePlus, Music, Search, X } from 'lucide-react';
 import { code as streamdownCode } from '@streamdown/code';
 import { createMermaidPlugin } from '@streamdown/mermaid';
+import { Check, ChevronDown, ChevronUp, Code, Copy, FileCode, FileVideo, Image, List, MessageSquarePlus, Music, Search, X } from 'lucide-react';
+import type { Components } from 'streamdown';
 import { Streamdown } from 'streamdown';
 import 'streamdown/styles.css';
 
@@ -67,6 +68,303 @@ function isPdfFile(relPath: string): boolean {
 function isMarkdownPath(path: string): boolean {
   const lower = path.toLowerCase();
   return lower.endsWith('.md') || lower.endsWith('.markdown');
+}
+
+// --- Slug generation for heading anchors ---
+
+function generateSlug(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s-]/gu, '') // keep letters (any language), numbers, spaces, hyphens
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-');
+}
+
+/** Extract text content from React children recursively. */
+function extractText(children: React.ReactNode): string {
+  if (typeof children === 'string') return children;
+  if (typeof children === 'number') return String(children);
+  if (Array.isArray(children)) return children.map(extractText).join('');
+  if (children && typeof children === 'object' && 'props' in children) {
+    return extractText((children as React.ReactElement<{ children?: React.ReactNode }>).props.children);
+  }
+  return '';
+}
+
+// --- Custom heading components that add id for anchor links ---
+
+/** Create a set of heading components (h1–h6) that add id attributes based on text content. */
+function createHeadingComponents(): Components {
+  // Per-render slug counters for deduplication (reset each time Streamdown re-renders the tree)
+  const counters = new Map<string, number>();
+
+  function uniqueSlug(base: string): string {
+    const count = counters.get(base) ?? 0;
+    counters.set(base, count + 1);
+    return count === 0 ? base : `${base}-${count}`;
+  }
+
+  function makeHeading(level: 1 | 2 | 3 | 4 | 5 | 6) {
+    const Tag = `h${level}` as const;
+    const HeadingComponent = (props: React.HTMLAttributes<HTMLHeadingElement> & { node?: unknown }) => {
+      const { children, node: _, ...rest } = props;
+      const text = extractText(children);
+      const slug = uniqueSlug(generateSlug(text));
+      return (
+        <Tag {...rest} id={slug}>
+          {children}
+        </Tag>
+      );
+    };
+    HeadingComponent.displayName = `Heading${level}`;
+    return HeadingComponent;
+  }
+
+  return {
+    h1: makeHeading(1),
+    h2: makeHeading(2),
+    h3: makeHeading(3),
+    h4: makeHeading(4),
+    h5: makeHeading(5),
+    h6: makeHeading(6),
+  };
+}
+
+// NOTE: headingComponents instances are created per-render via useMemo in the component,
+// so that slug counters reset when markdown content changes.
+
+// --- TOC types ---
+
+type TocItem = {
+  id: string;
+  text: string;
+  level: number;
+};
+
+// --- TOC rail path helpers ---
+
+const RAIL_X_LEFT = 8; // x of the leftmost rail position (level 0)
+const RAIL_X_STEP = 12; // extra x per indentation level
+
+/**
+ * Build a tree-style rail path with diagonal transitions between indent levels.
+ *
+ * When the level changes between two items the path uses a diagonal line to
+ * bridge the X difference, with the remaining vertical distance as a straight
+ * vertical segment:
+ *
+ *   - Same level   (H2→H2):  pure vertical │
+ *   - Deeper       (H2→H3):  vertical down then diagonal ╲ to child
+ *   - Shallower    (H3→H2):  diagonal ╱ back to parent then vertical down
+ *
+ * The diagonal always consumes a fixed portion of the vertical gap so the
+ * slope stays consistent regardless of the distance between items.
+ */
+function buildRailPath(
+  itemYCenters: number[],
+  itemLevels: number[],
+  minLevel: number,
+): { d: string; segmentLengths: number[] } {
+  if (itemYCenters.length === 0) return { d: '', segmentLengths: [] };
+
+  const xOf = (level: number) => RAIL_X_LEFT + (level - minLevel) * RAIL_X_STEP;
+
+  const points: [number, number][] = itemYCenters.map((y, i) => [xOf(itemLevels[i]), y]);
+
+  let d = `M ${points[0][0]} ${points[0][1]}`;
+  const segmentLengths: number[] = [];
+
+  const diagLen = (dx: number, dy: number) => Math.sqrt(dx * dx + dy * dy);
+
+  for (let i = 1; i < points.length; i++) {
+    const [prevX, prevY] = points[i - 1];
+    const [curX, curY] = points[i];
+
+    if (prevX === curX) {
+      // Same indent level — pure vertical
+      d += ` L ${curX} ${curY}`;
+      segmentLengths.push(Math.abs(curY - prevY));
+    } else {
+      const totalDy = curY - prevY;
+      // Diagonal consumes up to 40% of the vertical gap, capped so the
+      // slope doesn't get too steep or too shallow.
+      const diagonalDy = Math.min(Math.abs(totalDy) * 0.4, 16);
+      const dx = curX - prevX;
+
+      if (curX > prevX) {
+        // Going deeper (e.g. H2 → H3): vertical first, then diagonal
+        const midY = curY - diagonalDy;
+        d += ` L ${prevX} ${midY}`;                 // vertical down
+        d += ` L ${curX} ${curY}`;                   // diagonal to child
+        const vertLen = Math.abs(midY - prevY);
+        segmentLengths.push(vertLen + diagLen(dx, diagonalDy));
+      } else {
+        // Going shallower (e.g. H3 → H2): diagonal first, then vertical
+        const midY = prevY + diagonalDy;
+        d += ` L ${curX} ${midY}`;                   // diagonal back
+        d += ` L ${curX} ${curY}`;                   // vertical down
+        const vertLen = Math.abs(curY - midY);
+        segmentLengths.push(diagLen(dx, diagonalDy) + vertLen);
+      }
+    }
+  }
+
+  return { d, segmentLengths };
+}
+
+// --- TOC sidebar component ---
+
+function MarkdownToc({
+  items,
+  activeId,
+  scrollContainerRef,
+  collapsed,
+}: {
+  items: TocItem[];
+  activeId: string;
+  scrollContainerRef: React.RefObject<HTMLElement | null>;
+  collapsed: boolean;
+}) {
+  const navRef = useRef<HTMLDivElement>(null);
+  const itemRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
+  const [railData, setRailData] = useState<{
+    d: string;
+    totalLength: number;
+    segmentLengths: number[];
+    svgHeight: number;
+    /** Pre-computed [x, y] centers for each item, in same order as items. */
+    points: [number, number][];
+  } | null>(null);
+
+  const handleClick = useCallback(
+    (id: string) => {
+      const container = scrollContainerRef.current;
+      if (!container) return;
+      const target = container.querySelector(`#${CSS.escape(id)}`);
+      if (target) {
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    },
+    [scrollContainerRef],
+  );
+
+  const minLevel = items.length > 0 ? Math.min(...items.map((item) => item.level)) : 1;
+
+  // Measure item positions and build SVG path whenever items change
+  useLayoutEffect(() => {
+    const nav = navRef.current;
+    if (!nav || items.length === 0) {
+      setRailData(null);
+      return;
+    }
+
+    // Wait one frame for layout to settle after render
+    const raf = requestAnimationFrame(() => {
+      const navRect = nav.getBoundingClientRect();
+      const yCenters: number[] = [];
+      const levels: number[] = [];
+
+      for (const item of items) {
+        const el = itemRefs.current.get(item.id);
+        if (!el) continue;
+        const rect = el.getBoundingClientRect();
+        yCenters.push(rect.top - navRect.top + rect.height / 2);
+        levels.push(item.level);
+      }
+
+      if (yCenters.length < 1) {
+        setRailData(null);
+        return;
+      }
+
+      const { d, segmentLengths } = buildRailPath(yCenters, levels, minLevel);
+      const totalLength = segmentLengths.reduce((a, b) => a + b, 0);
+      const svgHeight = navRect.height;
+      const points: [number, number][] = yCenters.map((y, idx) => [
+        RAIL_X_LEFT + (levels[idx] - minLevel) * RAIL_X_STEP,
+        y,
+      ]);
+
+      setRailData({ d, totalLength, segmentLengths, svgHeight, points });
+    });
+
+    return () => cancelAnimationFrame(raf);
+  }, [items, minLevel]);
+
+  // Auto-scroll the TOC panel so the active item stays visible
+  useEffect(() => {
+    if (!activeId) return;
+    const el = itemRefs.current.get(activeId);
+    if (el) {
+      el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }
+  }, [activeId]);
+
+  if (items.length === 0) return null;
+
+  // Calculate how much of the path to highlight up to the active item
+  let activeDrawLength = 0;
+  if (railData && activeId) {
+    const activeIndex = items.findIndex((item) => item.id === activeId);
+    if (activeIndex >= 0) {
+      // Sum segment lengths up to activeIndex (segments connect item i-1 to item i)
+      for (let i = 0; i < activeIndex && i < railData.segmentLengths.length; i++) {
+        activeDrawLength += railData.segmentLengths[i];
+      }
+    }
+  }
+
+  return (
+    <nav className={`markdown-toc scrollbar-thin ${collapsed ? 'collapsed' : ''}`} ref={navRef}>
+      <div className="markdown-toc-title">
+        <List size={14} />
+        目录
+      </div>
+
+      {/* Rail SVG — positioned absolutely behind the items */}
+      {railData && railData.d && (
+        <svg className="markdown-toc-rail" height={railData.svgHeight} aria-hidden="true">
+          {/* Background track */}
+          <path
+            d={railData.d}
+            className="markdown-toc-rail-track"
+            strokeDasharray="none"
+          />
+          {/* Active highlight */}
+          <path
+            d={railData.d}
+            className="markdown-toc-rail-active"
+            strokeDasharray={`${activeDrawLength} ${railData.totalLength}`}
+          />
+          {/* Active dot at the current position */}
+          {(() => {
+            const idx = items.findIndex((item) => item.id === activeId);
+            if (idx < 0 || !railData.points[idx]) return null;
+            const [cx, cy] = railData.points[idx];
+            return <circle cx={cx} cy={cy} r="3" className="markdown-toc-rail-dot" />;
+          })()}
+        </svg>
+      )}
+
+      {items.map((item) => (
+        <button
+          key={item.id}
+          ref={(el) => {
+            if (el) itemRefs.current.set(item.id, el);
+            else itemRefs.current.delete(item.id);
+          }}
+          type="button"
+          className={`markdown-toc-item ${activeId === item.id ? 'active' : ''}`}
+          style={{ paddingLeft: `${(item.level - minLevel) * RAIL_X_STEP + RAIL_X_LEFT + 12}px` }}
+          onClick={() => handleClick(item.id)}
+          title={item.text}
+        >
+          {item.text}
+        </button>
+      ))}
+    </nav>
+  );
 }
 
 // --- Streamdown plugins ---
@@ -313,6 +611,9 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
   /** Any file type that requires loading a data URL for preview */
   const isMediaFile = isImage || isAudio || isVideo || isPdf;
   const markdownText = useMemo(() => (markdownFile ? renderFrontmatterAsTable(fileText) : fileText), [markdownFile, fileText]);
+  // Create fresh heading components whenever markdown changes so slug counters reset
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentional recreation on content change
+  const mdHeadingComponents = useMemo(() => createHeadingComponents(), [markdownText]);
   const showRenderedMarkdown = markdownFile && markdownMode === 'rendered';
   const showMediaPreview = isMediaFile && mediaViewMode === 'preview';
   // showCodeViewer is computed later but we need it for search; mirror the logic here.
@@ -336,6 +637,83 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
       ),
     [contextItems, workspace.id, tab.relPath],
   );
+
+  // --- TOC state and logic ---
+  const [tocItems, setTocItems] = useState<TocItem[]>([]);
+  const [activeTocId, setActiveTocId] = useState('');
+  const [tocOpen, setTocOpen] = useState(true);
+
+  // Extract TOC items from rendered DOM via MutationObserver
+  useEffect(() => {
+    if (!showRenderedMarkdown) {
+      setTocItems([]);
+      return;
+    }
+
+    const container = previewRef.current;
+    if (!container) return;
+
+    function extractToc() {
+      if (!container) return;
+      const headings = container.querySelectorAll<HTMLElement>('h1, h2, h3, h4, h5, h6');
+      const items: TocItem[] = [];
+      for (const heading of headings) {
+        const id = heading.id;
+        const text = heading.textContent?.trim() ?? '';
+        const level = Number.parseInt(heading.tagName[1], 10);
+        if (id && text) {
+          items.push({ id, text, level });
+        }
+      }
+      setTocItems(items);
+    }
+
+    // Initial extraction (after Streamdown has rendered)
+    const raf = requestAnimationFrame(extractToc);
+
+    // Re-extract on DOM changes (e.g. streaming updates)
+    const observer = new MutationObserver(extractToc);
+    observer.observe(container, { childList: true, subtree: true });
+
+    return () => {
+      cancelAnimationFrame(raf);
+      observer.disconnect();
+    };
+  }, [showRenderedMarkdown, markdownText]);
+
+  // Track which heading is currently visible via IntersectionObserver
+  useEffect(() => {
+    if (!showRenderedMarkdown || tocItems.length === 0) return;
+
+    const scrollContainer = scrollRef.current;
+    if (!scrollContainer) return;
+
+    const headingElements = tocItems
+      .map((item) => scrollContainer.querySelector<HTMLElement>(`#${CSS.escape(item.id)}`))
+      .filter(Boolean) as HTMLElement[];
+
+    if (headingElements.length === 0) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        // Find the topmost visible heading
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            setActiveTocId(entry.target.id);
+            return;
+          }
+        }
+      },
+      {
+        root: scrollContainer,
+        rootMargin: '0px 0px -80% 0px',
+        threshold: 0,
+      },
+    );
+
+    for (const el of headingElements) observer.observe(el);
+    return () => observer.disconnect();
+  }, [showRenderedMarkdown, tocItems]);
 
   // --- File options for @pierre/diffs File component ---
   const fileOptions: FileOptions<AnnotationMeta> = useMemo(
@@ -559,10 +937,12 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
     return () => window.removeEventListener('keydown', handleKeyDown, true);
   }, [closeSearch, goToMatch, openSearch, searchOpen, pendingSelection]);
 
+  const [copied, setCopied] = useState(false);
   const copyContent = async () => {
     try {
       await navigator.clipboard.writeText(fileText);
-      addToast('success', 'Copied to clipboard');
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
     } catch {
       addToast('error', 'Failed to copy');
     }
@@ -739,8 +1119,22 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
               <Search size={16} />
             </button>
           ) : null}
+          {showRenderedMarkdown && tocItems.length > 0 ? (
+            <button
+              className={`icon-button ${tocOpen ? 'active' : ''}`}
+              type="button"
+              title="Toggle table of contents"
+              onClick={() => setTocOpen((v) => !v)}
+            >
+              <List size={16} />
+            </button>
+          ) : null}
           <button className="icon-button" type="button" title="Copy file" onClick={copyContent}>
-            <Copy size={16} />
+            {copied ? (
+              <span key="check" className="icon-swap"><Check size={16} /></span>
+            ) : (
+              <span key="copy" className="icon-swap"><Copy size={16} /></span>
+            )}
           </button>
         </div>
       </div>
@@ -812,12 +1206,20 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
           style={{ width: '100%', height: '100%' }}
         />
       ) : showRenderedMarkdown ? (
-        <div className="markdown-viewer-scroll scrollbar-thin scroll-mask-y min-h-0 flex-1 overflow-auto" ref={scrollRef}>
-          <div ref={previewRef} className="markdown-preview">
-            <Streamdown plugins={resolvedTheme === 'dark' ? streamdownPluginsDark : streamdownPluginsLight}>
-              {markdownText}
-            </Streamdown>
+        <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
+          <div className="markdown-viewer-scroll scrollbar-thin scroll-mask-y min-h-0 min-w-0 flex-1 overflow-auto" ref={scrollRef}>
+            <div ref={previewRef} className="markdown-preview">
+              <Streamdown
+                components={mdHeadingComponents}
+                plugins={resolvedTheme === 'dark' ? streamdownPluginsDark : streamdownPluginsLight}
+              >
+                {markdownText}
+              </Streamdown>
+            </div>
           </div>
+          {tocItems.length > 0 ? (
+            <MarkdownToc items={tocItems} activeId={activeTocId} scrollContainerRef={scrollRef} collapsed={!tocOpen} />
+          ) : null}
         </div>
       ) : (
         <div ref={codeViewerRef} className="scrollbar-thin scroll-mask flex min-h-0 flex-1 flex-col overflow-auto">
