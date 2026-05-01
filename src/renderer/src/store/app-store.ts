@@ -14,6 +14,7 @@ import type {
   FileStatus,
   GitBucket,
   GitStatusKind,
+  LspSymbolPeekState,
   NotificationSettings,
   NotificationSound,
   PersistedAppState,
@@ -88,6 +89,8 @@ type AppState = {
   feedbackModalOpen: boolean;
   /** Pending element selection for feedback modal */
   pendingFeedback: { tabId: string; element: SelectedElementInfo } | null;
+  /** LSP symbol peek panel state (Cmd+Click results) */
+  symbolPeek: LspSymbolPeekState;
   handleAgentStatusUpdate: (ptyId: string, status: AgentStatus) => void;
   clearAgentStatus: (ptyId: string) => void;
   notifyAgentInput: (ptyId: string) => void;
@@ -186,6 +189,8 @@ type AppState = {
   openFeedbackModal: (tabId: string, element: SelectedElementInfo) => void;
   closeFeedbackModal: () => void;
   submitBrowserFeedback: (comment: string) => void;
+  openSymbolPeek: (peek: NonNullable<LspSymbolPeekState>) => void;
+  closeSymbolPeek: () => void;
   updateNotificationSettings: (partial: Partial<NotificationSettings>) => void;
   addCustomSound: (sound: NotificationSound) => void;
   removeCustomSound: (soundId: string) => void;
@@ -364,6 +369,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   browserHistory: [],
   feedbackModalOpen: false,
   pendingFeedback: null,
+  symbolPeek: null,
   handleAgentStatusUpdate: (ptyId, status) => {
     // Reset the working-timeout whenever we receive any hook event.
     // If status is "working", start a timeout that auto-clears to "idle"
@@ -1797,6 +1803,14 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
 
     get().closeFeedbackModal();
+  },
+
+  openSymbolPeek: (peek) => {
+    set({ symbolPeek: peek });
+  },
+
+  closeSymbolPeek: () => {
+    set({ symbolPeek: null });
   },
 
   updateNotificationSettings: (partial) =>

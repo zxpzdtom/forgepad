@@ -7,6 +7,7 @@ import type {
   FileStatus,
   GitBucket,
   GitStatusKind,
+  LspLocation,
   OpenProjectResult,
   PersistedAppState,
   WorkspaceChangeEvent,
@@ -178,6 +179,10 @@ const api = {
       ipcRenderer.on(IPC.BROWSER_CONSOLE_EVENT, handler);
       return () => ipcRenderer.removeListener(IPC.BROWSER_CONSOLE_EVENT, handler);
     },
+  },
+  lsp: {
+    getDefinition: (worktreePath: string, token: string) =>
+      ipcRenderer.invoke(IPC.LSP_GET_DEFINITION, worktreePath, token) as Promise<LspLocation[]>,
   },
 };
 
