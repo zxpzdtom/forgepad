@@ -180,7 +180,7 @@ export function useLspTokenNavigation(
         if (looksLikeImportPath(stripped)) {
           const resolved = await resolveImportPath(worktreePath, stripped, filePath);
           if (resolved) {
-            openFileTab(workspaceId, resolved);
+            openFileTab(workspaceId, resolved, 1);
             closeSymbolPeek();
             return;
           }
@@ -198,10 +198,10 @@ export function useLspTokenNavigation(
 
         if (locations.length === 0) return;
 
-        // Single definition → jump directly to the file
+        // Single definition → jump directly to the file and line
         if (locations.length === 1) {
           const loc = locations[0];
-          openFileTab(workspaceId, loc.filePath);
+          openFileTab(workspaceId, loc.filePath, loc.lineNumber);
           closeSymbolPeek();
           return;
         }

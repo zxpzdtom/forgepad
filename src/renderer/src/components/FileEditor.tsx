@@ -572,6 +572,25 @@ function findScrollableAncestor(node: Node, boundary: HTMLElement): HTMLElement 
 
 // --- Helpers ---
 
+/** Top offset (px) when scrolling to a target line, so it's not hidden by the toolbar shadow. */
+const SCROLL_TO_LINE_OFFSET = 80;
+
+/**
+ * Scroll a target element into view inside a given scroll container, placing it
+ * near the top with a small offset so it's not obscured by toolbar shadows.
+ *
+ * We compute the position manually via getBoundingClientRect so it works
+ * correctly for elements inside a shadow DOM.
+ */
+function scrollToLineElement(el: HTMLElement, scrollContainer: HTMLElement) {
+  const elRect = el.getBoundingClientRect();
+  const containerRect = scrollContainer.getBoundingClientRect();
+  scrollContainer.scrollTo({
+    top: scrollContainer.scrollTop + elRect.top - containerRect.top - SCROLL_TO_LINE_OFFSET,
+    behavior: 'smooth',
+  });
+}
+
 /** Extract lines from file text by 1-based line numbers (inclusive). */
 function extractLines(text: string, startLine: number, endLine: number): string {
   const lines = text.split('\n');
@@ -603,6 +622,7 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
   const addCodeSelection = useAppStore((state) => state.addCodeSelection);
   const contextItems = useAppStore((state) => state.contextItems);
   const editorFontSize = useAppStore((state) => state.settings.editorFontSize);
+  const clearTabTargetLine = useAppStore((state) => state.clearTabTargetLine);
   /** True when this tab was opened from outside the workspace (read-only, no context actions). */
   const isExternal = Boolean(tab.absPath);
   const { onTokenClick, onTokenEnter, onTokenLeave } = useLspTokenNavigation(
@@ -746,6 +766,25 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
           });
         }
       },
+      onPostRender: (node: HTMLElement) => {
+        const lineNumber = pendingScrollLineRef.current;
+        if (!lineNumber) return;
+        const root = node.shadowRoot;
+        // The scroll container is the codeViewerRef div (parent of diffs-container)
+        const scrollContainer = codeViewerRef.current ?? node.parentElement;
+        if (!root || !scrollContainer) return;
+        // data-line-index is 0-based
+        const lineIndex = lineNumber - 1;
+        const lineEl = root.querySelector(`[data-content] [data-line-index="${lineIndex}"]`) as HTMLElement
+          ?? root.querySelector(`[data-gutter] [data-column-number="${lineNumber}"]`) as HTMLElement;
+        if (lineEl) {
+          // Delay briefly so the browser finishes layout after render
+          requestAnimationFrame(() => {
+            scrollToLineElement(lineEl, scrollContainer);
+            pendingScrollLineRef.current = undefined;
+          });
+        }
+      },
     }),
     [resolvedTheme, onTokenClick, onTokenEnter, onTokenLeave],
   );
@@ -825,6 +864,55 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
       setSelectedRange(null);
     }
   }, [showRenderedMarkdown]);
+
+  // --- Scroll-to-line when targetLine is set (e.g. from Go to Definition) ---
+  // We use a ref so that the onPostRender callback (captured in fileOptions)
+  // can read the latest value without re-creating the options object.
+  const pendingScrollLineRef = useRef<number | undefined>(undefined);
+
+  useEffect(() => {
+    if (!tab.targetLine || loading) return;
+    pendingScrollLineRef.current = tab.targetLine;
+    clearTabTargetLine(tab.id);
+
+    const scrollContainer = codeViewerRef.current;
+    if (!scrollContainer) return;
+
+    // For the plain-text fallback (no @pierre/diffs), scroll directly.
+    if (isPlainText) {
+      const rows = scrollContainer.querySelectorAll('tr');
+      const line = pendingScrollLineRef.current;
+      if (line && line <= rows.length) {
+        scrollToLineElement(rows[line - 1] as HTMLElement, scrollContainer);
+        pendingScrollLineRef.current = undefined;
+      }
+      return;
+    }
+
+    // For @pierre/diffs: the onPostRender callback below will handle it.
+    // But if the file is already rendered (same file, just a new targetLine),
+    // onPostRender may not fire again. In that case, do a manual DOM query.
+    const diffsHost = scrollContainer.querySelector('diffs-container') as HTMLElement | null;
+    const root = diffsHost?.shadowRoot;
+    if (root) {
+      // data-line-index is 0-based
+      const lineIndex = pendingScrollLineRef.current - 1;
+      const lineEl = root.querySelector(`[data-content] [data-line-index="${lineIndex}"]`) as HTMLElement | null;
+      if (lineEl) {
+        scrollToLineElement(lineEl, scrollContainer);
+        pendingScrollLineRef.current = undefined;
+        return;
+      }
+      // Also try gutter as fallback
+      const gutterItem = root.querySelector(`[data-gutter] [data-column-number="${pendingScrollLineRef.current}"]`) as HTMLElement | null;
+      if (gutterItem) {
+        scrollToLineElement(gutterItem, scrollContainer);
+        pendingScrollLineRef.current = undefined;
+        return;
+      }
+    }
+    // Otherwise onPostRender will handle it when the component renders.
+  }, [tab.targetLine, tab.id, loading, clearTabTargetLine, isPlainText]);
 
   // --- Search (for rendered markdown & code viewer modes) ---
 
