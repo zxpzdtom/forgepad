@@ -5,7 +5,9 @@ import { CSS } from '@dnd-kit/utilities';
 import { useAppStore } from '@renderer/store/app-store';
 import type { AgentStatus } from '@shared/agent-lifecycle';
 import type { Project } from '@shared/types';
-import { FolderOpen, FolderPlus, Settings } from 'lucide-react';
+import { FolderOpen, FolderPlus, RefreshCw, Settings } from 'lucide-react';
+
+import { generateRandomBranchName } from '@renderer/lib/random-branch-name';
 
 import { ContextMenu, type ContextMenuSection } from './ContextMenu';
 import { Spinner } from './Spinner';
@@ -562,7 +564,7 @@ function NewWorktreeDialog({
   onCreate: (branch: string, trackRemote: boolean) => void;
 }) {
   const worktreeTrackRemoteByDefault = useAppStore((s) => s.settings.worktreeTrackRemoteByDefault);
-  const [branch, setBranch] = useState('');
+  const [branch, setBranch] = useState(generateRandomBranchName);
   const [trackRemote, setTrackRemote] = useState(worktreeTrackRemoteByDefault);
   const [loading, setLoading] = useState(false);
   const [remoteStatus, setRemoteStatus] = useState<'idle' | 'checking' | 'exists' | 'not-found'>('idle');
@@ -625,17 +627,27 @@ function NewWorktreeDialog({
         <div className="flex flex-col gap-3 px-4 py-4">
           <label className="flex flex-col gap-1.5">
             <span className="text-[12px] text-subtle">Branch name</span>
-            <input
-              ref={inputRef}
-              type="text"
-              className="h-8 rounded-md border border-border bg-panel-3 px-2.5 text-[13px] text-text outline-none focus:border-accent"
-              placeholder="feature/my-branch"
-              value={branch}
-              onChange={(e) => setBranch(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') void handleSubmit();
-              }}
-            />
+            <div className="flex items-center gap-1.5">
+              <input
+                ref={inputRef}
+                type="text"
+                className="h-8 flex-1 rounded-md border border-border bg-panel-3 px-2.5 text-[13px] text-text outline-none focus:border-accent"
+                placeholder="e.g. swift-fox"
+                value={branch}
+                onChange={(e) => setBranch(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') void handleSubmit();
+                }}
+              />
+              <button
+                type="button"
+                className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-md border border-border bg-panel-3 text-subtle hover:bg-panel-2 hover:text-text"
+                title="Generate random name"
+                onClick={() => setBranch(generateRandomBranchName())}
+              >
+                <RefreshCw size={14} />
+              </button>
+            </div>
           </label>
           <label className="flex cursor-pointer select-none items-center gap-2">
             <input
