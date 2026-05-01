@@ -364,9 +364,11 @@ export const useAppStore = create<AppState>((set, get) => ({
   handleAgentStatusUpdate: (ptyId, status) => {
     // Reset the working-timeout whenever we receive any hook event.
     // If status is "working", start a timeout that auto-clears to "idle"
-    // after 10s of silence (handles ESC cancel / unexpected interruptions).
-    // Normal work continuously fires PreToolUse/PostToolUse hooks which
-    // reset this timer, so 10s is safe — only ESC/interrupts go silent.
+    // only after the PTY process has exited (handles ESC cancel /
+    // unexpected interruptions).  During LLM inference no hooks fire so
+    // we must NOT clear the status while the process is alive — instead
+    // we use a generous timeout and double-check exitedPtyIds before
+    // clearing.
     const prev = agentWorkingTimers.get(ptyId);
     if (prev) clearTimeout(prev);
 
@@ -375,10 +377,13 @@ export const useAppStore = create<AppState>((set, get) => ({
         ptyId,
         setTimeout(() => {
           agentWorkingTimers.delete(ptyId);
-          const current = get().agentStatuses[ptyId];
-          if (current === 'working') {
-            set((s) => {
-              const { [ptyId]: _, ...rest } = s.agentStatuses;
+          const s = get();
+          // Only auto-clear if the PTY has actually exited.  If the
+          // process is still alive the agent is likely inferring (waiting
+          // for the LLM API), so we keep the "working" indicator.
+          if (s.agentStatuses[ptyId] === 'working' && s.exitedPtyIds.has(ptyId)) {
+            set((prev) => {
+              const { [ptyId]: _, ...rest } = prev.agentStatuses;
               return { agentStatuses: rest };
             });
           }
