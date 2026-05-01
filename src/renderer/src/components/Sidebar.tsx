@@ -391,17 +391,6 @@ function SortableWorkspaceRow({
       {...listeners}
     >
       {isActive && <span className="absolute top-1 bottom-1 left-0 w-[3px] rounded-full bg-accent" />}
-      {onDelete && (
-        <div
-          className="absolute top-1 right-1 hidden size-5 cursor-pointer items-center justify-center rounded text-subtle hover:text-danger group-hover/sidebar-workspace:flex"
-          onClick={(e) => {
-            e.stopPropagation();
-            onDelete();
-          }}
-        >
-          <CancelIcon />
-        </div>
-      )}
       <div className="mt-[3px] flex size-[14px] shrink-0 items-center justify-center">
         {agentStatus && agentStatus !== 'idle' ? (
           <WorkspaceStatusDot isActive={isActive} agentStatus={agentStatus} />

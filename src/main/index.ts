@@ -133,7 +133,9 @@ function createWindow(): void {
   });
 
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-    void shell.openExternal(url);
+    shell.openExternal(url).catch((err) => {
+      console.error('Failed to open external URL:', url, err);
+    });
     return { action: 'deny' };
   });
 

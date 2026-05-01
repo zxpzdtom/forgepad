@@ -132,6 +132,7 @@ const api = {
   },
   shell: {
     openPath: (fullPath: string) => ipcRenderer.invoke(IPC.SHELL_OPEN_PATH, fullPath) as Promise<void>,
+    openExternal: (url: string) => ipcRenderer.invoke(IPC.SHELL_OPEN_EXTERNAL, url) as Promise<void>,
     openInIde: (fullPath: string) => ipcRenderer.invoke(IPC.SHELL_OPEN_IN_IDE, fullPath) as Promise<void>,
     openInTerminal: (fullPath: string) => ipcRenderer.invoke(IPC.SHELL_OPEN_IN_TERMINAL, fullPath) as Promise<void>,
     showItemInFolder: (fullPath: string) => ipcRenderer.invoke(IPC.SHELL_SHOW_ITEM_IN_FOLDER, fullPath) as Promise<void>,
