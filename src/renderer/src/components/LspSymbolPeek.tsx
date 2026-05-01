@@ -83,7 +83,7 @@ export function LspSymbolPeek({ workspace }: LspSymbolPeekProps) {
 
   const handleLocationDoubleClick = useCallback(
     (loc: LspLocation) => {
-      openFileTab(workspace.id, loc.filePath);
+      openFileTab(workspace.id, loc.filePath, loc.lineNumber);
       closeSymbolPeek();
     },
     [workspace.id, openFileTab, closeSymbolPeek],
