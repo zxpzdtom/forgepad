@@ -8,6 +8,7 @@ import { BrowserTab } from './BrowserTab';
 import { ContextPreview } from './ContextPreview';
 import { DiffViewer } from './DiffViewer';
 import { FileEditor } from './FileEditor';
+import { LspSymbolPeek } from './LspSymbolPeek';
 
 /** Error boundary so a crashing BrowserTab doesn't take down the whole column */
 class BrowserErrorBoundary extends Component<{ children: ReactNode; onRetry: () => void }, { hasError: boolean; error: string }> {
@@ -58,6 +59,7 @@ export function FileColumn() {
   const setFocusedColumn = useAppStore((state) => state.setFocusedColumn);
   const openFileTab = useAppStore((state) => state.openFileTab);
   const openExternalFileTab = useAppStore((state) => state.openExternalFileTab);
+  const symbolPeek = useAppStore((state) => state.symbolPeek);
 
   const fileTabs = tabs.filter((tab) => tab.workspaceId === activeWorkspaceId && tab.type !== 'terminal');
 
@@ -168,6 +170,7 @@ export function FileColumn() {
           return null;
         })}
       </div>
+      {symbolPeek && <LspSymbolPeek workspace={activeWorkspace} />}
     </div>
   );
 }

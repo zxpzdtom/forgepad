@@ -56,4 +56,6 @@ export const IPC = {
   APP_FOCUS_WINDOW: 'app:focus-window',
   FS_READ_ABS_FILE: 'fs:read-abs-file',
   FS_READ_ABS_FILE_DATA_URL: 'fs:read-abs-file-data-url',
+  // LSP (text-based symbol search)
+  LSP_GET_DEFINITION: 'lsp:get-definition',
 } as const;
