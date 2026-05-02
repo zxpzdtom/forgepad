@@ -1,5 +1,6 @@
 import { type MouseEvent, useCallback, useMemo, useState } from 'react';
 import { useHorizontalScroll } from '@renderer/hooks/useHorizontalScroll';
+import { useTranslation } from '@renderer/i18n';
 import { closestCenter, DndContext, type DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { horizontalListSortingStrategy, SortableContext } from '@dnd-kit/sortable';
 import { useAppStore } from '@renderer/store/app-store';
@@ -46,6 +47,7 @@ function StatusDot({ status }: { status: AgentStatus | undefined }) {
 }
 
 export function AgentTabBar() {
+  const { t } = useTranslation();
   const tabs = useAppStore((state) => state.tabs);
   const activeWorkspaceId = useAppStore((state) => state.activeWorkspaceId);
   const activeAgentTabId = useAppStore((state) => state.activeAgentTabId);
@@ -120,7 +122,7 @@ export function AgentTabBar() {
                   title={tab.title}
                   onSelect={() => setActiveTab(tab.id)}
                   onClose={() => closeTab(tab.id)}
-                  closeTitle="Close agent"
+                  closeTitle={t('agent.closeAgent')}
                   onContextMenu={(event) => handleContextMenu(event, tab)}
                   suffix={<StatusDot status={status} />}
                 />
@@ -133,7 +135,7 @@ export function AgentTabBar() {
       <button
         className="icon-button small"
         type="button"
-        title="New agent"
+        title={t('agent.newAgent')}
         onClick={() => void createAgentTerminal(activeWorkspaceId ?? undefined)}
       >
         <Plus size={14} />

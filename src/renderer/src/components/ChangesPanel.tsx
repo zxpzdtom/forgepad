@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from '@renderer/i18n';
 import { useAppStore } from '@renderer/store/app-store';
 import type { FileStatus, GitBucket, GitStatusKind, Workspace } from '@shared/types';
 import { Check, ChevronDown, FolderOpen, GitCommitHorizontal, RefreshCw, RotateCcw, Trash2 } from 'lucide-react';
@@ -15,10 +16,10 @@ function statusKey(status: FileStatus): string {
   return `${status.bucket}:${status.path}`;
 }
 
-function bucketTitle(bucket: GitBucket): string {
-  if (bucket === 'staged') return 'Staged';
-  if (bucket === 'untracked') return 'Untracked';
-  return 'Working Tree';
+function bucketTitle(bucket: GitBucket, t: (key: string) => string): string {
+  if (bucket === 'staged') return t('changes.staged');
+  if (bucket === 'untracked') return t('changes.untracked');
+  return t('changes.workingTree');
 }
 
 // --- Zed-style status indicator ---
@@ -315,6 +316,7 @@ function TreeSection({
 // --- Main panel ---
 
 export function ChangesPanel() {
+  const { t } = useTranslation();
   const workspace = useActiveWorkspace();
   const [statuses, setStatuses] = useState<FileStatus[]>([]);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
@@ -343,7 +345,7 @@ export function ChangesPanel() {
           if (silent) triggerGitRefresh();
         }
       } catch (error) {
-        addToast('error', error instanceof Error ? error.message : 'Failed to load git status.');
+        addToast('error', error instanceof Error ? error.message : t('changes.failedLoadStatus'));
       } finally {
         if (!silent) setLoading(false);
       }
@@ -446,7 +448,7 @@ export function ChangesPanel() {
           selected.map((s) => s.path),
         );
       } else if (kind === 'discard') {
-        const ok = window.confirm('Discard selected changes? This cannot be undone.');
+        const ok = window.confirm(t('changes.discardConfirm'));
         if (!ok) return;
         await window.forgepad.git.discard(
           workspace.worktreePath,
@@ -458,14 +460,14 @@ export function ChangesPanel() {
       }
       await load();
       triggerGitRefresh();
-      addToast('success', 'Git operation completed.');
+      addToast('success', t('changes.gitOpCompleted'));
     } catch (error) {
-      addToast('error', error instanceof Error ? error.message : 'Git operation failed.');
+      addToast('error', error instanceof Error ? error.message : t('changes.gitOpFailed'));
     }
   };
 
   if (!workspace) {
-    return <div className="grid min-h-[90px] place-items-center text-muted">Open a project first</div>;
+    return <div className="grid min-h-[90px] place-items-center text-muted">{t('changes.openProjectFirst')}</div>;
   }
 
   const bucketOrder: GitBucket[] = ['staged', 'unstaged', 'untracked'];
@@ -476,22 +478,22 @@ export function ChangesPanel() {
       <div className="flex min-h-8 items-center gap-2">
         <button className="secondary-button" type="button" disabled={selected.length === 0} onClick={() => mutate('stage')}>
           <Check size={15} />
-          Stage
+          {t('changes.stage')}
         </button>
         <button className="secondary-button" type="button" disabled={selected.length === 0} onClick={() => mutate('unstage')}>
           <RotateCcw size={15} />
-          Unstage
+          {t('changes.unstage')}
         </button>
         <button
           className="icon-button danger"
           type="button"
-          title="Discard selected"
+          title={t('changes.discardSelected')}
           disabled={selected.length === 0}
           onClick={() => mutate('discard')}
         >
           <Trash2 size={15} />
         </button>
-        <button className="icon-button" type="button" title="Refresh changes" onClick={load}>
+        <button className="icon-button" type="button" title={t('changes.refreshChanges')} onClick={load}>
           <RefreshCw size={15} />
         </button>
       </div>
@@ -506,7 +508,7 @@ export function ChangesPanel() {
           </div>
         )}
         {!loading && statuses.length === 0 && (
-          <div className="grid min-h-[52px] place-items-center text-muted">Clean working tree</div>
+          <div className="grid min-h-[52px] place-items-center text-muted">{t('changes.cleanWorkingTree')}</div>
         )}
         {bucketOrder.map((bucket) => {
           const trees = treesByBucket[bucket];
@@ -515,7 +517,7 @@ export function ChangesPanel() {
           return (
             <div key={bucket} className="mb-1">
               <div className="flex items-center justify-between px-1 py-1 text-muted text-xs">
-                <span className="font-[510]">{bucketTitle(bucket)}</span>
+                <span className="font-[510]">{bucketTitle(bucket, t)}</span>
                 <span>{bucketFiles.length}</span>
               </div>
               <TreeSection
@@ -538,11 +540,11 @@ export function ChangesPanel() {
           className="commit-textarea"
           value={commitMessage}
           onChange={(event) => setCommitMessage(event.currentTarget.value)}
-          placeholder="Commit message"
+          placeholder={t('changes.commitMessage')}
         />
         <button className="primary-button w-full" type="button" disabled={!commitMessage.trim()} onClick={() => mutate('commit')}>
           <GitCommitHorizontal size={16} />
-          Commit Staged
+          {t('changes.commitStaged')}
         </button>
       </div>
     </section>

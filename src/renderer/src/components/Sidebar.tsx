@@ -2,6 +2,7 @@ import { type KeyboardEvent, type ReactNode, memo, useEffect, useMemo, useState 
 import { closestCenter, DndContext, type DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { useTranslation } from '@renderer/i18n';
 import { useAppStore } from '@renderer/store/app-store';
 import type { AgentStatus } from '@shared/agent-lifecycle';
 import type { Project, WorkspacePanel } from '@shared/types';
@@ -215,7 +216,7 @@ function ProjectAvatar({ name }: { name: string }) {
 
 /* ── Relative time formatter ──────────────────────────────────── */
 
-function formatRelativeTime(timestamp: number): string {
+function formatRelativeTime(timestamp: number, t: (key: string, params?: Record<string, string | number>) => string): string {
   const now = Date.now();
   const diff = now - timestamp;
   const seconds = Math.floor(diff / 1000);
@@ -226,13 +227,13 @@ function formatRelativeTime(timestamp: number): string {
   const months = Math.floor(days / 30);
   const years = Math.floor(days / 365);
 
-  if (seconds < 60) return 'just now';
-  if (minutes < 60) return `${minutes}m ago`;
-  if (hours < 24) return `${hours}h ago`;
-  if (days < 7) return `${days}d ago`;
-  if (weeks < 5) return `${weeks}w ago`;
-  if (months < 12) return `${months}mo ago`;
-  return `${years}y ago`;
+  if (seconds < 60) return t('sidebar.justNow');
+  if (minutes < 60) return t('sidebar.minutesAgo', { n: minutes });
+  if (hours < 24) return t('sidebar.hoursAgo', { n: hours });
+  if (days < 7) return t('sidebar.daysAgo', { n: days });
+  if (weeks < 5) return t('sidebar.weeksAgo', { n: weeks });
+  if (months < 12) return t('sidebar.monthsAgo', { n: months });
+  return t('sidebar.yearsAgo', { n: years });
 }
 
 /**
@@ -319,6 +320,7 @@ function SortableProjectGroup({
   onAddWorktree: () => void;
   onContextMenu: (e: React.MouseEvent) => void;
 }) {
+  const { t } = useTranslation();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: projectId,
     data: { type: 'project' },
@@ -360,7 +362,7 @@ function SortableProjectGroup({
         <button
           className="grid size-5 shrink-0 cursor-pointer place-items-center rounded text-subtle opacity-0 transition-opacity hover:bg-panel-3 hover:text-text focus:opacity-100 group-hover/sidebar-project:opacity-100"
           type="button"
-          title="New worktree"
+          title={t('sidebar.newWorktree')}
           onPointerDown={(event) => event.stopPropagation()}
           onClick={(event) => {
             event.stopPropagation();
@@ -393,6 +395,7 @@ function SortableWorkspaceRow({
   onDelete?: () => void;
   onContextMenu?: (e: React.MouseEvent) => void;
 }) {
+  const { t } = useTranslation();
   const branchStats = useAppStore((state) => state.branchStats[workspace.id]);
   const stats = branchStats ?? {
     ahead: 0,
@@ -454,7 +457,7 @@ function SortableWorkspaceRow({
           <span
             className={`min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap font-mono text-[13px] font-[510]${isActive ? 'text-text' : ''}`}
           >
-            {workspace.branch || 'detached'}
+            {workspace.branch || t('sidebar.detached')}
           </span>
           {prNumber && (
             <span
@@ -485,7 +488,7 @@ function SortableWorkspaceRow({
         </div>
         <div className="flex min-w-0 items-center gap-2">
           <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[11px] text-subtle">
-            {formatRelativeTime(workspace.createdAt)}
+            {formatRelativeTime(workspace.createdAt, t)}
           </span>
           {hasRemoteStats && (
             <span className="shrink-0 font-mono text-[10px] text-subtle">
@@ -535,25 +538,26 @@ function ProjectContextMenu({
   onNewWorktree: () => void;
   onCloseProject: () => void;
 }) {
+  const { t } = useTranslation();
   const sections: ContextMenuSection[] = [
     {
-      label: 'Open in Finder',
+      label: t('sidebar.menu.openInFinder'),
       icon: <FolderIcon className="size-4" />,
       action: () => { void window.forgepad.shell.openPath(project.repoPath); onClose(); },
     },
     {
-      label: 'Copy Path',
+      label: t('sidebar.menu.copyPath'),
       icon: <ClipboardCopyIcon className="size-4" />,
       action: () => { void navigator.clipboard.writeText(project.repoPath); onClose(); },
     },
     {
-      label: 'New Worktree',
+      label: t('sidebar.menu.newWorktree'),
       icon: <FolderTreeIcon className="size-4" />,
       action: () => { onClose(); onNewWorktree(); },
     },
     'divider',
     {
-      label: 'Close Project',
+      label: t('sidebar.menu.closeProject'),
       icon: <CancelIcon className="size-4" />,
       danger: true,
       action: () => { onClose(); onCloseProject(); },
@@ -578,19 +582,20 @@ function WorkspaceContextMenu({
   onClose: () => void;
   onDelete?: () => void;
 }) {
+  const { t } = useTranslation();
   const sections: ContextMenuSection[] = [
     {
-      label: 'Open in Finder',
+      label: t('sidebar.menu.openInFinder'),
       icon: <FolderIcon className="size-4" />,
       action: () => { void window.forgepad.shell.openPath(workspace.worktreePath); onClose(); },
     },
     {
-      label: 'Copy Project Path',
+      label: t('sidebar.menu.copyProjectPath'),
       icon: <ClipboardCopyIcon className="size-4" />,
       action: () => { void navigator.clipboard.writeText(workspace.worktreePath); onClose(); },
     },
     {
-      label: 'Copy Branch Name',
+      label: t('sidebar.menu.copyBranchName'),
       icon: <GitMergeIcon className="size-4" />,
       action: () => { void navigator.clipboard.writeText(workspace.branch); onClose(); },
     },
@@ -598,7 +603,7 @@ function WorkspaceContextMenu({
       ? [
           'divider' as const,
           {
-            label: 'Delete Worktree',
+            label: t('sidebar.menu.deleteWorktree'),
             icon: <CancelIcon className="size-4" />,
             danger: true,
             action: () => { onClose(); onDelete(); },
@@ -613,6 +618,7 @@ function WorkspaceContextMenu({
 /* ── Delete worktree confirmation dialog ─────────────────────── */
 
 function DeleteWorktreeDialog({ branch, onClose, onConfirm }: { branch: string; onClose: () => void; onConfirm: () => void }) {
+  const { t } = useTranslation();
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -635,11 +641,10 @@ function DeleteWorktreeDialog({ branch, onClose, onConfirm }: { branch: string; 
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-border border-b px-4 py-3">
-          <span className="font-[590] text-[14px] text-text">Delete Worktree</span>
+          <span className="font-[590] text-[14px] text-text">{t('sidebar.deleteWorktree.title')}</span>
         </div>
         <div className="px-4 py-4 text-[13px] text-subtle leading-relaxed">
-          Are you sure you want to delete worktree <span className="font-[590] font-mono text-text">{branch}</span>? This will
-          remove the worktree directory and delete the local branch.
+          {t('sidebar.deleteWorktree.message')} <span className="font-[590] font-mono text-text">{branch}</span>{t('sidebar.deleteWorktree.detail')}
         </div>
         <div className="flex justify-end gap-2 border-border border-t px-4 py-3">
           <button
@@ -647,7 +652,7 @@ function DeleteWorktreeDialog({ branch, onClose, onConfirm }: { branch: string; 
             className="h-8 cursor-pointer rounded-md border border-border bg-transparent px-3 text-[13px] text-text hover:bg-panel-3"
             onClick={onClose}
           >
-            Cancel
+            {t('common.cancel')}
           </button>
           <button
             type="button"
@@ -655,7 +660,7 @@ function DeleteWorktreeDialog({ branch, onClose, onConfirm }: { branch: string; 
             disabled={loading}
             onClick={handleDelete}
           >
-            {loading ? 'Deleting…' : 'Delete'}
+            {loading ? t('sidebar.deleteWorktree.deleting') : t('common.delete')}
           </button>
         </div>
       </div>
@@ -724,6 +729,7 @@ const PanelDot = memo(function PanelDot({
  * Clicking the emoji button opens an emoji-mart picker popover.
  */
 function NewPanelDialog({ onClose, onCreate }: { onClose: () => void; onCreate: (name: string, emoji: string) => void }) {
+  const { t } = useTranslation();
   const [name, setName] = useState('');
   const [emoji, setEmoji] = useState('🚀');
   const [showPicker, setShowPicker] = useState(false);
@@ -740,7 +746,7 @@ function NewPanelDialog({ onClose, onCreate }: { onClose: () => void; onCreate: 
   }, [onClose, showPicker]);
 
   const handleSubmit = () => {
-    const finalName = name.trim() || 'Panel';
+    const finalName = name.trim() || t('sidebar.newPanel.defaultName');
     onCreate(finalName, emoji);
     onClose();
   };
@@ -752,18 +758,18 @@ function NewPanelDialog({ onClose, onCreate }: { onClose: () => void; onCreate: 
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-border border-b px-4 py-3">
-          <span className="font-[590] text-[14px] text-text">New Panel</span>
+          <span className="font-[590] text-[14px] text-text">{t('sidebar.newPanel.title')}</span>
         </div>
 
         <div className="flex flex-col gap-3 px-4 py-4">
           {/* Emoji + Name row */}
           <div className="flex items-end gap-2.5">
             <div className="relative flex flex-col gap-1.5">
-              <span className="text-[11px] font-[510] text-muted uppercase tracking-wider">Icon</span>
+              <span className="text-[11px] font-[510] text-muted uppercase tracking-wider">{t('sidebar.newPanel.icon')}</span>
               <button
                 type="button"
                 className="emoji-picker-btn"
-                title="Choose emoji"
+                title={t('sidebar.newPanel.chooseEmoji')}
                 onClick={() => setShowPicker((v) => !v)}
               >
                 {emoji}
@@ -788,13 +794,13 @@ function NewPanelDialog({ onClose, onCreate }: { onClose: () => void; onCreate: 
             </div>
             <div className="flex min-w-0 flex-1 flex-col gap-1.5">
               <label className="text-[11px] font-[510] text-muted uppercase tracking-wider" htmlFor="panel-name">
-                Name
+                {t('sidebar.newPanel.name')}
               </label>
               <input
                 id="panel-name"
                 type="text"
                 className="h-8 rounded-md border border-border bg-surface-input px-2.5 text-[13px] text-text placeholder:text-subtle focus:border-accent focus:outline-none"
-                placeholder="e.g. Work, Personal, Lab..."
+                placeholder={t('sidebar.newPanel.namePlaceholder')}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(); }}
@@ -810,14 +816,14 @@ function NewPanelDialog({ onClose, onCreate }: { onClose: () => void; onCreate: 
             className="h-8 cursor-pointer rounded-md border border-border bg-transparent px-3 text-[13px] text-text hover:bg-panel-3"
             onClick={onClose}
           >
-            Cancel
+            {t('common.cancel')}
           </button>
           <button
             type="button"
             className="h-8 cursor-pointer rounded-md border border-transparent bg-accent px-3 text-[13px] text-accent-contrast hover:brightness-110"
             onClick={handleSubmit}
           >
-            Create
+            {t('common.create')}
           </button>
         </div>
       </div>
@@ -835,6 +841,7 @@ function EditPanelDialog({
   panel: WorkspacePanel;
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
   const [name, setName] = useState(panel.name);
   const [emoji, setEmoji] = useState(panel.emoji);
   const [showPicker, setShowPicker] = useState(false);
@@ -866,17 +873,17 @@ function EditPanelDialog({
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-border border-b px-4 py-3">
-          <span className="font-[590] text-[14px] text-text">Edit Panel</span>
+          <span className="font-[590] text-[14px] text-text">{t('sidebar.editPanel.title')}</span>
         </div>
 
         <div className="flex flex-col gap-3 px-4 py-4">
           <div className="flex items-end gap-2.5">
             <div className="relative flex flex-col gap-1.5">
-              <span className="text-[11px] font-[510] text-muted uppercase tracking-wider">Icon</span>
+              <span className="text-[11px] font-[510] text-muted uppercase tracking-wider">{t('sidebar.newPanel.icon')}</span>
               <button
                 type="button"
                 className="emoji-picker-btn"
-                title="Choose emoji"
+                title={t('sidebar.newPanel.chooseEmoji')}
                 onClick={() => setShowPicker((v) => !v)}
               >
                 {emoji}
@@ -901,13 +908,13 @@ function EditPanelDialog({
             </div>
             <div className="flex min-w-0 flex-1 flex-col gap-1.5">
               <label className="text-[11px] font-[510] text-muted uppercase tracking-wider" htmlFor="edit-panel-name">
-                Name
+                {t('sidebar.newPanel.name')}
               </label>
               <input
                 id="edit-panel-name"
                 type="text"
                 className="h-8 rounded-md border border-border bg-surface-input px-2.5 text-[13px] text-text placeholder:text-subtle focus:border-accent focus:outline-none"
-                placeholder="e.g. Work, Personal, Lab..."
+                placeholder={t('sidebar.newPanel.namePlaceholder')}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(); }}
@@ -923,14 +930,14 @@ function EditPanelDialog({
             className="h-8 cursor-pointer rounded-md border border-border bg-transparent px-3 text-[13px] text-text hover:bg-panel-3"
             onClick={onClose}
           >
-            Cancel
+            {t('common.cancel')}
           </button>
           <button
             type="button"
             className="h-8 cursor-pointer rounded-md border border-transparent bg-accent px-3 text-[13px] text-accent-contrast hover:brightness-110"
             onClick={handleSubmit}
           >
-            Save
+            {t('common.save')}
           </button>
         </div>
       </div>
@@ -957,13 +964,14 @@ function PanelContextMenu({
   onEdit: () => void;
   onDelete: () => void;
 }) {
+  const { t } = useTranslation();
   const sections: ContextMenuSection[] = [
     {
-      label: 'Edit Panel',
+      label: t('sidebar.menu.editPanel'),
       action: () => { onClose(); onEdit(); },
     },
     {
-      label: 'Delete Panel',
+      label: t('sidebar.menu.deletePanel'),
       danger: true,
       disabled: panelCount <= 1,
       action: () => { onClose(); onDelete(); },
@@ -986,6 +994,8 @@ function DeletePanelDialog({
   onClose: () => void;
   onConfirm: () => void;
 }) {
+  const { t } = useTranslation();
+
   useEffect(() => {
     const handleKey = (e: globalThis.KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -1001,14 +1011,15 @@ function DeletePanelDialog({
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-border border-b px-4 py-3">
-          <span className="font-[590] text-[14px] text-text">Delete Panel</span>
+          <span className="font-[590] text-[14px] text-text">{t('sidebar.deletePanel.title')}</span>
         </div>
 
         <div className="px-4 py-4">
           <p className="text-[13px] leading-relaxed text-muted">
-            Panel <span className="font-[590] text-text">{panel.emoji} {panel.name}</span> contains{' '}
-            <span className="font-[590] text-text">{projectCount}</span> project{projectCount > 1 ? 's' : ''}.
-            Projects will be removed from the app. Files on disk will not be affected.
+            {t('sidebar.deletePanel.panel')} <span className="font-[590] text-text">{panel.emoji} {panel.name}</span>{' '}
+            {t('sidebar.deletePanel.contains')} <span className="font-[590] text-text">{projectCount}</span>{' '}
+            {projectCount > 1 ? t('sidebar.deletePanel.projects') : t('sidebar.deletePanel.project')}.{' '}
+            {t('sidebar.deletePanel.detail')}
           </p>
         </div>
 
@@ -1018,14 +1029,14 @@ function DeletePanelDialog({
             className="h-8 cursor-pointer rounded-md border border-border bg-transparent px-3 text-[13px] text-text hover:bg-panel-3"
             onClick={onClose}
           >
-            Cancel
+            {t('common.cancel')}
           </button>
           <button
             type="button"
             className="h-8 cursor-pointer rounded-md border border-transparent bg-danger px-3 text-[13px] text-white hover:brightness-110"
             onClick={onConfirm}
           >
-            Delete
+            {t('common.delete')}
           </button>
         </div>
       </div>
@@ -1034,6 +1045,7 @@ function DeletePanelDialog({
 }
 
 function PanelSwitcher() {
+  const { t } = useTranslation();
   const panels = useAppStore((state) => state.panels);
   const activePanelId = useAppStore((state) => state.activePanelId);
   const setActivePanel = useAppStore((state) => state.setActivePanel);
@@ -1076,7 +1088,7 @@ function PanelSwitcher() {
         </div>
 
         {panels.length < MAX_PANELS && (
-          <Tooltip label="New panel">
+          <Tooltip label={t('sidebar.newPanel')}>
             <button
               type="button"
               className="switcher-add"
@@ -1129,6 +1141,7 @@ function PanelSwitcher() {
 /* ── Sidebar ─────────────────────────────────────────────────── */
 
 export function Sidebar() {
+  const { t } = useTranslation();
   const [collapsedProjects, setCollapsedProjects] = useState<Set<string>>(new Set());
   const [contextMenu, setContextMenu] = useState<{
     project: Project;
@@ -1236,11 +1249,11 @@ export function Sidebar() {
       onMouseDown={() => setFocusedColumn('sidebar')}
     >
       <div className="flex h-9 shrink-0 items-center justify-between border-border border-b px-3">
-        <span className="font-semibold text-[11px] text-muted uppercase tracking-wider">Workspaces</span>
+        <span className="font-semibold text-[11px] text-muted uppercase tracking-wider">{t('sidebar.workspaces')}</span>
         <button
           className="icon-button small border-transparent"
           type="button"
-          title="设置"
+          title={t('settings.title')}
           onClick={() => useAppStore.setState({ settingsOpen: true })}
         >
           <Settings size={15} />
@@ -1256,7 +1269,7 @@ export function Sidebar() {
             onClick={openProject}
           >
             <FolderOpen size={18} />
-            <span>Open a project to get started</span>
+            <span>{t('sidebar.openProject')}</span>
           </button>
         ) : (
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
@@ -1343,7 +1356,7 @@ export function Sidebar() {
           onClick={openProject}
         >
           <FolderPlus size={14} />
-          <span>Add repository</span>
+          <span>{t('sidebar.addRepo')}</span>
         </button>
       </div>
 
@@ -1364,7 +1377,7 @@ export function Sidebar() {
             })
           }
           onCloseProject={() => {
-            const confirmed = window.confirm(`Remove ${contextMenu.project.name} from ForgePad? Files stay on disk.`);
+            const confirmed = window.confirm(t('sidebar.removeConfirm', { name: contextMenu.project.name }));
             if (confirmed) removeProject(contextMenu.project.id);
           }}
         />

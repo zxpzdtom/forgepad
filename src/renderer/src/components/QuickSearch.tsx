@@ -1,5 +1,6 @@
 import { type KeyboardEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { getTabTitle, type SettingsSection, useAppStore } from '@renderer/store/app-store';
+import { useTranslation } from '@renderer/i18n';
 import {
   Bell,
   Bot,
@@ -74,6 +75,7 @@ function matches(item: QuickSearchItem, query: string): boolean {
 }
 
 export function QuickSearch({ open, onClose }: QuickSearchProps) {
+  const { t } = useTranslation();
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [filePaths, setFilePaths] = useState<string[]>([]);
