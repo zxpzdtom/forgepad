@@ -74,8 +74,16 @@ export type SelectedElementInfo = {
   /** Page title at time of selection */
   pageTitle: string;
 };
+export type WorkspacePanel = {
+  id: string;
+  name: string;
+  emoji: string;
+  createdAt: number;
+};
+
 export type Project = {
   id: string;
+  panelId: string;
   name: string;
   repoPath: string;
   defaultAgentCommand?: string;
@@ -210,7 +218,9 @@ export type ContextBundleResult = {
 };
 
 export type PersistedAppState = {
-  schemaVersion: 1;
+  schemaVersion: 1 | 2;
+  panels: WorkspacePanel[];
+  activePanelId: string | null;
   projects: Project[];
   workspaces: Workspace[];
   tasks: Task[];
@@ -713,7 +723,18 @@ export type ShortcutActionId =
   | 'openRightPanelChanges'
   | 'openRightPanelContext'
   | 'copyPath'
-  | 'copyRelativePath';
+  | 'copyRelativePath'
+  | 'prevPanel'
+  | 'nextPanel'
+  | 'switchPanel1'
+  | 'switchPanel2'
+  | 'switchPanel3'
+  | 'switchPanel4'
+  | 'switchPanel5'
+  | 'switchPanel6'
+  | 'switchPanel7'
+  | 'switchPanel8'
+  | 'switchPanel9';
 
 export type ShortcutCombo = {
   meta: boolean;
@@ -759,6 +780,17 @@ export const DEFAULT_SHORTCUTS: Record<ShortcutActionId, ShortcutCombo> = {
   openRightPanelContext: combo('c', { meta: true, shift: true }),
   copyPath: combo('c', { meta: true, alt: true }),
   copyRelativePath: combo('c', { meta: true, shift: true, alt: true }),
+  prevPanel: combo('[', { ctrl: true, shift: true }),
+  nextPanel: combo(']', { ctrl: true, shift: true }),
+  switchPanel1: combo('1', { alt: true }),
+  switchPanel2: combo('2', { alt: true }),
+  switchPanel3: combo('3', { alt: true }),
+  switchPanel4: combo('4', { alt: true }),
+  switchPanel5: combo('5', { alt: true }),
+  switchPanel6: combo('6', { alt: true }),
+  switchPanel7: combo('7', { alt: true }),
+  switchPanel8: combo('8', { alt: true }),
+  switchPanel9: combo('9', { alt: true }),
 };
 
 export type ShortcutCategory = 'navigation' | 'tabs' | 'panels' | 'other';
@@ -806,6 +838,17 @@ export const SHORTCUT_DEFINITIONS: ShortcutDefinition[] = [
   },
   { id: 'copyPath', label: 'Copy Path', category: 'other' },
   { id: 'copyRelativePath', label: 'Copy Relative Path', category: 'other' },
+  { id: 'prevPanel', label: 'Previous Panel', category: 'navigation' },
+  { id: 'nextPanel', label: 'Next Panel', category: 'navigation' },
+  { id: 'switchPanel1', label: 'Switch to Panel 1', category: 'navigation' },
+  { id: 'switchPanel2', label: 'Switch to Panel 2', category: 'navigation' },
+  { id: 'switchPanel3', label: 'Switch to Panel 3', category: 'navigation' },
+  { id: 'switchPanel4', label: 'Switch to Panel 4', category: 'navigation' },
+  { id: 'switchPanel5', label: 'Switch to Panel 5', category: 'navigation' },
+  { id: 'switchPanel6', label: 'Switch to Panel 6', category: 'navigation' },
+  { id: 'switchPanel7', label: 'Switch to Panel 7', category: 'navigation' },
+  { id: 'switchPanel8', label: 'Switch to Panel 8', category: 'navigation' },
+  { id: 'switchPanel9', label: 'Switch to Panel 9', category: 'navigation' },
 ];
 
 /* ─── Notification types ─── */
@@ -865,7 +908,8 @@ export type AppSettings = {
   defaultShell: string;
   defaultAgentCommand: string;
   agentPresets: AgentPreset[];
-  runCommand?: string;
+  /** User-configured run commands (each entry has a display name and shell command) */
+  runCommands?: { name: string; command: string }[];
   terminalFontSize: number;
   terminalThemeMode: TerminalThemeMode;
   agentThemeMode: TerminalThemeMode;

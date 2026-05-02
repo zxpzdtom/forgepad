@@ -557,6 +557,16 @@ export const useAppStore = create<AppState>((set, get) => ({
       themeId: (state?.settings as AppSettings | undefined)?.themeId ?? DEFAULT_SETTINGS.themeId,
       customThemes: (state?.settings as AppSettings | undefined)?.customThemes ?? [],
     };
+    // Migrate old runCommand (string) or runCommands (string[]) → runCommands ({ name, command }[])
+    const oldRunCommand = (rawSettings as Record<string, unknown>).runCommand as string | undefined;
+    const oldRunCommands = rawSettings.runCommands as unknown;
+    if (oldRunCommand && !rawSettings.runCommands?.length) {
+      rawSettings.runCommands = [{ name: oldRunCommand, command: oldRunCommand }];
+    } else if (Array.isArray(oldRunCommands) && oldRunCommands.length > 0 && typeof oldRunCommands[0] === 'string') {
+      // Migrate string[] → { name, command }[]
+      rawSettings.runCommands = (oldRunCommands as string[]).map((cmd) => ({ name: cmd, command: cmd }));
+    }
+    delete (rawSettings as Record<string, unknown>).runCommand;
     if (!rawSettings.agentPresets || rawSettings.agentPresets.length === 0) {
       rawSettings.agentPresets = [...DEFAULT_SETTINGS.agentPresets];
     } else {

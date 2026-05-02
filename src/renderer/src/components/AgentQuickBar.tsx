@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { type CSSProperties, useCallback, useEffect, useRef, useState } from 'react';
 import { useAppStore } from '@renderer/store/app-store';
 import type { AgentPreset } from '@shared/types';
-import { Bot, Play, TerminalSquare } from 'lucide-react';
+import { Bot, ChevronDown, Pencil, Play, TerminalSquare } from 'lucide-react';
 
 import { agentPresetIcon } from './AgentIcons';
 import { RunSetupDialog } from './RunSetupDialog';
@@ -16,44 +16,159 @@ function presetIcon(preset: AgentPreset) {
   return <Bot size={15} />;
 }
 
+/* ── AgentQuickBar ─────────────────────────────────────────────────── */
+
 export function AgentQuickBar() {
   const [runSetupOpen, setRunSetupOpen] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [focusIndex, setFocusIndex] = useState(-1);
+  const [pkgScripts, setPkgScripts] = useState<{ name: string; command: string }[]>([]);
+  const menuRef = useRef<HTMLDivElement>(null);
+
   const activeWorkspaceId = useAppStore((state) => state.activeWorkspaceId);
+  const workspaces = useAppStore((state) => state.workspaces);
   const createAgentTerminal = useAppStore((state) => state.createAgentTerminal);
   const createTerminal = useAppStore((state) => state.createTerminal);
   const settings = useAppStore((state) => state.settings);
   const updateSettings = useAppStore((state) => state.updateSettings);
 
   const enabledPresets = settings.agentPresets.filter((preset) => preset.enabled);
+  const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId);
 
+  // ── Detect package.json scripts ──
+  useEffect(() => {
+    if (!activeWorkspace) {
+      setPkgScripts([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const raw = await window.forgepad.fs.readFile(activeWorkspace.worktreePath, 'package.json');
+        const pkg = JSON.parse(raw) as { scripts?: Record<string, string> };
+        if (!cancelled && pkg.scripts) {
+          let pm = 'npm run';
+          try {
+            await window.forgepad.fs.readFile(activeWorkspace.worktreePath, 'bun.lockb');
+            pm = 'bun run';
+          } catch {
+            try {
+              await window.forgepad.fs.readFile(activeWorkspace.worktreePath, 'bun.lock');
+              pm = 'bun run';
+            } catch {
+              try {
+                await window.forgepad.fs.readFile(activeWorkspace.worktreePath, 'pnpm-lock.yaml');
+                pm = 'pnpm run';
+              } catch {
+                try {
+                  await window.forgepad.fs.readFile(activeWorkspace.worktreePath, 'yarn.lock');
+                  pm = 'yarn';
+                } catch {
+                  /* default npm */
+                }
+              }
+            }
+          }
+          setPkgScripts(
+            Object.entries(pkg.scripts).map(([name]) => ({ name, command: `${pm} ${name}` })),
+          );
+        }
+      } catch {
+        if (!cancelled) setPkgScripts([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeWorkspace]);
+
+  // ── Build menu entries from user-saved commands only ──
+  const runCommands = settings.runCommands ?? [];
+  const menuEntries = runCommands;
+
+  // The "active" entry is the first one in the list (used for the main Run button)
+  const activeEntry = runCommands.length > 0 ? runCommands[0] : undefined;
+
+  // +1 for the "Edit Commands…" action at the bottom
+  const totalItems = menuEntries.length + 1;
+
+  // ── Outside click to close ──
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onClick = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
+    };
+    document.addEventListener('mousedown', onClick);
+    return () => document.removeEventListener('mousedown', onClick);
+  }, [menuOpen]);
+
+  // ── Keyboard navigation ──
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent) => {
+      if (!menuOpen) return;
+      switch (e.key) {
+        case 'ArrowDown':
+          e.preventDefault();
+          setFocusIndex((i) => (i + 1) % totalItems);
+          break;
+        case 'ArrowUp':
+          e.preventDefault();
+          setFocusIndex((i) => (i - 1 + totalItems) % totalItems);
+          break;
+        case 'Enter':
+          e.preventDefault();
+          if (focusIndex >= 0 && focusIndex < menuEntries.length) {
+            // Run the selected command directly
+            void createTerminal(activeWorkspaceId ?? undefined, menuEntries[focusIndex].command);
+            setMenuOpen(false);
+          } else if (focusIndex === menuEntries.length) {
+            setMenuOpen(false);
+            setRunSetupOpen(true);
+          }
+          break;
+        case 'Escape':
+          e.preventDefault();
+          setMenuOpen(false);
+          break;
+      }
+    },
+    [activeWorkspaceId, createTerminal, focusIndex, menuEntries, menuOpen, totalItems],
+  );
+
+  useEffect(() => {
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [handleKeyDown]);
+
+  // Reset focus when menu opens/closes
+  useEffect(() => {
+    if (!menuOpen) setFocusIndex(-1);
+  }, [menuOpen]);
+
+  // ── Handlers ──
   const handleRun = () => {
-    if (settings.runCommand?.trim()) {
-      void createTerminal(activeWorkspaceId ?? undefined, settings.runCommand.trim());
+    if (activeEntry) {
+      void createTerminal(activeWorkspaceId ?? undefined, activeEntry.command);
     } else {
       setRunSetupOpen(true);
     }
   };
 
-  const handleRunEdit = (e: React.MouseEvent) => {
-    e.preventDefault();
-    setRunSetupOpen(true);
-  };
-
-  const handleRunSetupSave = (command: string) => {
-    updateSettings({ runCommand: command });
-    setRunSetupOpen(false);
+  const handleRunCommand = (command: string) => {
     void createTerminal(activeWorkspaceId ?? undefined, command);
+    setMenuOpen(false);
   };
 
-  const handleRunSetupSaveOnly = (command: string) => {
-    updateSettings({ runCommand: command });
+  const handleRunSetupSave = (commands: { name: string; command: string }[]) => {
+    updateSettings({ runCommands: commands.length > 0 ? commands : undefined });
     setRunSetupOpen(false);
   };
 
-  const handleRunSetupClear = () => {
-    updateSettings({ runCommand: undefined });
-    setRunSetupOpen(false);
-  };
+  const runLabel = activeEntry
+    ? activeEntry.name.length > 18
+      ? `${activeEntry.name.slice(0, 18)}…`
+      : activeEntry.name
+    : 'Run';
 
   return (
     <>
@@ -61,7 +176,7 @@ export function AgentQuickBar() {
         <div className="scrollbar-none scroll-mask-x flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto">
           {enabledPresets.map((preset) => (
             <button
-              className={`flex h-7 shrink-0 items-center gap-1.5 rounded-md border px-2.5 text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-45${
+              className={`flex h-7 shrink-0 items-center gap-1.5 rounded-md border px-2.5 text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${
                 preset.command === settings.defaultAgentCommand
                   ? 'border-accent/45 bg-accent-surface text-text'
                   : 'border-transparent bg-transparent text-muted hover:bg-panel-2 hover:text-text'
@@ -81,17 +196,103 @@ export function AgentQuickBar() {
           ))}
         </div>
 
-        <button
-          className="secondary-button min-h-7"
-          type="button"
-          title={settings.runCommand?.trim() ? `运行: ${settings.runCommand}\n右键点击编辑` : '配置并运行项目'}
-          disabled={!activeWorkspaceId}
-          onClick={handleRun}
-          onContextMenu={handleRunEdit}
-        >
-          <Play size={15} />
-          Run
-        </button>
+        {/* ── Split Run Button (mirrors OpenWith pattern) ── */}
+        <div className="relative" ref={menuRef}>
+          <div className="flex overflow-hidden rounded-lg border border-border bg-panel-2">
+            {/* Left: execute current default */}
+            <button
+              className="flex h-7 items-center gap-1.5 px-2.5 text-[13px] text-text transition-colors hover:bg-panel-3 disabled:cursor-not-allowed disabled:text-subtle"
+              type="button"
+              disabled={!activeWorkspaceId}
+              title={activeEntry ? `Run: ${activeEntry.name} (${activeEntry.command})` : 'Configure and run project'}
+              onClick={handleRun}
+            >
+              <Play size={14} className="text-ok" />
+              <span className="max-w-[120px] truncate font-[510]">{runLabel}</span>
+            </button>
+
+            {/* Right: chevron trigger */}
+            <button
+              className="grid h-7 w-7 place-items-center border-border border-l text-muted transition-colors hover:text-text disabled:cursor-not-allowed disabled:text-subtle"
+              type="button"
+              disabled={!activeWorkspaceId}
+              title="Default run command"
+              onClick={() => setMenuOpen((v) => !v)}
+              style={{ anchorName: '--run-cmd-trigger' } as CSSProperties}
+            >
+              <ChevronDown size={13} />
+            </button>
+          </div>
+
+          {/* ── Dropdown menu (anchor-positioned) ── */}
+          <div
+            className="anchor-menu"
+            style={
+              {
+                positionAnchor: '--run-cmd-trigger',
+                top: 'anchor(bottom)',
+                right: 'anchor(right)',
+                marginTop: '7px',
+                positionTryFallbacks: 'flip-block',
+              } as CSSProperties
+            }
+            hidden={!menuOpen || !activeWorkspaceId}
+            role="listbox"
+          >
+            <div className="px-2 py-1.5 text-[11px] text-subtle">Run Commands</div>
+
+            {menuEntries.length === 0 && (
+              <div className="px-2 py-2 text-center text-[12px] text-subtle/60">
+                No commands yet, add below
+              </div>
+            )}
+
+            {menuEntries.map((entry, i) => {
+              const focused = focusIndex === i;
+              return (
+                <button
+                  key={entry.command}
+                  className={`flex h-8 w-full items-center gap-2.5 rounded-md px-2 text-left text-[13px] text-text transition-colors hover:bg-panel-3 ${
+                    focused ? 'bg-panel-3' : ''
+                  }`}
+                  type="button"
+                  role="option"
+                  aria-selected={false}
+                  title={entry.command}
+                  onClick={() => handleRunCommand(entry.command)}
+                  onMouseEnter={() => setFocusIndex(i)}
+                  onMouseLeave={() => setFocusIndex(-1)}
+                >
+                  <span className="grid size-4 shrink-0 place-items-center">
+                    <Play size={14} className="text-muted" />
+                  </span>
+                  <span className="min-w-0 flex-1 truncate">{entry.name}</span>
+                </button>
+              );
+            })}
+
+            {menuEntries.length > 0 && <div className="mx-2 my-1 border-border/60 border-t" />}
+
+            <button
+              className={`flex h-8 w-full items-center gap-2.5 rounded-md px-2 text-left text-[13px] text-text transition-colors hover:bg-panel-3 ${
+                focusIndex === menuEntries.length ? 'bg-panel-3' : ''
+              }`}
+              type="button"
+              onClick={() => {
+                setMenuOpen(false);
+                setRunSetupOpen(true);
+              }}
+              onMouseEnter={() => setFocusIndex(menuEntries.length)}
+              onMouseLeave={() => setFocusIndex(-1)}
+            >
+              <span className="grid size-4 shrink-0 place-items-center">
+                <Pencil size={13} className="text-muted" />
+              </span>
+              <span className="min-w-0 flex-1">Edit Commands…</span>
+            </button>
+          </div>
+        </div>
+
         <button
           className="icon-button"
           type="button"
@@ -105,10 +306,9 @@ export function AgentQuickBar() {
 
       {runSetupOpen && (
         <RunSetupDialog
-          initialCommand={settings.runCommand}
+          initialCommands={settings.runCommands}
+          pkgScripts={pkgScripts}
           onSave={handleRunSetupSave}
-          onSaveOnly={handleRunSetupSaveOnly}
-          onClear={settings.runCommand?.trim() ? handleRunSetupClear : undefined}
           onClose={() => setRunSetupOpen(false)}
         />
       )}
