@@ -2,12 +2,16 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
+import { getDotFolderPath } from './paths';
+
 const MARKER = '__forgepad_managed__';
 
 const NOTIFY_SCRIPT = `#!/usr/bin/env bash
 # ${MARKER} — DO NOT EDIT. Managed by ForgePad.
 
-SESSIONS_DIR="$HOME/.forgepad/sessions"
+# Check both production and dev session directories so a single hook
+# script works regardless of which ForgePad instance spawned the PTY.
+SESSIONS_DIRS=("$HOME/.forgepad/sessions" "$HOME/.forgepad-dev/sessions")
 
 # Read JSON input: Claude Code pipes to stdin, Codex passes as $1
 if [ -n "\${1:-}" ]; then
@@ -36,8 +40,15 @@ fi
 SESSION_ID=$(echo "$INPUT" | grep -oE '"session_id"[[:space:]]*:[[:space:]]*"[^"]*"' | grep -oE '"[^"]*"$' | tr -d '"' || true)
 [ -z "$SESSION_ID" ] && exit 0
 
-SESSION_FILE="$SESSIONS_DIR/$SESSION_ID.json"
-[ -f "$SESSION_FILE" ] || exit 0
+# Look for session file in all known directories
+SESSION_FILE=""
+for DIR in "\${SESSIONS_DIRS[@]}"; do
+  if [ -f "$DIR/$SESSION_ID.json" ]; then
+    SESSION_FILE="$DIR/$SESSION_ID.json"
+    break
+  fi
+done
+[ -z "$SESSION_FILE" ] && exit 0
 
 PORT=$(grep -oE '"port"[[:space:]]*:[[:space:]]*[0-9]+' "$SESSION_FILE" | grep -oE '[0-9]+$' || true)
 PTY_ID=$(grep -oE '"ptyId"[[:space:]]*:[[:space:]]*"[^"]*"' "$SESSION_FILE" | grep -oE '"[^"]*"$' | tr -d '"' || true)
@@ -72,6 +83,9 @@ export class AgentHooksService {
   private notifyScriptPath: string;
 
   constructor() {
+    // Always write the hook script to ~/.forgepad/hooks/ (never the -dev dir)
+    // because ~/.claude/settings.json is shared between dev and prod.
+    // The script itself checks both session directories.
     this.notifyScriptPath = path.join(os.homedir(), '.forgepad', 'hooks', 'notify.sh');
   }
 
