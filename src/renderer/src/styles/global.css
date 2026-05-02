@@ -1880,3 +1880,267 @@ textarea {
         opacity: 1;
     }
 }
+
+/* ─── Panel Switcher (inside Sidebar) ─────────────────────────── */
+
+.panel-switcher {
+    height: 34px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    padding: 0 6px;
+    border-top: 1px solid var(--border);
+    user-select: none;
+    flex-shrink: 0;
+}
+
+.switcher-dot-track {
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    padding: 0 4px;
+}
+
+/* ── Panel Dot: emoji / dot hybrid ────────────────────────────── */
+
+.panel-dot {
+    position: relative;
+    width: 22px;
+    height: 22px;
+    display: grid;
+    place-items: center;
+    border: none;
+    padding: 0;
+    background: transparent;
+    cursor: pointer;
+    border-radius: 6px;
+    flex-shrink: 0;
+    transition: transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.panel-dot:hover {
+    transform: scale(1.15);
+}
+
+.panel-dot:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+/* Emoji layer — default: hidden for inactive, visible for active */
+.panel-dot__emoji {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    font-size: 14px;
+    line-height: 1;
+    opacity: 0;
+    transform: scale(0.5);
+    transition:
+        opacity 200ms cubic-bezier(0.34, 1.56, 0.64, 1),
+        transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1);
+    pointer-events: none;
+}
+
+/* Dot layer — default: visible for inactive, hidden for active */
+.panel-dot__dot {
+    position: absolute;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: var(--subtle);
+    opacity: 0.45;
+    transition:
+        opacity 200ms cubic-bezier(0.25, 0.1, 0.25, 1),
+        transform 200ms cubic-bezier(0.25, 0.1, 0.25, 1);
+    pointer-events: none;
+}
+
+/* ── Active state: show emoji, hide dot ──────────────────────── */
+
+.panel-dot--active .panel-dot__emoji {
+    opacity: 1;
+    transform: scale(1);
+}
+
+.panel-dot--active .panel-dot__dot {
+    opacity: 0;
+    transform: scale(0);
+}
+
+/* ── Hover on inactive: reveal emoji, shrink dot ─────────────── */
+
+.panel-dot:not(.panel-dot--active):hover .panel-dot__emoji {
+    opacity: 0.85;
+    transform: scale(1);
+}
+
+.panel-dot:not(.panel-dot--active):hover .panel-dot__dot {
+    opacity: 0;
+    transform: scale(0);
+}
+
+/* Add panel button */
+.switcher-add {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    color: var(--subtle);
+    background: transparent;
+    border: 1px dashed var(--border);
+    cursor: pointer;
+    border-radius: 6px;
+    margin-left: 2px;
+    transition: color 120ms ease, border-color 120ms ease, background-color 120ms ease, transform 120ms ease;
+    flex-shrink: 0;
+}
+
+.switcher-add:hover {
+    color: var(--text);
+    border-color: var(--subtle);
+    background: rgba(255, 255, 255, 0.06);
+    transform: scale(1.1);
+}
+
+.switcher-add:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+/* ── Emoji picker button ─────────────────────────────────────── */
+
+.emoji-picker-btn {
+    width: 36px;
+    height: 32px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface-input);
+    cursor: pointer;
+    display: grid;
+    place-items: center;
+    font-size: 18px;
+    line-height: 1;
+    transition: border-color 150ms, transform 150ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.emoji-picker-btn:hover {
+    border-color: var(--subtle);
+    transform: scale(1.08);
+}
+
+.emoji-picker-btn:active {
+    transform: scale(0.95);
+}
+
+/* ── Emoji-mart popover (inside NewPanelDialog) ──────────────── */
+
+.emoji-mart-popover {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    z-index: 70;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+}
+
+/* ── Tooltip ─────────────────────────────────────────────────── */
+
+.tooltip-wrapper {
+    position: relative;
+    display: inline-flex;
+}
+
+.tooltip-bubble {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 80;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+    animation: tooltip-fade-in 120ms ease both;
+}
+
+.tooltip-bubble--top {
+    bottom: calc(100% + 6px);
+}
+
+.tooltip-bubble--bottom {
+    top: calc(100% + 6px);
+}
+
+.tooltip-label {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text);
+    line-height: 1;
+}
+
+.tooltip-kbd {
+    display: inline-grid;
+    place-items: center;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 4px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    background: rgba(255, 255, 255, 0.06);
+    font-family: inherit;
+    font-size: 10px;
+    font-weight: 500;
+    color: var(--subtle);
+    line-height: 1;
+}
+
+@keyframes tooltip-fade-in {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(2px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+/* ── Panel content switch animation ───────────────────────────── */
+
+@keyframes panel-fade-in {
+    from {
+        opacity: 0;
+        transform: translateY(4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.sidebar-panel-content {
+    animation: panel-fade-in 200ms cubic-bezier(0.25, 0.1, 0.25, 1) both;
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+    .panel-dot,
+    .panel-dot__emoji,
+    .panel-dot__dot,
+    .switcher-add {
+        transition: none;
+    }
+    .sidebar-panel-content {
+        animation: none;
+    }
+}

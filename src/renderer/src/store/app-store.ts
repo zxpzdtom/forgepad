@@ -27,6 +27,7 @@ import type {
   Task,
   TaskStatus,
   Workspace,
+  WorkspacePanel,
 } from '@shared/types';
 import { DEFAULT_AGENT_PRESETS, DEFAULT_NOTIFICATION_SETTINGS, DEFAULT_SETTINGS, DEFAULT_SHORTCUTS } from '@shared/types';
 import { create } from 'zustand';
@@ -49,6 +50,8 @@ type Toast = {
 };
 
 type AppState = {
+  panels: WorkspacePanel[];
+  activePanelId: string | null;
   projects: Project[];
   workspaces: Workspace[];
   tasks: Task[];
@@ -167,6 +170,12 @@ type AppState = {
   setFocusedColumn: (column: AppState['focusedColumn']) => void;
   refreshBranchStats: (workspaceId?: string) => Promise<void>;
   reorderProjects: (activeId: string, overId: string) => void;
+  navigatePanel: (direction: 'prev' | 'next') => void;
+  setActivePanel: (panelId: string) => void;
+  createPanel: (name?: string, emoji?: string) => string;
+  removePanel: (panelId: string) => void;
+  renamePanel: (panelId: string, name: string) => void;
+  updatePanelEmoji: (panelId: string, emoji: string) => void;
   reorderWorkspaces: (projectId: string, activeId: string, overId: string) => void;
   reorderTabs: (activeId: string, overId: string) => void;
   removeProject: (projectId: string) => void;
@@ -227,7 +236,9 @@ function serializeForSave(state: AppState): PersistedAppState {
   }
 
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
+    panels: state.panels,
+    activePanelId: state.activePanelId,
     projects: state.projects,
     workspaces: state.workspaces,
     tasks: state.tasks,
@@ -337,6 +348,8 @@ const agentWorkingTimers = new Map<string, ReturnType<typeof setTimeout>>();
 const agentCancelTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
 export const useAppStore = create<AppState>((set, get) => ({
+  panels: [],
+  activePanelId: null,
   projects: [],
   workspaces: [],
   tasks: [],
@@ -505,10 +518,34 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   hydrate: (state) => {
-    if (state?.schemaVersion !== undefined && state.schemaVersion !== 1) {
+    if (state?.schemaVersion !== undefined && state.schemaVersion !== 1 && state.schemaVersion !== 2) {
       set({ hydrated: true });
       return;
     }
+
+    // ── Schema migration v1 → v2: add panels ──────────────────────
+    // v1 data has no panels/activePanelId. Create a default panel and
+    // assign all existing projects to it.
+    let migratedPanels: WorkspacePanel[] = (state as Record<string, unknown>)?.panels as WorkspacePanel[] ?? [];
+    let migratedActivePanelId: string | null = (state as Record<string, unknown>)?.activePanelId as string | null ?? null;
+    const isV1 = !state?.schemaVersion || state.schemaVersion === 1;
+    if (isV1 || migratedPanels.length === 0) {
+      const defaultPanelId = crypto.randomUUID();
+      migratedPanels = [{ id: defaultPanelId, name: 'Default', emoji: '🏠', createdAt: Date.now() }];
+      migratedActivePanelId = defaultPanelId;
+      // Assign panelId to all projects that don't have one
+      if (state?.projects) {
+        state.projects = state.projects.map((p: Project) => ({
+          ...p,
+          panelId: (p as Record<string, unknown>).panelId as string || defaultPanelId,
+        }));
+      }
+    }
+    // Backfill emoji for panels that don't have it (pre-emoji v2 data)
+    migratedPanels = migratedPanels.map((p) => ({
+      ...p,
+      emoji: (p as Record<string, unknown>).emoji as string || '📁',
+    }));
 
     const rawSettings = {
       ...DEFAULT_SETTINGS,
@@ -584,6 +621,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
 
     set({
+      panels: migratedPanels,
+      activePanelId: migratedActivePanelId,
       projects,
       workspaces,
       tasks,
@@ -629,7 +668,16 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     const existingProject = get().projects.find((project) => project.repoPath === opened.repoPath);
     if (existingProject) {
-      const workspace = get().workspaces.find((item) => item.projectId === existingProject.id && item.isRoot);
+      const state = get();
+      const workspace = state.workspaces.find((item) => item.projectId === existingProject.id && item.isRoot);
+      // If the project is in a different panel, switch to that panel first and notify
+      if (existingProject.panelId !== state.activePanelId) {
+        const panel = state.panels.find((p) => p.id === existingProject.panelId);
+        if (panel) {
+          get().setActivePanel(panel.id);
+          get().addToast('info', `"${existingProject.name}" is already in panel "${panel.name}". Switched to it.`);
+        }
+      }
       get().setActiveWorkspace(workspace?.id ?? null);
       return;
     }
@@ -643,6 +691,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     const project: Project = {
       id: projectId,
+      panelId: get().activePanelId ?? '',
       name: opened.name,
       repoPath: opened.repoPath,
       createdAt: now(),
@@ -1493,6 +1542,73 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (oldIdx === -1 || newIdx === -1) return state;
       return { projects: arrayMove(state.projects, oldIdx, newIdx) };
     }),
+
+  navigatePanel: (direction) => {
+    const { panels, activePanelId } = get();
+    if (panels.length <= 1) return;
+    const idx = panels.findIndex((p) => p.id === activePanelId);
+    const nextIdx = direction === 'prev' ? idx - 1 : idx + 1;
+    if (nextIdx >= 0 && nextIdx < panels.length) {
+      get().setActivePanel(panels[nextIdx].id);
+    }
+  },
+
+  setActivePanel: (panelId) => {
+    const state = get();
+    if (panelId === state.activePanelId) return;
+    // Find the first workspace in the new panel to set as active
+    const panelProjects = state.projects.filter((p) => p.panelId === panelId);
+    const panelProjectIds = new Set(panelProjects.map((p) => p.id));
+    const panelWorkspaces = state.workspaces.filter((w) => panelProjectIds.has(w.projectId));
+    const firstWorkspaceId = panelWorkspaces[0]?.id ?? null;
+    set({ activePanelId: panelId });
+    if (firstWorkspaceId) {
+      get().setActiveWorkspace(firstWorkspaceId);
+    }
+  },
+
+  createPanel: (name, emoji) => {
+    const panelId = id();
+    const panelName = name || `Panel ${get().panels.length + 1}`;
+    const panel: WorkspacePanel = { id: panelId, name: panelName, emoji: emoji || '📁', createdAt: now() };
+    set((state) => ({
+      panels: [...state.panels, panel],
+      activePanelId: panelId,
+    }));
+    return panelId;
+  },
+
+  removePanel: (panelId) => {
+    const state = get();
+    if (state.panels.length <= 1) return; // Cannot remove last panel
+
+    // Remove all projects in this panel (from app only, not from disk)
+    const projectsInPanel = state.projects.filter((p) => p.panelId === panelId);
+    for (const project of projectsInPanel) {
+      get().removeProject(project.id);
+    }
+
+    const remainingPanels = get().panels.filter((p) => p.id !== panelId);
+    const fallbackPanelId = remainingPanels[0].id;
+    const newActivePanelId = get().activePanelId === panelId ? fallbackPanelId : get().activePanelId;
+
+    set(() => ({
+      panels: remainingPanels,
+      activePanelId: newActivePanelId,
+    }));
+  },
+
+  renamePanel: (panelId, name) => {
+    set((state) => ({
+      panels: state.panels.map((p) => (p.id === panelId ? { ...p, name } : p)),
+    }));
+  },
+
+  updatePanelEmoji: (panelId, emoji) => {
+    set((state) => ({
+      panels: state.panels.map((p) => (p.id === panelId ? { ...p, emoji } : p)),
+    }));
+  },
 
   reorderWorkspaces: (projectId, activeId, overId) =>
     set((state) => {
