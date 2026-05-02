@@ -59,4 +59,6 @@ export const IPC = {
   FS_READ_ABS_FILE_DATA_URL: 'fs:read-abs-file-data-url',
   // LSP (text-based symbol search)
   LSP_GET_DEFINITION: 'lsp:get-definition',
+  // System emoji picker
+  APP_SHOW_EMOJI_PANEL: 'app:show-emoji-panel',
 } as const;
