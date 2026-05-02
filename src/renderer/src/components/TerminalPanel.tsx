@@ -182,11 +182,11 @@ const FILE_EXT = 'ts|tsx|js|jsx|mjs|cjs|json|jsonc|css|scss|less|html|htm|md|mdx
 // Match file paths with known extensions, optionally followed by :line or :line:col
 // Supports: src/foo.ts, ./foo/bar.tsx, ../utils.js, /abs/path/file.go, foo.ts:42, foo.ts:42:10
 const FILE_PATH_RE = new RegExp(
-  `(?:^|[\\s"'(\`[{,;=])` +                       // boundary before path
+  `(?:^|[\\s"'(\`[{,;=])` +                        // boundary before path
   `((?:\\./|\\.\\.(?:/|(?=[^.]))|/|[a-zA-Z0-9@_])` + // path start: ./ ../ / or word char
-  `[^\\s"')\`\\]},;:]*\\.(?:${FILE_EXT})` +        // path body with known extension
+  `[^\\s"'()\`\\]},;:]*\\.(?:${FILE_EXT})` +       // path body with known extension (excludes parens)
   `(?::\\d+(?::\\d+)?)?)` +                          // optional :line:col
-  `(?=[\\s"')\`\\]},;:]|$)`,                        // boundary after path
+  `(?=[\\s"'()\`\\]},;:]|$)`,                       // boundary after path
   'gi',
 );
 

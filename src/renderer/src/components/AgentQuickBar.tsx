@@ -1,7 +1,7 @@
 import { type CSSProperties, useCallback, useEffect, useRef, useState } from 'react';
 import { useAppStore } from '@renderer/store/app-store';
 import type { AgentPreset } from '@shared/types';
-import { Bot, ChevronDown, Pencil, Play, TerminalSquare } from 'lucide-react';
+import { Bot, Check, ChevronDown, Pencil, Play, TerminalSquare } from 'lucide-react';
 
 import { agentPresetIcon } from './AgentIcons';
 import { RunSetupDialog } from './RunSetupDialog';
@@ -23,6 +23,7 @@ export function AgentQuickBar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [focusIndex, setFocusIndex] = useState(-1);
   const [pkgScripts, setPkgScripts] = useState<{ name: string; command: string }[]>([]);
+  const [activeRunIndex, setActiveRunIndex] = useState(0);
   const menuRef = useRef<HTMLDivElement>(null);
 
   const activeWorkspaceId = useAppStore((state) => state.activeWorkspaceId);
@@ -86,8 +87,9 @@ export function AgentQuickBar() {
   const runCommands = settings.runCommands ?? [];
   const menuEntries = runCommands;
 
-  // The "active" entry is the first one in the list (used for the main Run button)
-  const activeEntry = runCommands.length > 0 ? runCommands[0] : undefined;
+  // The "active" entry is the currently selected one (used for the main Run button)
+  const clampedIndex = Math.min(activeRunIndex, runCommands.length - 1);
+  const activeEntry = runCommands.length > 0 ? runCommands[Math.max(0, clampedIndex)] : undefined;
 
   // +1 for the "Edit Commands…" action at the bottom
   const totalItems = menuEntries.length + 1;
@@ -118,8 +120,8 @@ export function AgentQuickBar() {
         case 'Enter':
           e.preventDefault();
           if (focusIndex >= 0 && focusIndex < menuEntries.length) {
-            // Run the selected command directly
-            void createTerminal(activeWorkspaceId ?? undefined, menuEntries[focusIndex].command);
+            // Switch the active run command (don't execute)
+            setActiveRunIndex(focusIndex);
             setMenuOpen(false);
           } else if (focusIndex === menuEntries.length) {
             setMenuOpen(false);
@@ -132,7 +134,7 @@ export function AgentQuickBar() {
           break;
       }
     },
-    [activeWorkspaceId, createTerminal, focusIndex, menuEntries, menuOpen, totalItems],
+    [activeWorkspaceId, focusIndex, menuEntries, menuOpen, totalItems],
   );
 
   useEffect(() => {
@@ -152,11 +154,6 @@ export function AgentQuickBar() {
     } else {
       setRunSetupOpen(true);
     }
-  };
-
-  const handleRunCommand = (command: string) => {
-    void createTerminal(activeWorkspaceId ?? undefined, command);
-    setMenuOpen(false);
   };
 
   const handleRunSetupSave = (commands: { name: string; command: string }[]) => {
@@ -249,6 +246,7 @@ export function AgentQuickBar() {
 
             {menuEntries.map((entry, i) => {
               const focused = focusIndex === i;
+              const selected = i === Math.max(0, clampedIndex);
               return (
                 <button
                   key={entry.command}
@@ -257,14 +255,17 @@ export function AgentQuickBar() {
                   }`}
                   type="button"
                   role="option"
-                  aria-selected={false}
+                  aria-selected={selected}
                   title={entry.command}
-                  onClick={() => handleRunCommand(entry.command)}
+                  onClick={() => {
+                    setActiveRunIndex(i);
+                    setMenuOpen(false);
+                  }}
                   onMouseEnter={() => setFocusIndex(i)}
                   onMouseLeave={() => setFocusIndex(-1)}
                 >
                   <span className="grid size-4 shrink-0 place-items-center">
-                    <Play size={14} className="text-muted" />
+                    {selected ? <Check size={14} className="text-ok" /> : <Play size={14} className="text-muted" />}
                   </span>
                   <span className="min-w-0 flex-1 truncate">{entry.name}</span>
                 </button>
