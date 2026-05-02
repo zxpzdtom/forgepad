@@ -13,6 +13,7 @@ export const IPC = {
   GIT_COMMIT: 'git:commit',
   GIT_WORKTREE_ADD: 'git:worktree-add',
   GIT_WORKTREE_REMOVE: 'git:worktree-remove',
+  GIT_SCAN_WORKTREES: 'git:scan-worktrees',
   GIT_FETCH: 'git:fetch',
   GIT_REMOTE_BRANCHES: 'git:remote-branches',
   GIT_PR_NUMBER: 'git:pr-number',

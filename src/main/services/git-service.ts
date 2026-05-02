@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { mkdir, readFile, rm } from 'node:fs/promises';
+import { mkdir, readFile, readdir, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import type { DiffFileData, FileStatus, GitBucket, GitStatusKind } from '@shared/types';
@@ -419,6 +419,70 @@ export class GitService {
     if (deleteBranch) {
       await git(['branch', '-D', branch], repoPath).catch(() => '');
     }
+  }
+
+  /**
+   * Scan a worktree base directory to discover existing worktrees on disk.
+   * Directory structure: <baseDir>/<repoName>/<branch>/
+   * Returns discovered entries grouped by repo, with repoPath resolved via `git rev-parse --show-toplevel`.
+   */
+  static async scanWorktrees(
+    baseDir: string,
+  ): Promise<Array<{ repoName: string; repoPath: string; branch: string; worktreePath: string }>> {
+    const resolvedDir = baseDir.trim() || path.join(getDotFolderPath(), 'worktrees');
+    // biome-ignore lint: reassign baseDir to resolved value
+    baseDir = resolvedDir;
+    const results: Array<{ repoName: string; repoPath: string; branch: string; worktreePath: string }> = [];
+
+    let repoDirs: string[];
+    try {
+      repoDirs = await readdir(baseDir, { withFileTypes: true }).then((entries) =>
+        entries.filter((e) => e.isDirectory() && !e.name.startsWith('.')).map((e) => e.name),
+      );
+    } catch {
+      return results;
+    }
+
+    for (const repoName of repoDirs) {
+      const repoDir = path.join(baseDir, repoName);
+      let branchDirs: string[];
+      try {
+        branchDirs = await readdir(repoDir, { withFileTypes: true }).then((entries) =>
+          entries.filter((e) => e.isDirectory() && !e.name.startsWith('.')).map((e) => e.name),
+        );
+      } catch {
+        continue;
+      }
+
+      for (const branch of branchDirs) {
+        const worktreePath = path.join(repoDir, branch);
+        // Verify it's actually a git worktree
+        const isRepo = await GitService.isGitRepo(worktreePath).catch(() => false);
+        if (!isRepo) continue;
+
+        try {
+          const topLevel = await GitService.getTopLevel(worktreePath);
+          // For worktrees, the toplevel is the worktree path itself;
+          // We need the main repo path — read the gitdir file to find the real repo.
+          const gitDir = await git(['rev-parse', '--git-dir'], worktreePath);
+          // A worktree's .git is a file pointing to <mainRepo>/.git/worktrees/<name>
+          // So the main repo .git dir is two levels up from the worktree git dir
+          let repoPath = topLevel;
+          if (gitDir.includes('.git/worktrees/')) {
+            // gitDir is like /path/to/main-repo/.git/worktrees/<branch>
+            const mainGitDir = gitDir.replace(/\/worktrees\/[^/]+$/, '');
+            repoPath = path.dirname(mainGitDir);
+          }
+
+          const actualBranch = await GitService.getCurrentBranch(worktreePath).catch(() => branch);
+          results.push({ repoName, repoPath, branch: actualBranch, worktreePath });
+        } catch {
+          continue;
+        }
+      }
+    }
+
+    return results;
   }
 
   /**

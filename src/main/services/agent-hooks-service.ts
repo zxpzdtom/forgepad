@@ -86,7 +86,6 @@ const CLAUDE_HOOK_EVENTS = [
   'Notification', // 通知事件 → permission (通常是权限相关)
   'PermissionRequest', // 权限请求 → permission
   'Stop', // agent 完成响应 → review
-  'StopFailure', // API 错误导致停止 → review
   'SessionEnd', // session 结束 → idle
 ];
 

@@ -785,10 +785,14 @@ function GitSection() {
   const settings = useAppStore((state) => state.settings);
   const updateSettings = useAppStore((state) => state.updateSettings);
 
+  const syncWorktrees = useAppStore((state) => state.syncWorktreesFromDisk);
+
   const handleBrowse = async () => {
     const dir = await window.forgepad.app.pickDirectory('Choose Worktree Base Directory');
     if (dir) {
       updateSettings({ worktreeBaseDir: dir });
+      // Re-scan the new directory to discover existing worktrees
+      setTimeout(() => syncWorktrees(), 100);
     }
   };
 
@@ -822,7 +826,7 @@ function GitSection() {
           <button
             className="mt-1.5 text-[11px] text-subtle hover:text-text transition-colors"
             type="button"
-            onClick={() => updateSettings({ worktreeBaseDir: '' })}
+            onClick={() => { updateSettings({ worktreeBaseDir: '' }); setTimeout(() => syncWorktrees(), 100); }}
           >
             Reset to default
           </button>

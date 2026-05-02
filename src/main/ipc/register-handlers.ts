@@ -284,6 +284,7 @@ export function registerIpcHandlers(hookPort?: number): void {
     async (_event, repoPath: string, worktreePath: string, branch: string, deleteBranch?: boolean) =>
       GitService.removeWorktree(repoPath, worktreePath, branch, deleteBranch),
   );
+  ipcMain.handle(IPC.GIT_SCAN_WORKTREES, async (_event, baseDir: string) => GitService.scanWorktrees(baseDir));
   ipcMain.handle(IPC.GIT_FETCH, async (_event, repoPath: string) => GitService.fetch(repoPath));
   ipcMain.handle(IPC.GIT_REMOTE_BRANCHES, async (_event, repoPath: string) => GitService.listRemoteBranches(repoPath));
   ipcMain.handle(IPC.GIT_PR_NUMBER, async (_event, worktreePath: string) => GitService.getPrInfo(worktreePath));

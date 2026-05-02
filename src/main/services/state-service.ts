@@ -29,7 +29,7 @@ export class StateService {
       const raw = await readFile(StateService.getStatePath(), 'utf8');
       const parsed = JSON.parse(raw) as unknown;
       if (!isObject(parsed)) return null;
-      if (parsed.schemaVersion !== 1) return null;
+      if (parsed.schemaVersion !== 1 && parsed.schemaVersion !== 2) return null;
 
       const state = parsed as Partial<PersistedAppState>;
       const projects = [];
