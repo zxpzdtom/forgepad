@@ -6,6 +6,7 @@ import { promisify } from 'node:util';
 import type { DiffFileData, FileStatus, GitBucket, GitStatusKind } from '@shared/types';
 
 import { normalizeRelPath, resolveInsideRoot } from './path-guard';
+import { getDotFolderPath } from './paths';
 
 const execFileAsync = promisify(execFile);
 const MAX_BUFFER = 20 * 1024 * 1024;
@@ -384,8 +385,7 @@ export class GitService {
     if (worktreeBaseDir && worktreeBaseDir.trim()) {
       baseDir = path.join(worktreeBaseDir.trim(), repoName);
     } else {
-      const homeDir = process.env.HOME || process.env.USERPROFILE || '';
-      baseDir = path.join(homeDir, '.forgepad', 'worktrees', repoName);
+      baseDir = path.join(getDotFolderPath(), 'worktrees', repoName);
     }
 
     const worktreePath = path.join(baseDir, branch);

@@ -6,6 +6,12 @@ import { ptyService, registerIpcHandlers } from './ipc/register-handlers';
 import { AgentHooksService } from './services/agent-hooks-service';
 import { HookServer } from './services/hook-server';
 
+// In dev mode, use a separate userData directory so dev and packaged app
+// configurations don't interfere with each other.
+if (!app.isPackaged) {
+  app.setPath('userData', `${app.getPath('userData')}-dev`);
+}
+
 let hookServer: HookServer | null = null;
 
 function buildAppMenu(): void {
