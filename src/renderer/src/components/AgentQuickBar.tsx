@@ -23,18 +23,28 @@ export function AgentQuickBar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [focusIndex, setFocusIndex] = useState(-1);
   const [pkgScripts, setPkgScripts] = useState<{ name: string; command: string }[]>([]);
-  const [activeRunIndex, setActiveRunIndex] = useState(0);
   const menuRef = useRef<HTMLDivElement>(null);
 
   const activeWorkspaceId = useAppStore((state) => state.activeWorkspaceId);
   const workspaces = useAppStore((state) => state.workspaces);
+  const projects = useAppStore((state) => state.projects);
   const createAgentTerminal = useAppStore((state) => state.createAgentTerminal);
   const createTerminal = useAppStore((state) => state.createTerminal);
   const settings = useAppStore((state) => state.settings);
   const updateSettings = useAppStore((state) => state.updateSettings);
+  const projectActiveRunIndex = useAppStore((state) => state.projectActiveRunIndex);
+  const setProjectActiveRunIndex = useAppStore((state) => state.setProjectActiveRunIndex);
 
   const enabledPresets = settings.agentPresets.filter((preset) => preset.enabled);
   const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId);
+  const activeProject = activeWorkspace ? projects.find((p) => p.id === activeWorkspace.projectId) : undefined;
+  const activeRunIndex = activeProject ? (projectActiveRunIndex[activeProject.id] ?? 0) : 0;
+  const setActiveRunIndex = useCallback(
+    (index: number) => {
+      if (activeProject) setProjectActiveRunIndex(activeProject.id, index);
+    },
+    [activeProject, setProjectActiveRunIndex],
+  );
 
   // ── Detect package.json scripts ──
   useEffect(() => {
