@@ -325,7 +325,7 @@ function SortableProjectGroup({
     <div
       ref={setNodeRef}
       style={style}
-      className={`group/sidebar-project flex min-w-0 flex-col rounded-lg${hasActive ? 'bg-panel/60' : ''}${isDragging ? 'shadow-[0_16px_34px_rgba(0,0,0,0.28)] ring-1 ring-accent/25' : ''}`}
+      className={`group/sidebar-project flex min-w-0 flex-col rounded-lg ${hasActive ? 'bg-panel/60' : ''} ${isDragging ? 'shadow-[0_16px_34px_rgba(0,0,0,0.28)] ring-1 ring-accent/25' : ''}`}
     >
       <div
         className="flex h-8 w-full cursor-grab items-center gap-1.5 rounded-md bg-transparent px-1.5 text-left text-text transition-colors duration-150 hover:bg-panel-2 active:cursor-grabbing"
@@ -412,7 +412,7 @@ function SortableWorkspaceRow({
     <div
       ref={setNodeRef}
       style={style}
-      className={`group/sidebar-workspace relative flex w-full min-w-0 cursor-grab items-start gap-2 rounded-md px-2 py-1.5 text-left transition-colors duration-150 active:cursor-grabbing${isActive ? '' : 'hover:bg-panel-2'}${isDragging ? 'bg-panel-2 ring-1 ring-accent/20' : ''}`}
+      className={`group/sidebar-workspace relative flex w-full min-w-0 cursor-grab items-start gap-2 rounded-md px-2 py-1.5 text-left transition-colors duration-150 active:cursor-grabbing ${isActive ? '' : 'hover:bg-panel-2'} ${isDragging ? 'bg-panel-2 ring-1 ring-accent/20' : ''}`}
       role="button"
       tabIndex={0}
       onClick={onClick}
@@ -945,7 +945,7 @@ export function Sidebar() {
                       }}
                     >
                       <div
-                        className={`grid transition-[grid-template-rows] duration-300 ease-in-out${isCollapsed ? 'grid-rows-[0fr]' : 'grid-rows-[1fr]'}`}
+                        className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${isCollapsed ? 'grid-rows-[0fr]' : 'grid-rows-[1fr]'}`}
                       >
                         <div className="overflow-hidden">
                           <SortableContext items={wsIds} strategy={verticalListSortingStrategy}>

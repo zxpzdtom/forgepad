@@ -1,19 +1,30 @@
 import { type KeyboardEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { getTabTitle, type SettingsSection, useAppStore } from '@renderer/store/app-store';
 import {
+  Bell,
   Bot,
   CornerDownLeft,
   FileCode2,
   FolderOpen,
+  GitBranch,
   GitCompare,
+  Keyboard,
+  Monitor,
+  Moon,
   Paintbrush,
+  Palette,
   PanelRight,
   Search,
   SendHorizontal,
   Settings,
+  Sun,
+  SunMoon,
   Terminal,
   TerminalSquare,
 } from 'lucide-react';
+import { BUILTIN_THEMES } from '@shared/types';
+import { agentPresetIcon } from './AgentIcons';
+import { FileIcon } from './FileIcon';
 
 type QuickSearchProps = {
   open: boolean;
@@ -27,6 +38,35 @@ type QuickSearchItem = {
   icon: ReactNode;
   run: () => void;
 };
+
+const AVATAR_COLORS = [
+  'bg-[#5e6ad2]',
+  'bg-[#7170ff]',
+  'bg-[#828fff]',
+  'bg-[#7a7fad]',
+  'bg-[#62666d]',
+  'bg-[#8a8f98]',
+  'bg-[#4a4d55]',
+  'bg-[#3e3e44]',
+  'bg-[#34343a]',
+  'bg-[#23252a]',
+];
+
+function ProjectAvatar({ name }: { name: string }) {
+  const letter = (name[0] ?? '?').toUpperCase();
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const colorClass = AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+  return (
+    <span
+      className={`flex size-4 shrink-0 items-center justify-center rounded font-[590] text-[#f7f8f8] text-[10px] ${colorClass}`}
+    >
+      {letter}
+    </span>
+  );
+}
 
 function matches(item: QuickSearchItem, query: string): boolean {
   const haystack = `${item.label} ${item.detail}`.toLowerCase();
@@ -54,6 +94,8 @@ export function QuickSearch({ open, onClose }: QuickSearchProps) {
   const createAgentTerminal = useAppStore((state) => state.createAgentTerminal);
   const openDiffTab = useAppStore((state) => state.openDiffTab);
   const setRightPanelMode = useAppStore((state) => state.setRightPanelMode);
+  const updateSettings = useAppStore((state) => state.updateSettings);
+  const customThemes = settings.customThemes ?? [];
   const addToast = useAppStore((state) => state.addToast);
 
   const items = useMemo<QuickSearchItem[]>(() => {
@@ -74,7 +116,7 @@ export function QuickSearch({ open, onClose }: QuickSearchProps) {
           id: `workspace:${workspace.id}`,
           label: workspace.name,
           detail: workspace.branch || project.name,
-          icon: <FolderOpen size={16} />,
+          icon: <ProjectAvatar name={project.name} />,
           run: () => setActiveWorkspace(workspace.id),
         });
       }
@@ -87,7 +129,7 @@ export function QuickSearch({ open, onClose }: QuickSearchProps) {
           id: `file:${activeWorkspace.id}:${relPath}`,
           label: fileName,
           detail: relPath,
-          icon: <FileCode2 size={16} />,
+          icon: <FileIcon filePath={relPath} size={16} />,
           run: () => openFileTab(activeWorkspace.id, relPath),
         });
       }
@@ -95,11 +137,29 @@ export function QuickSearch({ open, onClose }: QuickSearchProps) {
 
     for (const tab of tabs) {
       const workspace = workspaces.find((item) => item.id === tab.workspaceId);
+
+      let tabIcon: ReactNode;
+      if (tab.type === 'terminal') {
+        if (tab.isAgent && tab.agentPresetId) {
+          tabIcon = agentPresetIcon(tab.agentPresetId, 16) ?? <Bot size={16} />;
+        } else if (tab.isAgent) {
+          tabIcon = <Bot size={16} />;
+        } else {
+          tabIcon = <TerminalSquare size={16} />;
+        }
+      } else if (tab.type === 'file') {
+        tabIcon = <FileIcon filePath={tab.relPath} size={16} />;
+      } else if (tab.type === 'diff') {
+        tabIcon = <GitCompare size={16} />;
+      } else {
+        tabIcon = <FileCode2 size={16} />;
+      }
+
       next.push({
         id: `tab:${tab.id}`,
         label: getTabTitle(tab),
         detail: workspace ? `${workspace.name} · ${tab.type}` : tab.type,
-        icon: tab.type === 'terminal' ? <TerminalSquare size={16} /> : <FileCode2 size={16} />,
+        icon: tabIcon,
         run: () => {
           setActiveWorkspace(tab.workspaceId);
           setActiveTab(tab.id);
@@ -144,10 +204,39 @@ export function QuickSearch({ open, onClose }: QuickSearchProps) {
           id: `agent:${preset.id}`,
           label: `New ${preset.label}`,
           detail: preset.command,
-          icon: <Bot size={16} />,
+          icon: agentPresetIcon(preset.id, 16) ?? <Bot size={16} />,
           run: () => void createAgentTerminal(activeWorkspaceId, preset.command, preset.id),
         });
       }
+    }
+
+    // Theme switching
+    const themeIconMap: Record<string, ReactNode> = {
+      system: <Monitor size={16} />,
+      dark: <Moon size={16} />,
+      light: <Sun size={16} />,
+      monokai: <Palette size={16} />,
+      dim: <SunMoon size={16} />,
+    };
+
+    for (const theme of BUILTIN_THEMES) {
+      next.push({
+        id: `theme:${theme.id}`,
+        label: `Theme: ${theme.name}`,
+        detail: settings.themeId === theme.id ? 'Theme · Active' : 'Theme',
+        icon: themeIconMap[theme.id] ?? <Palette size={16} />,
+        run: () => updateSettings({ themeId: theme.id }),
+      });
+    }
+
+    for (const theme of customThemes) {
+      next.push({
+        id: `theme:${theme.id}`,
+        label: `Theme: ${theme.name}`,
+        detail: settings.themeId === theme.id ? 'Theme · Active' : 'Custom Theme',
+        icon: <Palette size={16} />,
+        run: () => updateSettings({ themeId: theme.id }),
+      });
     }
 
     // Settings sections
@@ -162,6 +251,12 @@ export function QuickSearch({ open, onClose }: QuickSearchProps) {
         section: 'general',
         label: 'General',
         icon: <Paintbrush size={16} />,
+      },
+      {
+        id: 'settings:appearance',
+        section: 'appearance',
+        label: 'Appearance',
+        icon: <Palette size={16} />,
       },
       {
         id: 'settings:agent',
@@ -180,6 +275,24 @@ export function QuickSearch({ open, onClose }: QuickSearchProps) {
         section: 'changes',
         label: 'Changes',
         icon: <GitCompare size={16} />,
+      },
+      {
+        id: 'settings:notifications',
+        section: 'notifications',
+        label: 'Notifications',
+        icon: <Bell size={16} />,
+      },
+      {
+        id: 'settings:git',
+        section: 'git',
+        label: 'Git',
+        icon: <GitBranch size={16} />,
+      },
+      {
+        id: 'settings:shortcuts',
+        section: 'shortcuts',
+        label: 'Shortcuts',
+        icon: <Keyboard size={16} />,
       },
       {
         id: 'settings:advanced',
@@ -204,6 +317,7 @@ export function QuickSearch({ open, onClose }: QuickSearchProps) {
     activeWorkspace,
     createAgentTerminal,
     createTerminal,
+    customThemes,
     filePaths,
     openFileTab,
     openDiffTab,
@@ -213,7 +327,9 @@ export function QuickSearch({ open, onClose }: QuickSearchProps) {
     setActiveWorkspace,
     setRightPanelMode,
     settings.agentPresets,
+    settings.themeId,
     tabs,
+    updateSettings,
     workspaces,
   ]);
 
@@ -319,7 +435,7 @@ export function QuickSearch({ open, onClose }: QuickSearchProps) {
           ) : (
             filteredItems.map((item, index) => (
               <button
-                className={`grid h-9 w-full grid-cols-[24px_minmax(120px,auto)_minmax(0,1fr)_18px] items-center gap-3 rounded-lg px-3 text-left transition-colors${
+                className={`grid h-9 w-full grid-cols-[24px_minmax(120px,auto)_minmax(0,1fr)_18px] items-center gap-3 rounded-lg px-3 text-left transition-colors ${
                   index === selectedIndex ? 'bg-panel-3 text-text' : 'text-muted hover:bg-panel-2 hover:text-text'
                 }`}
                 key={item.id}
