@@ -6,7 +6,7 @@ import { IPC } from '@shared/ipc';
 import type { WebContents } from 'electron';
 import * as pty from 'node-pty';
 
-const SESSIONS_DIR = join(homedir(), '.forgepad', 'sessions');
+import { getDotFolderPath } from './paths';
 
 type PtyInstance = {
   process: pty.IPty;
@@ -136,8 +136,9 @@ export class PtyService {
     let sessionFile: string | null = null;
     if (sessionId && this.hookPort > 0) {
       try {
-        mkdirSync(SESSIONS_DIR, { recursive: true });
-        sessionFile = join(SESSIONS_DIR, `${sessionId}.json`);
+        const sessionsDir = join(getDotFolderPath(), 'sessions');
+        mkdirSync(sessionsDir, { recursive: true });
+        sessionFile = join(sessionsDir, `${sessionId}.json`);
         writeFileSync(sessionFile, JSON.stringify({ port: this.hookPort, ptyId: id }));
       } catch {
         // Non-critical — hooks won't fire but PTY still works
