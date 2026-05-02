@@ -45,6 +45,27 @@ function AddIcon({ className }: { className?: string }) {
   );
 }
 
+function GitBranchIcon({ className }: { className?: string }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" className={className}>
+      <path
+        d="M6 3v12M18 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M18 9c0 3-2 4-6 6"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 function GitMergeIcon({ className }: { className?: string }) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" className={className}>
@@ -60,6 +81,14 @@ function GitMergeIcon({ className }: { className?: string }) {
         strokeLinecap="round"
         strokeLinejoin="round"
       />
+    </svg>
+  );
+}
+
+function GitPullRequestIcon({ className }: { className?: string }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 16 16" fill="currentColor" className={className}>
+      <path d="M1.5 3.25a2.25 2.25 0 1 1 3 2.122v5.256a2.251 2.251 0 1 1-1.5 0V5.372A2.25 2.25 0 0 1 1.5 3.25Zm5.677-.177L9.573.677A.25.25 0 0 1 10 .854V2.5h1A2.5 2.5 0 0 1 13.5 5v5.628a2.251 2.251 0 1 1-1.5 0V5a1 1 0 0 0-1-1h-1v1.646a.25.25 0 0 1-.427.177L7.177 3.427a.25.25 0 0 1 0-.354ZM3.75 2.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm0 9.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm8.25.75a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0Z" />
     </svg>
   );
 }
@@ -355,6 +384,8 @@ function SortableWorkspaceRow({
   };
   const hasDiffStats = stats.additions > 0 || stats.deletions > 0;
   const hasRemoteStats = stats.ahead > 0 || stats.behind > 0;
+  const prNumber = branchStats?.prNumber ?? null;
+  const prUrl = branchStats?.prUrl ?? null;
   const agentStatus = useWorkspaceAgentStatus(workspace.id);
 
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -391,11 +422,13 @@ function SortableWorkspaceRow({
       {...listeners}
     >
       {isActive && <span className="absolute top-1 bottom-1 left-0 w-[3px] rounded-full bg-accent" />}
-      <div className="mt-[3px] flex size-[14px] shrink-0 items-center justify-center">
+      <div className="mt-[2px] flex size-[14px] shrink-0 items-center justify-center">
         {agentStatus && agentStatus !== 'idle' ? (
           <WorkspaceStatusDot isActive={isActive} agentStatus={agentStatus} />
+        ) : prNumber ? (
+          <GitPullRequestIcon className="text-[#a855f7]" />
         ) : (
-          <GitMergeIcon className="text-subtle" />
+          <GitBranchIcon className="text-subtle" />
         )}
       </div>
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
@@ -405,6 +438,26 @@ function SortableWorkspaceRow({
           >
             {workspace.branch || 'detached'}
           </span>
+          {prNumber && (
+            <span
+              role="link"
+              tabIndex={0}
+              className="shrink-0 cursor-pointer rounded-[3px] bg-[#a855f7]/10 px-[5px] py-px font-[560] font-mono text-[#a855f7] text-[9px] leading-[16px] transition-colors hover:bg-[#a855f7]/20"
+              title={prUrl ? `Open PR #${prNumber}` : `PR #${prNumber}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (prUrl) void window.forgepad.shell.openExternal(prUrl);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && prUrl) {
+                  e.stopPropagation();
+                  void window.forgepad.shell.openExternal(prUrl);
+                }
+              }}
+            >
+              #{prNumber}
+            </span>
+          )}
           {hasDiffStats && (
             <span className="flex shrink-0 items-center gap-1 font-mono text-[10px]">
               {stats.additions > 0 && <span className="text-text-addition">+{stats.additions}</span>}

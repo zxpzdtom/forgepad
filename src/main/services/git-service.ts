@@ -421,6 +421,120 @@ export class GitService {
     }
   }
 
+  /**
+   * Parse a git remote URL (HTTPS or SSH) into `{host, owner, repo}`.
+   * Examples:
+   *   https://github.com/user/repo.git   → { host: 'github.com', owner: 'user', repo: 'repo' }
+   *   git@gitlab.com:user/repo.git       → { host: 'gitlab.com', owner: 'user', repo: 'repo' }
+   */
+  private static parseRemoteUrl(raw: string): { host: string; owner: string; repo: string } | null {
+    const trimmed = raw.trim();
+    // SSH: git@host:owner/repo.git
+    const sshMatch = trimmed.match(/^[\w-]+@([^:]+):(.+?)(?:\.git)?$/);
+    if (sshMatch) {
+      const [, host, ownerRepo] = sshMatch;
+      const parts = ownerRepo.split('/');
+      if (parts.length >= 2) {
+        const repo = parts.pop()!;
+        return { host, owner: parts.join('/'), repo };
+      }
+    }
+    // HTTPS: https://host/owner/repo.git
+    try {
+      const url = new URL(trimmed);
+      const segments = url.pathname.replace(/\.git$/, '').split('/').filter(Boolean);
+      if (segments.length >= 2) {
+        const repo = segments.pop()!;
+        return { host: url.host, owner: segments.join('/'), repo };
+      }
+    } catch {
+      // not a valid URL
+    }
+    return null;
+  }
+
+  /**
+   * Detect PR/MR for the current branch using pure git (no CLI tools needed).
+   *
+   * How it works:
+   * - GitHub stores PR head refs at `refs/pull/<n>/head`
+   * - GitLab stores MR head refs at `refs/merge-requests/<n>/head`
+   *
+   * We run `git ls-remote origin` to fetch the branch's tracking SHA, then
+   * match it against PR/MR refs. The web URL is constructed from the parsed
+   * remote origin URL, so no `gh`/`glab` CLI is required.
+   */
+  static async getPrInfo(worktreePath: string): Promise<{ number: number; url: string } | null> {
+    try {
+      const branch = await GitService.getCurrentBranch(worktreePath);
+      if (!branch || branch === 'HEAD') return null;
+
+      const remoteUrl = await git(['remote', 'get-url', 'origin'], worktreePath).catch(() => '');
+      if (!remoteUrl) return null;
+
+      const parsed = GitService.parseRemoteUrl(remoteUrl);
+      if (!parsed) return null;
+
+      const isGitHub = /github\.com$/i.test(parsed.host);
+      const isGitLab = /gitlab/i.test(parsed.host);
+
+      // Determine which ref pattern to look for
+      let refPrefix: string;
+      if (isGitHub) {
+        refPrefix = 'refs/pull/';
+      } else if (isGitLab) {
+        refPrefix = 'refs/merge-requests/';
+      } else {
+        // Gitea/Forgejo also use refs/pull/, Bitbucket does not expose PR refs
+        refPrefix = 'refs/pull/';
+      }
+
+      // Get the SHA of the branch on the remote
+      const branchRefOutput = await git(
+        ['ls-remote', '--heads', 'origin', `refs/heads/${branch}`],
+        worktreePath,
+      ).catch(() => '');
+      const branchSha = branchRefOutput.split(/\s+/)[0];
+      if (!branchSha) return null;
+
+      // Fetch all PR/MR head refs from the remote
+      const prRefsOutput = await git(
+        ['ls-remote', 'origin', `${refPrefix}*/head`],
+        worktreePath,
+      ).catch(() => '');
+      if (!prRefsOutput) return null;
+
+      // Find the PR whose head SHA matches our branch's remote SHA
+      for (const line of prRefsOutput.split('\n')) {
+        const [sha, ref] = line.split(/\s+/);
+        if (sha !== branchSha || !ref) continue;
+
+        // Extract PR number: refs/pull/123/head → 123
+        const numMatch = ref.match(/\/(\d+)\/head$/);
+        if (!numMatch) continue;
+
+        const prNum = Number.parseInt(numMatch[1], 10);
+        if (!Number.isFinite(prNum) || prNum <= 0) continue;
+
+        // Construct the web URL
+        const baseUrl = `https://${parsed.host}/${parsed.owner}/${parsed.repo}`;
+        let webUrl: string;
+        if (isGitLab) {
+          webUrl = `${baseUrl}/-/merge_requests/${prNum}`;
+        } else {
+          // GitHub, Gitea, Forgejo all use /pull/<n>
+          webUrl = `${baseUrl}/pull/${prNum}`;
+        }
+
+        return { number: prNum, url: webUrl };
+      }
+
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
   static hasPath(worktreePath: string, relPath: string): boolean {
     return existsSync(path.join(worktreePath, relPath));
   }
