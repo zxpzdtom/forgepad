@@ -429,27 +429,6 @@ export function AppearancePanel() {
         </section>
       )}
 
-      {/* ── Placeholder links ── */}
-      <div className="flex items-center gap-4 pt-1">
-        <a
-          href="#"
-          className="flex items-center gap-1 text-[11px] text-muted transition-colors hover:text-text"
-          onClick={(e) => e.preventDefault()}
-          aria-label="Theme marketplace (coming soon)"
-        >
-          <ExternalLink size={11} />
-          Marketplace
-        </a>
-        <a
-          href="#"
-          className="flex items-center gap-1 text-[11px] text-muted transition-colors hover:text-text"
-          onClick={(e) => e.preventDefault()}
-          aria-label="Theme documentation (coming soon)"
-        >
-          <ExternalLink size={11} />
-          Docs
-        </a>
-      </div>
     </div>
   );
 }
