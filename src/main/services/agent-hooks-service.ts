@@ -75,7 +75,20 @@ exit 0
 
 const HOOK_COMMAND = `[ -f "$HOME/.forgepad/hooks/notify.sh" ] && "$HOME/.forgepad/hooks/notify.sh" || true`;
 
-const CLAUDE_HOOK_EVENTS = ['UserPromptSubmit', 'Stop', 'PermissionRequest', 'PreToolUse'];
+const CLAUDE_HOOK_EVENTS = [
+  'SessionStart', // session 开始或恢复 → working
+  'UserPromptSubmit', // 用户提交 prompt → working
+  'PreToolUse', // 工具调用前 → working
+  'PostToolUse', // 工具调用成功后 → working (确认仍在执行)
+  'PostToolUseFailure', // 工具调用失败后 → working (agent 仍在处理)
+  'SubagentStart', // 子 agent 启动 → working
+  'SubagentStop', // 子 agent 完成 → working (父级继续)
+  'Notification', // 通知事件 → permission (通常是权限相关)
+  'PermissionRequest', // 权限请求 → permission
+  'Stop', // agent 完成响应 → review
+  'StopFailure', // API 错误导致停止 → review
+  'SessionEnd', // session 结束 → idle
+];
 
 type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
 
