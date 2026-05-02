@@ -75,7 +75,7 @@ type AppState = {
   hydrated: boolean;
   workspaceLoadingIds: Set<string>;
   focusedColumn: 'sidebar' | 'agent' | 'file' | 'rightPanel';
-  branchStats: Record<string, { ahead: number; behind: number; additions: number; deletions: number }>;
+  branchStats: Record<string, { ahead: number; behind: number; additions: number; deletions: number; prNumber?: number | null; prUrl?: string | null }>;
   gitRefreshEpoch: number;
   /** Agent lifecycle statuses keyed by ptyId */
   agentStatuses: Record<string, AgentStatus>;
@@ -1675,11 +1675,19 @@ export const useAppStore = create<AppState>((set, get) => ({
   refreshBranchStats: async (workspaceId) => {
     const state = get();
     const targets = workspaceId ? state.workspaces.filter((w) => w.id === workspaceId) : state.workspaces;
-    const updates: Record<string, { ahead: number; behind: number; additions: number; deletions: number }> = {};
+    const updates: Record<string, { ahead: number; behind: number; additions: number; deletions: number; prNumber?: number | null; prUrl?: string | null }> = {};
     await Promise.all(
       targets.map(async (w) => {
         try {
-          updates[w.id] = await window.forgepad.git.getBranchStats(w.worktreePath);
+          const [stats, prInfo] = await Promise.all([
+            window.forgepad.git.getBranchStats(w.worktreePath),
+            window.forgepad.git.getPrInfo(w.worktreePath).catch(() => null),
+          ]);
+          updates[w.id] = {
+            ...stats,
+            prNumber: prInfo?.number ?? null,
+            prUrl: prInfo?.url ?? null,
+          };
         } catch {
           updates[w.id] = { ahead: 0, behind: 0, additions: 0, deletions: 0 };
         }

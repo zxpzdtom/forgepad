@@ -286,6 +286,7 @@ export function registerIpcHandlers(hookPort?: number): void {
   );
   ipcMain.handle(IPC.GIT_FETCH, async (_event, repoPath: string) => GitService.fetch(repoPath));
   ipcMain.handle(IPC.GIT_REMOTE_BRANCHES, async (_event, repoPath: string) => GitService.listRemoteBranches(repoPath));
+  ipcMain.handle(IPC.GIT_PR_NUMBER, async (_event, worktreePath: string) => GitService.getPrInfo(worktreePath));
 
   ipcMain.handle(IPC.FS_TREE_WITH_STATUS, async (_event, worktreePath: string) => FileService.getTreeWithStatus(worktreePath));
   ipcMain.handle(IPC.FS_LIST_FILES, async (_event, worktreePath: string) => FileService.listFiles(worktreePath));

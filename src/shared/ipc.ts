@@ -15,6 +15,7 @@ export const IPC = {
   GIT_WORKTREE_REMOVE: 'git:worktree-remove',
   GIT_FETCH: 'git:fetch',
   GIT_REMOTE_BRANCHES: 'git:remote-branches',
+  GIT_PR_NUMBER: 'git:pr-number',
   FS_TREE_WITH_STATUS: 'fs:tree-with-status',
   FS_LIST_FILES: 'fs:list-files',
   FS_READ_FILE: 'fs:read-file',
