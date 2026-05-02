@@ -1,6 +1,7 @@
 import type { CSSProperties } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FileTreeContextMenuItem, GitStatusEntry } from '@pierre/trees';
+import { useTranslation } from '@renderer/i18n';
 import { FileTree, useFileTree, useFileTreeSelection } from '@pierre/trees/react';
 import { useResolvedTheme } from '@renderer/App';
 import { useAppStore } from '@renderer/store/app-store';
@@ -149,6 +150,7 @@ const TREE_THEMES: Record<'dark' | 'light', CSSProperties> = {
 };
 
 export function FilesPanel() {
+  const { t } = useTranslation();
   const resolvedTheme = useResolvedTheme();
   const treeThemeStyle = TREE_THEMES[resolvedTheme];
   const workspace = useActiveWorkspace();
@@ -183,7 +185,7 @@ export function FilesPanel() {
     search: true,
     flattenEmptyDirectories: true,
     icons: { set: 'complete', colored: true },
-    renderRowDecoration: ({ item }) => (contextFileSet.has(item.path) ? { text: '', title: 'In AI context' } : null),
+    renderRowDecoration: ({ item }) => (contextFileSet.has(item.path) ? { text: '', title: t('files.inAIContext') } : null),
   });
 
   const selectedTreePaths = useFileTreeSelection(model);
@@ -244,7 +246,7 @@ export function FilesPanel() {
       const nodes = await window.forgepad.fs.getTreeWithStatus(workspace.worktreePath);
       setTreeData(treeDataFromNodes(nodes, workspace.worktreePath));
     } catch (error) {
-      addToast('error', error instanceof Error ? error.message : 'Failed to load file tree.');
+      addToast('error', error instanceof Error ? error.message : t('files.failedLoadTree'));
     } finally {
       setLoading(false);
     }
@@ -265,7 +267,7 @@ export function FilesPanel() {
     (relPaths: string[]) => {
       if (!workspace || relPaths.length === 0) return;
       addContextFiles(workspace.id, relPaths);
-      addToast('success', `Added ${relPaths.length} file${relPaths.length === 1 ? '' : 's'} to context.`);
+      addToast('success', relPaths.length === 1 ? t('files.addedToContext', { count: relPaths.length }) : t('files.addedToContextPlural', { count: relPaths.length }));
     },
     [addContextFiles, addToast, workspace],
   );
@@ -286,7 +288,7 @@ export function FilesPanel() {
             onClick={() => closeAfter(() => openFileTab(workspace.id, item.path))}
           >
             <span className="flex size-4 shrink-0 items-center justify-center text-subtle"><IconFile /></span>
-            <span className="text-[13px]">Open</span>
+            <span className="text-[13px]">{t('common.open')}</span>
           </button>
         ) : null}
         <button
@@ -298,7 +300,7 @@ export function FilesPanel() {
           <span className="flex size-4 shrink-0 items-center justify-center text-subtle">
             {item.kind === 'file' ? <IconContext /> : <IconFolder />}
           </span>
-          <span className="text-[13px]">{item.kind === 'file' ? 'Add to Context' : `Add Folder (${itemFiles.length})`}</span>
+          <span className="text-[13px]">{item.kind === 'file' ? t('files.addToContext') : t('files.addFolder', { count: itemFiles.length })}</span>
         </button>
         <button
           type="button"
@@ -306,12 +308,12 @@ export function FilesPanel() {
           onClick={() =>
             closeAfter(() => {
               void navigator.clipboard.writeText(`${workspace.worktreePath}/${item.path}`);
-              addToast('info', 'Path copied');
+              addToast('info', t('files.pathCopied'));
             })
           }
         >
           <span className="flex size-4 shrink-0 items-center justify-center text-subtle"><IconClipboard /></span>
-          <span className="text-[13px]">Copy Path</span>
+          <span className="text-[13px]">{t('files.copyPath')}</span>
         </button>
         <button
           type="button"
@@ -319,12 +321,12 @@ export function FilesPanel() {
           onClick={() =>
             closeAfter(() => {
               void navigator.clipboard.writeText(item.path);
-              addToast('info', 'Relative path copied');
+              addToast('info', t('files.relativePathCopied'));
             })
           }
         >
           <span className="flex size-4 shrink-0 items-center justify-center text-subtle"><IconClipboard /></span>
-          <span className="text-[13px]">Copy Relative Path</span>
+          <span className="text-[13px]">{t('files.copyRelativePath')}</span>
         </button>
       </div>
     );
@@ -429,7 +431,7 @@ export function FilesPanel() {
   }, []);
 
   if (!workspace) {
-    return <div className="grid min-h-[90px] place-items-center text-muted">Open a project first</div>;
+    return <div className="grid min-h-[90px] place-items-center text-muted">{t('files.openProjectFirst')}</div>;
   }
 
   return (

@@ -899,7 +899,10 @@ export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
   notifyOnTaskDone: false,
 };
 
+export type Locale = 'en' | 'zh-CN';
+
 export type AppSettings = {
+  locale: Locale;
   theme: ThemePreference;
   /** Active theme id — one of the built-in ids or a custom theme id */
   themeId: string;
@@ -940,6 +943,7 @@ export type AppSettings = {
 };
 
 export const DEFAULT_SETTINGS: AppSettings = {
+  locale: 'en',
   theme: 'dark',
   themeId: 'dark',
   customThemes: [],

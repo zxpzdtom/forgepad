@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useAppStore } from '@renderer/store/app-store';
+import { useTranslation } from '@renderer/i18n';
 import { BUILTIN_THEMES, THEME_SCHEMA_VERSION, type ThemeDefinition, type ThemeTokens } from '@shared/types';
 import { Check, Download, ExternalLink, Upload, X } from 'lucide-react';
 
@@ -9,27 +10,27 @@ const REQUIRED_TOKEN_KEYS: (keyof ThemeTokens)[] = ['bg', 'panel', 'text', 'acce
 
 type ValidationResult = { ok: true } | { ok: false; errors: string[] };
 
-function validateTheme(raw: unknown): ValidationResult {
+function validateTheme(raw: unknown, t: (key: string, params?: Record<string, unknown>) => string): ValidationResult {
   const errors: string[] = [];
   if (!raw || typeof raw !== 'object') {
-    return { ok: false, errors: ['Invalid JSON: not an object.'] };
+    return { ok: false, errors: [t('appearance.invalidJson')] };
   }
-  const t = raw as Record<string, unknown>;
+  const obj = raw as Record<string, unknown>;
 
-  if (t.schemaVersion !== THEME_SCHEMA_VERSION) {
-    errors.push(`Schema version mismatch: expected ${THEME_SCHEMA_VERSION}, got ${t.schemaVersion}.`);
+  if (obj.schemaVersion !== THEME_SCHEMA_VERSION) {
+    errors.push(t('appearance.schemaMismatch', { expected: THEME_SCHEMA_VERSION, got: obj.schemaVersion }));
   }
-  if (!t.id || typeof t.id !== 'string') errors.push('Missing required field: "id".');
-  if (!t.name || typeof t.name !== 'string') errors.push('Missing required field: "name".');
-  if (!['dark', 'light', 'system'].includes(t.mode as string)) {
-    errors.push(`"mode" must be "dark", "light", or "system" (got: ${JSON.stringify(t.mode)}).`);
+  if (!obj.id || typeof obj.id !== 'string') errors.push(t('appearance.missingId'));
+  if (!obj.name || typeof obj.name !== 'string') errors.push(t('appearance.missingName'));
+  if (!['dark', 'light', 'system'].includes(obj.mode as string)) {
+    errors.push(t('appearance.invalidMode', { mode: JSON.stringify(obj.mode) }));
   }
-  if (!t.tokens || typeof t.tokens !== 'object') {
-    errors.push('Missing required field: "tokens" (object).');
+  if (!obj.tokens || typeof obj.tokens !== 'object') {
+    errors.push(t('appearance.missingTokens'));
   } else {
-    const tokens = t.tokens as Record<string, unknown>;
+    const tokens = obj.tokens as Record<string, unknown>;
     for (const key of REQUIRED_TOKEN_KEYS) {
-      if (!tokens[key]) errors.push(`Missing required token: "${key}".`);
+      if (!tokens[key]) errors.push(t('appearance.missingToken', { key }));
     }
   }
   return errors.length > 0 ? { ok: false, errors } : { ok: true };
@@ -117,7 +118,7 @@ function TerminalPreview({ theme }: { theme: ThemeDefinition }) {
 
 /* ─── Theme card ─── */
 
-function ThemeCard({ theme, isSelected, onSelect }: { theme: ThemeDefinition; isSelected: boolean; onSelect: () => void }) {
+function ThemeCard({ theme, isSelected, onSelect, t }: { theme: ThemeDefinition; isSelected: boolean; onSelect: () => void; t: (key: string, params?: Record<string, unknown>) => string }) {
   const swatches = resolveSwatches(theme);
   const isSystem = theme.id === 'system';
 
@@ -125,7 +126,7 @@ function ThemeCard({ theme, isSelected, onSelect }: { theme: ThemeDefinition; is
     <button
       type="button"
       aria-pressed={isSelected}
-      aria-label={`Select ${theme.name} theme`}
+      aria-label={t('appearance.selectTheme', { name: theme.name })}
       onClick={onSelect}
       className={`group relative flex w-full flex-col overflow-hidden rounded-xl border text-left transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-border focus-visible:ring-offset-2 focus-visible:ring-offset-bg ${
         isSelected ? 'border-accent shadow-[0_0_0_2px_var(--accent)]' : 'border-border hover:border-border-soft hover:shadow-sm'
@@ -185,11 +186,11 @@ function ThemeCard({ theme, isSelected, onSelect }: { theme: ThemeDefinition; is
 
 /* ─── Import error banner ─── */
 
-function ImportErrorBanner({ errors, onDismiss }: { errors: string[]; onDismiss: () => void }) {
+function ImportErrorBanner({ errors, onDismiss, t }: { errors: string[]; onDismiss: () => void; t: (key: string, params?: Record<string, unknown>) => string }) {
   return (
     <div className="flex items-start gap-2 rounded-lg border border-danger/30 bg-danger/8 px-3 py-2.5">
       <div className="min-w-0 flex-1">
-        <div className="font-[510] text-[12px] text-danger">Theme import failed</div>
+        <div className="font-[510] text-[12px] text-danger">{t('appearance.importFailed')}</div>
         <ul className="mt-1 space-y-0.5">
           {errors.map((e, i) => (
             <li key={i} className="text-[11px] text-muted">
@@ -200,7 +201,7 @@ function ImportErrorBanner({ errors, onDismiss }: { errors: string[]; onDismiss:
       </div>
       <button
         type="button"
-        aria-label="Dismiss error"
+        aria-label={t('appearance.dismissError')}
         className="shrink-0 rounded p-0.5 text-muted hover:text-text"
         onClick={onDismiss}
       >
@@ -213,6 +214,7 @@ function ImportErrorBanner({ errors, onDismiss }: { errors: string[]; onDismiss:
 /* ─── Main AppearancePanel ─── */
 
 export function AppearancePanel() {
+  const { t } = useTranslation();
   const themeId = useAppStore((s) => s.settings.themeId);
   const customThemes = useAppStore((s) => s.settings.customThemes ?? []);
   const addCustomTheme = useAppStore((s) => s.addCustomTheme);
@@ -246,25 +248,25 @@ export function AppearancePanel() {
       try {
         const text = await file.text();
         const raw = JSON.parse(text) as unknown;
-        const result = validateTheme(raw);
+        const result = validateTheme(raw, t);
         if (!result.ok) {
           setImportErrors(result.errors);
           return;
         }
         const incoming = raw as ThemeDefinition;
-        if (BUILTIN_THEMES.some((t) => t.id === incoming.id)) {
+        if (BUILTIN_THEMES.some((bt) => bt.id === incoming.id)) {
           setImportErrors([
-            `Theme id "${incoming.id}" conflicts with a built-in theme. Change the id in the JSON and re-import.`,
+            t('appearance.conflictBuiltIn', { id: incoming.id }),
           ]);
           return;
         }
         addCustomTheme({ ...incoming, schemaVersion: THEME_SCHEMA_VERSION });
         setImportSuccess(incoming.name);
       } catch {
-        setImportErrors(['Invalid JSON file. Please check the file and try again.']);
+        setImportErrors([t('appearance.invalidJsonFile')]);
       }
     },
-    [addCustomTheme],
+    [addCustomTheme, t],
   );
 
   const handleFileInputChange = useCallback(
@@ -326,10 +328,10 @@ export function AppearancePanel() {
           type="button"
           className="flex items-center gap-1.5 rounded-lg border border-border bg-panel-2 px-3 py-1.5 text-[12px] text-text transition-colors hover:bg-panel-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-border"
           onClick={() => fileInputRef.current?.click()}
-          aria-label="Import theme JSON"
+          aria-label={t('appearance.importThemeAria')}
         >
           <Upload size={13} />
-          Import Theme
+          {t('appearance.importTheme')}
         </button>
         <input
           ref={fileInputRef}
@@ -344,34 +346,34 @@ export function AppearancePanel() {
           type="button"
           className="flex items-center gap-1.5 rounded-lg border border-border bg-panel-2 px-3 py-1.5 text-[12px] text-text transition-colors hover:bg-panel-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-border"
           onClick={handleDownloadBase}
-          aria-label="Download base theme file for customisation"
+          aria-label={t('appearance.downloadBaseAria')}
         >
           <Download size={13} />
-          Download Base File
+          {t('appearance.downloadBase')}
         </button>
 
         <button
           type="button"
           className="flex items-center gap-1.5 rounded-lg border border-border bg-panel-2 px-3 py-1.5 text-[12px] text-muted transition-colors hover:bg-panel-3 hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-border"
           onClick={handleExportActive}
-          aria-label="Export current theme"
+          aria-label={t('appearance.exportCurrentAria')}
         >
           <ExternalLink size={13} />
-          Export Current
+          {t('appearance.exportCurrent')}
         </button>
       </div>
 
       {/* ── Error / success banners ── */}
-      {importErrors && <ImportErrorBanner errors={importErrors} onDismiss={() => setImportErrors(null)} />}
+      {importErrors && <ImportErrorBanner errors={importErrors} onDismiss={() => setImportErrors(null)} t={t} />}
       {importSuccess && (
         <div className="flex items-center gap-2 rounded-lg border border-ok/30 bg-ok/8 px-3 py-2 text-[12px] text-ok">
           <Check size={13} />
           <span>
-            Theme <strong>{importSuccess}</strong> imported successfully.
+            {t('appearance.importSuccess', { name: importSuccess })}
           </span>
           <button
             type="button"
-            aria-label="Dismiss"
+            aria-label={t('common.dismiss')}
             className="ml-auto rounded p-0.5 text-ok/70 hover:text-ok"
             onClick={() => setImportSuccess(null)}
           >
@@ -381,40 +383,40 @@ export function AppearancePanel() {
       )}
 
       {/* ── Built-in themes gallery ── */}
-      <section aria-label="Built-in themes">
-        <h3 className="mb-3 font-[590] text-[13px] text-muted uppercase tracking-wider">Built-in</h3>
+      <section aria-label={t('appearance.builtInThemes')}>
+        <h3 className="mb-3 font-[590] text-[13px] text-muted uppercase tracking-wider">{t('appearance.builtIn')}</h3>
         <div
           className="grid gap-3"
           style={{
             gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
           }}
           role="radiogroup"
-          aria-label="Select built-in theme"
+          aria-label={t('appearance.selectBuiltIn')}
         >
           {BUILTIN_THEMES.map((theme) => (
-            <ThemeCard key={theme.id} theme={theme} isSelected={themeId === theme.id} onSelect={() => handleSelect(theme.id)} />
+            <ThemeCard key={theme.id} theme={theme} isSelected={themeId === theme.id} onSelect={() => handleSelect(theme.id)} t={t} />
           ))}
         </div>
       </section>
 
       {/* ── Custom themes gallery ── */}
       {customThemes.length > 0 && (
-        <section aria-label="Custom themes">
-          <h3 className="mb-3 font-[590] text-[13px] text-muted uppercase tracking-wider">Custom</h3>
+        <section aria-label={t('appearance.customThemes')}>
+          <h3 className="mb-3 font-[590] text-[13px] text-muted uppercase tracking-wider">{t('appearance.custom')}</h3>
           <div
             className="grid gap-3"
             style={{
               gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
             }}
             role="radiogroup"
-            aria-label="Select custom theme"
+            aria-label={t('appearance.selectCustom')}
           >
             {customThemes.map((theme) => (
               <div key={theme.id} className="group relative">
-                <ThemeCard theme={theme} isSelected={themeId === theme.id} onSelect={() => handleSelect(theme.id)} />
+                <ThemeCard theme={theme} isSelected={themeId === theme.id} onSelect={() => handleSelect(theme.id)} t={t} />
                 <button
                   type="button"
-                  aria-label={`Remove ${theme.name} theme`}
+                  aria-label={t('appearance.removeTheme', { name: theme.name })}
                   className="absolute top-1.5 left-1.5 hidden size-5 items-center justify-center rounded-full bg-panel-3/90 text-muted transition-colors hover:bg-danger/20 hover:text-danger group-hover:flex"
                   onClick={(e) => {
                     e.stopPropagation();
@@ -429,27 +431,6 @@ export function AppearancePanel() {
         </section>
       )}
 
-      {/* ── Placeholder links ── */}
-      <div className="flex items-center gap-4 pt-1">
-        <a
-          href="#"
-          className="flex items-center gap-1 text-[11px] text-muted transition-colors hover:text-text"
-          onClick={(e) => e.preventDefault()}
-          aria-label="Theme marketplace (coming soon)"
-        >
-          <ExternalLink size={11} />
-          Marketplace
-        </a>
-        <a
-          href="#"
-          className="flex items-center gap-1 text-[11px] text-muted transition-colors hover:text-text"
-          onClick={(e) => e.preventDefault()}
-          aria-label="Theme documentation (coming soon)"
-        >
-          <ExternalLink size={11} />
-          Docs
-        </a>
-      </div>
     </div>
   );
 }

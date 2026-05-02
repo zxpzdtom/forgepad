@@ -1,4 +1,5 @@
 import { type CSSProperties, type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from '@renderer/i18n';
 import { useAppStore } from '@renderer/store/app-store';
 import {
   Check,
@@ -79,6 +80,7 @@ function Submenu({
   onSelect: (id: string) => void;
   anchorName: string;
 }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const closeTimer = useRef<ReturnType<typeof setTimeout>>();
 
@@ -134,7 +136,7 @@ function Submenu({
             />
           ))
         ) : (
-          <div className="px-3 py-2 text-subtle text-xs">None detected</div>
+          <div className="px-3 py-2 text-subtle text-xs">{t('topbar.noneDetected')}</div>
         )}
       </div>
     </div>
@@ -153,6 +155,7 @@ const IDE_IDS = new Set(['zed', 'vscode', 'cursor', 'windsurf', 'intellij']);
 const TERMINAL_IDS = new Set(['terminal', 'iterm', 'iterm2', 'ghostty']);
 
 export function TopBar({ onOpenSearch }: TopBarProps) {
+  const { t } = useTranslation();
   const [menuOpen, setMenuOpen] = useState(false);
   const [ides, setIdes] = useState<DetectedIde[]>([]);
   const [terminals, setTerminals] = useState<DetectedTerminal[]>([]);
@@ -237,7 +240,7 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
     try {
       await action(activeWorkspace.worktreePath);
     } catch (error) {
-      addToast('error', error instanceof Error ? error.message : 'Failed to open.');
+      addToast('error', error instanceof Error ? error.message : t('topbar.failedToOpen'));
     }
   };
 
@@ -252,7 +255,7 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
         <button
           className="icon-button border-transparent"
           type="button"
-          title={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}
+          title={sidebarOpen ? t('topbar.collapseSidebar') : t('topbar.expandSidebar')}
           onClick={() => useAppStore.setState({ sidebarOpen: !sidebarOpen })}
         >
           {sidebarOpen ? <PanelLeftClose size={17} /> : <PanelLeftOpen size={17} />}
@@ -262,12 +265,12 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
       <button
         className="absolute left-1/2 flex h-8 w-[min(460px,40vw)] -translate-x-1/2 items-center gap-2 rounded-lg border border-border bg-surface-search px-3 text-left text-muted shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] transition-colors hover:border-subtle hover:text-text"
         type="button"
-        title="Search ForgePad"
+        title={t('topbar.searchForgePad')}
         onClick={onOpenSearch}
       >
         <Search size={17} />
         <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[13px]">
-          Search ForgePad
+          {t('topbar.searchForgePad')}
           {activeWorkspace ? ` - ${activeWorkspace.name}` : ''}
         </span>
         <kbd className="grid size-[20px] place-items-center rounded border border-border bg-panel-2 text-[11px] text-subtle leading-none">
@@ -283,7 +286,7 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
         <button
           className="icon-button border-transparent"
           type="button"
-          title={rightPanelOpen ? 'Close side panel' : 'Open side panel'}
+          title={rightPanelOpen ? t('topbar.closeSidePanel') : t('topbar.openSidePanel')}
           onClick={() => useAppStore.setState({ rightPanelOpen: !rightPanelOpen })}
         >
           {rightPanelOpen ? <PanelRightClose size={17} /> : <PanelRightOpen size={17} />}
@@ -295,11 +298,11 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
               className="flex h-8 items-center gap-2 px-2.5 text-sm text-text disabled:cursor-not-allowed disabled:text-subtle"
               type="button"
               disabled={!activeWorkspace}
-              title={`Open with ${defaultOpenWith}`}
+              title={t('topbar.openWith', { tool: defaultOpenWith })}
               onClick={handleOpen}
             >
               <span className="grid size-4 place-items-center">{selectedIcon}</span>
-              <span className="font-[590]">Open</span>
+              <span className="font-[590]">{t('common.open')}</span>
             </button>
 
             {/* Right: chevron trigger (anchor for dropdown) */}
@@ -307,7 +310,7 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
               className="grid h-8 w-8 place-items-center border-border border-l text-muted hover:text-text disabled:cursor-not-allowed disabled:text-subtle"
               type="button"
               disabled={!activeWorkspace}
-              title="Default open with"
+              title={t('topbar.defaultOpenWith')}
               onClick={() => setMenuOpen((v) => !v)}
               style={{ anchorName: '--open-with-trigger' } as CSSProperties}
             >
@@ -329,19 +332,19 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
             }
             hidden={!menuOpen || !activeWorkspace}
           >
-            <div className="px-2 py-1.5 text-[11px] text-subtle">Default open with</div>
+            <div className="px-2 py-1.5 text-[11px] text-subtle">{t('topbar.defaultOpenWith')}</div>
 
             {/* Finder */}
             <MenuItem
               icon={appIcon('finder', ICON_SIZE) ?? <Folder size={ICON_SIZE} />}
-              label="Finder"
+              label={t('topbar.finder')}
               selected={defaultOpenWith === 'finder'}
               onClick={() => handleSelect('finder')}
             />
 
             {/* IDE submenu */}
             <Submenu
-              parentLabel="IDE"
+              parentLabel={t('topbar.ide')}
               parentIcon={ideParentIcon}
               items={ides}
               selectedId={selectedIsIde ? defaultOpenWith : null}
@@ -351,7 +354,7 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
 
             {/* Terminal submenu */}
             <Submenu
-              parentLabel="Terminal"
+              parentLabel={t('topbar.terminal')}
               parentIcon={terminalParentIcon}
               items={terminals}
               selectedId={selectedIsTerminal ? defaultOpenWith : null}

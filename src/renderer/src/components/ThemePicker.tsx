@@ -1,5 +1,6 @@
 import { Monitor, Moon, Sun } from 'lucide-react';
 
+import { useTranslation } from '@renderer/i18n';
 import { SegmentedControl } from './SegmentedControl';
 
 /**
@@ -29,17 +30,19 @@ type ThemePickerProps =
     };
 
 export function ThemePicker(props: ThemePickerProps) {
+  const { t } = useTranslation();
+
   if (props.includeSystem) {
     return (
       <SegmentedControl
         value={props.value}
         label={props.label}
         options={[
-          { value: 'dark' as const, label: 'Dark', icon: <Moon size={12} /> },
-          { value: 'light' as const, label: 'Light', icon: <Sun size={12} /> },
+          { value: 'dark' as const, label: t('themePicker.dark'), icon: <Moon size={12} /> },
+          { value: 'light' as const, label: t('themePicker.light'), icon: <Sun size={12} /> },
           {
             value: 'system' as const,
-            label: 'System',
+            label: t('themePicker.system'),
             icon: <Monitor size={12} />,
           },
         ]}
@@ -55,11 +58,11 @@ export function ThemePicker(props: ThemePickerProps) {
       options={[
         {
           value: 'follow' as const,
-          label: 'Follow',
+          label: t('common.follow'),
           icon: <Monitor size={12} />,
         },
-        { value: 'dark' as const, label: 'Dark', icon: <Moon size={12} /> },
-        { value: 'light' as const, label: 'Light', icon: <Sun size={12} /> },
+        { value: 'dark' as const, label: t('themePicker.dark'), icon: <Moon size={12} /> },
+        { value: 'light' as const, label: t('themePicker.light'), icon: <Sun size={12} /> },
       ]}
       onChange={props.onChange}
     />

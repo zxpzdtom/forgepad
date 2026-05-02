@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PatchDiff } from '@pierre/diffs/react';
 import { useResolvedTheme } from '@renderer/App';
+import { useTranslation } from '@renderer/i18n';
 import { type SettingsSection, useAppStore } from '@renderer/store/app-store';
 import type { AgentPreset, ShortcutCategory } from '@shared/types';
 import { DEFAULT_SETTINGS, DEFAULT_SHORTCUTS, SHORTCUT_DEFINITIONS } from '@shared/types';
@@ -63,15 +64,15 @@ const SAMPLE_PATCH = `--- a/src/utils/format.ts
 type SectionId = SettingsSection;
 
 const NAV_ITEMS: { id: SectionId; label: string; icon: React.ReactNode }[] = [
-  { id: 'general', label: 'General', icon: <Paintbrush size={15} /> },
-  { id: 'appearance', label: 'Appearance', icon: <SwatchBook size={15} /> },
-  { id: 'agent', label: 'Agent', icon: <Bot size={15} /> },
-  { id: 'terminal', label: 'Terminal', icon: <Terminal size={15} /> },
-  { id: 'changes', label: 'Changes', icon: <Rows2 size={15} /> },
-  { id: 'notifications', label: 'Notifications', icon: <Bell size={15} /> },
-  { id: 'git', label: 'Git', icon: <GitBranch size={15} /> },
-  { id: 'advanced', label: 'Advanced', icon: <Settings size={15} /> },
-  { id: 'shortcuts', label: 'Shortcuts', icon: <Keyboard size={15} /> },
+  { id: 'general', label: 'settings.nav.general', icon: <Paintbrush size={15} /> },
+  { id: 'appearance', label: 'settings.nav.appearance', icon: <SwatchBook size={15} /> },
+  { id: 'agent', label: 'settings.nav.agent', icon: <Bot size={15} /> },
+  { id: 'terminal', label: 'settings.nav.terminal', icon: <Terminal size={15} /> },
+  { id: 'changes', label: 'settings.nav.changes', icon: <Rows2 size={15} /> },
+  { id: 'notifications', label: 'settings.nav.notifications', icon: <Bell size={15} /> },
+  { id: 'git', label: 'settings.nav.git', icon: <GitBranch size={15} /> },
+  { id: 'advanced', label: 'settings.nav.advanced', icon: <Settings size={15} /> },
+  { id: 'shortcuts', label: 'settings.nav.shortcuts', icon: <Keyboard size={15} /> },
 ];
 
 /* ─── Reusable UI primitives ─── */
@@ -173,6 +174,7 @@ function AgentPresetRow({
   onEdit: () => void;
   onRemove: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <div
       className={`group flex items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors ${
@@ -192,8 +194,8 @@ function AgentPresetRow({
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <span className="font-[510] text-[13px] text-text">{preset.label}</span>
-          {isDefault && <span className="rounded-full bg-accent/20 px-1.5 py-0.5 text-[10px] text-accent">Default</span>}
-          {preset.builtIn && <span className="rounded-full bg-panel-3 px-1.5 py-0.5 text-[10px] text-subtle">Built-in</span>}
+          {isDefault && <span className="rounded-full bg-accent/20 px-1.5 py-0.5 text-[10px] text-accent">{t('common.default')}</span>}
+          {preset.builtIn && <span className="rounded-full bg-panel-3 px-1.5 py-0.5 text-[10px] text-subtle">{t('common.builtIn')}</span>}
         </div>
         <code className="mt-0.5 block truncate font-mono text-[11px] text-subtle">{preset.command}</code>
       </div>
@@ -202,16 +204,16 @@ function AgentPresetRow({
           <button
             className="hidden h-6 items-center rounded px-2 text-[11px] text-muted hover:bg-panel-3 hover:text-text group-hover:flex"
             type="button"
-            title="Set as default"
+            title={t('settings.agent.setDefault')}
             onClick={onSetDefault}
           >
-            Set default
+            {t('settings.agent.setDefault')}
           </button>
         )}
         <button
           className="icon-button small border-transparent opacity-0 transition-opacity group-hover:opacity-100"
           type="button"
-          title="Edit preset"
+          title={t('settings.agent.editPreset')}
           onClick={onEdit}
         >
           <Settings size={13} />
@@ -220,7 +222,7 @@ function AgentPresetRow({
           <button
             className="icon-button small border-transparent opacity-0 transition-opacity hover:text-danger group-hover:opacity-100"
             type="button"
-            title="Delete preset"
+            title={t('settings.agent.deletePreset')}
             onClick={onRemove}
           >
             <Trash2 size={13} />
@@ -241,6 +243,7 @@ function EditPresetDialog({
   onSave: (data: { label: string; command: string; restoreTemplate?: string }) => void;
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
   const [label, setLabel] = useState(preset?.label ?? '');
   const [command, setCommand] = useState(preset?.command ?? '');
   const [restoreTemplate, setRestoreTemplate] = useState(preset?.restoreTemplate ?? '');
@@ -260,7 +263,7 @@ function EditPresetDialog({
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="flex h-12 items-center justify-between border-border border-b px-4">
-          <span className="font-[590] text-[15px] text-text">{preset ? 'Edit Preset' : 'Add Preset'}</span>
+          <span className="font-[590] text-[15px] text-text">{preset ? t('settings.agent.editPresetTitle') : t('settings.agent.addPresetTitle')}</span>
           <button className="icon-button border-transparent" type="button" onClick={onClose}>
             <X size={16} />
           </button>
@@ -269,27 +272,27 @@ function EditPresetDialog({
         <div className="space-y-4 p-4">
           <div className="space-y-1.5">
             <label className="font-[510] text-[12px] text-subtle" htmlFor="preset-label">
-              Name
+              {t('settings.agent.presetName')}
             </label>
             <input
               ref={labelRef}
               id="preset-label"
               className="h-8 w-full rounded-md border border-border bg-panel-2 px-3 text-[13px] text-text outline-none focus:border-accent/60 focus:ring-1 focus:ring-accent/30"
               value={label}
-              placeholder="My Agent"
+              placeholder={t('settings.agent.presetNamePlaceholder')}
               onChange={(e) => setLabel(e.currentTarget.value)}
             />
           </div>
 
           <div className="space-y-1.5">
             <label className="font-[510] text-[12px] text-subtle" htmlFor="preset-command">
-              Command
+              {t('settings.agent.presetCommand')}
             </label>
             <input
               id="preset-command"
               className="h-8 w-full rounded-md border border-border bg-panel-2 px-3 font-mono text-[12px] text-text outline-none focus:border-accent/60 focus:ring-1 focus:ring-accent/30"
               value={command}
-              placeholder="my-agent --flag"
+              placeholder={t('settings.agent.presetCommandPlaceholder')}
               onChange={(e) => setCommand(e.currentTarget.value)}
             />
           </div>
@@ -301,12 +304,12 @@ function EditPresetDialog({
               onClick={() => setShowAdvanced((v) => !v)}
             >
               {showAdvanced ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
-              Advanced
+              {t('common.advanced')}
             </button>
             {showAdvanced && (
               <div className="mt-3 space-y-1.5">
                 <label className="font-[510] text-[12px] text-subtle" htmlFor="preset-restore">
-                  Restore command template <span className="text-subtle/60">(optional, use {'{sessionId}'})</span>
+                  {t('settings.agent.restoreTemplate')} <span className="text-subtle/60">{t('settings.agent.restoreTemplateOptional')}</span>
                 </label>
                 <input
                   id="preset-restore"
@@ -322,7 +325,7 @@ function EditPresetDialog({
 
         <div className="flex items-center justify-end gap-2 border-border border-t px-4 py-3">
           <button className="secondary-button" type="button" onClick={onClose}>
-            Cancel
+            {t('common.cancel')}
           </button>
           <button
             className="primary-button"
@@ -337,7 +340,7 @@ function EditPresetDialog({
             }
           >
             <Check size={14} />
-            {preset ? 'Save' : 'Add'}
+            {preset ? t('common.save') : t('common.add')}
           </button>
         </div>
       </div>
@@ -356,18 +359,30 @@ const SPINNER_OPTIONS: { name: BrailleSpinnerName; label: string }[] = (Object.k
 /* ─── Section: General ─── */
 
 function GeneralSection() {
+  const { t } = useTranslation();
   const settings = useAppStore((state) => state.settings);
   const updateSettings = useAppStore((state) => state.updateSettings);
 
   return (
     <div>
-      <SectionHeader title="General" />
+      <SectionHeader title={t('settings.general.title')} />
 
-      <SettingRow label="Theme" description="Application color scheme">
+      <SettingRow label={t('settings.general.language')} description={t('settings.general.languageDesc')}>
+        <select
+          className="h-8 rounded-md border border-border bg-panel-2 px-2.5 text-[13px] text-text outline-none focus:border-accent/60"
+          value={settings.locale}
+          onChange={(e) => updateSettings({ locale: e.currentTarget.value as 'en' | 'zh-CN' })}
+        >
+          <option value="en">English</option>
+          <option value="zh-CN">中文</option>
+        </select>
+      </SettingRow>
+
+      <SettingRow label={t('settings.general.theme')} description={t('settings.general.themeDesc')}>
         <ThemePicker value={settings.theme} label="Theme" includeSystem onChange={(v) => updateSettings({ theme: v })} />
       </SettingRow>
 
-      <SettingRow label="Editor Font Size" description="Font size for the code editor">
+      <SettingRow label={t('settings.general.editorFontSize')} description={t('settings.general.editorFontSizeDesc')}>
         <NumberStepper
           value={settings.editorFontSize}
           min={10}
@@ -376,23 +391,23 @@ function GeneralSection() {
         />
       </SettingRow>
 
-      <SettingRow label="Open With" description="Default external editor / tool for opening files">
+      <SettingRow label={t('settings.general.openWith')} description={t('settings.general.openWithDesc')}>
         <select
           className="h-8 rounded-md border border-border bg-panel-2 px-2.5 text-[13px] text-text outline-none focus:border-accent/60"
           value={settings.defaultOpenWith}
           onChange={(e) => updateSettings({ defaultOpenWith: e.currentTarget.value })}
         >
-          <option value="finder">Finder</option>
-          <option value="vscode">VS Code</option>
-          <option value="terminal">Terminal</option>
+          <option value="finder">{t('settings.general.openWith.finder')}</option>
+          <option value="vscode">{t('settings.general.openWith.vscode')}</option>
+          <option value="terminal">{t('settings.general.openWith.terminal')}</option>
         </select>
       </SettingRow>
 
       <Divider />
 
       <div className="py-2">
-        <div className="mb-1 font-[510] text-[13px] text-text">Loading Animation</div>
-        <div className="mb-3 text-[11px] text-subtle leading-tight">Spinner shown in sidebar when an agent is working</div>
+        <div className="mb-1 font-[510] text-[13px] text-text">{t('settings.general.loadingAnimation')}</div>
+        <div className="mb-3 text-[11px] text-subtle leading-tight">{t('settings.general.loadingAnimationDesc')}</div>
         <div className="grid grid-cols-3 gap-2">
           {SPINNER_OPTIONS.map(({ name, label }) => (
             <button
@@ -420,6 +435,7 @@ function GeneralSection() {
 /* ─── Section: Agent ─── */
 
 function AgentSection() {
+  const { t } = useTranslation();
   const settings = useAppStore((state) => state.settings);
   const updateSettings = useAppStore((state) => state.updateSettings);
   const addAgentPreset = useAppStore((state) => state.addAgentPreset);
@@ -460,23 +476,23 @@ function AgentSection() {
   };
 
   const handleRemove = (preset: AgentPreset) => {
-    if (window.confirm(`Delete preset "${preset.label}"?`)) {
+    if (window.confirm(t('settings.agent.deleteConfirm', { name: preset.label }))) {
       removeAgentPreset(preset.id);
     }
   };
 
   return (
     <div>
-      <SectionHeader title="Agent" />
+      <SectionHeader title={t('settings.agent.title')} />
 
       <div className="mb-3 flex items-center justify-between">
         <div>
-          <div className="font-[510] text-[13px] text-text">Agent Presets</div>
-          <p className="text-[11px] text-subtle">Configure and sort AI coding assistants</p>
+          <div className="font-[510] text-[13px] text-text">{t('settings.agent.presets')}</div>
+          <p className="text-[11px] text-subtle">{t('settings.agent.presetsDesc')}</p>
         </div>
         <button className="secondary-button small" type="button" onClick={() => setEditingPreset('new')}>
           <Plus size={13} />
-          Add
+          {t('common.add')}
         </button>
       </div>
 
@@ -496,7 +512,7 @@ function AgentSection() {
 
       <Divider />
 
-      <SettingRow label="Agent Theme" description="Override agent terminal color scheme independently from the app theme">
+      <SettingRow label={t('settings.agent.agentTheme')} description={t('settings.agent.agentThemeDesc')}>
         <ThemePicker
           value={settings.agentThemeMode}
           label="Agent theme"
@@ -505,8 +521,8 @@ function AgentSection() {
       </SettingRow>
 
       <SettingRow
-        label="Clear Comments on Send"
-        description="Automatically remove comments and selections from context after sending"
+        label={t('settings.agent.clearComments')}
+        description={t('settings.agent.clearCommentsDesc')}
       >
         <Toggle
           checked={settings.sendAndClearComments}
@@ -529,14 +545,15 @@ function AgentSection() {
 /* ─── Section: Terminal ─── */
 
 function TerminalSection() {
+  const { t } = useTranslation();
   const settings = useAppStore((state) => state.settings);
   const updateSettings = useAppStore((state) => state.updateSettings);
 
   return (
     <div>
-      <SectionHeader title="Terminal" />
+      <SectionHeader title={t('settings.terminal.title')} />
 
-      <SettingRow label="Default Shell" description="Shell to use for new terminals (leave empty for system default)">
+      <SettingRow label={t('settings.terminal.defaultShell')} description={t('settings.terminal.defaultShellDesc')}>
         <input
           className="h-8 w-48 rounded-md border border-border bg-panel-2 px-3 font-mono text-[12px] text-text outline-none focus:border-accent/60 focus:ring-1 focus:ring-accent/30"
           value={settings.defaultShell}
@@ -545,7 +562,7 @@ function TerminalSection() {
         />
       </SettingRow>
 
-      <SettingRow label="Font Size" description="Terminal text size">
+      <SettingRow label={t('settings.terminal.fontSize')} description={t('settings.terminal.fontSizeDesc')}>
         <NumberStepper
           value={settings.terminalFontSize}
           min={10}
@@ -554,7 +571,7 @@ function TerminalSection() {
         />
       </SettingRow>
 
-      <SettingRow label="Terminal Theme" description="Override shell terminal color scheme independently from the app theme">
+      <SettingRow label={t('settings.terminal.terminalTheme')} description={t('settings.terminal.terminalThemeDesc')}>
         <ThemePicker
           value={settings.terminalThemeMode}
           label="Terminal theme"
@@ -568,6 +585,7 @@ function TerminalSection() {
 /* ─── Section: Changes (with live preview) ─── */
 
 function ChangesSection() {
+  const { t } = useTranslation();
   const settings = useAppStore((state) => state.settings);
   const updateSettings = useAppStore((state) => state.updateSettings);
   const resolvedTheme = useResolvedTheme();
@@ -596,15 +614,15 @@ function ChangesSection() {
 
   return (
     <div>
-      <SectionHeader title="Changes" />
+      <SectionHeader title={t('settings.changes.title')} />
 
-      <SettingRow label="Layout" description="Side-by-side or interleaved diff view">
+      <SettingRow label={t('settings.changes.layout')} description={t('settings.changes.layoutDesc')}>
         <SegmentedControl
           value={settings.diffStyle}
           label="Diff layout"
           options={[
-            { value: 'split', label: 'Split', icon: <Columns2 size={12} /> },
-            { value: 'unified', label: 'Unified', icon: <Rows2 size={12} /> },
+            { value: 'split', label: t('settings.changes.split'), icon: <Columns2 size={12} /> },
+            { value: 'unified', label: t('settings.changes.unified'), icon: <Rows2 size={12} /> },
           ]}
           onChange={(v) =>
             updateSettings({
@@ -615,46 +633,46 @@ function ChangesSection() {
         />
       </SettingRow>
 
-      <SettingRow label="Indicators" description="Visual style for added/removed line markers">
+      <SettingRow label={t('settings.changes.indicators')} description={t('settings.changes.indicatorsDesc')}>
         <SegmentedControl
           value={settings.diffIndicators}
           label="Diff indicators"
           options={[
-            { value: 'bars', label: 'Bars' },
-            { value: 'classic', label: '+/\u2212' },
-            { value: 'none', label: 'None' },
+            { value: 'bars', label: t('settings.changes.bars') },
+            { value: 'classic', label: t('settings.changes.classic') },
+            { value: 'none', label: t('common.none') },
           ]}
           onChange={(v) => updateSettings({ diffIndicators: v })}
         />
       </SettingRow>
 
-      <SettingRow label="Inline Diff" description="Granularity of inline change highlighting">
+      <SettingRow label={t('settings.changes.inlineDiff')} description={t('settings.changes.inlineDiffDesc')}>
         <SegmentedControl
           value={settings.diffLineDiffType}
           label="Inline diff type"
           options={[
-            { value: 'word-alt', label: 'Word Alt' },
-            { value: 'word', label: 'Word' },
-            { value: 'char', label: 'Char' },
-            { value: 'none', label: 'None' },
+            { value: 'word-alt', label: t('settings.changes.wordAlt') },
+            { value: 'word', label: t('settings.changes.word') },
+            { value: 'char', label: t('settings.changes.char') },
+            { value: 'none', label: t('common.none') },
           ]}
           onChange={(v) => updateSettings({ diffLineDiffType: v })}
         />
       </SettingRow>
 
-      <SettingRow label="Overflow" description="How long lines are handled in diff view">
+      <SettingRow label={t('settings.changes.overflow')} description={t('settings.changes.overflowDesc')}>
         <SegmentedControl
           value={settings.diffOverflow}
           label="Diff overflow"
           options={[
-            { value: 'scroll', label: 'Scroll' },
-            { value: 'wrap', label: 'Wrap' },
+            { value: 'scroll', label: t('settings.changes.scroll') },
+            { value: 'wrap', label: t('settings.changes.wrap') },
           ]}
           onChange={(v) => updateSettings({ diffOverflow: v })}
         />
       </SettingRow>
 
-      <SettingRow label="Diff Background" description="Show colored background tint on changed lines">
+      <SettingRow label={t('settings.changes.diffBackground')} description={t('settings.changes.diffBackgroundDesc')}>
         <Toggle
           checked={!settings.diffDisableBackground}
           onChange={(v) => updateSettings({ diffDisableBackground: !v })}
@@ -664,7 +682,7 @@ function ChangesSection() {
 
       {/* Live diff preview */}
       <Divider />
-      <div className="mb-2 font-[510] text-[13px] text-text">Preview</div>
+      <div className="mb-2 font-[510] text-[13px] text-text">{t('settings.changes.preview')}</div>
       <div className="overflow-hidden rounded-lg border border-border">
         <PatchDiff patch={SAMPLE_PATCH} options={diffOptions} />
       </div>
@@ -675,20 +693,21 @@ function ChangesSection() {
 /* ─── Section: Advanced ─── */
 
 function AdvancedSection() {
+  const { t } = useTranslation();
   const settings = useAppStore((state) => state.settings);
   const updateSettings = useAppStore((state) => state.updateSettings);
 
   const handleReset = () => {
-    if (window.confirm('Reset all settings to defaults? This cannot be undone.')) {
+    if (window.confirm(t('settings.advanced.resetConfirm'))) {
       updateSettings({ ...DEFAULT_SETTINGS });
     }
   };
 
   return (
     <div>
-      <SectionHeader title="Advanced" />
+      <SectionHeader title={t('settings.advanced.title')} />
 
-      <SettingRow label="Run Commands" description="Custom named commands executed via the Run action">
+      <SettingRow label={t('settings.advanced.runCommands')} description={t('settings.advanced.runCommandsDesc')}>
         <div className="space-y-1 text-[12px]">
           {(settings.runCommands ?? []).map((entry, i) => (
             <div key={`${entry.command}-${i}`} className="flex items-center gap-1.5">
@@ -697,7 +716,7 @@ function AdvancedSection() {
             </div>
           ))}
           {(settings.runCommands ?? []).length === 0 && (
-            <span className="text-subtle/60">No commands configured</span>
+            <span className="text-subtle/60">{t('settings.advanced.noCommands')}</span>
           )}
         </div>
       </SettingRow>
@@ -706,8 +725,8 @@ function AdvancedSection() {
 
       <div className="flex items-center justify-between py-2">
         <div>
-          <div className="font-[510] text-[13px] text-text">Reset Settings</div>
-          <div className="mt-0.5 text-[11px] text-subtle">Restore all settings to their default values</div>
+          <div className="font-[510] text-[13px] text-text">{t('settings.advanced.resetSettings')}</div>
+          <div className="mt-0.5 text-[11px] text-subtle">{t('settings.advanced.resetSettingsDesc')}</div>
         </div>
         <button
           className="secondary-button small text-danger hover:border-danger/40 hover:bg-danger/10"
@@ -715,7 +734,7 @@ function AdvancedSection() {
           onClick={handleReset}
         >
           <RotateCcw size={13} />
-          Reset All
+          {t('settings.advanced.resetAll')}
         </button>
       </div>
     </div>
@@ -724,16 +743,10 @@ function AdvancedSection() {
 
 /* ─── Keyboard Shortcuts Section ─── */
 
-const CATEGORY_LABELS: Record<ShortcutCategory, string> = {
-  navigation: 'Navigation',
-  tabs: 'Tabs',
-  panels: 'Panels',
-  other: 'Other',
-};
-
 const CATEGORY_ORDER: ShortcutCategory[] = ['panels', 'navigation', 'tabs', 'other'];
 
 function ShortcutsSection() {
+  const { t } = useTranslation();
   const keyboardShortcuts = useAppStore((s) => s.settings.keyboardShortcuts);
   const shortcuts = useMemo(() => ({ ...DEFAULT_SHORTCUTS, ...(keyboardShortcuts ?? {}) }), [keyboardShortcuts]);
   const resetAllShortcuts = useAppStore((s) => s.resetAllShortcuts);
@@ -741,18 +754,18 @@ function ShortcutsSection() {
   return (
     <div>
       <div className="mb-6 flex items-center justify-between">
-        <SectionHeader title="Keyboard Shortcuts" />
+        <SectionHeader title={t('settings.shortcuts.title')} />
         <button
           type="button"
           className="secondary-button small"
           onClick={() => {
-            if (window.confirm('Reset all keyboard shortcuts to defaults?')) {
+            if (window.confirm(t('settings.shortcuts.resetConfirm'))) {
               resetAllShortcuts();
             }
           }}
         >
           <RotateCcw size={13} />
-          Reset All
+          {t('settings.advanced.resetAll')}
         </button>
       </div>
 
@@ -762,7 +775,7 @@ function ShortcutsSection() {
           if (defs.length === 0) return null;
           return (
             <div key={cat}>
-              <div className="mb-2 font-semibold text-[11px] text-subtle uppercase tracking-wider">{CATEGORY_LABELS[cat]}</div>
+              <div className="mb-2 font-semibold text-[11px] text-subtle uppercase tracking-wider">{t(`settings.shortcuts.category.${cat}` as any)}</div>
               <div className="divide-y divide-border rounded-lg border border-border bg-panel">
                 {defs.map((def) => (
                   <div key={def.id} className="flex items-center justify-between px-3 py-2">
@@ -782,6 +795,7 @@ function ShortcutsSection() {
 /* ─── Git Section ─── */
 
 function GitSection() {
+  const { t } = useTranslation();
   const settings = useAppStore((state) => state.settings);
   const updateSettings = useAppStore((state) => state.updateSettings);
 
@@ -798,17 +812,17 @@ function GitSection() {
 
   return (
     <div>
-      <SectionHeader title="Git" />
+      <SectionHeader title={t('settings.git.title')} />
 
       {/* ── Worktrees ── */}
-      <div className="mb-1 font-[510] text-[13px] text-text">Worktrees</div>
-      <div className="mb-3 text-[11px] text-subtle leading-tight">Configure how git worktrees are created and managed</div>
+      <div className="mb-1 font-[510] text-[13px] text-text">{t('settings.git.worktrees')}</div>
+      <div className="mb-3 text-[11px] text-subtle leading-tight">{t('settings.git.worktreesDesc')}</div>
 
       {/* Worktree Base Directory — full-width layout for long paths */}
       <div className="py-2">
-        <div className="font-[510] text-[13px] text-text">Worktree Base Directory</div>
+        <div className="font-[510] text-[13px] text-text">{t('settings.git.worktreeBaseDir')}</div>
         <div className="mt-0.5 mb-2 text-[11px] text-subtle leading-tight">
-          Parent directory for all worktrees. Each repo gets a subdirectory inside this path.
+          {t('settings.git.worktreeBaseDirDesc')}
         </div>
         <div className="flex gap-2">
           <input
@@ -819,7 +833,7 @@ function GitSection() {
           />
           <button className="secondary-button small shrink-0" type="button" onClick={() => void handleBrowse()}>
             <FolderOpen size={13} />
-            Browse…
+            {t('settings.git.browse')}
           </button>
         </div>
         {settings.worktreeBaseDir && (
@@ -828,12 +842,12 @@ function GitSection() {
             type="button"
             onClick={() => { updateSettings({ worktreeBaseDir: '' }); setTimeout(() => syncWorktrees(), 100); }}
           >
-            Reset to default
+            {t('settings.git.resetToDefault')}
           </button>
         )}
       </div>
 
-      <SettingRow label="Track Remote by Default" description="Pre-select 'Track remote branch' when creating new worktrees">
+      <SettingRow label={t('settings.git.trackRemote')} description={t('settings.git.trackRemoteDesc')}>
         <Toggle
           checked={settings.worktreeTrackRemoteByDefault}
           onChange={(v) => updateSettings({ worktreeTrackRemoteByDefault: v })}
@@ -841,7 +855,7 @@ function GitSection() {
         />
       </SettingRow>
 
-      <SettingRow label="Delete Branch on Removal" description="Automatically delete the local branch when removing a worktree">
+      <SettingRow label={t('settings.git.deleteBranch')} description={t('settings.git.deleteBranchDesc')}>
         <Toggle
           checked={settings.worktreeAutoDeleteBranch}
           onChange={(v) => updateSettings({ worktreeAutoDeleteBranch: v })}
@@ -852,10 +866,10 @@ function GitSection() {
       <Divider />
 
       {/* ── Remote ── */}
-      <div className="mb-1 font-[510] text-[13px] text-text">Remote</div>
-      <div className="mb-3 text-[11px] text-subtle leading-tight">Configure automatic fetching of remote changes</div>
+      <div className="mb-1 font-[510] text-[13px] text-text">{t('settings.git.remote')}</div>
+      <div className="mb-3 text-[11px] text-subtle leading-tight">{t('settings.git.remoteDesc')}</div>
 
-      <SettingRow label="Auto-Fetch" description="Periodically fetch remote refs to keep branches up to date">
+      <SettingRow label={t('settings.git.autoFetch')} description={t('settings.git.autoFetchDesc')}>
         <Toggle
           checked={settings.autoFetchEnabled}
           onChange={(v) => updateSettings({ autoFetchEnabled: v })}
@@ -864,7 +878,7 @@ function GitSection() {
       </SettingRow>
 
       {settings.autoFetchEnabled && (
-        <SettingRow label="Fetch Interval" description="Minutes between automatic fetches">
+        <SettingRow label={t('settings.git.fetchInterval')} description={t('settings.git.fetchIntervalDesc')}>
           <NumberStepper
             value={settings.autoFetchIntervalMinutes}
             min={1}
@@ -892,6 +906,7 @@ const SECTIONS: Record<SectionId, React.ComponentType> = {
 };
 
 export function SettingsPanel() {
+  const { t } = useTranslation();
   const settingsOpen = useAppStore((state) => state.settingsOpen);
   const lastSettingsTab = useAppStore((state) => state.settings.lastSettingsTab);
   const updateSettings = useAppStore((state) => state.updateSettings);
@@ -936,14 +951,14 @@ export function SettingsPanel() {
             onClick={close}
           >
             <ArrowLeft size={14} />
-            Back
+            {t('common.back')}
           </button>
         </div>
 
         {/* Section title */}
         <div className="flex items-center gap-2.5 px-5 pt-5 pb-3">
           <Settings size={16} className="text-muted" />
-          <span className="font-[590] text-[15px] text-text">Settings</span>
+          <span className="font-[590] text-[15px] text-text">{t('settings.title')}</span>
         </div>
 
         {/* Nav items */}
@@ -958,7 +973,7 @@ export function SettingsPanel() {
               onClick={() => setActiveSection(item.id)}
             >
               {item.icon}
-              {item.label}
+              {t(item.label as any)}
             </button>
           ))}
         </nav>

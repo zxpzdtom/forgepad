@@ -17,8 +17,10 @@ export type BuiltinSoundId =
 
 export type SoundDefinition = {
   id: BuiltinSoundId;
-  name: string;
-  subtitle: string;
+  /** Translation key for the display name, e.g. 'sound.ping' */
+  nameKey: string;
+  /** Translation key for the subtitle/description, e.g. 'sound.pingDesc' */
+  subtitleKey: string;
   durationMs: number;
   play: (ctx: AudioContext, volume: number) => void;
 };
@@ -83,8 +85,8 @@ function pluck(ctx: AudioContext, dest: AudioNode, freq: number, startAt: number
 
 const ping: SoundDefinition = {
   id: 'ping',
-  name: 'Ping',
-  subtitle: 'Classic notification tone',
+  nameKey: 'sound.ping',
+  subtitleKey: 'sound.pingDesc',
   durationMs: 600,
   play(ctx, volume) {
     const g = gainNode(ctx, volume);
@@ -94,8 +96,8 @@ const ping: SoundDefinition = {
 
 const quickPing: SoundDefinition = {
   id: 'quick-ping',
-  name: 'Quick Ping',
-  subtitle: 'Short and sweet',
+  nameKey: 'sound.quickPing',
+  subtitleKey: 'sound.quickPingDesc',
   durationMs: 250,
   play(ctx, volume) {
     const g = gainNode(ctx, volume);
@@ -105,8 +107,8 @@ const quickPing: SoundDefinition = {
 
 const arcade: SoundDefinition = {
   id: 'arcade',
-  name: 'Arcade',
-  subtitle: 'Retro game style',
+  nameKey: 'sound.arcade',
+  subtitleKey: 'sound.arcadeDesc',
   durationMs: 500,
   play(ctx, volume) {
     const g = gainNode(ctx, volume * 0.6);
@@ -120,8 +122,8 @@ const arcade: SoundDefinition = {
 
 const shamisen: SoundDefinition = {
   id: 'shamisen',
-  name: 'Shamisen',
-  subtitle: 'Japanese stringed instrument',
+  nameKey: 'sound.shamisen',
+  subtitleKey: 'sound.shamisenDesc',
   durationMs: 1200,
   play(ctx, volume) {
     const g = gainNode(ctx, volume);
@@ -134,8 +136,8 @@ const shamisen: SoundDefinition = {
 
 const dooWap: SoundDefinition = {
   id: 'doo-wap',
-  name: 'Doo-Wap',
-  subtitle: 'Two-tone melody',
+  nameKey: 'sound.dooWap',
+  subtitleKey: 'sound.dooWapDesc',
   durationMs: 500,
   play(ctx, volume) {
     const g = gainNode(ctx, volume);
@@ -147,8 +149,8 @@ const dooWap: SoundDefinition = {
 
 const agentDone: SoundDefinition = {
   id: 'agent-done',
-  name: 'Agent is Done',
-  subtitle: 'Ascending completion chime',
+  nameKey: 'sound.agentIsDone',
+  subtitleKey: 'sound.agentIsDoneDesc',
   durationMs: 900,
   play(ctx, volume) {
     const g = gainNode(ctx, volume * 0.7);
@@ -162,8 +164,8 @@ const agentDone: SoundDefinition = {
 
 const codeComplete: SoundDefinition = {
   id: 'code-complete',
-  name: 'Code Complete',
-  subtitle: 'Soft two-note resolve',
+  nameKey: 'sound.codeComplete',
+  subtitleKey: 'sound.codeCompleteDesc',
   durationMs: 700,
   play(ctx, volume) {
     const g = gainNode(ctx, volume * 0.7);
@@ -175,8 +177,8 @@ const codeComplete: SoundDefinition = {
 
 const longEdm: SoundDefinition = {
   id: 'long-edm',
-  name: 'Long EDM',
-  subtitle: 'Electronic dance music burst',
+  nameKey: 'sound.longEdm',
+  subtitleKey: 'sound.longEdmDesc',
   durationMs: 1500,
   play(ctx, volume) {
     const g = gainNode(ctx, volume * 0.5);
@@ -201,8 +203,8 @@ const longEdm: SoundDefinition = {
 
 const comeBack: SoundDefinition = {
   id: 'come-back',
-  name: 'Come Back',
-  subtitle: 'Beckoning call',
+  nameKey: 'sound.comeBack',
+  subtitleKey: 'sound.comeBackDesc',
   durationMs: 800,
   play(ctx, volume) {
     const g = gainNode(ctx, volume);
@@ -217,8 +219,8 @@ const comeBack: SoundDefinition = {
 
 const shabalaba: SoundDefinition = {
   id: 'shabalaba',
-  name: 'Shabalaba',
-  subtitle: 'Playful bouncy tones',
+  nameKey: 'sound.shabalaba',
+  subtitleKey: 'sound.shabalabaDesc',
   durationMs: 700,
   play(ctx, volume) {
     const g = gainNode(ctx, volume * 0.6);

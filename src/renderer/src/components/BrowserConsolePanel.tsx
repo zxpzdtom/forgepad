@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { useTranslation } from '@renderer/i18n';
 import type { ConsoleArg, ConsoleEntry } from './console-utils';
 import { parseStyledConsole, sanitizeConsoleStyle, stringifyArg, stringifyConsoleArgs } from './console-utils';
 
@@ -116,6 +117,7 @@ function ConsoleArgs({ args }: { args: ConsoleArg[] }) {
 // ── Console script input ─────────────────────────────────────────────────
 
 function ConsoleInput({ onExecute }: { onExecute: (script: string) => void }) {
+  const { t } = useTranslation();
   const [value, setValue] = useState('');
   const historyRef = useRef<string[]>([]);
   const historyIdxRef = useRef(-1);
@@ -176,7 +178,7 @@ function ConsoleInput({ onExecute }: { onExecute: (script: string) => void }) {
           setValue(e.target.value);
         }}
         onKeyDown={handleKeyDown}
-        placeholder="Enter script and press Enter to run..."
+        placeholder={t('browserConsole.inputPlaceholder')}
         spellCheck={false}
         className="min-w-0 flex-1 bg-transparent font-mono text-[12px] text-text outline-none placeholder:text-subtle"
       />
@@ -184,7 +186,7 @@ function ConsoleInput({ onExecute }: { onExecute: (script: string) => void }) {
         type="button"
         onClick={commit}
         disabled={!value.trim()}
-        title="Run script (Enter)"
+        title={t('browserConsole.runScript')}
         className="flex h-[22px] items-center rounded px-1.5 text-[11px] text-subtle transition-colors hover:text-muted disabled:opacity-30"
       >
         <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
@@ -215,6 +217,7 @@ function LevelBadge({ level }: { level: ConsoleEntry['level'] }) {
 // ── Main panel ───────────────────────────────────────────────────────────
 
 export function BrowserConsolePanel({ entries, onClear, onSendToAgent, onExecuteScript }: Props) {
+  const { t } = useTranslation();
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [levelFilter, setLevelFilter] = useState<LevelFilter>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -288,7 +291,7 @@ export function BrowserConsolePanel({ entries, onClear, onSendToAgent, onExecute
       {/* ── Toolbar ──────────────────────────────────────────────────── */}
       <div className="surface-toolbar flex h-9 shrink-0 items-center gap-1.5 border-border border-b px-2">
         {/* Title */}
-        <span className="mr-0.5 font-medium text-muted text-[13px] select-none">Console</span>
+        <span className="mr-0.5 font-medium text-muted text-[13px] select-none">{t('browserConsole.title')}</span>
 
         {/* Level filter pills — segmented control style */}
         <div className="segmented-control" role="radiogroup">
@@ -311,7 +314,7 @@ export function BrowserConsolePanel({ entries, onClear, onSendToAgent, onExecute
                 }}
                 className={isActive ? 'active' : ''}
               >
-                {level === 'all' ? 'All' : level.charAt(0).toUpperCase() + level.slice(1)}
+                {t(`browserConsole.${level}` as any)}
                 {count > 0 && level !== 'all' && (
                   <span className={`ml-1 font-mono text-[10px] ${isActive ? levelColor || 'text-subtle' : 'opacity-50'}`}>
                     {count}
@@ -332,7 +335,7 @@ export function BrowserConsolePanel({ entries, onClear, onSendToAgent, onExecute
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Filter logs..."
+            placeholder={t('browserConsole.filterPlaceholder')}
             className="h-[26px] w-36 rounded-[4px] border border-border bg-surface-input pl-7 pr-5 text-text text-[12px] transition-all placeholder:text-[11px] placeholder:text-subtle focus:w-48 focus:border-accent focus:outline-none"
           />
           {searchQuery && (
@@ -363,7 +366,7 @@ export function BrowserConsolePanel({ entries, onClear, onSendToAgent, onExecute
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') toggleSelectAll();
             }}
-            title={allFilteredSelected ? 'Deselect all' : 'Select all'}
+            title={allFilteredSelected ? t('browserConsole.deselectAll') : t('browserConsole.selectAll')}
             className="flex cursor-pointer items-center gap-1 rounded px-1.5 py-0.5 text-subtle text-[12px] transition-colors hover:text-muted"
           >
             {allFilteredSelected ? (
@@ -392,7 +395,7 @@ export function BrowserConsolePanel({ entries, onClear, onSendToAgent, onExecute
                 <rect x="1.5" y="1.5" width="13" height="13" rx="2" stroke="currentColor" strokeWidth="1.3" />
               </svg>
             )}
-            <span className="select-none">{allFilteredSelected ? 'Deselect' : 'Select all'}</span>
+            <span className="select-none">{allFilteredSelected ? t('browserConsole.deselect') : t('browserConsole.selectAll')}</span>
           </span>
         )}
 
@@ -419,7 +422,7 @@ export function BrowserConsolePanel({ entries, onClear, onSendToAgent, onExecute
               strokeLinejoin="round"
             />
           </svg>
-          {selectedIds.size > 0 ? `Send (${selectedIds.size})` : 'Send'}
+          {selectedIds.size > 0 ? t('browserConsole.sendCount', { count: selectedIds.size }) : t('common.send')}
         </span>
 
         {/* Clear */}
@@ -430,7 +433,7 @@ export function BrowserConsolePanel({ entries, onClear, onSendToAgent, onExecute
           onKeyDown={(e) => {
             if (e.key === 'Enter' && entries.length > 0) handleClear();
           }}
-          title="Clear console"
+          title={t('browserConsole.clearConsole')}
           className={[
             'flex size-[26px] items-center justify-center rounded-[4px] transition-colors',
             entries.length > 0 ? 'cursor-pointer text-danger/70 hover:text-danger' : 'cursor-not-allowed text-subtle opacity-40',
@@ -453,7 +456,7 @@ export function BrowserConsolePanel({ entries, onClear, onSendToAgent, onExecute
               <line x1="15" y1="20" x2="22" y2="20" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
             </svg>
             <span className="text-[11px]">
-              {entries.length === 0 ? 'No console output yet' : searchQuery ? 'No matching entries' : `No ${levelFilter} entries`}
+              {entries.length === 0 ? t('browserConsole.noOutput') : searchQuery ? t('browserConsole.noMatching') : t('browserConsole.noEntries', { level: levelFilter })}
             </span>
           </div>
         ) : (

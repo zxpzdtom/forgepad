@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
 import { File as PierreFile } from '@pierre/diffs/react';
 import { useResolvedTheme } from '@renderer/App';
+import { useTranslation } from '@renderer/i18n';
 import { ChevronDown, MessageSquare, Send, X } from 'lucide-react';
 
 import { useAppStore } from '../store/app-store';
 
 export function BrowserFeedbackModal() {
+  const { t } = useTranslation();
   const open = useAppStore((s) => s.feedbackModalOpen);
   const feedback = useAppStore((s) => s.pendingFeedback);
   const closeFeedbackModal = useAppStore((s) => s.closeFeedbackModal);
@@ -55,7 +57,7 @@ export function BrowserFeedbackModal() {
         <div className="flex h-12 shrink-0 items-center justify-between border-border border-b px-4">
           <div className="flex items-center gap-2">
             <MessageSquare size={15} className="text-accent" />
-            <span className="font-[590] text-[15px] text-text">Element Feedback</span>
+            <span className="font-[590] text-[15px] text-text">{t('browserFeedback.title')}</span>
           </div>
           <button className="icon-button border-transparent" type="button" onClick={handleCancel}>
             <X size={16} />
@@ -69,7 +71,7 @@ export function BrowserFeedbackModal() {
             <div className="flex max-h-[200px] items-center justify-center overflow-hidden rounded-lg border border-border bg-surface-inset p-2">
               <img
                 src={`data:image/png;base64,${element.screenshotBase64}`}
-                alt="Selected element"
+                alt={t('browserFeedback.selectedElement')}
                 className="max-h-[180px] max-w-full rounded object-contain"
               />
             </div>
@@ -78,15 +80,15 @@ export function BrowserFeedbackModal() {
           {/* Element info */}
           <div className="space-y-1.5 rounded-lg border border-border-soft bg-panel p-3 font-mono text-[12px]">
             <div className="flex items-baseline gap-1.5">
-              <span className="shrink-0 font-[510] text-subtle">Tag</span>
+              <span className="shrink-0 font-[510] text-subtle">{t('browserFeedback.tag')}</span>
               <span className="text-text">{element.tagName.toLowerCase()}</span>
             </div>
             <div className="flex items-baseline gap-1.5">
-              <span className="shrink-0 font-[510] text-subtle">Selector</span>
+              <span className="shrink-0 font-[510] text-subtle">{t('browserFeedback.selector')}</span>
               <span className="truncate text-muted">{element.selector}</span>
             </div>
             <div className="flex items-baseline gap-1.5">
-              <span className="shrink-0 font-[510] text-subtle">Page</span>
+              <span className="shrink-0 font-[510] text-subtle">{t('browserFeedback.page')}</span>
               <span className="truncate text-muted">{element.pageUrl}</span>
             </div>
             {element.outerHTML && (
@@ -97,7 +99,7 @@ export function BrowserFeedbackModal() {
                   onClick={() => setSnippetOpen((v) => !v)}
                 >
                   <ChevronDown size={12} className={`transition-transform ${snippetOpen ? '' : '-rotate-90'}`} />
-                  HTML snippet
+                  {t('browserFeedback.htmlSnippet')}
                 </button>
                 {snippetOpen && (
                   <div className="mt-1.5 max-h-[120px] overflow-auto rounded border border-border-soft text-[12px]">
@@ -124,7 +126,7 @@ export function BrowserFeedbackModal() {
           {/* Comment input */}
           <div className="space-y-1.5">
             <label className="font-[510] text-[12px] text-subtle" htmlFor="feedback-comment">
-              Describe what you want the agent to do
+              {t('browserFeedback.describeLabel')}
             </label>
             <textarea
               ref={textareaRef}
@@ -132,14 +134,14 @@ export function BrowserFeedbackModal() {
               value={comment}
               onChange={(e) => setComment(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="e.g. Change the button color to indigo, make it larger..."
+              placeholder={t('browserFeedback.placeholder')}
               rows={3}
               className="w-full resize-y rounded-md border border-border bg-panel-2 p-2.5 text-[13px] text-text outline-none transition-colors placeholder:text-subtle/50 focus:border-accent/60 focus:ring-1 focus:ring-accent/30"
             />
             <p className="text-[11px] text-subtle/60">
-              Press{' '}
+              {t('browserFeedback.pressHint')}{' '}
               <kbd className="rounded border border-border bg-panel-3 px-1 py-0.5 font-mono text-[10px] text-muted">⌘ Enter</kbd>{' '}
-              to send
+              {t('browserFeedback.toSend')}
             </p>
           </div>
         </div>
@@ -147,11 +149,11 @@ export function BrowserFeedbackModal() {
         {/* ── Footer ──────────────────────────────────────────────── */}
         <div className="flex shrink-0 items-center justify-end gap-2 border-border border-t px-4 py-3">
           <button className="secondary-button" type="button" onClick={handleCancel}>
-            Cancel
+            {t('common.cancel')}
           </button>
           <button className="primary-button" type="button" disabled={!canSubmit} onClick={handleSubmit}>
             <Send size={14} />
-            Send to Agent
+            {t('browserFeedback.sendToAgent')}
           </button>
         </div>
       </div>

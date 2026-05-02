@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { useTranslation } from '@renderer/i18n';
 import type { BrowserHistoryEntry } from '@shared/types';
 
 type UrlBarProps = {
@@ -37,6 +38,7 @@ function FaviconImg({ src, alt }: { src: string; alt: string }) {
 }
 
 export function UrlBar({ value, onChange, onNavigate, history }: UrlBarProps) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [activeIdx, setActiveIdx] = useState(-1);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -153,7 +155,7 @@ export function UrlBar({ value, onChange, onNavigate, history }: UrlBarProps) {
           }}
           onFocus={handleFocus}
           onKeyDown={handleKeyDown}
-          placeholder="Enter URL..."
+          placeholder={t('urlBar.placeholder')}
           spellCheck={false}
           className="h-7 w-full rounded border border-border bg-panel-2 py-0 pl-2.5 pr-7 text-text text-xs transition-colors placeholder:text-subtle focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/30"
         />
@@ -162,7 +164,7 @@ export function UrlBar({ value, onChange, onNavigate, history }: UrlBarProps) {
           type="button"
           tabIndex={-1}
           onClick={handleChevronClick}
-          title={open ? 'Close history' : 'Show history'}
+          title={open ? t('urlBar.closeHistory') : t('urlBar.showHistory')}
           className="absolute right-1 flex h-5 w-5 items-center justify-center rounded text-subtle transition-colors hover:text-muted"
         >
           <svg

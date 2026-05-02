@@ -1,4 +1,5 @@
 import { type MouseEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from '@renderer/i18n';
 import { closestCenter, DndContext, type DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { restrictToHorizontalAxis, restrictToParentElement } from '@dnd-kit/modifiers';
 import { horizontalListSortingStrategy, SortableContext } from '@dnd-kit/sortable';
@@ -21,6 +22,7 @@ function tabIcon(tab: Tab) {
 }
 
 export function TabBar() {
+  const { t } = useTranslation();
   const tabs = useAppStore((state) => state.tabs);
   const activeWorkspaceId = useAppStore((state) => state.activeWorkspaceId);
   const activeFileTabId = useAppStore((state) => state.activeFileTabId);
@@ -167,7 +169,7 @@ export function TabBar() {
       <button
         type="button"
         onClick={() => createBrowserTab()}
-        title="Open Browser"
+        title={t('tabBar.openBrowser')}
         className="mx-1 flex h-7 w-7 shrink-0 items-center justify-center rounded text-(--color-text-3) transition-colors hover:bg-(--color-bg-3) hover:text-(--color-text-1)"
       >
         <Globe size={14} />

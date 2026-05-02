@@ -1,5 +1,6 @@
 import type { Tab } from '@shared/types';
 import { DEFAULT_SHORTCUTS } from '@shared/types';
+import { useTranslation } from '@renderer/i18n';
 import { useAppStore } from '@renderer/store/app-store';
 import { comboToDisplay } from '@renderer/lib/shortcut-utils';
 import { ContextMenu, type ContextMenuSection } from './ContextMenu';
@@ -31,6 +32,7 @@ export function TabContextMenu({
   onCloseToRight,
   onRename,
 }: TabContextMenuProps) {
+  const { t } = useTranslation();
   const keyboardShortcuts = useAppStore((s) => s.settings.keyboardShortcuts);
   const addToast = useAppStore((s) => s.addToast);
   const shortcuts = { ...DEFAULT_SHORTCUTS, ...(keyboardShortcuts ?? {}) };
@@ -50,7 +52,7 @@ export function TabContextMenu({
 
   if (isTerminalType && onRename) {
     sections.push({
-      label: 'Rename',
+      label: t('tabMenu.rename'),
       action: () => {
         onRename(tab.id);
         onClose();
@@ -61,7 +63,7 @@ export function TabContextMenu({
 
   sections.push(
     {
-      label: 'Close',
+      label: t('tabMenu.close'),
       shortcut: sc('closeTab'),
       action: () => {
         onCloseTab(tab.id);
@@ -69,21 +71,21 @@ export function TabContextMenu({
       },
     },
     {
-      label: 'Close Others',
+      label: t('tabMenu.closeOthers'),
       action: () => {
         onCloseOthers(tab.id);
         onClose();
       },
     },
     {
-      label: 'Close to Right',
+      label: t('tabMenu.closeToRight'),
       action: () => {
         onCloseToRight(tab.id);
         onClose();
       },
     },
     {
-      label: 'Close All',
+      label: t('tabMenu.closeAll'),
       action: () => {
         onCloseAll(tab.workspaceId, isTerminalType ? 'terminal' : 'file');
         onClose();
@@ -94,12 +96,12 @@ export function TabContextMenu({
   if (isFileType) {
     sections.push('divider');
     sections.push({
-      label: 'Copy Path',
+      label: t('tabMenu.copyPath'),
       shortcut: sc('copyPath'),
       action: () => {
         if (fullPath) {
           void navigator.clipboard.writeText(fullPath);
-          addToast('info', 'Path copied');
+          addToast('info', t('tabMenu.pathCopied'));
         }
         onClose();
       },
@@ -108,18 +110,18 @@ export function TabContextMenu({
     // "Copy Relative Path" only makes sense for workspace files
     if (!isExternal) {
       sections.push({
-        label: 'Copy Relative Path',
+        label: t('tabMenu.copyRelativePath'),
         shortcut: sc('copyRelativePath'),
         action: () => {
           void navigator.clipboard.writeText(tab.relPath);
-          addToast('info', 'Relative path copied');
+          addToast('info', t('tabMenu.relativePathCopied'));
           onClose();
         },
       });
     }
 
     sections.push({
-      label: 'Reveal in Finder',
+      label: t('tabMenu.revealInFinder'),
       action: () => {
         if (fullPath) void window.forgepad.shell.showItemInFolder(fullPath);
         onClose();

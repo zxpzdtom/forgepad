@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Check, FileJson2, Plus, Save, Trash2, X } from 'lucide-react';
+import { useTranslation } from '@renderer/i18n';
 
 interface RunCommandEntry {
   name: string;
@@ -17,6 +18,7 @@ export function RunSetupDialog({
   onSave: (commands: RunCommandEntry[]) => void;
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
   const [commands, setCommands] = useState<RunCommandEntry[]>(initialCommands?.length ? [...initialCommands] : []);
   const [draftName, setDraftName] = useState('');
   const [draftCommand, setDraftCommand] = useState('');

@@ -1,4 +1,5 @@
 import { type CSSProperties, useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from '@renderer/i18n';
 import { useAppStore } from '@renderer/store/app-store';
 import type { AgentPreset } from '@shared/types';
 import { Bot, Check, ChevronDown, Pencil, Play, TerminalSquare } from 'lucide-react';
@@ -19,6 +20,7 @@ function presetIcon(preset: AgentPreset) {
 /* ── AgentQuickBar ─────────────────────────────────────────────────── */
 
 export function AgentQuickBar() {
+  const { t } = useTranslation();
   const [runSetupOpen, setRunSetupOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [focusIndex, setFocusIndex] = useState(-1);
@@ -165,7 +167,7 @@ export function AgentQuickBar() {
     ? activeEntry.name.length > 18
       ? `${activeEntry.name.slice(0, 18)}…`
       : activeEntry.name
-    : 'Run';
+    : t('agent.runCommand');
 
   return (
     <>
@@ -180,7 +182,7 @@ export function AgentQuickBar() {
               }`}
               key={preset.id}
               type="button"
-              title={`New ${preset.label} agent`}
+              title={t('agent.newAgentPreset', { label: preset.label })}
               disabled={!activeWorkspaceId}
               onClick={() => {
                 updateSettings({ defaultAgentCommand: preset.command });
@@ -201,7 +203,7 @@ export function AgentQuickBar() {
               className="flex h-7 items-center gap-1.5 px-2.5 text-[13px] text-text transition-colors hover:bg-panel-3 disabled:cursor-not-allowed disabled:text-subtle"
               type="button"
               disabled={!activeWorkspaceId}
-              title={activeEntry ? `Run: ${activeEntry.name} (${activeEntry.command})` : 'Configure and run project'}
+              title={activeEntry ? t('agent.runCommandDetail', { name: activeEntry.name, command: activeEntry.command }) : t('agent.configureRun')}
               onClick={handleRun}
             >
               <Play size={14} className="text-ok" />
@@ -213,7 +215,7 @@ export function AgentQuickBar() {
               className="grid h-7 w-7 place-items-center border-border border-l text-muted transition-colors hover:text-text disabled:cursor-not-allowed disabled:text-subtle"
               type="button"
               disabled={!activeWorkspaceId}
-              title="Default run command"
+              title={t('agent.defaultRunCommand')}
               onClick={() => setMenuOpen((v) => !v)}
               style={{ anchorName: '--run-cmd-trigger' } as CSSProperties}
             >
@@ -236,11 +238,11 @@ export function AgentQuickBar() {
             hidden={!menuOpen || !activeWorkspaceId}
             role="listbox"
           >
-            <div className="px-2 py-1.5 text-[11px] text-subtle">Run Commands</div>
+            <div className="px-2 py-1.5 text-[11px] text-subtle">{t('agent.runCommands')}</div>
 
             {menuEntries.length === 0 && (
               <div className="px-2 py-2 text-center text-[12px] text-subtle/60">
-                No commands yet, add below
+                {t('agent.noCommandsYet')}
               </div>
             )}
 
@@ -289,7 +291,7 @@ export function AgentQuickBar() {
               <span className="grid size-4 shrink-0 place-items-center">
                 <Pencil size={13} className="text-muted" />
               </span>
-              <span className="min-w-0 flex-1">Edit Commands…</span>
+              <span className="min-w-0 flex-1">{t('agent.editCommands')}</span>
             </button>
           </div>
         </div>
@@ -297,7 +299,7 @@ export function AgentQuickBar() {
         <button
           className="icon-button"
           type="button"
-          title="New terminal"
+          title={t('agent.newTerminal')}
           disabled={!activeWorkspaceId}
           onClick={() => void createTerminal(activeWorkspaceId ?? undefined)}
         >
