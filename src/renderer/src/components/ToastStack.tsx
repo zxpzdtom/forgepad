@@ -1,7 +1,9 @@
 import { useAppStore } from '@renderer/store/app-store';
 import { X } from 'lucide-react';
+import { useTranslation } from '@renderer/i18n';
 
 export function ToastStack() {
+  const { t } = useTranslation();
   const toasts = useAppStore((state) => state.toasts);
   const dismissToast = useAppStore((state) => state.dismissToast);
 

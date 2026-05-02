@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { File as PierreFile } from '@pierre/diffs/react';
 import { useResolvedTheme } from '@renderer/App';
 import { useAppStore } from '@renderer/store/app-store';
+import { useTranslation } from '@renderer/i18n';
 import type { LspLocation, Workspace } from '@shared/types';
 import { ArrowLeft, FileCode, X } from 'lucide-react';
 
@@ -21,6 +22,7 @@ function groupByFile(locations: LspLocation[]): Map<string, LspLocation[]> {
 }
 
 export function LspSymbolPeek({ workspace }: LspSymbolPeekProps) {
+  const { t } = useTranslation();
   const symbolPeek = useAppStore((s) => s.symbolPeek);
   const closeSymbolPeek = useAppStore((s) => s.closeSymbolPeek);
   const openFileTab = useAppStore((s) => s.openFileTab);

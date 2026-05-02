@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from '@renderer/i18n';
 import { useNotificationSound } from '@renderer/hooks/useNotificationSound';
 import { BUILTIN_SOUNDS } from '@renderer/lib/builtin-sounds';
 import { useAppStore } from '@renderer/store/app-store';
@@ -83,6 +84,7 @@ function VolumeSlider({ value, onChange }: { value: number; onChange: (v: number
 /* ─── Rename dialog ─── */
 
 function RenameDialog({ initial, onSave, onClose }: { initial: string; onSave: (name: string) => void; onClose: () => void }) {
+  const { t } = useTranslation();
   const [value, setValue] = useState(initial);
   const ref = useRef<HTMLInputElement>(null);
 
@@ -97,7 +99,7 @@ function RenameDialog({ initial, onSave, onClose }: { initial: string; onSave: (
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="px-4 pt-4 pb-3">
-          <div className="mb-2 font-[590] text-[14px] text-text">Rename Sound</div>
+          <div className="mb-2 font-[590] text-[14px] text-text">{t('settings.notifications.renameSound')}</div>
           <input
             ref={ref}
             className="h-8 w-full rounded-md border border-border bg-panel-2 px-3 text-[13px] text-text outline-none focus:border-accent/60 focus:ring-1 focus:ring-accent/30"
@@ -111,7 +113,7 @@ function RenameDialog({ initial, onSave, onClose }: { initial: string; onSave: (
         </div>
         <div className="flex items-center justify-end gap-2 border-border border-t px-4 py-3">
           <button className="secondary-button small" type="button" onClick={onClose}>
-            Cancel
+            {t('common.cancel')}
           </button>
           <button
             className="primary-button small"
@@ -120,7 +122,7 @@ function RenameDialog({ initial, onSave, onClose }: { initial: string; onSave: (
             onClick={() => value.trim() && onSave(value.trim())}
           >
             <Check size={13} />
-            Save
+            {t('common.save')}
           </button>
         </div>
       </div>
@@ -147,6 +149,7 @@ function SoundCard({
   onRename?: (name: string) => void;
   onDelete?: () => void;
 }) {
+  const { t } = useTranslation();
   const durationLabel = sound.durationMs >= 1000 ? `${(sound.durationMs / 1000).toFixed(1)}s` : `${sound.durationMs}ms`;
 
   return (
@@ -196,8 +199,8 @@ function SoundCard({
               : 'border-border bg-panel-2 text-muted hover:border-accent/40 hover:text-accent'
           }`}
           type="button"
-          title={isPlaying ? 'Stop preview' : 'Preview sound'}
-          aria-label={isPlaying ? 'Stop preview' : 'Preview sound'}
+          title={isPlaying ? t('settings.notifications.stopPreview') : t('settings.notifications.previewSound')}
+          aria-label={isPlaying ? t('settings.notifications.stopPreview') : t('settings.notifications.previewSound')}
           onClick={(e) => {
             e.stopPropagation();
             onPlayPause();
@@ -212,7 +215,7 @@ function SoundCard({
             <button
               className="flex h-5 w-5 items-center justify-center rounded text-muted opacity-0 transition-opacity hover:text-text group-hover:opacity-100"
               type="button"
-              title="Rename"
+              title={t('common.rename')}
               onClick={(e) => {
                 e.stopPropagation();
                 onRename(sound.name);
@@ -225,7 +228,7 @@ function SoundCard({
             <button
               className="flex h-5 w-5 items-center justify-center rounded text-muted opacity-0 transition-opacity hover:text-danger group-hover:opacity-100"
               type="button"
-              title="Delete"
+              title={t('common.delete')}
               onClick={(e) => {
                 e.stopPropagation();
                 onDelete();
@@ -248,6 +251,7 @@ function SoundCard({
 /* ─── Main Notifications Section ─── */
 
 export function NotificationsSection() {
+  const { t } = useTranslation();
   const settings = useAppStore((s) => s.settings);
   const ns = settings.notifications;
   const updateNotifications = useAppStore((s) => s.updateNotificationSettings);
@@ -298,7 +302,7 @@ export function NotificationsSection() {
               setPlayingId((prev) => (prev === sound.id ? null : prev));
             }, sound.durationMs + 100);
           } catch {
-            addToast('error', 'Failed to play sound preview.');
+            addToast('error', t('settings.notifications.failedPlayPreview'));
             setPlayingId(null);
           }
         }
@@ -307,7 +311,7 @@ export function NotificationsSection() {
           const audio = new Audio(sound.dataUrl);
           audio.volume = ns.volume / 100;
           audio.play().catch(() => {
-            addToast('error', 'Failed to play sound preview.');
+            addToast('error', t('settings.notifications.failedPlayPreview'));
             setPlayingId(null);
           });
           audio.onended = () => setPlayingId((prev) => (prev === sound.id ? null : prev));
@@ -321,7 +325,7 @@ export function NotificationsSection() {
           // Store stop in ref via play hook is complex; just track via state
           audio.onpause = () => setPlayingId((prev) => (prev === sound.id ? null : prev));
         } catch {
-          addToast('error', 'Failed to play sound preview.');
+          addToast('error', t('settings.notifications.failedPlayPreview'));
           setPlayingId(null);
         }
       }
@@ -339,7 +343,7 @@ export function NotificationsSection() {
       const sound: NotificationSound = {
         id: `custom-${Date.now()}`,
         name: result.fileName.replace(/_\d+\.(mp3|wav|ogg)$/i, '').replace(/_/g, ' '),
-        subtitle: 'Custom sound',
+        subtitle: t('settings.notifications.customSound'),
         durationMs: 3000, // Estimate; real duration not easily available from main
         source: 'custom',
         assetPath: result.assetPath,
@@ -347,9 +351,9 @@ export function NotificationsSection() {
         createdAt: Date.now(),
       };
       addCustomSound(sound);
-      addToast('success', `Imported "${sound.name}"`);
+      addToast('success', t('settings.notifications.importSuccess', { name: sound.name }));
     } catch (err) {
-      addToast('error', `Import failed: ${err instanceof Error ? err.message : String(err)}`);
+      addToast('error', t('settings.notifications.importFailed', { error: err instanceof Error ? err.message : String(err) }));
     } finally {
       setImporting(false);
     }
@@ -357,7 +361,7 @@ export function NotificationsSection() {
 
   const handleDelete = useCallback(
     async (sound: NotificationSound) => {
-      if (!window.confirm(`Delete "${sound.name}"?`)) return;
+      if (!window.confirm(t('settings.notifications.deleteConfirm', { name: sound.name }))) return;
       // If deleting the currently selected sound, fallback to default
       if (ns.selectedSoundId === sound.id) {
         updateNotifications({ selectedSoundId: 'ping' });
@@ -382,8 +386,8 @@ export function NotificationsSection() {
   // Combine built-in + custom sounds
   const builtinSounds: NotificationSound[] = BUILTIN_SOUNDS.map((s) => ({
     id: s.id,
-    name: s.name,
-    subtitle: s.subtitle,
+    name: t(s.nameKey as any),
+    subtitle: t(s.subtitleKey as any),
     durationMs: s.durationMs,
     source: 'built-in' as const,
     createdAt: 0,
@@ -392,61 +396,61 @@ export function NotificationsSection() {
 
   return (
     <div>
-      <SectionHeader title="Notifications" />
+      <SectionHeader title={t('settings.notifications.title')} />
 
       {/* ─── Sound master toggle ─── */}
-      <SettingRow label="Notification Sounds" description="Play a sound when agents complete tasks or need input">
-        <Toggle checked={ns.enabled} onChange={(v) => updateNotifications({ enabled: v })} label="Notification sounds" />
+      <SettingRow label={t('settings.notifications.sounds')} description={t('settings.notifications.soundsDesc')}>
+        <Toggle checked={ns.enabled} onChange={(v) => updateNotifications({ enabled: v })} label={t('settings.notifications.sounds')} />
       </SettingRow>
 
-      <SettingRow label="Volume" description="Playback volume for notification sounds">
+      <SettingRow label={t('settings.notifications.volume')} description={t('settings.notifications.volumeDesc')}>
         <VolumeSlider value={ns.volume} onChange={(v) => updateNotifications({ volume: v })} />
       </SettingRow>
 
-      <SettingRow label="Play When App Is Focused" description="Also play sound when the ForgePad window is active">
+      <SettingRow label={t('settings.notifications.playWhenFocused')} description={t('settings.notifications.playWhenFocusedDesc')}>
         <Toggle
           checked={ns.playWhenAppFocused}
           onChange={(v) => updateNotifications({ playWhenAppFocused: v })}
-          label="Play when app is focused"
+          label={t('settings.notifications.playWhenFocused')}
         />
       </SettingRow>
 
       <Divider />
 
       {/* ─── Desktop notifications ─── */}
-      <SectionHeader title="Desktop Notifications" />
+      <SectionHeader title={t('settings.notifications.desktopTitle')} />
 
-      <SettingRow label="Enable Desktop Notifications" description="Show system notification banners when app is not focused">
+      <SettingRow label={t('settings.notifications.desktopEnable')} description={t('settings.notifications.desktopEnableDesc')}>
         <Toggle
           checked={ns.desktopNotificationEnabled}
           onChange={(v) => updateNotifications({ desktopNotificationEnabled: v })}
-          label="Desktop notifications"
+          label={t('settings.notifications.desktopEnable')}
         />
       </SettingRow>
 
-      <SettingRow label="Agent Completed" description="Notify when an agent finishes its task">
+      <SettingRow label={t('settings.notifications.agentCompleted')} description={t('settings.notifications.agentCompletedDesc')}>
         <Toggle
           checked={ns.notifyOnAgentDone}
           onChange={(v) => updateNotifications({ notifyOnAgentDone: v })}
-          label="Agent completed"
+          label={t('settings.notifications.agentCompleted')}
           disabled={!ns.desktopNotificationEnabled && !ns.enabled}
         />
       </SettingRow>
 
-      <SettingRow label="Agent Needs Approval" description="Notify when an agent is waiting for you">
+      <SettingRow label={t('settings.notifications.agentNeedsApproval')} description={t('settings.notifications.agentNeedsApprovalDesc')}>
         <Toggle
           checked={ns.notifyOnAgentNeedsApproval}
           onChange={(v) => updateNotifications({ notifyOnAgentNeedsApproval: v })}
-          label="Agent needs approval"
+          label={t('settings.notifications.agentNeedsApproval')}
           disabled={!ns.desktopNotificationEnabled && !ns.enabled}
         />
       </SettingRow>
 
-      <SettingRow label="Task Completed" description="Notify when a task changes to done status">
+      <SettingRow label={t('settings.notifications.taskCompleted')} description={t('settings.notifications.taskCompletedDesc')}>
         <Toggle
           checked={ns.notifyOnTaskDone}
           onChange={(v) => updateNotifications({ notifyOnTaskDone: v })}
-          label="Task completed"
+          label={t('settings.notifications.taskCompleted')}
           disabled={!ns.desktopNotificationEnabled && !ns.enabled}
         />
       </SettingRow>
@@ -456,16 +460,16 @@ export function NotificationsSection() {
       {/* ─── Sound picker ─── */}
       <div className="mb-3 flex items-center justify-between">
         <div>
-          <div className="font-[590] text-[14px] text-text">Notification Sound</div>
-          <p className="mt-0.5 text-[11px] text-subtle">Click a card to select, then press play to preview</p>
+          <div className="font-[590] text-[14px] text-text">{t('settings.notifications.soundPicker')}</div>
+          <p className="mt-0.5 text-[11px] text-subtle">{t('settings.notifications.soundPickerDesc')}</p>
         </div>
         <button className="secondary-button small" type="button" disabled={importing} onClick={handleAddCustom}>
           {importing ? (
-            <span className="text-[12px]">Importing…</span>
+            <span className="text-[12px]">{t('settings.notifications.importing')}</span>
           ) : (
             <>
               <Upload size={13} />
-              Add Custom Audio
+              {t('settings.notifications.addCustomAudio')}
             </>
           )}
         </button>
@@ -501,13 +505,13 @@ export function NotificationsSection() {
           onClick={handleAddCustom}
         >
           <Plus size={18} />
-          <span className="text-[11px]">Add Audio</span>
+          <span className="text-[11px]">{t('settings.notifications.addAudio')}</span>
         </button>
       </div>
 
       <p className="mt-3 text-[11px] text-subtle">
-        Supports <code className="text-text-code-inline">.mp3</code>, <code className="text-text-code-inline">.wav</code>,{' '}
-        <code className="text-text-code-inline">.ogg</code> audio files
+        {t('settings.notifications.supportedFormats')} <code className="text-text-code-inline">.mp3</code>, <code className="text-text-code-inline">.wav</code>,{' '}
+        <code className="text-text-code-inline">.ogg</code> {t('settings.notifications.audioFiles')}
       </p>
 
       {/* Rename dialog */}

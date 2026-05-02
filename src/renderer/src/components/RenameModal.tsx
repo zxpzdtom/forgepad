@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { useTranslation } from '@renderer/i18n';
 
 type RenameModalProps = {
   value: string;
@@ -8,6 +9,7 @@ type RenameModalProps = {
 };
 
 export function RenameModal({ value, onChange, onConfirm, onCancel }: RenameModalProps) {
+  const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from '@renderer/i18n';
 import type { FileDiffOptions, SelectedLineRange } from '@pierre/diffs';
 import { getFiletypeFromFileName, processFile } from '@pierre/diffs';
 import type { DiffLineAnnotation } from '@pierre/diffs/react';
@@ -136,6 +137,7 @@ function DiffFileEntry({
     text: string,
   ) => void;
 }) {
+  const { t } = useTranslation();
   const isThisFilePending = pending?.file.path === file.path && pending.file.bucket === file.bucket;
   const { onTokenClick, onTokenEnter, onTokenLeave } = useLspTokenNavigation(
     workspace.worktreePath,
@@ -186,7 +188,7 @@ function DiffFileEntry({
           <div className="m-2.5 rounded-lg border border-border bg-panel p-2.5">
             <div className="mb-2 flex items-center gap-2 text-accent text-xs">
               <MessageSquarePlus size={15} />
-              Comment on {formatRange(pending.range)}
+              {t('diff.commentOn', { range: formatRange(pending.range) })}
             </div>
             <textarea
               className="w-full"
@@ -197,7 +199,7 @@ function DiffFileEntry({
                   text: event.currentTarget.value,
                 })
               }
-              placeholder="Add a note for the agent"
+              placeholder={t('diff.addNote')}
               onKeyDown={(event) => {
                 if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
                   event.preventDefault();
@@ -208,7 +210,7 @@ function DiffFileEntry({
             />
             <div className="mt-2 flex justify-end gap-2">
               <button className="secondary-button" type="button" onClick={() => setPending(null)}>
-                Cancel
+                {t('common.cancel')}
               </button>
               <button
                 className="primary-button"
@@ -218,7 +220,7 @@ function DiffFileEntry({
                   setPending(null);
                 }}
               >
-                Add Comment
+                {t('diff.addComment')}
               </button>
             </div>
           </div>
@@ -249,23 +251,24 @@ function DiffFileEntry({
             <strong title={file.path}>{file.path}</strong>
             <span className="text-muted text-xs">
               {file.bucket} · {file.status}
-              {file.oldPath ? ` · from ${file.oldPath}` : ''}
+              {file.oldPath ? ` · ${t('diff.fromFile', { path: file.oldPath })}` : ''}
             </span>
           </div>
         </header>
       )}
       {file.isBinary ? (
-        <div className="grid min-h-[90px] place-items-center text-muted">Binary diff omitted</div>
+        <div className="grid min-h-[90px] place-items-center text-muted">{t('diff.binaryOmitted')}</div>
       ) : file.patch.trim() ? (
         <DiffContent file={file} options={options} lineAnnotations={lineAnnotations} renderAnnotation={renderAnnotation} />
       ) : (
-        <div className="grid min-h-[90px] place-items-center text-muted">No textual diff available</div>
+        <div className="grid min-h-[90px] place-items-center text-muted">{t('diff.noTextualDiff')}</div>
       )}
     </article>
   );
 }
 
 export function DiffViewer({ tab, workspace }: DiffViewerProps) {
+  const { t } = useTranslation();
   const [statuses, setStatuses] = useState<FileStatus[]>([]);
   const [diffs, setDiffs] = useState<DiffFileData[]>([]);
   const [loading, setLoading] = useState(false);
@@ -302,7 +305,7 @@ export function DiffViewer({ tab, workspace }: DiffViewerProps) {
       );
       setDiffs(files);
     } catch (error) {
-      addToast('error', error instanceof Error ? error.message : 'Failed to load diffs.');
+      addToast('error', error instanceof Error ? error.message : t('diff.failedLoadDiffs'));
     } finally {
       setLoading(false);
     }
@@ -341,20 +344,20 @@ export function DiffViewer({ tab, workspace }: DiffViewerProps) {
     <section className="absolute inset-0 flex min-h-0 min-w-0 flex-col bg-bg">
       <div className="flex min-h-12 items-center justify-between gap-3 border-border border-b bg-panel px-3 py-2">
         <div className="flex min-w-0 items-center gap-[7px] overflow-hidden text-ellipsis whitespace-nowrap font-[510] text-[13px]">
-          {tab.activePath ? `Changes: ${tab.activePath}` : 'Workspace Changes'}
+          {tab.activePath ? t('diff.changesTitle', { path: tab.activePath }) : t('diff.workspaceChanges')}
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
-          <button className="icon-button" type="button" title="Refresh" onClick={load}>
+          <button className="icon-button" type="button" title={t('diff.refresh')} onClick={load}>
             <RefreshCw size={16} />
           </button>
         </div>
       </div>
-      {loading ? <div className="grid min-h-[90px] place-items-center text-muted">Loading diffs</div> : null}
+      {loading ? <div className="grid min-h-[90px] place-items-center text-muted">{t('diff.loadingDiffs')}</div> : null}
       {!loading && statuses.length === 0 ? (
-        <div className="grid min-h-[90px] place-items-center text-muted">No git changes</div>
+        <div className="grid min-h-[90px] place-items-center text-muted">{t('diff.noGitChanges')}</div>
       ) : null}
       {!loading && diffs.length === 0 && statuses.length > 0 ? (
-        <div className="grid min-h-[90px] place-items-center text-muted">Select a changed file from the Changes panel</div>
+        <div className="grid min-h-[90px] place-items-center text-muted">{t('diff.selectFile')}</div>
       ) : null}
       <div className="scrollbar-thin scroll-mask flex min-h-0 flex-1 overflow-auto">
         {diffs.map((file) => (
