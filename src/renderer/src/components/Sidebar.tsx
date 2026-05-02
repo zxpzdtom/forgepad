@@ -1,16 +1,18 @@
-import { type KeyboardEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import { type KeyboardEvent, type ReactNode, memo, useEffect, useMemo, useState } from 'react';
 import { closestCenter, DndContext, type DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { useAppStore } from '@renderer/store/app-store';
 import type { AgentStatus } from '@shared/agent-lifecycle';
-import type { Project } from '@shared/types';
-import { FolderOpen, FolderPlus, RefreshCw, Settings } from 'lucide-react';
-
-import { generateRandomBranchName } from '@renderer/lib/random-branch-name';
+import type { Project, WorkspacePanel } from '@shared/types';
+import data from '@emoji-mart/data';
+import EmojiPicker from '@emoji-mart/react';
+import { FolderOpen, FolderPlus, Plus, Settings } from 'lucide-react';
 
 import { ContextMenu, type ContextMenuSection } from './ContextMenu';
+import { NewWorktreeDialog } from './NewWorktreeDialog';
 import { Spinner } from './Spinner';
+import { Tooltip } from './Tooltip';
 
 type SidebarWorkspace = {
   id: string;
@@ -130,6 +132,22 @@ function CancelIcon({ className }: { className?: string }) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" className={className}>
       <path d="M18 6L6 18m12 0L6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function PencilIcon({ className }: { className?: string }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" className={className}>
+      <path d="M17 3a2.83 2.83 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function TrashIcon({ className }: { className?: string }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" className={className}>
+      <path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
@@ -539,150 +557,6 @@ function WorkspaceContextMenu({
   return <ContextMenu sections={sections} x={x} y={y} onClose={onClose} />;
 }
 
-/* ── New worktree dialog ──────────────────────────────────────── */
-
-function NewWorktreeDialog({
-  projectName,
-  repoPath,
-  onClose,
-  onCreate,
-}: {
-  projectName: string;
-  repoPath: string;
-  onClose: () => void;
-  onCreate: (branch: string, trackRemote: boolean) => void;
-}) {
-  const worktreeTrackRemoteByDefault = useAppStore((s) => s.settings.worktreeTrackRemoteByDefault);
-  const [branch, setBranch] = useState(generateRandomBranchName);
-  const [trackRemote, setTrackRemote] = useState(worktreeTrackRemoteByDefault);
-  const [loading, setLoading] = useState(false);
-  const [remoteStatus, setRemoteStatus] = useState<'idle' | 'checking' | 'exists' | 'not-found'>('idle');
-  const inputRef = useRef<HTMLInputElement>(null);
-  const checkTimerRef = useRef<ReturnType<typeof setTimeout>>();
-
-  useEffect(() => {
-    inputRef.current?.focus();
-  }, []);
-
-  useEffect(() => {
-    const handleKey = (e: globalThis.KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    document.addEventListener('keydown', handleKey);
-    return () => document.removeEventListener('keydown', handleKey);
-  }, [onClose]);
-
-  // Debounced remote branch check
-  useEffect(() => {
-    if (!trackRemote || !branch.trim()) {
-      setRemoteStatus('idle');
-      return;
-    }
-    setRemoteStatus('checking');
-    clearTimeout(checkTimerRef.current);
-    checkTimerRef.current = setTimeout(async () => {
-      try {
-        const branches = await window.forgepad.git.listRemoteBranches(repoPath);
-        const trimmed = branch.trim();
-        const found = branches.some((b) => b === `origin/${trimmed}` || b === trimmed);
-        setRemoteStatus(found ? 'exists' : 'not-found');
-      } catch {
-        setRemoteStatus('not-found');
-      }
-    }, 400);
-    return () => clearTimeout(checkTimerRef.current);
-  }, [branch, trackRemote, repoPath]);
-
-  const handleSubmit = async () => {
-    const trimmed = branch.trim();
-    if (!trimmed || loading) return;
-    setLoading(true);
-    try {
-      onCreate(trimmed, trackRemote);
-    } finally {
-      onClose();
-    }
-  };
-
-  return (
-    <div className="fixed inset-0 z-[60] grid place-items-center bg-black/85" onMouseDown={onClose}>
-      <div
-        className="w-[min(400px,90vw)] rounded-xl border border-border bg-panel-2 shadow-[0_20px_40px_rgba(0,0,0,0.4)]"
-        onMouseDown={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between border-border border-b px-4 py-3">
-          <span className="font-[590] text-[14px] text-text">New Worktree — {projectName}</span>
-        </div>
-        <div className="flex flex-col gap-3 px-4 py-4">
-          <label className="flex flex-col gap-1.5">
-            <span className="text-[12px] text-subtle">Branch name</span>
-            <div className="flex items-center gap-1.5">
-              <input
-                ref={inputRef}
-                type="text"
-                className="h-8 flex-1 rounded-md border border-border bg-panel-3 px-2.5 text-[13px] text-text outline-none focus:border-accent"
-                placeholder="e.g. swift-fox"
-                value={branch}
-                onChange={(e) => setBranch(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') void handleSubmit();
-                }}
-              />
-              <button
-                type="button"
-                className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-md border border-border bg-panel-3 text-subtle hover:bg-panel-2 hover:text-text"
-                title="Generate random name"
-                onClick={() => setBranch(generateRandomBranchName())}
-              >
-                <RefreshCw size={14} />
-              </button>
-            </div>
-          </label>
-          <label className="flex cursor-pointer select-none items-center gap-2">
-            <input
-              type="checkbox"
-              className="size-3.5 cursor-pointer accent-accent"
-              checked={trackRemote}
-              onChange={(e) => setTrackRemote(e.target.checked)}
-            />
-            <span className="text-[12px] text-subtle">Track remote branch</span>
-          </label>
-          {trackRemote && branch.trim() && (
-            <div className="text-[11px]">
-              {remoteStatus === 'checking' && <span className="text-subtle">Checking origin/{branch.trim()}…</span>}
-              {remoteStatus === 'exists' && (
-                <span className="text-text-addition">✓ origin/{branch.trim()} found — will create tracking branch</span>
-              )}
-              {remoteStatus === 'not-found' && (
-                <span className="text-text-warning-status">
-                  ✗ origin/{branch.trim()} not found — will create new branch and push
-                </span>
-              )}
-            </div>
-          )}
-        </div>
-        <div className="flex justify-end gap-2 border-border border-t px-4 py-3">
-          <button
-            type="button"
-            className="h-8 cursor-pointer rounded-md border border-border bg-transparent px-3 text-[13px] text-text hover:bg-panel-3"
-            onClick={onClose}
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            className="h-8 cursor-pointer rounded-md border border-transparent bg-accent px-3 text-[13px] text-accent-contrast hover:brightness-110 disabled:opacity-50"
-            disabled={!branch.trim() || loading}
-            onClick={() => void handleSubmit()}
-          >
-            {loading ? 'Creating…' : 'Create'}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 /* ── Delete worktree confirmation dialog ─────────────────────── */
 
 function DeleteWorktreeDialog({ branch, onClose, onConfirm }: { branch: string; onClose: () => void; onConfirm: () => void }) {
@@ -736,6 +610,471 @@ function DeleteWorktreeDialog({ branch, onClose, onConfirm }: { branch: string; 
   );
 }
 
+/* ── Panel Dot Switcher ───────────────────────────────────────── */
+
+const MAX_VISIBLE_DOTS = 9;
+const MAX_PANELS = 9;
+
+function useDotWindow(panels: WorkspacePanel[], activePanelId: string | null) {
+  const activeIndex = panels.findIndex((p) => p.id === activePanelId);
+
+  return useMemo(() => {
+    if (panels.length <= MAX_VISIBLE_DOTS) {
+      return { visiblePanels: panels, startIndex: 0 };
+    }
+
+    const half = Math.floor(MAX_VISIBLE_DOTS / 2);
+    let windowStart = Math.max(0, activeIndex - half);
+    let windowEnd = windowStart + MAX_VISIBLE_DOTS;
+    if (windowEnd > panels.length) {
+      windowEnd = panels.length;
+      windowStart = windowEnd - MAX_VISIBLE_DOTS;
+    }
+
+    return { visiblePanels: panels.slice(windowStart, windowEnd), startIndex: windowStart };
+  }, [panels, activeIndex]);
+}
+
+/** A single emoji dot in the panel switcher. Active = emoji visible; inactive = dot; hover reveals emoji. */
+const PanelDot = memo(function PanelDot({
+  panel,
+  isActive,
+  globalIndex,
+  onClick,
+  onContextMenu,
+}: {
+  panel: WorkspacePanel;
+  isActive: boolean;
+  globalIndex: number;
+  onClick: () => void;
+  onContextMenu: (e: React.MouseEvent) => void;
+}) {
+  return (
+    <Tooltip label={panel.name} shortcut={`⌥${globalIndex + 1}`}>
+      <button
+        type="button"
+        className={`panel-dot${isActive ? ' panel-dot--active' : ''}`}
+        onClick={onClick}
+        onContextMenu={onContextMenu}
+      >
+        {/* Emoji layer — visible when active or hovered */}
+        <span className="panel-dot__emoji">{panel.emoji}</span>
+        {/* Dot layer — visible when inactive and not hovered */}
+        <span className="panel-dot__dot" />
+      </button>
+    </Tooltip>
+  );
+});
+
+/**
+ * Dialog to create a new panel with name + emoji.
+ * Clicking the emoji button opens an emoji-mart picker popover.
+ */
+function NewPanelDialog({ onClose, onCreate }: { onClose: () => void; onCreate: (name: string, emoji: string) => void }) {
+  const [name, setName] = useState('');
+  const [emoji, setEmoji] = useState('🚀');
+  const [showPicker, setShowPicker] = useState(false);
+
+  useEffect(() => {
+    const handleKey = (e: globalThis.KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (showPicker) setShowPicker(false);
+        else onClose();
+      }
+    };
+    document.addEventListener('keydown', handleKey);
+    return () => document.removeEventListener('keydown', handleKey);
+  }, [onClose, showPicker]);
+
+  const handleSubmit = () => {
+    const finalName = name.trim() || 'Panel';
+    onCreate(finalName, emoji);
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] grid place-items-center bg-black/85" onMouseDown={onClose}>
+      <div
+        className="w-[min(320px,90vw)] rounded-xl border border-border bg-panel-2 shadow-[0_20px_40px_rgba(0,0,0,0.4)]"
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-border border-b px-4 py-3">
+          <span className="font-[590] text-[14px] text-text">New Panel</span>
+        </div>
+
+        <div className="flex flex-col gap-3 px-4 py-4">
+          {/* Emoji + Name row */}
+          <div className="flex items-end gap-2.5">
+            <div className="relative flex flex-col gap-1.5">
+              <span className="text-[11px] font-[510] text-muted uppercase tracking-wider">Icon</span>
+              <button
+                type="button"
+                className="emoji-picker-btn"
+                title="Choose emoji"
+                onClick={() => setShowPicker((v) => !v)}
+              >
+                {emoji}
+              </button>
+              {showPicker && (
+                <div className="emoji-mart-popover">
+                  <EmojiPicker
+                    data={data}
+                    onEmojiSelect={(picked: { native: string }) => {
+                      setEmoji(picked.native);
+                      setShowPicker(false);
+                    }}
+                    theme="dark"
+                    set="native"
+                    previewPosition="none"
+                    skinTonePosition="none"
+                    perLine={8}
+                    maxFrequentRows={1}
+                  />
+                </div>
+              )}
+            </div>
+            <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+              <label className="text-[11px] font-[510] text-muted uppercase tracking-wider" htmlFor="panel-name">
+                Name
+              </label>
+              <input
+                id="panel-name"
+                type="text"
+                className="h-8 rounded-md border border-border bg-surface-input px-2.5 text-[13px] text-text placeholder:text-subtle focus:border-accent focus:outline-none"
+                placeholder="e.g. Work, Personal, Lab..."
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(); }}
+                autoFocus
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2 border-border border-t px-4 py-3">
+          <button
+            type="button"
+            className="h-8 cursor-pointer rounded-md border border-border bg-transparent px-3 text-[13px] text-text hover:bg-panel-3"
+            onClick={onClose}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="h-8 cursor-pointer rounded-md border border-transparent bg-accent px-3 text-[13px] text-accent-contrast hover:brightness-110"
+            onClick={handleSubmit}
+          >
+            Create
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Dialog to edit an existing panel (rename + change emoji).
+ */
+function EditPanelDialog({
+  panel,
+  onClose,
+}: {
+  panel: WorkspacePanel;
+  onClose: () => void;
+}) {
+  const [name, setName] = useState(panel.name);
+  const [emoji, setEmoji] = useState(panel.emoji);
+  const [showPicker, setShowPicker] = useState(false);
+  const renamePanel = useAppStore((state) => state.renamePanel);
+  const updatePanelEmoji = useAppStore((state) => state.updatePanelEmoji);
+
+  useEffect(() => {
+    const handleKey = (e: globalThis.KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (showPicker) setShowPicker(false);
+        else onClose();
+      }
+    };
+    document.addEventListener('keydown', handleKey);
+    return () => document.removeEventListener('keydown', handleKey);
+  }, [onClose, showPicker]);
+
+  const handleSubmit = () => {
+    const finalName = name.trim() || panel.name;
+    if (finalName !== panel.name) renamePanel(panel.id, finalName);
+    if (emoji !== panel.emoji) updatePanelEmoji(panel.id, emoji);
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] grid place-items-center bg-black/85" onMouseDown={onClose}>
+      <div
+        className="w-[min(320px,90vw)] rounded-xl border border-border bg-panel-2 shadow-[0_20px_40px_rgba(0,0,0,0.4)]"
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-border border-b px-4 py-3">
+          <span className="font-[590] text-[14px] text-text">Edit Panel</span>
+        </div>
+
+        <div className="flex flex-col gap-3 px-4 py-4">
+          <div className="flex items-end gap-2.5">
+            <div className="relative flex flex-col gap-1.5">
+              <span className="text-[11px] font-[510] text-muted uppercase tracking-wider">Icon</span>
+              <button
+                type="button"
+                className="emoji-picker-btn"
+                title="Choose emoji"
+                onClick={() => setShowPicker((v) => !v)}
+              >
+                {emoji}
+              </button>
+              {showPicker && (
+                <div className="emoji-mart-popover">
+                  <EmojiPicker
+                    data={data}
+                    onEmojiSelect={(picked: { native: string }) => {
+                      setEmoji(picked.native);
+                      setShowPicker(false);
+                    }}
+                    theme="dark"
+                    set="native"
+                    previewPosition="none"
+                    skinTonePosition="none"
+                    perLine={8}
+                    maxFrequentRows={1}
+                  />
+                </div>
+              )}
+            </div>
+            <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+              <label className="text-[11px] font-[510] text-muted uppercase tracking-wider" htmlFor="edit-panel-name">
+                Name
+              </label>
+              <input
+                id="edit-panel-name"
+                type="text"
+                className="h-8 rounded-md border border-border bg-surface-input px-2.5 text-[13px] text-text placeholder:text-subtle focus:border-accent focus:outline-none"
+                placeholder="e.g. Work, Personal, Lab..."
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(); }}
+                autoFocus
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2 border-border border-t px-4 py-3">
+          <button
+            type="button"
+            className="h-8 cursor-pointer rounded-md border border-border bg-transparent px-3 text-[13px] text-text hover:bg-panel-3"
+            onClick={onClose}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="h-8 cursor-pointer rounded-md border border-transparent bg-accent px-3 text-[13px] text-accent-contrast hover:brightness-110"
+            onClick={handleSubmit}
+          >
+            Save
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── Panel context menu ──────────────────────────────────────── */
+
+function PanelContextMenu({
+  panel,
+  panelCount,
+  x,
+  y,
+  onClose,
+  onEdit,
+  onDelete,
+}: {
+  panel: WorkspacePanel;
+  panelCount: number;
+  x: number;
+  y: number;
+  onClose: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const sections: ContextMenuSection[] = [
+    {
+      label: 'Edit Panel',
+      action: () => { onClose(); onEdit(); },
+    },
+    {
+      label: 'Delete Panel',
+      danger: true,
+      disabled: panelCount <= 1,
+      action: () => { onClose(); onDelete(); },
+    },
+  ];
+
+  return <ContextMenu sections={sections} x={x} y={y} onClose={onClose} />;
+}
+
+/* ── Delete panel confirmation dialog ────────────────────────── */
+
+function DeletePanelDialog({
+  panel,
+  projectCount,
+  onClose,
+  onConfirm,
+}: {
+  panel: WorkspacePanel;
+  projectCount: number;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  useEffect(() => {
+    const handleKey = (e: globalThis.KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', handleKey);
+    return () => document.removeEventListener('keydown', handleKey);
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-[60] grid place-items-center bg-black/85" onMouseDown={onClose}>
+      <div
+        className="w-[min(340px,90vw)] rounded-xl border border-border bg-panel-2 shadow-[0_20px_40px_rgba(0,0,0,0.4)]"
+        onMouseDown={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-border border-b px-4 py-3">
+          <span className="font-[590] text-[14px] text-text">Delete Panel</span>
+        </div>
+
+        <div className="px-4 py-4">
+          <p className="text-[13px] leading-relaxed text-muted">
+            Panel <span className="font-[590] text-text">{panel.emoji} {panel.name}</span> contains{' '}
+            <span className="font-[590] text-text">{projectCount}</span> project{projectCount > 1 ? 's' : ''}.
+            Projects will be removed from the app. Files on disk will not be affected.
+          </p>
+        </div>
+
+        <div className="flex justify-end gap-2 border-border border-t px-4 py-3">
+          <button
+            type="button"
+            className="h-8 cursor-pointer rounded-md border border-border bg-transparent px-3 text-[13px] text-text hover:bg-panel-3"
+            onClick={onClose}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            className="h-8 cursor-pointer rounded-md border border-transparent bg-danger px-3 text-[13px] text-white hover:brightness-110"
+            onClick={onConfirm}
+          >
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PanelSwitcher() {
+  const panels = useAppStore((state) => state.panels);
+  const activePanelId = useAppStore((state) => state.activePanelId);
+  const setActivePanel = useAppStore((state) => state.setActivePanel);
+  const createPanel = useAppStore((state) => state.createPanel);
+  const removePanel = useAppStore((state) => state.removePanel);
+  const allProjects = useAppStore((state) => state.projects);
+  const [showNewDialog, setShowNewDialog] = useState(false);
+  const [editPanel, setEditPanel] = useState<WorkspacePanel | null>(null);
+  const [panelMenu, setPanelMenu] = useState<{ panel: WorkspacePanel; x: number; y: number } | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<WorkspacePanel | null>(null);
+
+  const { visiblePanels, startIndex } = useDotWindow(panels, activePanelId);
+
+  const handleDelete = (panel: WorkspacePanel) => {
+    const projectCount = allProjects.filter((p) => p.panelId === panel.id).length;
+    if (projectCount > 0) {
+      setDeleteConfirm(panel);
+    } else {
+      removePanel(panel.id);
+    }
+  };
+
+  return (
+    <>
+      <div className="panel-switcher">
+        <div className="switcher-dot-track">
+          {visiblePanels.map((panel, i) => (
+            <PanelDot
+              key={panel.id}
+              panel={panel}
+              isActive={panel.id === activePanelId}
+              globalIndex={startIndex + i}
+              onClick={() => setActivePanel(panel.id)}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                setPanelMenu({ panel, x: e.clientX, y: e.clientY });
+              }}
+            />
+          ))}
+        </div>
+
+        {panels.length < MAX_PANELS && (
+          <Tooltip label="New panel">
+            <button
+              type="button"
+              className="switcher-add"
+              onClick={() => setShowNewDialog(true)}
+            >
+              <Plus size={11} />
+            </button>
+          </Tooltip>
+        )}
+      </div>
+
+      {showNewDialog && (
+        <NewPanelDialog
+          onClose={() => setShowNewDialog(false)}
+          onCreate={(name, emojiVal) => createPanel(name, emojiVal)}
+        />
+      )}
+
+      {editPanel && (
+        <EditPanelDialog
+          panel={editPanel}
+          onClose={() => setEditPanel(null)}
+        />
+      )}
+
+      {panelMenu && (
+        <PanelContextMenu
+          panel={panelMenu.panel}
+          panelCount={panels.length}
+          x={panelMenu.x}
+          y={panelMenu.y}
+          onClose={() => setPanelMenu(null)}
+          onEdit={() => setEditPanel(panelMenu.panel)}
+          onDelete={() => handleDelete(panelMenu.panel)}
+        />
+      )}
+
+      {deleteConfirm && (
+        <DeletePanelDialog
+          panel={deleteConfirm}
+          projectCount={allProjects.filter((p) => p.panelId === deleteConfirm.id).length}
+          onClose={() => setDeleteConfirm(null)}
+          onConfirm={() => { removePanel(deleteConfirm.id); setDeleteConfirm(null); }}
+        />
+      )}
+    </>
+  );
+}
+
+/* ── Sidebar ─────────────────────────────────────────────────── */
+
 export function Sidebar() {
   const [collapsedProjects, setCollapsedProjects] = useState<Set<string>>(new Set());
   const [contextMenu, setContextMenu] = useState<{
@@ -758,7 +1097,9 @@ export function Sidebar() {
     branch: string;
   } | null>(null);
 
-  const projects = useAppStore((state) => state.projects);
+  const allProjects = useAppStore((state) => state.projects);
+  const panels = useAppStore((state) => state.panels);
+  const activePanelId = useAppStore((state) => state.activePanelId);
   const workspaces = useAppStore((state) => state.workspaces);
   const activeWorkspaceId = useAppStore((state) => state.activeWorkspaceId);
   const hydrated = useAppStore((state) => state.hydrated);
@@ -770,6 +1111,12 @@ export function Sidebar() {
   const removeProject = useAppStore((state) => state.removeProject);
   const deleteWorktree = useAppStore((state) => state.deleteWorktree);
   const createWorktree = useAppStore((state) => state.createWorktree);
+
+  // Filter projects by active panel
+  const projects = useMemo(
+    () => allProjects.filter((p) => p.panelId === activePanelId),
+    [allProjects, activePanelId],
+  );
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: { distance: 5 },
@@ -846,7 +1193,7 @@ export function Sidebar() {
           <Settings size={15} />
         </button>
       </div>
-      <div className="scrollbar-thin scroll-mask-y flex min-h-0 min-w-0 flex-1 flex-col gap-0.5 overflow-y-auto overflow-x-hidden px-2 py-1.5">
+      <div key={activePanelId} className="sidebar-panel-content scrollbar-thin scroll-mask-y flex min-h-0 min-w-0 flex-1 flex-col gap-0.5 overflow-y-auto overflow-x-hidden px-2 py-1.5">
         {!hydrated ? (
           <SidebarSkeleton />
         ) : projects.length === 0 ? (
@@ -946,6 +1293,9 @@ export function Sidebar() {
           <span>Add repository</span>
         </button>
       </div>
+
+      {/* Panel switcher — always visible (dots show when ≥2 panels) */}
+      <PanelSwitcher />
 
       {contextMenu && (
         <ProjectContextMenu
