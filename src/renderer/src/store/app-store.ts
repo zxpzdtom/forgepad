@@ -182,6 +182,7 @@ type AppState = {
   removeWorkspace: (workspaceId: string) => void;
   deleteWorktree: (workspaceId: string) => Promise<void>;
   createWorktree: (projectId: string, branch: string, trackRemote?: boolean) => Promise<void>;
+  syncWorktreesFromDisk: () => Promise<void>;
   // Browser tab actions
   createBrowserTab: (url?: string) => void;
   addBrowserHistoryEntry: (url: string, title: string, favicon?: string) => void;
@@ -656,6 +657,8 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     get().restoreAgentSessions();
     get().refreshBranchStats();
+    // Discover worktrees on disk that aren't tracked yet
+    get().syncWorktreesFromDisk();
     // Refresh branch names in case they changed since last session
     for (const w of get().workspaces) {
       get().refreshBranch(w.id);
@@ -1801,6 +1804,61 @@ export const useAppStore = create<AppState>((set, get) => ({
         next.delete(workspaceId);
         return { workspaceLoadingIds: next };
       });
+    }
+  },
+
+  syncWorktreesFromDisk: async () => {
+    const baseDir = get().settings.worktreeBaseDir?.trim() || '';
+    const entries = await window.forgepad.git.scanWorktrees(baseDir).catch(() => []);
+
+    if (entries.length === 0) return;
+
+    const state = get();
+    const existingWorktreePaths = new Set(state.workspaces.map((w) => w.worktreePath));
+    const existingRepoPaths = new Map(state.projects.map((p) => [p.repoPath, p]));
+
+    const newProjects: Project[] = [];
+    const newWorkspaces: Workspace[] = [];
+
+    for (const entry of entries) {
+      // Skip already tracked worktrees
+      if (existingWorktreePaths.has(entry.worktreePath)) continue;
+
+      // Find or create the parent project
+      let project = existingRepoPaths.get(entry.repoPath) ?? newProjects.find((p) => p.repoPath === entry.repoPath);
+      if (!project) {
+        project = {
+          id: id(),
+          panelId: state.activePanelId ?? '',
+          name: entry.repoName,
+          repoPath: entry.repoPath,
+          createdAt: now(),
+          updatedAt: now(),
+        };
+        newProjects.push(project);
+        existingRepoPaths.set(entry.repoPath, project);
+      }
+
+      newWorkspaces.push({
+        id: id(),
+        projectId: project.id,
+        name: entry.branch,
+        branch: entry.branch,
+        worktreePath: entry.worktreePath,
+        isRoot: false,
+        createdAt: now(),
+      });
+    }
+
+    if (newProjects.length > 0 || newWorkspaces.length > 0) {
+      set((s) => ({
+        projects: [...s.projects, ...newProjects],
+        workspaces: [...s.workspaces, ...newWorkspaces],
+      }));
+      // Refresh stats for newly added workspaces
+      for (const ws of newWorkspaces) {
+        get().refreshBranchStats(ws.id);
+      }
     }
   },
 

@@ -18,6 +18,7 @@ const api = {
   app: {
     openProject: () => ipcRenderer.invoke(IPC.APP_OPEN_PROJECT) as Promise<OpenProjectResult | null>,
     showEmojiPanel: () => ipcRenderer.invoke(IPC.APP_SHOW_EMOJI_PANEL) as Promise<void>,
+    pickDirectory: (title?: string) => ipcRenderer.invoke(IPC.APP_PICK_DIRECTORY, title) as Promise<string | null>,
   },
   state: {
     load: () => ipcRenderer.invoke(IPC.STATE_LOAD) as Promise<Partial<PersistedAppState> | null>,
@@ -40,8 +41,8 @@ const api = {
     discard: (worktreePath: string, entries: Array<{ path: string; bucket: GitBucket }>) =>
       ipcRenderer.invoke(IPC.GIT_DISCARD, worktreePath, entries) as Promise<void>,
     commit: (worktreePath: string, message: string) => ipcRenderer.invoke(IPC.GIT_COMMIT, worktreePath, message) as Promise<void>,
-    addWorktree: (repoPath: string, branch: string, trackRemote?: boolean) =>
-      ipcRenderer.invoke(IPC.GIT_WORKTREE_ADD, repoPath, branch, trackRemote) as Promise<{
+    addWorktree: (repoPath: string, branch: string, trackRemote?: boolean, worktreeBaseDir?: string) =>
+      ipcRenderer.invoke(IPC.GIT_WORKTREE_ADD, repoPath, branch, trackRemote, worktreeBaseDir) as Promise<{
         worktreePath: string;
         branch: string;
       }>,
@@ -51,6 +52,10 @@ const api = {
     listRemoteBranches: (repoPath: string) => ipcRenderer.invoke(IPC.GIT_REMOTE_BRANCHES, repoPath) as Promise<string[]>,
     getPrInfo: (worktreePath: string) =>
       ipcRenderer.invoke(IPC.GIT_PR_NUMBER, worktreePath) as Promise<{ number: number; url: string } | null>,
+    scanWorktrees: (baseDir: string) =>
+      ipcRenderer.invoke(IPC.GIT_SCAN_WORKTREES, baseDir) as Promise<
+        Array<{ repoName: string; repoPath: string; branch: string; worktreePath: string }>
+      >,
   },
   fs: {
     getTreeWithStatus: (worktreePath: string) => ipcRenderer.invoke(IPC.FS_TREE_WITH_STATUS, worktreePath) as Promise<FileNode[]>,
