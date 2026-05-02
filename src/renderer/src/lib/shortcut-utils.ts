@@ -66,6 +66,28 @@ export function comboToParts(combo: ShortcutCombo): {
 const MODIFIER_KEYS = new Set(['Meta', 'Control', 'Shift', 'Alt']);
 
 /**
+ * Derive the "logical" key from a KeyboardEvent.
+ *
+ * On macOS, pressing Option+<key> produces special Unicode characters in `e.key`
+ * (e.g. Option+1 → "¡", Option+2 → "™").  When the shortcut uses Alt/Option we
+ * fall back to `e.code` to recover the original key.
+ */
+function logicalKey(e: KeyboardEvent): string {
+  if (e.altKey && e.code) {
+    // e.code: "Digit1" → "1", "KeyA" → "a", "BracketLeft" → "["
+    if (e.code.startsWith('Digit')) return e.code[5];
+    if (e.code.startsWith('Key')) return e.code.slice(3).toLowerCase();
+    const codeMap: Record<string, string> = {
+      BracketLeft: '[', BracketRight: ']', Backslash: '\\',
+      Semicolon: ';', Quote: "'", Comma: ',', Period: '.',
+      Slash: '/', Minus: '-', Equal: '=', Backquote: '`',
+    };
+    if (codeMap[e.code]) return codeMap[e.code];
+  }
+  return e.key.toLowerCase();
+}
+
+/**
  * Extract a ShortcutCombo from a live KeyboardEvent.
  * Returns null if only modifiers are pressed (no "real" key yet).
  */
@@ -77,7 +99,7 @@ export function comboFromEvent(e: KeyboardEvent): ShortcutCombo | null {
     ctrl: e.ctrlKey,
     shift: e.shiftKey,
     alt: e.altKey,
-    key: e.key.toLowerCase(),
+    key: e.altKey ? logicalKey(e) : e.key.toLowerCase(),
   };
 }
 
@@ -90,7 +112,7 @@ export function eventMatchesCombo(e: KeyboardEvent, combo: ShortcutCombo): boole
     e.ctrlKey === combo.ctrl &&
     e.shiftKey === combo.shift &&
     e.altKey === combo.alt &&
-    e.key.toLowerCase() === combo.key
+    logicalKey(e) === combo.key
   );
 }
 

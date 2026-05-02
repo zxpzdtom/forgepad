@@ -61,6 +61,7 @@ export function App() {
   const closeTab = useAppStore((state) => state.closeTab);
   const setActiveTab = useAppStore((state) => state.setActiveTab);
   const setActiveWorkspace = useAppStore((state) => state.setActiveWorkspace);
+  const navigatePanel = useAppStore((state) => state.navigatePanel);
   const setRightPanelMode = useAppStore((state) => state.setRightPanelMode);
   const setFocusedColumn = useAppStore((state) => state.setFocusedColumn);
   const toggleTerminalPanel = useAppStore((state) => state.toggleTerminalPanel);
@@ -213,7 +214,25 @@ export function App() {
         void navigator.clipboard.writeText(tab.relPath);
         state.addToast('info', 'Relative path copied');
       },
+      prevPanel: () => navigatePanel('prev'),
+      nextPanel: () => navigatePanel('next'),
+      switchPanel1: () => switchPanelByIndex(0),
+      switchPanel2: () => switchPanelByIndex(1),
+      switchPanel3: () => switchPanelByIndex(2),
+      switchPanel4: () => switchPanelByIndex(3),
+      switchPanel5: () => switchPanelByIndex(4),
+      switchPanel6: () => switchPanelByIndex(5),
+      switchPanel7: () => switchPanelByIndex(6),
+      switchPanel8: () => switchPanelByIndex(7),
+      switchPanel9: () => switchPanelByIndex(8),
     };
+
+    function switchPanelByIndex(idx: number) {
+      const state = useAppStore.getState();
+      if (idx < state.panels.length) {
+        state.setActivePanel(state.panels[idx].id);
+      }
+    }
 
     function switchTabByIndex(idx: number) {
       const state = useAppStore.getState();
@@ -264,6 +283,7 @@ export function App() {
     toggleTerminalPanel,
     toggleSidebar,
     toggleRightPanel,
+    navigatePanel,
     shortcuts,
   ]);
 

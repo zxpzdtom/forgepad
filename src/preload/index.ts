@@ -17,6 +17,7 @@ import { contextBridge, ipcRenderer, webUtils } from 'electron';
 const api = {
   app: {
     openProject: () => ipcRenderer.invoke(IPC.APP_OPEN_PROJECT) as Promise<OpenProjectResult | null>,
+    showEmojiPanel: () => ipcRenderer.invoke(IPC.APP_SHOW_EMOJI_PANEL) as Promise<void>,
   },
   state: {
     load: () => ipcRenderer.invoke(IPC.STATE_LOAD) as Promise<Partial<PersistedAppState> | null>,

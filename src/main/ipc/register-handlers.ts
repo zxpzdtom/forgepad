@@ -602,4 +602,9 @@ export function registerIpcHandlers(hookPort?: number): void {
   ipcMain.handle(IPC.LSP_GET_DEFINITION, async (_event, worktreePath: string, token: string) =>
     LspService.getDefinition(worktreePath, token),
   );
+
+  // ── System emoji picker ────────────────────────────────────────────────
+  ipcMain.handle(IPC.APP_SHOW_EMOJI_PANEL, () => {
+    app.showEmojiPanel();
+  });
 }
