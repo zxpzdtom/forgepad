@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { comboFromEvent, comboToDisplay, comboToString, findConflict } from '@renderer/lib/shortcut-utils';
 import { useAppStore } from '@renderer/store/app-store';
+import { useTranslation } from '@renderer/i18n';
 import type { ShortcutActionId, ShortcutCombo } from '@shared/types';
 import { DEFAULT_SHORTCUTS, SHORTCUT_DEFINITIONS } from '@shared/types';
 import { RotateCcw } from 'lucide-react';
@@ -11,6 +12,7 @@ interface ShortcutRecorderProps {
 }
 
 export function ShortcutRecorder({ actionId, currentCombo }: ShortcutRecorderProps) {
+  const { t } = useTranslation();
   const [recording, setRecording] = useState(false);
   const [pendingCombo, setPendingCombo] = useState<ShortcutCombo | null>(null);
   const [conflict, setConflict] = useState<string | null>(null);

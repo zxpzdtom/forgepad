@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Allotment } from 'allotment';
 
+import { useTranslation } from '@renderer/i18n';
 import { getElementSelectionScript } from '../lib/element-selection-script';
 import { useAppStore } from '../store/app-store';
 import { BrowserConsolePanel } from './BrowserConsolePanel';
@@ -33,7 +34,7 @@ type LoadError = {
 };
 
 /** Map common Chromium error codes to user-friendly messages */
-function friendlyErrorMessage(code: number, desc: string, url: string): { title: string; detail: string; canRetry: boolean } {
+function friendlyErrorMessage(code: number, desc: string, url: string, t: (key: string, params?: Record<string, string | number>) => string): { title: string; detail: string; canRetry: boolean } {
   const host = (() => {
     try {
       return new URL(url).host;
@@ -45,100 +46,100 @@ function friendlyErrorMessage(code: number, desc: string, url: string): { title:
   switch (code) {
     case -2: // ERR_FAILED
       return {
-        title: 'Failed to load',
-        detail: `Could not load ${host}`,
+        title: t('browser.failedToLoad'),
+        detail: t('browser.couldNotLoad', { host }),
         canRetry: true,
       };
     case -6: // ERR_FILE_NOT_FOUND
       return {
-        title: 'Page not found',
-        detail: `The page at ${host} could not be found`,
+        title: t('browser.pageNotFound'),
+        detail: t('browser.pageNotFoundDetail', { host }),
         canRetry: false,
       };
     case -7: // ERR_TIMED_OUT
       return {
-        title: 'Connection timed out',
-        detail: `${host} took too long to respond`,
+        title: t('browser.connectionTimeout'),
+        detail: t('browser.connectionTimeoutDetail', { host }),
         canRetry: true,
       };
     case -21: // ERR_NETWORK_CHANGED
       return {
-        title: 'Network changed',
-        detail: 'Your network connection changed during loading',
+        title: t('browser.networkChanged'),
+        detail: t('browser.networkChangedDetail'),
         canRetry: true,
       };
     case -100: // ERR_CONNECTION_CLOSED
       return {
-        title: 'Connection closed',
-        detail: `${host} closed the connection`,
+        title: t('browser.connectionClosed'),
+        detail: t('browser.connectionClosedDetail', { host }),
         canRetry: true,
       };
     case -101: // ERR_CONNECTION_RESET
       return {
-        title: 'Connection reset',
-        detail: `The connection to ${host} was reset`,
+        title: t('browser.connectionReset'),
+        detail: t('browser.connectionResetDetail', { host }),
         canRetry: true,
       };
     case -102: // ERR_CONNECTION_REFUSED
       return {
-        title: 'Connection refused',
-        detail: `${host} refused to connect. Check if the server is running.`,
+        title: t('browser.connectionRefused'),
+        detail: t('browser.connectionRefusedDetail', { host }),
         canRetry: true,
       };
     case -103: // ERR_CONNECTION_ABORTED
       return {
-        title: 'Connection aborted',
-        detail: `The connection to ${host} was aborted`,
+        title: t('browser.connectionAborted'),
+        detail: t('browser.connectionAbortedDetail', { host }),
         canRetry: true,
       };
     case -104: // ERR_CONNECTION_FAILED
       return {
-        title: 'Connection failed',
-        detail: `Could not connect to ${host}`,
+        title: t('browser.connectionFailed'),
+        detail: t('browser.connectionFailedDetail', { host }),
         canRetry: true,
       };
     case -105: // ERR_NAME_NOT_RESOLVED
       return {
-        title: 'Address not found',
-        detail: `Could not resolve ${host}. Check the URL or your DNS settings.`,
+        title: t('browser.addressNotFound'),
+        detail: t('browser.addressNotFoundDetail', { host }),
         canRetry: true,
       };
     case -106: // ERR_INTERNET_DISCONNECTED
       return {
-        title: 'No internet',
-        detail: 'Your device is not connected to the internet',
+        title: t('browser.noInternet'),
+        detail: t('browser.noInternetDetail'),
         canRetry: true,
       };
     case -109: // ERR_ADDRESS_UNREACHABLE
       return {
-        title: 'Address unreachable',
-        detail: `${host} is unreachable`,
+        title: t('browser.addressUnreachable'),
+        detail: t('browser.addressUnreachableDetail', { host }),
         canRetry: true,
       };
     case -118: // ERR_CONNECTION_TIMED_OUT
       return {
-        title: 'Connection timed out',
-        detail: `${host} took too long to respond`,
+        title: t('browser.connectionTimeout'),
+        detail: t('browser.connectionTimeoutDetail', { host }),
         canRetry: true,
       };
     case -200: // ERR_CERT_COMMON_NAME_INVALID
     case -201: // ERR_CERT_DATE_INVALID
     case -202: // ERR_CERT_AUTHORITY_INVALID
       return {
-        title: 'Certificate error',
-        detail: `The security certificate for ${host} is not trusted`,
+        title: t('browser.certificateError'),
+        detail: t('browser.certificateErrorDetail', { host }),
         canRetry: true,
       };
     case -501: // ERR_INSECURE_RESPONSE
       return {
-        title: 'Insecure connection',
-        detail: `${host} sent an insecure response`,
+        title: t('browser.insecureConnection'),
+        detail: t('browser.insecureConnectionDetail', { host }),
         canRetry: true,
       };
     default:
       return {
-        title: 'Failed to load',
-        detail: desc || `Error ${code}`,
+        title: t('browser.failedToLoad'),
+        detail: desc || `Error ${Math.abs(code)}`,
         canRetry: true,
       };
   }
@@ -170,6 +171,7 @@ function normalizeUrl(url: string): string {
 }
 
 export function BrowserTab({ tab }: BrowserTabProps) {
+  const { t } = useTranslation();
   const webviewRef = useRef<Electron.WebviewTag>(null);
   const [urlInput, setUrlInput] = useState(tab.url === 'about:blank' ? '' : tab.url);
   const [loadError, setLoadError] = useState<LoadError | null>(null);
@@ -559,7 +561,7 @@ export function BrowserTab({ tab }: BrowserTabProps) {
         ) ?? state.tabs.find((t) => t.workspaceId === tab.workspaceId && t.type === 'terminal' && t.isAgent);
 
       if (!agentTab || agentTab.type !== 'terminal') {
-        addToast('error', 'No active agent terminal. Please open an agent tab first.');
+        addToast('error', t('browser.noActiveAgent'));
         return;
       }
 
@@ -738,7 +740,7 @@ export function BrowserTab({ tab }: BrowserTabProps) {
   const mobilePreset = VIEWPORT_PRESETS.mobile;
 
   const errorInfo = loadError
-    ? friendlyErrorMessage(loadError.errorCode, loadError.errorDescription, loadError.validatedURL)
+    ? friendlyErrorMessage(loadError.errorCode, loadError.errorDescription, loadError.validatedURL, t)
     : null;
 
   return (
@@ -750,7 +752,7 @@ export function BrowserTab({ tab }: BrowserTabProps) {
           type="button"
           onClick={handleBack}
           disabled={!tab.canGoBack}
-          title="Back"
+          title={t('browser.back')}
           className="rounded p-1.5 text-subtle transition-colors hover:bg-panel-3 hover:text-text disabled:cursor-not-allowed disabled:opacity-30"
         >
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -763,7 +765,7 @@ export function BrowserTab({ tab }: BrowserTabProps) {
           type="button"
           onClick={handleForward}
           disabled={!tab.canGoForward}
-          title="Forward"
+          title={t('browser.forward')}
           className="rounded p-1.5 text-subtle transition-colors hover:bg-panel-3 hover:text-text disabled:cursor-not-allowed disabled:opacity-30"
         >
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -775,7 +777,7 @@ export function BrowserTab({ tab }: BrowserTabProps) {
         <button
           type="button"
           onClick={handleReloadOrStop}
-          title={tab.isLoading ? 'Stop' : 'Reload'}
+          title={tab.isLoading ? t('browser.stop') : t('common.reload')}
           className="rounded p-1.5 text-subtle transition-colors hover:bg-panel-3 hover:text-text"
         >
           {tab.isLoading ? (
@@ -810,7 +812,7 @@ export function BrowserTab({ tab }: BrowserTabProps) {
         <button
           type="button"
           onClick={handleToggleViewport}
-          title={isMobile ? 'Switch to desktop view' : 'Switch to mobile view'}
+          title={isMobile ? t('browser.switchDesktop') : t('browser.switchMobile')}
           className={[
             'flex h-7 items-center gap-1 rounded px-2 font-medium text-xs transition-colors',
             isMobile ? 'bg-accent text-white' : 'border border-border bg-panel-2 text-muted hover:border-border hover:text-text',
@@ -837,7 +839,7 @@ export function BrowserTab({ tab }: BrowserTabProps) {
         <button
           type="button"
           onClick={handleToggleSelect}
-          title={selectMode ? 'Exit element selection' : 'Select element to comment'}
+          title={selectMode ? t('browser.exitElementSelection') : t('browser.selectElement')}
           className={[
             'flex h-7 items-center gap-1.5 rounded px-2.5 font-medium text-xs transition-colors',
             selectMode
@@ -850,14 +852,14 @@ export function BrowserTab({ tab }: BrowserTabProps) {
             <circle cx="6.5" cy="6.5" r="1.5" fill="currentColor" />
             <path d="M6.5 1v2M6.5 10v2M1 6.5h2M10 6.5h2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
           </svg>
-          {selectMode ? 'Selecting\u2026' : 'Inspect'}
+          {selectMode ? t('browser.selecting') : t('browser.inspect')}
         </button>
 
         {/* Console toggle */}
         <button
           type="button"
           onClick={() => setConsoleOpen((v) => !v)}
-          title={consoleOpen ? 'Hide console' : 'Show console'}
+          title={consoleOpen ? t('browser.hideConsole') : t('browser.showConsole')}
           className={[
             'flex h-7 items-center gap-1 rounded px-2 font-medium text-xs transition-colors',
             consoleOpen
@@ -870,7 +872,7 @@ export function BrowserTab({ tab }: BrowserTabProps) {
             <path d="M3.5 5.5l2 1.5-2 1.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
             <line x1="7" y1="8.5" x2="9.5" y2="8.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
           </svg>
-          Console
+          {t('browser.console')}
           {consoleErrorCount > 0 && !consoleOpen && (
             <span
               key={consoleErrorCount}
@@ -937,7 +939,7 @@ export function BrowserTab({ tab }: BrowserTabProps) {
             {selectMode && (
               <div className="pointer-events-none absolute inset-0 z-10 flex items-start justify-center pt-4">
                 <div className="rounded-full border border-accent/50 bg-panel/90 px-3 py-1.5 text-accent text-xs shadow backdrop-blur-sm">
-                  Click any element on the page &bull; ESC to cancel
+                  {t('browser.selectHint')}
                 </div>
               </div>
             )}
@@ -965,6 +967,7 @@ function ErrorOverlay({
   errorCode: number;
   onRetry: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="absolute inset-0 z-20 flex items-center justify-center bg-bg">
       <div className="flex max-w-sm flex-col items-center gap-4 px-6 text-center">
@@ -1002,7 +1005,7 @@ function ErrorOverlay({
                 strokeLinejoin="round"
               />
             </svg>
-            Retry
+            {t('common.retry')}
           </button>
         )}
       </div>

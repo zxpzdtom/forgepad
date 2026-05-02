@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { useTranslation } from '@renderer/i18n';
 import { useAppStore } from '@renderer/store/app-store';
 import type { ContextItem, Workspace } from '@shared/types';
 import { Bot, ClipboardList, Eye, FileCode2, GitCompare, MessageSquare, SendHorizontal, Trash2, X } from 'lucide-react';
@@ -27,6 +28,7 @@ function itemIcon(item: ContextItem) {
 }
 
 export function ContextPanel() {
+  const { t } = useTranslation();
   const workspace = useActiveWorkspace();
   const contextItems = useAppStore((state) => state.contextItems);
   const activeWorkspaceId = useAppStore((state) => state.activeWorkspaceId);
@@ -49,7 +51,7 @@ export function ContextPanel() {
   const selectedAgentPreset = enabledPresets.find((preset) => preset.command === settings.defaultAgentCommand)?.id ?? 'custom';
 
   if (!workspace) {
-    return <div className="grid min-h-[90px] place-items-center text-muted">Open a project first</div>;
+    return <div className="grid min-h-[90px] place-items-center text-muted">{t('context.openProjectFirst')}</div>;
   }
 
   return (
@@ -59,11 +61,11 @@ export function ContextPanel() {
           className="composer-textarea"
           value={composerText}
           onChange={(event) => setComposerText(event.currentTarget.value)}
-          placeholder="Ask the agent what to do with the selected context"
+          placeholder={t('context.askAgent')}
         />
         <label className="grid min-h-8 grid-cols-[16px_auto_minmax(92px,128px)_minmax(0,1fr)] items-center gap-2 text-muted text-xs">
           <Bot size={15} />
-          <span>Agent</span>
+          <span>{t('context.agent')}</span>
           <select
             className="toolbar-select agent-preset-select"
             value={selectedAgentPreset}

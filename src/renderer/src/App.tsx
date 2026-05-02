@@ -13,6 +13,7 @@ import { ToastStack } from '@renderer/components/ToastStack';
 import { TopBar } from '@renderer/components/TopBar';
 import { useAgentLifecycle } from '@renderer/hooks/useAgentLifecycle';
 import { type ResolvedTheme, useTheme } from '@renderer/hooks/useTheme';
+import { I18nProvider, useTranslation } from '@renderer/i18n';
 import { getDroppedPaths, hasDraggableFiles, isInternalDrop } from '@renderer/lib/drag-utils';
 import { eventMatchesCombo } from '@renderer/lib/shortcut-utils';
 import { useAppStore } from '@renderer/store/app-store';
@@ -24,9 +25,10 @@ import { Bot, FolderOpen, GitBranch, TerminalSquare } from 'lucide-react';
 export const ThemeContext = createContext<ResolvedTheme>('dark');
 export const useResolvedTheme = () => useContext(ThemeContext);
 
-export function App() {
+function AppInner() {
   const resolvedTheme = useTheme();
   useAgentLifecycle();
+  const { t } = useTranslation();
   const [quickSearchOpen, setQuickSearchOpen] = useState(false);
   const terminalHeightRef = useRef(240);
   const sidebarWidthRef = useRef(260);
@@ -83,7 +85,7 @@ export function App() {
       })
       .catch((error) => {
         useAppStore.getState().hydrate(null);
-        useAppStore.getState().addToast('error', error instanceof Error ? error.message : 'Failed to load workspace state.');
+        useAppStore.getState().addToast('error', error instanceof Error ? error.message : t('app.toast.failedLoadState'));
       });
     return () => {
       disposed = true;
@@ -97,7 +99,7 @@ export function App() {
       if (saveTimer) window.clearTimeout(saveTimer);
       saveTimer = window.setTimeout(() => {
         window.forgepad.state.save(state.toPersistedState()).catch((error) => {
-          state.addToast('error', error instanceof Error ? error.message : 'Failed to save workspace state.');
+          state.addToast('error', error instanceof Error ? error.message : t('app.toast.failedSaveState'));
         });
       }, 400);
     });
@@ -205,14 +207,14 @@ export function App() {
         })();
         if (!path) return;
         void navigator.clipboard.writeText(path);
-        state.addToast('info', 'Path copied');
+        state.addToast('info', t('app.toast.pathCopied'));
       },
       copyRelativePath: () => {
         const state = useAppStore.getState();
         const tab = state.tabs.find((t) => t.id === state.activeFileTabId);
         if (!tab || tab.type !== 'file' || tab.absPath) return;
         void navigator.clipboard.writeText(tab.relPath);
-        state.addToast('info', 'Relative path copied');
+        state.addToast('info', t('app.toast.relativePathCopied'));
       },
       prevPanel: () => navigatePanel('prev'),
       nextPanel: () => navigatePanel('next'),
@@ -317,7 +319,7 @@ export function App() {
         });
       })
       .catch((error) => {
-        addToast('error', error instanceof Error ? error.message : 'Failed to watch workspace changes.');
+        addToast('error', error instanceof Error ? error.message : t('app.toast.failedWatchWorkspace'));
       });
 
     return () => {
@@ -408,13 +410,13 @@ export function App() {
           <div className="grid size-14 place-items-center rounded-lg border border-border bg-panel-2 text-accent">
             <FolderOpen size={32} />
           </div>
-          <h1 className="m-0 font-semibold text-[22px]">Open a repository to start</h1>
+          <h1 className="m-0 font-semibold text-[22px]">{t('app.emptyState.title')}</h1>
           <p className="m-0 max-w-[460px] text-muted leading-relaxed">
-            ForgePad keeps the agent loop terminal-first, with file context and git diffs close at hand.
+            {t('app.emptyState.description')}
           </p>
           <button className="primary-button" type="button" onClick={openProject}>
             <FolderOpen size={16} />
-            Open Project
+            {t('app.emptyState.openProject')}
           </button>
         </section>
       );
@@ -423,25 +425,25 @@ export function App() {
     return (
       <section className="flex size-full flex-col items-center justify-center gap-3.5 p-8 text-center">
         <TerminalSquare size={30} />
-        <h1 className="m-0 font-semibold text-[22px]">{activeWorkspace?.name ?? 'No workspace selected'}</h1>
+        <h1 className="m-0 font-semibold text-[22px]">{activeWorkspace?.name ?? t('app.emptyState.noWorkspace')}</h1>
         <p className="m-0 flex max-w-[460px] items-center gap-[7px] text-muted leading-relaxed">
           {activeWorkspace ? (
             <>
-              <GitBranch size={14} /> {activeWorkspace.branch || 'detached'}
+              <GitBranch size={14} /> {activeWorkspace.branch || t('app.emptyState.detached')}
             </>
           ) : (
-            'Pick a project from the sidebar.'
+            t('app.emptyState.pickProject')
           )}
         </p>
         {activeWorkspace ? (
           <div className="flex gap-2">
             <button className="primary-button" type="button" onClick={() => createAgentTerminal(activeWorkspace.id)}>
               <Bot size={16} />
-              New Agent
+              {t('app.emptyState.newAgent')}
             </button>
             <button className="secondary-button" type="button" onClick={() => createTerminal(activeWorkspace.id)}>
               <TerminalSquare size={16} />
-              Terminal
+              {t('app.emptyState.terminal')}
             </button>
           </div>
         ) : null}
@@ -452,8 +454,8 @@ export function App() {
   if (!hydrated) {
     return (
       <div className="flex size-full flex-col items-center justify-center gap-3.5 p-8 text-center">
-        <div className="font-bold text-[22px]">ForgePad</div>
-        <div className="text-muted">Loading workspace</div>
+        <div className="font-bold text-[22px]">{t('app.name')}</div>
+        <div className="text-muted">{t('app.loading')}</div>
       </div>
     );
   }
@@ -667,5 +669,13 @@ export function App() {
         <ToastStack />
       </div>
     </ThemeContext.Provider>
+  );
+}
+
+export function App() {
+  return (
+    <I18nProvider>
+      <AppInner />
+    </I18nProvider>
   );
 }

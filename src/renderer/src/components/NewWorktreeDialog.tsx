@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useAppStore } from '@renderer/store/app-store';
 import { generateRandomBranchName } from '@renderer/lib/random-branch-name';
 import { RefreshCw } from 'lucide-react';
+import { useTranslation } from '@renderer/i18n';
 
 export function NewWorktreeDialog({
   projectName,
@@ -14,6 +15,7 @@ export function NewWorktreeDialog({
   onClose: () => void;
   onCreate: (branch: string, trackRemote: boolean) => void;
 }) {
+  const { t } = useTranslation();
   const worktreeTrackRemoteByDefault = useAppStore((s) => s.settings.worktreeTrackRemoteByDefault);
   const [branch, setBranch] = useState(generateRandomBranchName);
   const [trackRemote, setTrackRemote] = useState(worktreeTrackRemoteByDefault);

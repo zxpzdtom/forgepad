@@ -1,5 +1,6 @@
 import { type MouseEvent, useCallback, useMemo, useRef, useState } from 'react';
 import { useHorizontalScroll } from '@renderer/hooks/useHorizontalScroll';
+import { useTranslation } from '@renderer/i18n';
 import { getDroppedPaths, hasDraggableFiles } from '@renderer/lib/drag-utils';
 import { closestCenter, DndContext, type DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { horizontalListSortingStrategy, SortableContext } from '@dnd-kit/sortable';
@@ -19,6 +20,7 @@ function terminalIcon(tab: TerminalTab) {
 }
 
 export function TerminalDock() {
+  const { t } = useTranslation();
   const tabs = useAppStore((state) => state.tabs);
   const activeWorkspaceId = useAppStore((state) => state.activeWorkspaceId);
   const activeShellTabId = useAppStore((state) => state.activeShellTabId);
@@ -146,7 +148,7 @@ export function TerminalDock() {
                     setActiveTab(tab.id);
                   }}
                   onClose={() => closeTab(tab.id)}
-                  closeTitle="Close terminal"
+                  closeTitle={t('terminalDock.closeTerminal')}
                   onContextMenu={(event) => handleContextMenu(event, tab)}
                 />
               ))}
@@ -157,12 +159,12 @@ export function TerminalDock() {
         <button
           className="icon-button small"
           type="button"
-          title="New terminal"
+          title={t('terminalDock.newTerminal')}
           onClick={() => void createTerminal(activeWorkspaceId ?? undefined)}
         >
           <Plus size={14} />
         </button>
-        <button className="icon-button small" type="button" title="Hide terminal" onClick={() => setTerminalPanelOpen(false)}>
+        <button className="icon-button small" type="button" title={t('terminalDock.hideTerminal')} onClick={() => setTerminalPanelOpen(false)}>
           <Minimize2 size={13} />
         </button>
       </div>
