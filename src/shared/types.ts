@@ -237,6 +237,8 @@ export type PersistedAppState = {
   composerText: string;
   settings: AppSettings;
   browserHistory?: BrowserHistoryEntry[];
+  /** Per-project last-selected run command index */
+  projectActiveRunIndex?: Record<string, number>;
 };
 
 export type ThemePreference = 'dark' | 'light' | 'system';

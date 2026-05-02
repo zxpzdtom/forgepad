@@ -199,6 +199,9 @@ type AppState = {
   openFeedbackModal: (tabId: string, element: SelectedElementInfo) => void;
   closeFeedbackModal: () => void;
   submitBrowserFeedback: (comment: string) => void;
+  /** Per-project last-selected run command index */
+  projectActiveRunIndex: Record<string, number>;
+  setProjectActiveRunIndex: (projectId: string, index: number) => void;
   openSymbolPeek: (peek: NonNullable<LspSymbolPeekState>) => void;
   closeSymbolPeek: () => void;
   clearTabTargetLine: (tabId: string) => void;
@@ -263,6 +266,7 @@ function serializeForSave(state: AppState): PersistedAppState {
     composerText: state.composerText,
     settings: state.settings,
     browserHistory: state.browserHistory,
+    projectActiveRunIndex: state.projectActiveRunIndex,
   };
 }
 
@@ -387,6 +391,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   feedbackModalOpen: false,
   pendingFeedback: null,
   symbolPeek: null,
+  projectActiveRunIndex: {},
   handleAgentStatusUpdate: (ptyId, status) => {
     // Reset the working-timeout whenever we receive any hook event.
     // If status is "working", start a timeout that auto-clears to "idle"
@@ -652,6 +657,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       composerText: state?.composerText ?? '',
       settings,
       browserHistory: state?.browserHistory ?? [],
+      projectActiveRunIndex: state?.projectActiveRunIndex ?? {},
       hydrated: true,
     });
 
@@ -1678,6 +1684,9 @@ export const useAppStore = create<AppState>((set, get) => ({
       const nextWsAgentTabs = { ...state.workspaceActiveAgentTabIds };
       for (const id of removedWorkspaceIds) delete nextWsAgentTabs[id];
 
+      // Clean projectActiveRunIndex
+      const { [projectId]: _, ...nextProjectActiveRunIndex } = state.projectActiveRunIndex;
+
       return {
         projects: state.projects.filter((project) => project.id !== projectId),
         workspaces,
@@ -1688,6 +1697,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         exitedPtyIds: nextExited,
         agentStatuses: nextAgentStatuses,
         workspaceActiveAgentTabIds: nextWsAgentTabs,
+        projectActiveRunIndex: nextProjectActiveRunIndex,
         ...activeIdsAfterRemoval(state, tabs, workspaces),
       };
     }),
@@ -2002,6 +2012,11 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     get().closeFeedbackModal();
   },
+
+  setProjectActiveRunIndex: (projectId, index) =>
+    set((state) => ({
+      projectActiveRunIndex: { ...state.projectActiveRunIndex, [projectId]: index },
+    })),
 
   openSymbolPeek: (peek) => {
     set({ symbolPeek: peek });
