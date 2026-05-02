@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { FileDiffOptions, SelectedLineRange } from '@pierre/diffs';
-import { processFile } from '@pierre/diffs';
+import { getFiletypeFromFileName, processFile } from '@pierre/diffs';
 import type { DiffLineAnnotation } from '@pierre/diffs/react';
 import { FileDiff, PatchDiff } from '@pierre/diffs/react';
 import { useResolvedTheme } from '@renderer/App';
@@ -35,7 +35,12 @@ function DiffContent({
   lineAnnotations?: DiffLineAnnotation<AnnotationMeta>[];
   renderAnnotation?: (annotation: DiffLineAnnotation<AnnotationMeta>) => React.ReactNode;
 }) {
+  // Pierre has an infinite-loop bug when the computed language is "text"
+  // (same guard as FileEditor). Render a plain <pre> patch instead.
+  const isPlainText = useMemo(() => getFiletypeFromFileName(file.path) === 'text', [file.path]);
+
   const fileDiffMetadata = useMemo(() => {
+    if (isPlainText) return undefined;
     if (file.oldContent == null && file.newContent == null) {
       console.warn('[DiffContent] no oldContent/newContent, falling back to PatchDiff');
       return undefined;
@@ -53,7 +58,30 @@ function DiffContent({
       hasResult: result != null,
     });
     return result;
-  }, [file.patch, file.path, file.oldPath, file.oldContent, file.newContent]);
+  }, [file.patch, file.path, file.oldPath, file.oldContent, file.newContent, isPlainText]);
+
+  if (isPlainText) {
+    // Show the new file content with line numbers, matching FileEditor's
+    // plain-text rendering style, since pierre crashes on language "text".
+    const content = file.newContent ?? file.oldContent ?? file.patch ?? '';
+    const lines = content.split('\n');
+    return (
+      <pre className="m-0 flex-1 overflow-auto p-4 font-mono text-[13px] text-text" style={{ lineHeight: 1.6, tabSize: 4 }}>
+        <table className="border-collapse">
+          <tbody>
+            {lines.map((line, i) => (
+              <tr key={i}>
+                <td className="select-none pr-4 text-right align-top text-subtle/50" style={{ minWidth: '3em' }}>
+                  {i + 1}
+                </td>
+                <td className="whitespace-pre-wrap break-all">{line || '\u00A0'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </pre>
+    );
+  }
 
   if (fileDiffMetadata) {
     return (
