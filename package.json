@@ -24,6 +24,7 @@
     "productName": "ForgePad",
     "mac": {
       "target": "dmg",
+      "icon": "build/icon.icns",
       "category": "public.app-category.developer-tools",
       "identity": null
     },
