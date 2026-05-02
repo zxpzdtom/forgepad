@@ -688,13 +688,18 @@ function AdvancedSection() {
     <div>
       <SectionHeader title="Advanced" />
 
-      <SettingRow label="Run Command" description="Custom command executed via the Run action">
-        <input
-          className="h-8 w-48 rounded-md border border-border bg-panel-2 px-3 font-mono text-[12px] text-text outline-none focus:border-accent/60 focus:ring-1 focus:ring-accent/30"
-          value={settings.runCommand ?? ''}
-          placeholder="npm run dev"
-          onChange={(e) => updateSettings({ runCommand: e.currentTarget.value || undefined })}
-        />
+      <SettingRow label="Run Commands" description="Custom named commands executed via the Run action">
+        <div className="space-y-1 text-[12px]">
+          {(settings.runCommands ?? []).map((entry, i) => (
+            <div key={`${entry.command}-${i}`} className="flex items-center gap-1.5">
+              <span className="font-[510] text-text">{entry.name}</span>
+              <span className="truncate font-mono text-subtle">{entry.command}</span>
+            </div>
+          ))}
+          {(settings.runCommands ?? []).length === 0 && (
+            <span className="text-subtle/60">No commands configured</span>
+          )}
+        </div>
       </SettingRow>
 
       <Divider />
