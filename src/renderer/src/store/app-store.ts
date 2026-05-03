@@ -639,6 +639,14 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
     }
 
+    // Derive per-type active tab IDs from restored tabs
+    const wsTabs = tabs.filter((tab) => tab.workspaceId === activeWorkspaceId);
+    const restoredActiveTabId = tabs.some((tab) => tab.id === state?.activeTabId) ? (state?.activeTabId ?? null) : null;
+    const restoredAgentTabs = wsTabs.filter((t) => t.type === 'terminal' && t.isAgent);
+    const restoredShellTabs = wsTabs.filter((t) => t.type === 'terminal' && !t.isAgent);
+    const restoredFileTabs = wsTabs.filter((t) => t.type !== 'terminal');
+    const rememberedAgentTabId = activeWorkspaceId ? workspaceActiveAgentTabIds[activeWorkspaceId] : undefined;
+
     set({
       panels: migratedPanels,
       activePanelId: migratedActivePanelId,
@@ -647,7 +655,12 @@ export const useAppStore = create<AppState>((set, get) => ({
       tasks,
       tabs,
       activeWorkspaceId,
-      activeTabId: tabs.some((tab) => tab.id === state?.activeTabId) ? (state?.activeTabId ?? null) : null,
+      activeTabId: restoredActiveTabId,
+      activeAgentTabId:
+        (rememberedAgentTabId && restoredAgentTabs.some((t) => t.id === rememberedAgentTabId) ? rememberedAgentTabId : null)
+        ?? restoredAgentTabs.at(-1)?.id ?? null,
+      activeShellTabId: restoredShellTabs.at(-1)?.id ?? null,
+      activeFileTabId: restoredFileTabs.at(-1)?.id ?? null,
       workspaceActiveAgentTabIds,
       rightPanelMode: state?.rightPanelMode ?? 'files',
       rightPanelOpen: state?.rightPanelOpen ?? true,
@@ -1472,15 +1485,24 @@ export const useAppStore = create<AppState>((set, get) => ({
     set((state) => ({
       workspaceLoadingIds: new Set([...state.workspaceLoadingIds, workspaceId]),
     }));
-    const branch = await window.forgepad.git.getCurrentBranch(workspace.worktreePath);
-    set((state) => {
-      const next = new Set(state.workspaceLoadingIds);
-      next.delete(workspaceId);
-      return {
-        workspaces: state.workspaces.map((item) => (item.id === workspaceId ? { ...item, branch } : item)),
-        workspaceLoadingIds: next,
-      };
-    });
+    try {
+      const branch = await window.forgepad.git.getCurrentBranch(workspace.worktreePath);
+      set((state) => {
+        const next = new Set(state.workspaceLoadingIds);
+        next.delete(workspaceId);
+        return {
+          workspaces: state.workspaces.map((item) => (item.id === workspaceId ? { ...item, branch } : item)),
+          workspaceLoadingIds: next,
+        };
+      });
+    } catch {
+      // Clear loading state even if the branch lookup fails (e.g. worktree removed)
+      set((state) => {
+        const next = new Set(state.workspaceLoadingIds);
+        next.delete(workspaceId);
+        return { workspaceLoadingIds: next };
+      });
+    }
   },
 
   addAgentPreset: (preset) =>
