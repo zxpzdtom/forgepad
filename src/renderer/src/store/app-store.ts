@@ -1574,6 +1574,27 @@ export const useAppStore = create<AppState>((set, get) => ({
         set((s) => ({
           tabs: s.tabs.map((t) => (t.id === tab.id ? { ...t, ptyId } : t)),
         }));
+
+        // After restoring a session, the CLI may emit a transient "working"
+        // hook during startup even though the session is actually idle
+        // (waiting for user input).  Set a settle timer: if "working" is
+        // still the status after a grace period and no fresh hook event has
+        // refreshed the timer, clear it to "idle".  If the agent is truly
+        // working, new hook events will re-set the status before this fires.
+        const settleTimer = setTimeout(() => {
+          const s = get();
+          if (s.agentStatuses[ptyId] === 'working') {
+            set((prev) => {
+              const { [ptyId]: _, ...rest } = prev.agentStatuses;
+              return { agentStatuses: rest };
+            });
+          }
+        }, 15_000);
+        // If a real working event arrives, the agentWorkingTimers mechanism
+        // will manage the lifecycle; clear this one-shot settle timer on
+        // any subsequent hook event by piggybacking on the existing timer
+        // map (the first handleAgentStatusUpdate call clears & replaces it).
+        agentWorkingTimers.set(ptyId, settleTimer);
       } catch {
         get().addToast('error', `Failed to restore ${tab.title}`);
       }
