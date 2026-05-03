@@ -7,6 +7,7 @@ import { QuickSearch } from '@renderer/components/QuickSearch';
 import { RightPanel } from '@renderer/components/RightPanel';
 import { SettingsPanel } from '@renderer/components/SettingsPanel';
 import { Sidebar } from '@renderer/components/Sidebar';
+import { SketchyFilters } from '@renderer/components/SketchyFilters';
 import { TabBar } from '@renderer/components/TabBar';
 import { TerminalDock } from '@renderer/components/TerminalDock';
 import { ToastStack } from '@renderer/components/ToastStack';
@@ -618,6 +619,7 @@ function AppInner() {
 
   return (
     <ThemeContext.Provider value={resolvedTheme}>
+      <SketchyFilters />
       <div className="flex size-full flex-col bg-bg">
         <TopBar onOpenSearch={() => setQuickSearchOpen(true)} />
 
