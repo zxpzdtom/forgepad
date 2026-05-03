@@ -5,7 +5,7 @@ import { useTranslation } from '@renderer/i18n';
 import { FileTree, useFileTree, useFileTreeSelection } from '@pierre/trees/react';
 import { useResolvedTheme } from '@renderer/App';
 import { useAppStore } from '@renderer/store/app-store';
-import type { FileNode, Workspace } from '@shared/types';
+import type { FileNode, Tab, Workspace } from '@shared/types';
 
 import { Spinner } from './Spinner';
 
@@ -169,6 +169,7 @@ export function FilesPanel() {
   const revealFileInTree = useAppStore((state) => state.revealFileInTree);
   const rightPanelMode = useAppStore((state) => state.rightPanelMode);
   const spinnerStyle = useAppStore((state) => state.settings.spinnerStyle);
+  const tabs = useAppStore((state) => state.tabs);
 
   const contextFileSet = useMemo(() => {
     return new Set(
@@ -238,6 +239,32 @@ export function FilesPanel() {
       item.select();
     }
   }, [revealFileInTree, rightPanelMode, model]);
+
+  // Deselect tree items whose file tab has been closed so that clicking
+  // the same file again triggers a fresh selection change and re-opens the tab.
+  const openFileRelPaths = useMemo(() => {
+    if (!workspace) return new Set<string>();
+    return new Set(
+      tabs
+        .filter((tab): tab is Extract<Tab, { type: 'file' }> => tab.workspaceId === workspace.id && tab.type === 'file')
+        .map((tab) => tab.relPath),
+    );
+  }, [tabs, workspace]);
+
+  useEffect(() => {
+    const currentlySelected = model.getSelectedPaths();
+    for (const p of currentlySelected) {
+      // Only deselect file paths (not directories) that no longer have an open tab
+      if (treeData.filePaths.has(p) && !openFileRelPaths.has(p)) {
+        model.getItem(p)?.deselect();
+        // Sync prevSelectedRef so the next user click is seen as a new addition.
+        // No need to increment suppressCountRef here — the deselect's selection
+        // change (if any) will be a no-op via sameStringArray because
+        // prevSelectedRef is already updated.
+        prevSelectedRef.current = prevSelectedRef.current.filter((pp) => pp !== p);
+      }
+    }
+  }, [openFileRelPaths, model, treeData.filePaths]);
 
   const load = useCallback(async () => {
     if (!workspace) return;
