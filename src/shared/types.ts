@@ -1396,7 +1396,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   diffDisableBackground: false,
   sendAndClearComments: false,
   defaultOpenWith: 'finder',
-  spinnerStyle: 'braille',
+  spinnerStyle: 'core-spiral',
   notifications: { ...DEFAULT_NOTIFICATION_SETTINGS },
   worktreeBaseDir: '',
   worktreeTrackRemoteByDefault: false,

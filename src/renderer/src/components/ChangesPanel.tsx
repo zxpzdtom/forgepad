@@ -503,7 +503,7 @@ export function ChangesPanel() {
         {loading && (
           <div className="grid min-h-[52px] place-items-center text-muted">
             <span className="flex items-center gap-1.5 text-xs">
-              <Spinner name={spinnerStyle as import('unicode-animations').BrailleSpinnerName} />
+              <Spinner name={spinnerStyle} size={16} dotSize={2} />
             </span>
           </div>
         )}

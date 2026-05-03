@@ -273,11 +273,11 @@ function useWorkspaceAgentStatus(workspaceId: string): AgentStatus | undefined {
 function WorkspaceStatusDot({ isActive, agentStatus }: { isActive: boolean; agentStatus: AgentStatus | undefined }) {
   const spinnerStyle = useAppStore((state) => state.settings.spinnerStyle);
 
-  // Working → unicode braille spinner
+  // Working → dotmatrix spinner
   if (agentStatus === 'working') {
     return (
-      <span className="text-[14px] text-accent leading-none">
-        <Spinner name={spinnerStyle as import('unicode-animations').BrailleSpinnerName} />
+      <span className="text-accent leading-none">
+        <Spinner name={spinnerStyle} size={14} dotSize={2} />
       </span>
     );
   }
