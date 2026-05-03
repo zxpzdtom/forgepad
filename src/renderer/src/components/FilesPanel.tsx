@@ -169,12 +169,20 @@ export function FilesPanel() {
   const revealFileInTree = useAppStore((state) => state.revealFileInTree);
   const rightPanelMode = useAppStore((state) => state.rightPanelMode);
   const spinnerStyle = useAppStore((state) => state.settings.spinnerStyle);
+  const themeId = useAppStore((state) => state.settings.themeId);
 
   const contextFileSet = useMemo(() => {
     return new Set(
       contextItems.filter((item) => item.type === 'file' && item.workspaceId === workspace?.id).map((item) => item.relPath),
     );
   }, [contextItems, workspace?.id]);
+
+  /* Inject a thicker, sketchier border on the search input inside Shadow DOM
+     when the Sketchy theme is active. The `unsafeCSS` option injects a <style>
+     into the web component's Shadow DOM so we can override internal styles. */
+  const sketchyUnsafeCSS = themeId === 'sketchy'
+    ? `[data-file-tree-search-input] { border: 2px solid var(--trees-border-color); }`
+    : undefined;
 
   const { model } = useFileTree({
     id: workspace ? `tree-${workspace.id}` : 'tree-empty',
@@ -186,6 +194,7 @@ export function FilesPanel() {
     flattenEmptyDirectories: true,
     icons: { set: 'complete', colored: true },
     renderRowDecoration: ({ item }) => (contextFileSet.has(item.path) ? { text: '', title: t('files.inAIContext') } : null),
+    unsafeCSS: sketchyUnsafeCSS,
   });
 
   const selectedTreePaths = useFileTreeSelection(model);
