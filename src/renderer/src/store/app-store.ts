@@ -1558,7 +1558,26 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
-  setFocusedColumn: (column) => set({ focusedColumn: column }),
+  setFocusedColumn: (column) => {
+    set((state) => {
+      const patch: Partial<AppState> = { focusedColumn: column };
+
+      // When the agent column gains focus, clear "review" / "permission"
+      // indicator on the active agent tab — same behaviour as clicking
+      // the tab, so the user doesn't have to click the tab explicitly.
+      if (column === 'agent' && state.activeAgentTabId) {
+        const activeTab = state.tabs.find((t) => t.id === state.activeAgentTabId);
+        if (activeTab?.type === 'terminal') {
+          const agentStatus = state.agentStatuses[activeTab.ptyId];
+          if (agentStatus === 'review' || agentStatus === 'permission') {
+            patch.agentStatuses = { ...state.agentStatuses, [activeTab.ptyId]: 'idle' };
+          }
+        }
+      }
+
+      return patch;
+    });
+  },
 
   reorderProjects: (activeId, overId) =>
     set((state) => {
