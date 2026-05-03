@@ -449,7 +449,7 @@ export function FilesPanel() {
         {loading ? (
           <div className="absolute inset-0 z-2 grid min-h-0 place-items-center bg-bg/72">
             <span className="flex items-center gap-1.5 text-muted text-xs">
-              <Spinner name={spinnerStyle as import('unicode-animations').BrailleSpinnerName} />
+              <Spinner name={spinnerStyle} size={16} dotSize={2} />
             </span>
           </div>
         ) : null}

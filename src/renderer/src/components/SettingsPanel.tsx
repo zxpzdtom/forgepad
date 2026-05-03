@@ -27,10 +27,9 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
-import { type BrailleSpinnerName, spinners } from 'unicode-animations';
-
 import { agentPresetIcon } from './AgentIcons';
 import { AppearancePanel } from './AppearancePanel';
+import { DOTMATRIX_SPINNERS } from './dotmatrix';
 import { NotificationsSection } from './NotificationsSection';
 import { SegmentedControl } from './SegmentedControl';
 import { ShortcutRecorder } from './ShortcutRecorder';
@@ -348,13 +347,8 @@ function EditPresetDialog({
   );
 }
 
-/** Spinner presets filtered to ≤2 chars wide (suitable for sidebar). */
-const SPINNER_OPTIONS: { name: BrailleSpinnerName; label: string }[] = (Object.keys(spinners) as BrailleSpinnerName[])
-  .filter((name) => {
-    const maxLen = Math.max(...spinners[name].frames.map((f) => [...f].length));
-    return maxLen <= 2;
-  })
-  .map((name) => ({ name, label: name }));
+/** DotMatrix spinner options for the settings picker. */
+const SPINNER_OPTIONS = DOTMATRIX_SPINNERS;
 
 /* ─── Section: General ─── */
 
@@ -409,19 +403,19 @@ function GeneralSection() {
         <div className="mb-1 font-[510] text-[13px] text-text">{t('settings.general.loadingAnimation')}</div>
         <div className="mb-3 text-[11px] text-subtle leading-tight">{t('settings.general.loadingAnimationDesc')}</div>
         <div className="grid grid-cols-3 gap-2">
-          {SPINNER_OPTIONS.map(({ name, label }) => (
+          {SPINNER_OPTIONS.map(({ id, label }) => (
             <button
-              key={name}
+              key={id}
               type="button"
-              className={`flex h-9 items-center gap-2.5 rounded-lg border px-3 text-left transition-colors${
-                settings.spinnerStyle === name
+              className={`flex h-9 items-center gap-2.5 rounded-lg border px-3 text-left transition-colors ${
+                settings.spinnerStyle === id
                   ? 'border-accent/60 bg-accent-surface text-text'
                   : 'border-border bg-panel-2 text-muted hover:bg-panel-3 hover:text-text'
               }`}
-              onClick={() => updateSettings({ spinnerStyle: name })}
+              onClick={() => updateSettings({ spinnerStyle: id })}
             >
-              <span className="w-4 shrink-0 text-center text-[14px] text-accent leading-none">
-                <Spinner name={name} />
+              <span className="shrink-0 text-accent leading-none">
+                <Spinner name={id} size={16} dotSize={2} />
               </span>
               <span className="truncate text-[12px]">{label}</span>
             </button>
