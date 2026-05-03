@@ -1,17 +1,36 @@
-import { useEffect, useState } from 'react';
-import { type BrailleSpinnerName, spinners } from 'unicode-animations';
+import { DOTMATRIX_MAP, DEFAULT_DOTMATRIX_STYLE } from './dotmatrix';
 
-const defaults: BrailleSpinnerName = 'braille';
+/**
+ * Renders a DotMatrix loading spinner by style id.
+ * Replaces the old unicode-animations based spinner.
+ */
+export function Spinner({
+  name = DEFAULT_DOTMATRIX_STYLE,
+  className,
+  size = 16,
+  dotSize = 2,
+}: {
+  name?: string;
+  className?: string;
+  size?: number;
+  dotSize?: number;
+}) {
+  const entry = DOTMATRIX_MAP.get(name);
+  if (!entry) {
+    // Fallback to default if unknown name
+    const fallback = DOTMATRIX_MAP.get(DEFAULT_DOTMATRIX_STYLE)!;
+    const Comp = fallback.Component;
+    return (
+      <span className={className}>
+        <Comp size={size} dotSize={dotSize} color="currentColor" animated />
+      </span>
+    );
+  }
 
-export function Spinner({ name = defaults, className }: { name?: BrailleSpinnerName; className?: string }) {
-  const preset = spinners[name];
-  const [frame, setFrame] = useState(0);
-
-  useEffect(() => {
-    setFrame(0);
-    const id = setInterval(() => setFrame((i) => (i + 1) % preset.frames.length), preset.interval);
-    return () => clearInterval(id);
-  }, [preset]);
-
-  return <span className={`spinner${className ? ` ${className}` : ''}`}>{preset.frames[frame]}</span>;
+  const Comp = entry.Component;
+  return (
+    <span className={className}>
+      <Comp size={size} dotSize={dotSize} color="currentColor" animated />
+    </span>
+  );
 }
