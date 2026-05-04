@@ -1405,6 +1405,28 @@ export const DEFAULT_NOTIFICATION_SETTINGS: NotificationSettings = {
   notifyOnTaskDone: false,
 };
 
+export type PetDefinition = {
+  id: string;
+  displayName: string;
+  description: string;
+  spritesheetPath: string;
+  kind?: 'person' | 'animal' | 'object';
+};
+
+export type PetSettings = {
+  enabled: boolean;
+  selectedPetId: string;
+  petSize: number;
+  petSpeed: number;
+};
+
+export const DEFAULT_PET_SETTINGS: PetSettings = {
+  enabled: false,
+  selectedPetId: 'clawd',
+  petSize: 0.8,
+  petSpeed: 2,
+};
+
 export type Locale = 'en' | 'zh-CN';
 
 export type AppSettings = {
@@ -1446,6 +1468,8 @@ export type AppSettings = {
   autoFetchEnabled: boolean;
   /** Minutes between automatic fetches (1–60) */
   autoFetchIntervalMinutes: number;
+  /** Desktop pet settings */
+  pets: PetSettings;
 };
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -1475,6 +1499,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   worktreeAutoDeleteBranch: true,
   autoFetchEnabled: false,
   autoFetchIntervalMinutes: 5,
+  pets: { ...DEFAULT_PET_SETTINGS },
 };
 
 export type OpenProjectResult = {

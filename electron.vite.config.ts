@@ -19,6 +19,14 @@ export default defineConfig({
   },
   preload: {
     plugins: [externalizeDepsPlugin()],
+    build: {
+      rollupOptions: {
+        input: {
+          index: fromRoot("src/preload/index.ts"),
+          pet: fromRoot("src/preload/pet.ts"),
+        },
+      },
+    },
     resolve: {
       alias: {
         "@shared": fromRoot("src/shared"),
@@ -28,6 +36,14 @@ export default defineConfig({
   renderer: {
     root: fromRoot("src/renderer"),
     plugins: [react(), tailwindcss()],
+    build: {
+      rollupOptions: {
+        input: {
+          index: fromRoot("src/renderer/index.html"),
+          pet: fromRoot("src/renderer/pet.html"),
+        },
+      },
+    },
     resolve: {
       alias: {
         "@renderer": fromRoot("src/renderer/src"),

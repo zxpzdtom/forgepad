@@ -56,6 +56,9 @@ importers:
       allotment:
         specifier: ^1.20.4
         version: 1.20.5(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
+      codex-pets-react:
+        specifier: ^0.2.0
+        version: 0.2.0(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       lucide-react:
         specifier: ^0.577.0
         version: 0.577.0(react@19.2.5)
@@ -1402,6 +1405,12 @@ packages:
   clsx@2.1.1:
     resolution: {integrity: sha512-eYm0QWBtUrBWZWG0d386OGAw16Z995PiOVo2B7bjWSbHedGl5e0ZWaq65kOGgUSNesEIDkB9ISbTg/JK9dhCZA==}
     engines: {node: '>=6'}
+
+  codex-pets-react@0.2.0:
+    resolution: {integrity: sha512-V2f8Zp3ICu3jSw0m2iC040N7STXPnF4BMV9e9svm/N2wz0pjXGMtxp+B+QhTq4eEQ7KtG3InfaKEX0furSGLcw==}
+    peerDependencies:
+      react: ^18.3.0 || ^19.0.0
+      react-dom: ^18.3.0 || ^19.0.0
 
   color-convert@2.0.1:
     resolution: {integrity: sha512-RRECPsj7iu/xb5oKYcsFHSppFNnsj/52OVTRKb4zP5onXwVF3zVmmToNcOfGC+CRDpfK/U584fMg38ZHCaElKQ==}
@@ -4325,6 +4334,11 @@ snapshots:
       mimic-response: 1.0.1
 
   clsx@2.1.1: {}
+
+  codex-pets-react@0.2.0(react-dom@19.2.5(react@19.2.5))(react@19.2.5):
+    dependencies:
+      react: 19.2.5
+      react-dom: 19.2.5(react@19.2.5)
 
   color-convert@2.0.1:
     dependencies:
