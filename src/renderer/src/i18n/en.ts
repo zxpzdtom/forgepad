@@ -54,6 +54,19 @@ const en = {
   'settings.nav.git': 'Git',
   'settings.nav.advanced': 'Advanced',
   'settings.nav.shortcuts': 'Shortcuts',
+  'settings.nav.pets': 'Pets',
+
+  // ── Settings > Pets ──
+  'settings.pets.title': 'Desktop Pets',
+  'settings.pets.enable': 'Enable Desktop Pet',
+  'settings.pets.enableDesc': 'Show an animated pet companion in your workspace',
+  'settings.pets.preview': 'Preview',
+  'settings.pets.size': 'Size',
+  'settings.pets.sizeDesc': 'Scale factor for the pet (1x–4x)',
+  'settings.pets.speed': 'Speed',
+  'settings.pets.speedDesc': 'Movement speed of the pet',
+  'settings.pets.choosePet': 'Choose Your Pet',
+  'settings.pets.choosePetDesc': 'Select from 28 built-in pets. Click to select, drag in the workspace to interact.',
 
   // ── Settings > General ──
   'settings.general.title': 'General',

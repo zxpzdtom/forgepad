@@ -41,7 +41,8 @@ export type SettingsSection =
   | 'git'
   | 'advanced'
   | 'shortcuts'
-  | 'appearance';
+  | 'appearance'
+  | 'pets';
 
 type Toast = {
   id: string;
@@ -673,6 +674,11 @@ export const useAppStore = create<AppState>((set, get) => ({
       projectActiveRunIndex: state?.projectActiveRunIndex ?? {},
       hydrated: true,
     });
+
+    // Send initial pet settings to the overlay window
+    if (settings.pets?.enabled) {
+      window.forgepad.pet.sendSettings(settings.pets);
+    }
 
     get().restoreAgentSessions();
     get().refreshBranchStats();
@@ -1442,7 +1448,15 @@ export const useAppStore = create<AppState>((set, get) => ({
       },
     })),
 
-  updateSettings: (partial) => set((state) => ({ settings: { ...state.settings, ...partial } })),
+  updateSettings: (partial) =>
+    set((state) => {
+      const next = { ...state.settings, ...partial };
+      // Forward pet settings to the overlay window via main process
+      if (partial.pets) {
+        window.forgepad.pet.sendSettings(next.pets);
+      }
+      return { settings: next };
+    }),
 
   updateShortcut: (actionId, combo) =>
     set((state) => ({

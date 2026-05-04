@@ -1,8 +1,10 @@
 import type { ForgePadApi } from '../../preload';
+import type { ForgePadPetApi } from '../../preload/pet';
 
 declare global {
   interface Window {
     forgepad: ForgePadApi;
+    forgepadPet?: ForgePadPetApi;
   }
 
   namespace JSX {

@@ -62,4 +62,7 @@ export const IPC = {
   LSP_GET_DEFINITION: 'lsp:get-definition',
   // System emoji picker
   APP_SHOW_EMOJI_PANEL: 'app:show-emoji-panel',
+  // Pet overlay window
+  PET_SETTINGS_CHANGED: 'pet:settings-changed',
+  PET_MOVE_WINDOW: 'pet:move-window',
 } as const;
