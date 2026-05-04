@@ -207,7 +207,14 @@ app.whenReady().then(async () => {
   });
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    // Check whether the *main* window exists – the pet overlay (skipTaskbar,
+    // non-focusable) doesn't count.  Without this, clicking the Dock icon
+    // after closing the main window does nothing because the pet window keeps
+    // getAllWindows().length > 0.
+    const mainWindowExists = BrowserWindow.getAllWindows().some(
+      (w) => w !== getPetWindow() && !w.isDestroyed(),
+    );
+    if (!mainWindowExists) createWindow();
   });
 });
 
