@@ -497,7 +497,7 @@ function SortableWorkspaceRow({
               {stats.behind > 0 ? `↓${stats.behind}` : ''}
             </span>
           )}
-          <span className="shrink-0 text-[10px] text-subtle/40 tabular-nums">⌘{globalIndex + 1}</span>
+          {globalIndex < 9 && <span className="shrink-0 text-[10px] text-subtle/40 tabular-nums">⌘{globalIndex + 1}</span>}
         </div>
       </div>
     </div>
