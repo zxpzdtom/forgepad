@@ -229,6 +229,9 @@ function MarkdownToc({
   collapsed: boolean;
 }) {
   const navRef = useRef<HTMLDivElement>(null);
+  const trackPathRef = useRef<SVGPathElement>(null);
+  const dotRef = useRef<SVGCircleElement>(null);
+  const dotAnimRef = useRef<{ raf: number; fromLen: number } | null>(null);
   const itemRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
   const [railData, setRailData] = useState<{
     d: string;
@@ -303,19 +306,71 @@ function MarkdownToc({
     }
   }, [activeId]);
 
-  if (items.length === 0) return null;
-
   // Calculate how much of the path to highlight up to the active item
   let activeDrawLength = 0;
   if (railData && activeId) {
     const activeIndex = items.findIndex((item) => item.id === activeId);
     if (activeIndex >= 0) {
-      // Sum segment lengths up to activeIndex (segments connect item i-1 to item i)
       for (let i = 0; i < activeIndex && i < railData.segmentLengths.length; i++) {
         activeDrawLength += railData.segmentLengths[i];
       }
     }
   }
+
+  // Animate the dot along the SVG path so it follows the rail's shape
+  // (diagonals / bends) instead of cutting a straight line via CSS transition.
+  useEffect(() => {
+    const pathEl = trackPathRef.current;
+    const dotEl = dotRef.current;
+    if (!pathEl || !dotEl || !railData) return;
+
+    // Initialise fromLen on first mount
+    if (!dotAnimRef.current) {
+      dotAnimRef.current = { raf: 0, fromLen: activeDrawLength };
+      const pt = pathEl.getPointAtLength(activeDrawLength);
+      dotEl.setAttribute('cx', String(pt.x));
+      dotEl.setAttribute('cy', String(pt.y));
+      return;
+    }
+
+    // Cancel any running animation
+    cancelAnimationFrame(dotAnimRef.current.raf);
+
+    const fromLen = dotAnimRef.current.fromLen;
+    const toLen = activeDrawLength;
+
+    if (fromLen === toLen) return;
+
+    const duration = 250; // ms — matches the stroke-dasharray transition
+    const startTime = performance.now();
+
+    const animate = (now: number) => {
+      const elapsed = now - startTime;
+      const t = Math.min(elapsed / duration, 1);
+      // ease-out quad
+      const eased = 1 - (1 - t) * (1 - t);
+      const currentLen = fromLen + (toLen - fromLen) * eased;
+
+      // Keep fromLen in sync so interruptions start from the right spot
+      dotAnimRef.current!.fromLen = currentLen;
+
+      const pt = pathEl.getPointAtLength(currentLen);
+      dotEl.setAttribute('cx', String(pt.x));
+      dotEl.setAttribute('cy', String(pt.y));
+
+      if (t < 1) {
+        dotAnimRef.current!.raf = requestAnimationFrame(animate);
+      }
+    };
+
+    dotAnimRef.current.raf = requestAnimationFrame(animate);
+
+    return () => {
+      if (dotAnimRef.current) cancelAnimationFrame(dotAnimRef.current.raf);
+    };
+  }, [activeDrawLength, railData]);
+
+  if (items.length === 0) return null;
 
   return (
     <nav className={`markdown-toc scrollbar-thin ${collapsed ? 'collapsed' : ''}`} ref={navRef}>
@@ -329,6 +384,7 @@ function MarkdownToc({
         <svg className="markdown-toc-rail" height={railData.svgHeight} aria-hidden="true">
           {/* Background track */}
           <path
+            ref={trackPathRef}
             d={railData.d}
             className="markdown-toc-rail-track"
             strokeDasharray="none"
@@ -339,13 +395,10 @@ function MarkdownToc({
             className="markdown-toc-rail-active"
             strokeDasharray={`${activeDrawLength} ${railData.totalLength}`}
           />
-          {/* Active dot at the current position */}
-          {(() => {
-            const idx = items.findIndex((item) => item.id === activeId);
-            if (idx < 0 || !railData.points[idx]) return null;
-            const [cx, cy] = railData.points[idx];
-            return <circle cx={cx} cy={cy} r="3" className="markdown-toc-rail-dot" />;
-          })()}
+          {/* Active dot — animated along the path via JS (see useEffect below) */}
+          {activeId && items.findIndex((item) => item.id === activeId) >= 0 && (
+            <circle ref={dotRef} r="3" className="markdown-toc-rail-dot" />
+          )}
         </svg>
       )}
 

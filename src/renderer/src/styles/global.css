@@ -727,7 +727,8 @@ textarea {
 
 .markdown-toc-rail-dot {
     fill: var(--accent-2);
-    transition: cx 0.3s ease, cy 0.3s ease;
+    /* Animation handled by JS (getPointAtLength) so the dot follows the
+       rail path's shape instead of cutting a straight line via CSS. */
 }
 
 .markdown-toc-item {
