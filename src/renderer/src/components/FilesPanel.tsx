@@ -178,11 +178,20 @@ export function FilesPanel() {
     );
   }, [contextItems, workspace?.id]);
 
-  /* Inject a thicker, sketchier border on the search input inside Shadow DOM
-     when the Sketchy theme is active. The `unsafeCSS` option injects a <style>
-     into the web component's Shadow DOM so we can override internal styles. */
+  /* Inject sketchy styles into the Shadow DOM when the Sketchy theme is active.
+     The `unsafeCSS` option injects a <style> into the web component's Shadow DOM
+     so we can override internal styles.
+
+     IMPORTANT: The `filter` is applied to individual child elements (rows,
+     search input, list) rather than to the <file-tree-container> host.
+     Applying `filter` on the host creates a stacking context that traps the
+     Shadow-DOM context menu below the paper-texture overlay, breaking
+     right-click.  Targeting leaf elements preserves the sketchy wobble
+     without affecting the context-menu's stacking order. */
   const sketchyUnsafeCSS = themeId === 'sketchy'
-    ? `[data-file-tree-search-input] { border: 2px solid var(--trees-border-color); }`
+    ? `[data-file-tree-search-input] { border: 2px solid var(--trees-border-color); }
+       [data-type='item'] { filter: url(#sketchy-subtle); }
+       [data-file-tree-search-input] { filter: url(#sketchy-subtle); }`
     : undefined;
 
   const { model } = useFileTree({

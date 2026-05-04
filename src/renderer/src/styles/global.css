@@ -2389,15 +2389,15 @@ textarea {
 
 /* ── @pierre/trees — file tree (inside Shadow DOM) ───────────────────────── */
 /* The search <input> lives inside the Shadow DOM of <file-tree-container>.   */
-/* We can't target it with external CSS selectors, but:                       */
-/*   1. CSS custom properties inherit through the shadow boundary.            */
-/*   2. `filter` on the host element applies to its entire rendered output,   */
-/*      including shadow-DOM children, so the search input gets the wobble.   */
+/* We can't target it with external CSS selectors, but CSS custom properties  */
+/* inherit through the shadow boundary.                                       */
+/* NOTE: Do NOT apply `filter` on the host element — it creates a new         */
+/* stacking context that traps the Shadow-DOM context menu below the          */
+/* z-index:9999 paper-texture overlay, breaking right-click.                  */
 
 [data-theme-id="sketchy"] file-tree-container {
     --trees-border-radius-override: 3px;
     --trees-border-color-override: var(--border);
-    filter: url(#sketchy-subtle);
 }
 
 /* ── TopBar ──────────────────────────────────────────────────────────────── */
