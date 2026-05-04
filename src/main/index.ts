@@ -1,8 +1,10 @@
 import { join } from 'node:path';
 import { IPC } from '@shared/ipc';
-import { app, BrowserWindow, Menu, shell } from 'electron';
+import type { PetSettings } from '@shared/types';
+import { app, BrowserWindow, ipcMain, Menu, shell } from 'electron';
 
 import { ptyService, registerIpcHandlers } from './ipc/register-handlers';
+import { createPetWindow, destroyPetWindow, getPetWindow, registerPetIpcHandlers, sendPetSettings, setPetWindowVisible } from './pet-window';
 import { AgentHooksService } from './services/agent-hooks-service';
 import { HookServer } from './services/hook-server';
 
@@ -180,7 +182,29 @@ app.whenReady().then(async () => {
 
   buildAppMenu();
   registerIpcHandlers(hookPort);
+  registerPetIpcHandlers();
   createWindow();
+
+  // Listen for pet settings changes from the main renderer.
+  // When the user toggles pets on/off or changes settings, the main renderer
+  // sends the updated PetSettings here, and we forward them to the pet overlay window.
+  ipcMain.on(IPC.PET_SETTINGS_CHANGED, (_event, settings: PetSettings) => {
+    if (settings.enabled) {
+      const petWin = getPetWindow();
+      if (!petWin) {
+        const win = createPetWindow(settings.petSize);
+        // Send settings once the pet window is ready
+        win.webContents.on('did-finish-load', () => {
+          sendPetSettings(settings);
+        });
+      } else {
+        setPetWindowVisible(true);
+        sendPetSettings(settings);
+      }
+    } else {
+      setPetWindowVisible(false);
+    }
+  });
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
@@ -188,10 +212,12 @@ app.whenReady().then(async () => {
 });
 
 app.on('window-all-closed', () => {
+  // Don't quit on macOS (standard behavior)
   if (process.platform !== 'darwin') app.quit();
 });
 
 app.on('will-quit', () => {
+  destroyPetWindow();
   ptyService.destroyAll();
   hookServer?.stop().catch(() => {});
 });
