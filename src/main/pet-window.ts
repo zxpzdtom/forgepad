@@ -61,6 +61,11 @@ export function createPetWindow(scale = 0.8): BrowserWindow {
     petWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
     // Prevent mouse events on the window from activating the app
     petWindow.setIgnoreMouseEvents(false);
+
+    // IMPORTANT: Creating a transparent, non-focusable overlay window can cause
+    // macOS to demote the app's activation policy (hiding the Dock icon).
+    // Force it back to "regular" so the Dock icon stays visible.
+    app.setActivationPolicy('regular');
   }
 
   // Load the pet renderer page
