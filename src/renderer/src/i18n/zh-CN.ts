@@ -56,6 +56,19 @@ const zhCN: Record<TranslationKeys, string> = {
   'settings.nav.git': 'Git',
   'settings.nav.advanced': '高级',
   'settings.nav.shortcuts': '快捷键',
+  'settings.nav.pets': '桌面宠物',
+
+  // ── Settings > Pets ──
+  'settings.pets.title': '桌面宠物',
+  'settings.pets.enable': '启用桌面宠物',
+  'settings.pets.enableDesc': '在工作区中显示一个动画宠物伙伴',
+  'settings.pets.preview': '预览',
+  'settings.pets.size': '大小',
+  'settings.pets.sizeDesc': '宠物的缩放比例 (1x–4x)',
+  'settings.pets.speed': '速度',
+  'settings.pets.speedDesc': '宠物的移动速度',
+  'settings.pets.choosePet': '选择你的宠物',
+  'settings.pets.choosePetDesc': '从 28 个内置宠物中选择。点击选择，在工作区中拖动进行互动。',
 
   // ── Settings > General ──
   'settings.general.title': '通用',

@@ -1,0 +1,7 @@
+{
+  "id": "professor-puff",
+  "displayName": "Professor Puff",
+  "description": "A tiny Codex-style scientist pet inspired by Albert Einstein, using small science gadgets only when an action calls for them.",
+  "spritesheetPath": "spritesheet.webp",
+  "kind": "object"
+}

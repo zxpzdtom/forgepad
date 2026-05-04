@@ -1,0 +1,123 @@
+import { join } from 'node:path';
+import { app, BrowserWindow, ipcMain, screen } from 'electron';
+import { IPC } from '@shared/ipc';
+import type { PetSettings } from '@shared/types';
+
+let petWindow: BrowserWindow | null = null;
+
+// Default sprite dimensions (cellWidth × cellHeight at scale 1)
+const BASE_WIDTH = 192;
+const BASE_HEIGHT = 208;
+
+function getSpriteSize(scale: number) {
+  return {
+    width: Math.round(BASE_WIDTH * scale),
+    height: Math.round(BASE_HEIGHT * scale),
+  };
+}
+
+/**
+ * Creates a small, sprite-sized transparent window for the desktop pet.
+ * The window is exactly the size of one animation frame — no fullscreen overlay.
+ * This avoids blocking any interaction with other windows.
+ */
+export function createPetWindow(scale = 0.8): BrowserWindow {
+  if (petWindow && !petWindow.isDestroyed()) return petWindow;
+
+  const display = screen.getPrimaryDisplay();
+  const { width: screenW, height: screenH } = display.workAreaSize;
+  const { x: areaX, y: areaY } = display.workArea;
+  const { width, height } = getSpriteSize(scale);
+
+  // Start at bottom-right of the work area
+  const startX = areaX + screenW - width - 40;
+  const startY = areaY + screenH - height - 40;
+
+  petWindow = new BrowserWindow({
+    width,
+    height,
+    x: startX,
+    y: startY,
+    frame: false,
+    transparent: true,
+    hasShadow: false,
+    resizable: false,
+    minimizable: false,
+    maximizable: false,
+    skipTaskbar: true,
+    focusable: false,
+    alwaysOnTop: true,
+    webPreferences: {
+      preload: join(__dirname, '../preload/pet.mjs'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false,
+    },
+  });
+
+  petWindow.setAlwaysOnTop(true, 'floating');
+
+  if (process.platform === 'darwin') {
+    petWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+    // Prevent mouse events on the window from activating the app
+    petWindow.setIgnoreMouseEvents(false);
+  }
+
+  // Load the pet renderer page
+  if (!app.isPackaged && process.env.ELECTRON_RENDERER_URL) {
+    void petWindow.loadURL(`${process.env.ELECTRON_RENDERER_URL}/pet.html`);
+  } else {
+    void petWindow.loadFile(join(__dirname, '../renderer/pet.html'));
+  }
+
+  petWindow.on('closed', () => {
+    petWindow = null;
+  });
+
+  return petWindow;
+}
+
+/** Send updated pet settings to the overlay window. */
+export function sendPetSettings(settings: PetSettings): void {
+  if (!petWindow || petWindow.isDestroyed()) return;
+  petWindow.webContents.send(IPC.PET_SETTINGS_CHANGED, settings);
+
+  // Resize the window to match the new scale
+  const { width, height } = getSpriteSize(settings.petSize);
+  petWindow.setSize(width, height);
+}
+
+/** Show or hide the pet overlay. */
+export function setPetWindowVisible(visible: boolean): void {
+  if (!petWindow || petWindow.isDestroyed()) {
+    if (visible) createPetWindow();
+    return;
+  }
+  if (visible) {
+    petWindow.showInactive();
+  } else {
+    petWindow.hide();
+  }
+}
+
+/** Register IPC handlers for the pet overlay window. */
+export function registerPetIpcHandlers(): void {
+  // Move the pet window to a new screen position (called during drag)
+  ipcMain.on(IPC.PET_MOVE_WINDOW, (_event, x: number, y: number) => {
+    if (!petWindow || petWindow.isDestroyed()) return;
+    petWindow.setPosition(Math.round(x), Math.round(y), false);
+  });
+}
+
+/** Get the pet window instance. */
+export function getPetWindow(): BrowserWindow | null {
+  return petWindow && !petWindow.isDestroyed() ? petWindow : null;
+}
+
+/** Destroy the pet window. */
+export function destroyPetWindow(): void {
+  if (petWindow && !petWindow.isDestroyed()) {
+    petWindow.close();
+    petWindow = null;
+  }
+}

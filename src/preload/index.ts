@@ -10,6 +10,7 @@ import type {
   LspLocation,
   OpenProjectResult,
   PersistedAppState,
+  PetSettings,
   WorkspaceChangeEvent,
 } from '@shared/types';
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
@@ -191,6 +192,10 @@ const api = {
   lsp: {
     getDefinition: (worktreePath: string, token: string) =>
       ipcRenderer.invoke(IPC.LSP_GET_DEFINITION, worktreePath, token) as Promise<LspLocation[]>,
+  },
+  pet: {
+    /** Send updated pet settings to the main process, which forwards them to the pet overlay window. */
+    sendSettings: (settings: PetSettings) => ipcRenderer.send(IPC.PET_SETTINGS_CHANGED, settings),
   },
 };
 

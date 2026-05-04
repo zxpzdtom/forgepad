@@ -9,6 +9,7 @@ import {
   ArrowLeft,
   Bell,
   Bot,
+  Cat,
   Check,
   ChevronDown,
   ChevronUp,
@@ -31,6 +32,7 @@ import { agentPresetIcon } from './AgentIcons';
 import { AppearancePanel } from './AppearancePanel';
 import { DOTMATRIX_SPINNERS } from './dotmatrix';
 import { NotificationsSection } from './NotificationsSection';
+import { PetsSection } from './PetsSection';
 import { SegmentedControl } from './SegmentedControl';
 import { ShortcutRecorder } from './ShortcutRecorder';
 import { Spinner } from './Spinner';
@@ -72,6 +74,7 @@ const NAV_ITEMS: { id: SectionId; label: string; icon: React.ReactNode }[] = [
   { id: 'git', label: 'settings.nav.git', icon: <GitBranch size={15} /> },
   { id: 'advanced', label: 'settings.nav.advanced', icon: <Settings size={15} /> },
   { id: 'shortcuts', label: 'settings.nav.shortcuts', icon: <Keyboard size={15} /> },
+  { id: 'pets', label: 'settings.nav.pets', icon: <Cat size={15} /> },
 ];
 
 /* ─── Reusable UI primitives ─── */
@@ -897,6 +900,7 @@ const SECTIONS: Record<SectionId, React.ComponentType> = {
   git: GitSection,
   advanced: AdvancedSection,
   shortcuts: ShortcutsSection,
+  pets: PetsSection,
 };
 
 export function SettingsPanel() {
