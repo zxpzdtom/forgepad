@@ -2389,11 +2389,18 @@ textarea {
 
 /* ── @pierre/trees — file tree (inside Shadow DOM) ───────────────────────── */
 /* The search <input> lives inside the Shadow DOM of <file-tree-container>.   */
-/* We can't target it with external CSS selectors, but CSS custom properties  */
-/* inherit through the shadow boundary.                                       */
-/* NOTE: Do NOT apply `filter` on the host element — it creates a new         */
-/* stacking context that traps the Shadow-DOM context menu below the          */
-/* z-index:9999 paper-texture overlay, breaking right-click.                  */
+/* We can't target it with external CSS selectors, but:                       */
+/*   1. CSS custom properties inherit through the shadow boundary.            */
+/*   2. `filter` on the host element applies to its entire rendered output,   */
+/*      including shadow-DOM children, so the search input gets the wobble.   */
+/*                                                                            */
+/* NOTE: Do NOT apply `filter` directly on <file-tree-container>.             */
+/* It creates a stacking context + compositing layer that traps the           */
+/* Shadow-DOM context menu, causing it to render behind other layers or       */
+/* flicker when the window resizes (Chromium compositing bug with filter +    */
+/* Shadow DOM + slotted content). The wobble filter is instead injected       */
+/* via unsafeCSS onto individual Shadow-DOM children (scroll container,       */
+/* search input) — see FilesPanel.tsx.                                        */
 
 [data-theme-id="sketchy"] file-tree-container {
     --trees-border-radius-override: 3px;

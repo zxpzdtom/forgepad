@@ -182,16 +182,23 @@ export function FilesPanel() {
      The `unsafeCSS` option injects a <style> into the web component's Shadow DOM
      so we can override internal styles.
 
-     IMPORTANT: The `filter` is applied to individual child elements (rows,
-     search input, list) rather than to the <file-tree-container> host.
-     Applying `filter` on the host creates a stacking context that traps the
-     Shadow-DOM context menu below the paper-texture overlay, breaking
-     right-click.  Targeting leaf elements preserves the sketchy wobble
-     without affecting the context-menu's stacking order. */
+     The wobble filter is applied to the scroll container and search input
+     (NOT the host element) so the context-menu-anchor — a sibling of the
+     scroll container — stays outside any filter-created stacking context.
+     This avoids the Chromium compositing bug where `filter` on the host
+     traps slotted context-menu content in a broken compositing layer.
+
+     We use an inline SVG data-URI so the filter definition is self-contained
+     and works inside Shadow DOM without needing to reference a fragment in
+     the host document (url(#id) cannot cross the shadow boundary). */
   const sketchyUnsafeCSS = themeId === 'sketchy'
-    ? `[data-file-tree-search-input] { border: 2px solid var(--trees-border-color); }
-       [data-type='item'] { filter: url(#sketchy-subtle); }
-       [data-file-tree-search-input] { filter: url(#sketchy-subtle); }`
+    ? `[data-file-tree-search-input] {
+         border: 2px solid var(--trees-border-color);
+         filter: url('data:image/svg+xml,<svg%20xmlns=%22http://www.w3.org/2000/svg%22><filter%20id=%22f%22%20x=%22-5%25%22%20y=%22-5%25%22%20width=%22110%25%22%20height=%22110%25%22><feTurbulence%20type=%22turbulence%22%20baseFrequency=%220.03%22%20numOctaves=%224%22%20seed=%2215%22%20result=%22noise%22/><feDisplacementMap%20in=%22SourceGraphic%22%20in2=%22noise%22%20scale=%222%22%20xChannelSelector=%22R%22%20yChannelSelector=%22G%22/></filter></svg>#f');
+       }
+       [data-file-tree-virtualized-scroll] {
+         filter: url('data:image/svg+xml,<svg%20xmlns=%22http://www.w3.org/2000/svg%22><filter%20id=%22f%22%20x=%22-5%25%22%20y=%22-5%25%22%20width=%22110%25%22%20height=%22110%25%22><feTurbulence%20type=%22turbulence%22%20baseFrequency=%220.03%22%20numOctaves=%224%22%20seed=%2215%22%20result=%22noise%22/><feDisplacementMap%20in=%22SourceGraphic%22%20in2=%22noise%22%20scale=%222%22%20xChannelSelector=%22R%22%20yChannelSelector=%22G%22/></filter></svg>#f');
+       }`
     : undefined;
 
   const { model } = useFileTree({
