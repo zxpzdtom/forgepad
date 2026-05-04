@@ -76,7 +76,7 @@ exit 0
 const HOOK_COMMAND = `[ -f "$HOME/.forgepad/hooks/notify.sh" ] && "$HOME/.forgepad/hooks/notify.sh" || true`;
 
 const CLAUDE_HOOK_EVENTS = [
-  'SessionStart', // session 开始或恢复 → working
+  'SessionStart', // session 开始或恢复 → idle (不再设为 working，避免 --resume 假 spinner)
   'UserPromptSubmit', // 用户提交 prompt → working
   'PreToolUse', // 工具调用前 → working
   'PostToolUse', // 工具调用成功后 → working (确认仍在执行)

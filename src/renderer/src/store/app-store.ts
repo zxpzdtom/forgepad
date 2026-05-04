@@ -434,12 +434,25 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
 
     set((state) => {
+      const currentStatus = state.agentStatuses[ptyId];
+
+      // Protect actionable states: don't let "working" / "idle" events
+      // overwrite "permission" or "review" — the user hasn't acknowledged
+      // them yet.  Only a new "permission" can upgrade "review", and only
+      // explicit user focus / setActiveTab clears these states.
+      // (Inspired by CodeIsland's isWaiting guard.)
+      const isWaiting = currentStatus === 'permission';
+      let effectiveStatus = status;
+      if (isWaiting && (status === 'working' || status === 'idle')) {
+        effectiveStatus = currentStatus;
+      }
+
       const patch: Partial<AppState> = {
-        agentStatuses: { ...state.agentStatuses, [ptyId]: status },
+        agentStatuses: { ...state.agentStatuses, [ptyId]: effectiveStatus },
       };
 
       // If the agent finished ("review") and its tab is currently active, mark idle
-      if (status === 'review') {
+      if (effectiveStatus === 'review') {
         const activeTab = state.tabs.find((t) => t.id === state.activeAgentTabId);
         if (activeTab?.type === 'terminal' && activeTab.ptyId === ptyId) {
           patch.agentStatuses = { ...state.agentStatuses, [ptyId]: 'idle' };
@@ -1588,27 +1601,10 @@ export const useAppStore = create<AppState>((set, get) => ({
         set((s) => ({
           tabs: s.tabs.map((t) => (t.id === tab.id ? { ...t, ptyId } : t)),
         }));
-
-        // After restoring a session, the CLI may emit a transient "working"
-        // hook during startup even though the session is actually idle
-        // (waiting for user input).  Set a settle timer: if "working" is
-        // still the status after a grace period and no fresh hook event has
-        // refreshed the timer, clear it to "idle".  If the agent is truly
-        // working, new hook events will re-set the status before this fires.
-        const settleTimer = setTimeout(() => {
-          const s = get();
-          if (s.agentStatuses[ptyId] === 'working') {
-            set((prev) => {
-              const { [ptyId]: _, ...rest } = prev.agentStatuses;
-              return { agentStatuses: rest };
-            });
-          }
-        }, 15_000);
-        // If a real working event arrives, the agentWorkingTimers mechanism
-        // will manage the lifecycle; clear this one-shot settle timer on
-        // any subsequent hook event by piggybacking on the existing timer
-        // map (the first handleAgentStatusUpdate call clears & replaces it).
-        agentWorkingTimers.set(ptyId, settleTimer);
+        // No settle timer needed — SessionStart is now mapped to "idle"
+        // instead of "working", so `claude --resume` won't cause a false
+        // spinner.  Real activity (PreToolUse, UserPromptSubmit, etc.)
+        // will transition to "working" naturally.
       } catch {
         get().addToast('error', `Failed to restore ${tab.title}`);
       }

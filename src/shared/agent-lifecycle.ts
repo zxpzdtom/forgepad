@@ -8,10 +8,9 @@ export type AgentStatusUpdate = {
 /** Map raw agent hook event names → canonical ForgePad status. */
 export function mapEventToStatus(eventType: string): AgentStatus | null {
   switch (eventType) {
-    // Agent is working
+    // Agent is working (actual activity events only)
     case 'UserPromptSubmit':
     case 'Start':
-    case 'SessionStart':
     case 'PreToolUse':
     case 'PostToolUse':
     case 'PostToolUseFailure':
@@ -34,6 +33,15 @@ export function mapEventToStatus(eventType: string): AgentStatus | null {
     case 'apply_patch_approval_request':
     case 'request_user_input':
       return 'permission';
+
+    // Session started / resumed — do NOT set "working" here because
+    // `claude --resume` emits SessionStart even when the session is idle
+    // (waiting for user input).  Real work will be signalled by subsequent
+    // PreToolUse / PostToolUse / UserPromptSubmit events.
+    // We still treat it as a "sign of life" (non-null) so the hook server
+    // can confirm the session, but map to idle instead.
+    case 'SessionStart':
+      return 'idle';
 
     // Session ended
     case 'SessionEnd':
