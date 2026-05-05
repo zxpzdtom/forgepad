@@ -1,0 +1,7 @@
+{
+  "id": "monica",
+  "displayName": "Monica",
+  "description": "A tiny shy Codex pet inspired by Monica Everett, the Silent Witch who avoids speaking and casts silently.",
+  "spritesheetPath": "spritesheet.webp",
+  "kind": "object"
+}

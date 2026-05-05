@@ -82,21 +82,31 @@ export const forgePetAtlas: PetSpriteAtlas<ForgePetAnimationName> = {
 
 /** All built-in pets */
 export const PET_REGISTRY: PetDefinition[] = [
+  { id: '4lpha-joko', displayName: '4lpha Joko', description: 'A cute neon lime and cyan circuit-board mascot pet inspired by the 4lpha logo.', spritesheetPath: 'spritesheet.webp', kind: 'animal' },
   { id: 'amane', displayName: 'Amane', description: 'A compact Codex digital pet version of Amane.', spritesheetPath: 'spritesheet.webp' },
+  { id: 'bx-cat', displayName: 'Bx-Cat', description: 'A cool white cat wearing a blue B cap and blue sunglasses.', spritesheetPath: 'spritesheet.webp', kind: 'animal' },
   { id: 'clawd', displayName: 'Clawd', description: 'A compact Codex pet based on official Claude Code pixel Clawd frames.', spritesheetPath: 'spritesheet.webp' },
   { id: 'dario', displayName: 'Dario', description: 'A tiny frustrated Codex pet inspired by Dario, CEO of Anthropic.', spritesheetPath: 'spritesheet.webp' },
   { id: 'dev', displayName: 'Dev', description: 'A calm green hoodie developer carrying a laptop.', spritesheetPath: 'spritesheet.webp' },
   { id: 'doge', displayName: 'Doge', description: 'A cute Doge-style Shiba Inu companion for Codex.', spritesheetPath: 'spritesheet.webp', kind: 'animal' },
   { id: 'doraemon', displayName: 'Doraemon', description: 'A compact blue robot-cat Codex pet inspired by 哆啦A梦.', spritesheetPath: 'spritesheet.webp', kind: 'animal' },
   { id: 'goku', displayName: 'Goku', description: 'A cute compact Codex pet based on a spiky-haired martial arts hero.', spritesheetPath: 'spritesheet.webp', kind: 'person' },
+  { id: 'gyaru-pm', displayName: 'Gyaru-PM', description: 'A tiny blonde ponytail gyaru PM Codex companion with a white hoodie, cyan scrunchie and accents, heart hairpin, wink, hoop earring, and a small drink bottle charm.', spritesheetPath: 'spritesheet.webp' },
   { id: 'itachi', displayName: 'Itachi', description: 'A calm shinobi strategist companion with red eyes and black cloak.', spritesheetPath: 'spritesheet.webp', kind: 'person' },
   { id: 'jollio', displayName: 'Jollio', description: 'A chubby pure white English bulldog DJ wearing pink headphones.', spritesheetPath: 'spritesheet.webp', kind: 'animal' },
+  { id: 'kafka', displayName: 'Kafka', description: 'A compact chibi pet inspired by the user\'s FFXIV character, with magenta hair, round goggles, pink eyes, and a black-white adventurer outfit.', spritesheetPath: 'spritesheet.webp', kind: 'person' },
   { id: 'kid-goku-classic-actions', displayName: 'Kid Goku', description: 'A tiny Codex pet based on kid Son Goku with classic Dragon Ball actions.', spritesheetPath: 'spritesheet.webp', kind: 'person' },
+  { id: 'kiki', displayName: 'Kiki', description: 'A little witch deliver Kiki with her black cat Zizi.', spritesheetPath: 'spritesheet.webp', kind: 'person' },
+  { id: 'kitmar', displayName: 'Marin-chan', description: 'A cheerful, charming digital companion inspired by Marin Kitagawa.', spritesheetPath: 'spritesheet.webp', kind: 'person' },
   { id: 'kun', displayName: 'Kun', description: 'A compact Codex table pet dancer named Kun with basketball dance poses.', spritesheetPath: 'spritesheet.webp', kind: 'person' },
+  { id: 'little-ameath', displayName: 'Little Ameath', description: 'A tiny pink winged pixel chibi companion with crystalline blue-white wings and a halo ornament.', spritesheetPath: 'spritesheet.webp', kind: 'animal' },
   { id: 'luffy', displayName: 'Luffy', description: 'A tiny straw-hat pirate companion with cheerful rubbery energy.', spritesheetPath: 'spritesheet.webp', kind: 'person' },
   { id: 'lulu', displayName: 'Lulu', description: 'A tiny yellow capybara-like Codex digital pet.', spritesheetPath: 'spritesheet.webp', kind: 'animal' },
+  { id: 'luminer', displayName: '荧', description: '原神旅行者荧风格的可爱 chibi 桌面宠物，金发、白金旅装、轻盈坚定。', spritesheetPath: 'spritesheet.webp', kind: 'person' },
+  { id: 'maomao', displayName: '大开门', description: 'A compact calico cat companion wearing a blue crocheted cat-ear bonnet with a tiny yellow flower and dangling blue ties.', spritesheetPath: 'spritesheet.webp', kind: 'animal' },
   { id: 'mini-elon', displayName: 'Mini Elon', description: 'What did you get done today?', spritesheetPath: 'spritesheet.webp', kind: 'person' },
   { id: 'mini-sama', displayName: 'Mini Sama', description: 'A funny pixel-sprite Sama-inspired pet with anxious energy.', spritesheetPath: 'spritesheet.webp', kind: 'person' },
+  { id: 'monica', displayName: 'Monica', description: 'A tiny shy Codex pet inspired by Monica Everett, the Silent Witch who avoids speaking and casts silently.', spritesheetPath: 'spritesheet.webp', kind: 'object' },
   { id: 'nimbus', displayName: 'Nimbus', description: 'A tiny chibi martial-arts kid riding a golden cloud.', spritesheetPath: 'spritesheet.webp' },
   { id: 'ninja-naru', displayName: 'Ninja Naru', description: 'A compact chibi blond orange-clad ninja digital pet.', spritesheetPath: 'spritesheet.webp', kind: 'person' },
   { id: 'noir-maid', displayName: 'Noir Maid', description: 'A tiny chibi elf in a black-and-white maid outfit.', spritesheetPath: 'spritesheet.webp', kind: 'person' },
@@ -110,6 +120,7 @@ export const PET_REGISTRY: PetDefinition[] = [
   { id: 'tom', displayName: 'Tom', description: 'A confident blue-gray chibi cat companion.', spritesheetPath: 'spritesheet.webp', kind: 'animal' },
   { id: 'trump', displayName: 'Trump', description: 'A small smooth-edged digital pet caricature.', spritesheetPath: 'spritesheet.webp', kind: 'person' },
   { id: 'ultra', displayName: 'Ultra', description: 'A compact Ultraman-inspired silver-and-red tokusatsu hero pet.', spritesheetPath: 'spritesheet.webp' },
+  { id: 'yuki', displayName: 'Yuki', description: 'A tiny gothic chibi desk companion with long dark hair, white hair clips, a black dress, and choker.', spritesheetPath: 'spritesheet.webp' },
 ];
 
 /** Get the URL for a pet's spritesheet. Built-in pets use public/, custom pets use custom-pet:// protocol. */

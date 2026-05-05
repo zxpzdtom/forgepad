@@ -1,0 +1,7 @@
+{
+  "id": "bx-cat",
+  "displayName": "Bx-Cat",
+  "description": "A cool white cat wearing a blue B cap and blue sunglasses.let‘ go",
+  "spritesheetPath": "spritesheet.webp",
+  "kind": "animal"
+}
