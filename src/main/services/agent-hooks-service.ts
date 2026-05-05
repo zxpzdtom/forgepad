@@ -63,6 +63,17 @@ if [ "\${EVENT_TYPE}" = "UserPromptSubmit" ]; then
     -d "\${INPUT}" \\
     "http://127.0.0.1:\${PORT}/hook/notify?eventType=\${EVENT_TYPE}&ptyId=\${PTY_ID}" \\
     || true
+elif [ "\${EVENT_TYPE}" = "PermissionRequest" ]; then
+  # POST full JSON body and wait for approval decision (up to 2 min).
+  # The hook server holds the connection open until the user clicks
+  # Allow/Deny in the pet approval UI. The response is echoed to stdout
+  # so Claude Code can read the decision.
+  RESPONSE=$(curl -s -m 120 -X POST \\
+    -H "Content-Type: application/json" \\
+    -d "\${INPUT}" \\
+    "http://127.0.0.1:\${PORT}/hook/notify?eventType=\${EVENT_TYPE}&ptyId=\${PTY_ID}" \\
+    || true)
+  [ -n "$RESPONSE" ] && echo "$RESPONSE"
 else
   # Fire-and-forget GET for other events
   curl -s -m 2 \\

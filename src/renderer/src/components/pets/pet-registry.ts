@@ -1,4 +1,4 @@
-import type { PetDefinition } from '@shared/types';
+import type { CustomPetMeta, PetDefinition } from '@shared/types';
 import type { PetSpriteAtlas } from 'codex-pets-react';
 
 /**
@@ -112,7 +112,47 @@ export const PET_REGISTRY: PetDefinition[] = [
   { id: 'ultra', displayName: 'Ultra', description: 'A compact Ultraman-inspired silver-and-red tokusatsu hero pet.', spritesheetPath: 'spritesheet.webp' },
 ];
 
-/** Get the URL for a pet's spritesheet (served from public/pets/) */
-export function getPetSpritesheetUrl(petId: string): string {
+/** Get the URL for a pet's spritesheet. Built-in pets use public/, custom pets use custom-pet:// protocol. */
+export function getPetSpritesheetUrl(petId: string, cacheBust?: string): string {
+  if (petId.startsWith('custom-')) {
+    const suffix = cacheBust ? `?v=${cacheBust}` : '';
+    return `custom-pet://local/${petId}/spritesheet.webp${suffix}`;
+  }
   return `${import.meta.env.BASE_URL}pets/${petId}/spritesheet.webp`;
+}
+
+/** Merge built-in pets with user-imported custom pets */
+export function getAllPets(customPets: CustomPetMeta[]): PetDefinition[] {
+  return [
+    ...PET_REGISTRY,
+    ...customPets.map((meta): PetDefinition => ({
+      id: meta.id,
+      displayName: meta.displayName,
+      description: meta.description,
+      spritesheetPath: 'spritesheet.webp',
+      kind: meta.kind,
+      isCustom: true,
+    })),
+  ];
+}
+
+/**
+ * Map agent lifecycle status to pet animation.
+ * Inspired by CodeIsland's mascot-per-status approach:
+ *   idle       → idle (then waiting after timeout)
+ *   working    → running (agent is actively processing / using tools)
+ *   review     → review (agent finished a turn, waiting for user to review)
+ *   permission → waving  (agent needs user approval)
+ */
+export function agentStatusToAnimation(status: string): ForgePetAnimationName {
+  switch (status) {
+    case 'working':
+      return 'running';
+    case 'review':
+      return 'review';
+    case 'permission':
+      return 'waving';
+    default:
+      return 'idle';
+  }
 }

@@ -3,12 +3,16 @@ import { IPC } from '@shared/ipc';
 import type {
   ContextBundleResult,
   CreateBundleInput,
+  CustomPetMeta,
+  DeletePetResult,
   FileNode,
   FileStatus,
   GitBucket,
   GitStatusKind,
+  ImportPetResult,
   LspLocation,
   OpenProjectResult,
+  PendingPermission,
   PersistedAppState,
   PetSettings,
   WorkspaceChangeEvent,
@@ -130,6 +134,18 @@ const api = {
         ipcRenderer.removeListener(IPC.AGENT_RENAME_TAB, handler);
       };
     },
+    /** Subscribe to PermissionRequest details (tool name, tool input). */
+    onPermissionRequest: (callback: (data: PendingPermission) => void) => {
+      const handler = (_event: Electron.IpcRendererEvent, data: PendingPermission) => callback(data);
+      ipcRenderer.on(IPC.AGENT_PERMISSION_REQUEST, handler);
+      return () => {
+        ipcRenderer.removeListener(IPC.AGENT_PERMISSION_REQUEST, handler);
+      };
+    },
+    /** Send a permission decision (allow/deny) back to the main process. */
+    sendPermissionDecision: (ptyId: string, decision: 'allow' | 'deny') => {
+      ipcRenderer.send(IPC.AGENT_PERMISSION_DECISION, ptyId, decision);
+    },
   },
   menu: {
     onOpenSettings: (callback: () => void) => {
@@ -196,6 +212,12 @@ const api = {
   pet: {
     /** Send updated pet settings to the main process, which forwards them to the pet overlay window. */
     sendSettings: (settings: PetSettings) => ipcRenderer.send(IPC.PET_SETTINGS_CHANGED, settings),
+    /** Open folder picker, validate, and import a custom pet. */
+    importPet: () => ipcRenderer.invoke(IPC.PET_IMPORT) as Promise<ImportPetResult>,
+    /** Delete a custom pet by ID (removes files from disk). */
+    deletePet: (petId: string) => ipcRenderer.invoke(IPC.PET_DELETE, petId) as Promise<DeletePetResult>,
+    /** List all custom pets on disk (for hydration sync). */
+    listPets: () => ipcRenderer.invoke(IPC.PET_LIST) as Promise<CustomPetMeta[]>,
   },
 };
 

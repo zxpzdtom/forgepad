@@ -65,4 +65,16 @@ export const IPC = {
   // Pet overlay window
   PET_SETTINGS_CHANGED: 'pet:settings-changed',
   PET_MOVE_WINDOW: 'pet:move-window',
+  PET_AGENT_STATUS_UPDATE: 'pet:agent-status-update',
+  PET_FOCUS_AGENT: 'pet:focus-agent',
+  // Pet approval UI
+  PET_PERMISSION_REQUEST: 'pet:permission-request',
+  PET_PERMISSION_DECISION: 'pet:permission-decision',
+  PET_RESIZE_WINDOW: 'pet:resize-window',
+  AGENT_PERMISSION_REQUEST: 'agent:permission-request',
+  AGENT_PERMISSION_DECISION: 'agent:permission-decision',
+  // Custom pet management
+  PET_IMPORT: 'pet:import',
+  PET_DELETE: 'pet:delete',
+  PET_LIST: 'pet:list',
 } as const;
