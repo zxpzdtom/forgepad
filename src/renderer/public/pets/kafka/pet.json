@@ -1,0 +1,7 @@
+{
+  "id": "kafka",
+  "displayName": "Kafka",
+  "description": "A compact chibi pet inspired by the user's FFXIV character, with magenta hair, round goggles, pink eyes, and a black-white adventurer outfit.",
+  "spritesheetPath": "spritesheet.webp",
+  "kind": "person"
+}

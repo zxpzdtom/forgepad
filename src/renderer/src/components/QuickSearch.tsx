@@ -72,7 +72,8 @@ function ProjectAvatar({ name }: { name: string }) {
 
 function matches(item: QuickSearchItem, query: string): boolean {
   const haystack = `${item.label} ${item.detail}`.toLowerCase();
-  return haystack.includes(query.trim().toLowerCase());
+  const words = query.trim().toLowerCase().split(/\s+/);
+  return words.every((word) => haystack.includes(word));
 }
 
 export function QuickSearch({ open, onClose }: QuickSearchProps) {
