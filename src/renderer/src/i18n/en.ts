@@ -579,6 +579,8 @@ const en = {
   'appearance.missingToken': 'Missing required token: "{key}".',
   'appearance.conflictBuiltIn': 'Theme id "{id}" conflicts with a built-in theme. Change the id in the JSON and re-import.',
   'appearance.invalidJsonFile': 'Invalid JSON file. Please check the file and try again.',
+  'appearance.sketchyMode': 'Sketchy Mode',
+  'appearance.sketchyModeDesc': 'Apply hand-drawn styling to any theme',
 
   // ── Store (toast messages) ──
   'store.changes': 'Changes',

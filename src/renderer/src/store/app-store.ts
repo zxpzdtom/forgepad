@@ -587,6 +587,11 @@ export const useAppStore = create<AppState>((set, get) => ({
       rawSettings.runCommands = (oldRunCommands as string[]).map((cmd) => ({ name: cmd, command: cmd }));
     }
     delete (rawSettings as Record<string, unknown>).runCommand;
+    // Migrate old 'sketchy' theme → 'paper' theme + sketchyMode enabled
+    if (rawSettings.themeId === 'sketchy') {
+      rawSettings.themeId = 'paper';
+      rawSettings.sketchyMode = true;
+    }
     if (!rawSettings.agentPresets || rawSettings.agentPresets.length === 0) {
       rawSettings.agentPresets = [...DEFAULT_SETTINGS.agentPresets];
     } else {

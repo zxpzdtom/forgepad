@@ -2164,7 +2164,7 @@ textarea {
 
 /* ── Global overrides ────────────────────────────────────────────────────── */
 
-[data-theme-id="sketchy"] {
+[data-sketchy] {
     /* Reduce border-radius — perfectly round + sketchy feels wrong */
     --radius: 2px;
 
@@ -2182,7 +2182,7 @@ textarea {
 }
 
 /* Paper texture noise overlay on root surfaces */
-[data-theme-id="sketchy"]::before {
+[data-sketchy]::before {
     content: "";
     position: fixed;
     inset: 0;
@@ -2193,37 +2193,43 @@ textarea {
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
+/* Dark mode: softer blend + slightly higher opacity for visibility */
+[data-theme="dark"][data-sketchy]::before {
+    opacity: 0.04;
+    mix-blend-mode: soft-light;
+}
+
 /* ── Tier 1: Whole-element subtle wobble ─────────────────────────────────── */
 /* Small UI elements — the slight text wobble IS the sketchy effect.          */
 
-[data-theme-id="sketchy"] .primary-button,
-[data-theme-id="sketchy"] .secondary-button,
-[data-theme-id="sketchy"] .icon-button,
-[data-theme-id="sketchy"] .mini-button,
-[data-theme-id="sketchy"] .segmented-control,
-[data-theme-id="sketchy"] .view-mode-toggle,
-[data-theme-id="sketchy"] .view-mode-btn,
-[data-theme-id="sketchy"] .tooltip-kbd,
-[data-theme-id="sketchy"] .change-status-dot,
-[data-theme-id="sketchy"] .dirty-dot,
-[data-theme-id="sketchy"] .emoji-picker-btn,
-[data-theme-id="sketchy"] .switcher-add,
-[data-theme-id="sketchy"] .panel-dot {
+[data-sketchy] .primary-button,
+[data-sketchy] .secondary-button,
+[data-sketchy] .icon-button,
+[data-sketchy] .mini-button,
+[data-sketchy] .segmented-control,
+[data-sketchy] .view-mode-toggle,
+[data-sketchy] .view-mode-btn,
+[data-sketchy] .tooltip-kbd,
+[data-sketchy] .change-status-dot,
+[data-sketchy] .dirty-dot,
+[data-sketchy] .emoji-picker-btn,
+[data-sketchy] .switcher-add,
+[data-sketchy] .panel-dot {
     filter: url(#sketchy-subtle);
 }
 
 /* Buttons: thicker, more visible borders */
-[data-theme-id="sketchy"] .primary-button {
+[data-sketchy] .primary-button {
     border: 2px solid color-mix(in srgb, var(--accent) 60%, #000);
     border-radius: 3px;
 }
 
-[data-theme-id="sketchy"] .secondary-button {
+[data-sketchy] .secondary-button {
     border: 2px solid var(--border);
     border-radius: 3px;
 }
 
-[data-theme-id="sketchy"] .icon-button {
+[data-sketchy] .icon-button {
     border: 1.5px solid var(--border);
     border-radius: 3px;
 }
@@ -2231,21 +2237,21 @@ textarea {
 /* ── Tier 2: Border-only wobble via ::after ──────────────────────────────── */
 /* Large containers — crisp text, only the border gets the wobble.            */
 
-[data-theme-id="sketchy"] .anchor-menu,
-[data-theme-id="sketchy"] .anchor-submenu,
-[data-theme-id="sketchy"] .tooltip-bubble,
-[data-theme-id="sketchy"] .context-selection-snippet,
-[data-theme-id="sketchy"] .emoji-mart-popover {
+[data-sketchy] .anchor-menu,
+[data-sketchy] .anchor-submenu,
+[data-sketchy] .tooltip-bubble,
+[data-sketchy] .context-selection-snippet,
+[data-sketchy] .emoji-mart-popover {
     border-color: transparent !important;
     border-radius: 3px;
     overflow: visible;
 }
 
-[data-theme-id="sketchy"] .anchor-menu::after,
-[data-theme-id="sketchy"] .anchor-submenu::after,
-[data-theme-id="sketchy"] .tooltip-bubble::after,
-[data-theme-id="sketchy"] .context-selection-snippet::after,
-[data-theme-id="sketchy"] .emoji-mart-popover::after {
+[data-sketchy] .anchor-menu::after,
+[data-sketchy] .anchor-submenu::after,
+[data-sketchy] .tooltip-bubble::after,
+[data-sketchy] .context-selection-snippet::after,
+[data-sketchy] .emoji-mart-popover::after {
     content: "";
     position: absolute;
     inset: -1px;
@@ -2259,26 +2265,26 @@ textarea {
 /* <input> and <textarea> can't use ::after, so we use outline + whole-element */
 /* filter at subtle intensity. Scale=2 keeps text readable.                    */
 
-[data-theme-id="sketchy"] .composer textarea,
-[data-theme-id="sketchy"] .context-textarea,
-[data-theme-id="sketchy"] .commit-textarea,
-[data-theme-id="sketchy"] .agent-command-row input,
-[data-theme-id="sketchy"] .file-search-bar input {
+[data-sketchy] .composer textarea,
+[data-sketchy] .context-textarea,
+[data-sketchy] .commit-textarea,
+[data-sketchy] .agent-command-row input,
+[data-sketchy] .file-search-bar input {
     border: 2px solid var(--border);
     border-radius: 3px;
     filter: url(#sketchy-subtle);
 }
 
-[data-theme-id="sketchy"] .composer textarea:focus,
-[data-theme-id="sketchy"] .context-textarea:focus,
-[data-theme-id="sketchy"] .commit-textarea:focus,
-[data-theme-id="sketchy"] .agent-command-row input:focus,
-[data-theme-id="sketchy"] .file-search-bar input:focus {
+[data-sketchy] .composer textarea:focus,
+[data-sketchy] .context-textarea:focus,
+[data-sketchy] .commit-textarea:focus,
+[data-sketchy] .agent-command-row input:focus,
+[data-sketchy] .file-search-bar input:focus {
     border-color: var(--focus-border);
 }
 
 /* Toolbar select */
-[data-theme-id="sketchy"] .toolbar-select {
+[data-sketchy] .toolbar-select {
     border: 1.5px solid var(--border);
     border-radius: 3px;
     filter: url(#sketchy-subtle);
@@ -2286,19 +2292,19 @@ textarea {
 
 /* ── Structural elements — panel borders ─────────────────────────────────── */
 
-[data-theme-id="sketchy"] .panel-switcher {
+[data-sketchy] .panel-switcher {
     border-top: 2px solid var(--border);
     filter: url(#sketchy-subtle);
 }
 
 /* Tab bar bottom borders */
-[data-theme-id="sketchy"] .tabbar,
-[data-theme-id="sketchy"] .column-tabbar {
+[data-sketchy] .tabbar,
+[data-sketchy] .column-tabbar {
     border-bottom: 2px solid var(--border);
 }
 
 /* Segmented control */
-[data-theme-id="sketchy"] .segmented-control {
+[data-sketchy] .segmented-control {
     border: 2px solid var(--border);
     border-radius: 3px;
 }
@@ -2308,35 +2314,35 @@ textarea {
 /* Disable all sketchy filters on the entire markdown viewer area.            */
 
 /* Reset font to system default inside markdown viewer for readability */
-[data-theme-id="sketchy"] .markdown-viewer-scroll,
-[data-theme-id="sketchy"] .markdown-toc {
+[data-sketchy] .markdown-viewer-scroll,
+[data-sketchy] .markdown-toc {
     font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
-[data-theme-id="sketchy"] .markdown-preview blockquote {
+[data-sketchy] .markdown-preview blockquote {
     border-left: 3px solid var(--border);
 }
 
-[data-theme-id="sketchy"] .markdown-preview :not(pre) > code {
+[data-sketchy] .markdown-preview :not(pre) > code {
     border: 1.5px solid var(--border);
     border-radius: 2px;
 }
 
-[data-theme-id="sketchy"] .markdown-preview th,
-[data-theme-id="sketchy"] .markdown-preview td {
+[data-sketchy] .markdown-preview th,
+[data-sketchy] .markdown-preview td {
     border-bottom: 1.5px solid var(--border);
 }
 
 /* ── Toast notifications ─────────────────────────────────────────────────── */
 
-[data-theme-id="sketchy"] .toast-item {
+[data-sketchy] .toast-item {
     filter: url(#sketchy-subtle);
     border-radius: 3px;
 }
 
 /* ── Dialog / modal surfaces ─────────────────────────────────────────────── */
 
-[data-theme-id="sketchy"] [role="dialog"] {
+[data-sketchy] [role="dialog"] {
     border: 2px solid var(--border);
     border-radius: 4px;
     filter: url(#sketchy-subtle);
@@ -2344,7 +2350,7 @@ textarea {
 
 /* ── Sidebar workspace cards ─────────────────────────────────────────────── */
 
-[data-theme-id="sketchy"] .workspace-card {
+[data-sketchy] .workspace-card {
     border: 1.5px solid var(--border);
     border-radius: 3px;
     filter: url(#sketchy-subtle);
@@ -2359,19 +2365,19 @@ textarea {
 /* stripe) and apply the sketchy filter to the sash itself.                   */
 
 /* All sashes: sketchy wobble */
-[data-theme-id="sketchy"] [data-testid="sash"] {
+[data-sketchy] [data-testid="sash"] {
     filter: url(#sketchy-border);
 }
 
 /* Vertical sashes (column dividers) — visible 2px center stripe */
-[data-theme-id="sketchy"] .columns-split [data-testid="sash"],
-[data-theme-id="sketchy"] .app-horizontal-split [data-testid="sash"] {
+[data-sketchy] .columns-split [data-testid="sash"],
+[data-sketchy] .app-horizontal-split [data-testid="sash"] {
     background: transparent !important;
     background-image: linear-gradient(to right, transparent calc(50% - 1px), var(--border) calc(50% - 1px), var(--border) calc(50% + 1px), transparent calc(50% + 1px)) !important;
 }
 
 /* Horizontal sashes (terminal dock divider) — visible 2px center stripe */
-[data-theme-id="sketchy"] .terminal-vertical-split [data-testid="sash"] {
+[data-sketchy] .terminal-vertical-split [data-testid="sash"] {
     background: transparent !important;
     background-image: linear-gradient(to bottom, transparent calc(50% - 1px), var(--border) calc(50% - 1px), var(--border) calc(50% + 1px), transparent calc(50% + 1px)) !important;
 }
@@ -2381,8 +2387,8 @@ textarea {
 /* inline <span> elements with "absolute right-3 bottom-0 left-3 h-[2px]    */
 /* rounded-full bg-accent". We target via their parent tab container.        */
 
-[data-theme-id="sketchy"] [role="tab"] > span.absolute.bg-accent,
-[data-theme-id="sketchy"] [aria-selected="true"] > span.absolute.bg-accent {
+[data-sketchy] [role="tab"] > span.absolute.bg-accent,
+[data-sketchy] [aria-selected="true"] > span.absolute.bg-accent {
     border-radius: 0;
     height: 2.5px;
     filter: url(#sketchy-border);
@@ -2403,26 +2409,26 @@ textarea {
 /* via unsafeCSS onto individual Shadow-DOM children (scroll container,       */
 /* search input) — see FilesPanel.tsx.                                        */
 
-[data-theme-id="sketchy"] file-tree-container {
+[data-sketchy] file-tree-container {
     --trees-border-radius-override: 3px;
     --trees-border-color-override: var(--border);
 }
 
 /* ── TopBar ──────────────────────────────────────────────────────────────── */
 
-[data-theme-id="sketchy"] .app-topbar {
+[data-sketchy] .app-topbar {
     border-bottom: 2px solid var(--border);
 }
 
 /* TopBar search button */
-[data-theme-id="sketchy"] .app-topbar button[class*="rounded-lg"][class*="border-border"] {
+[data-sketchy] .app-topbar button[class*="rounded-lg"][class*="border-border"] {
     border: 1.5px solid var(--border);
     border-radius: 3px;
     filter: url(#sketchy-subtle);
 }
 
 /* TopBar kbd elements */
-[data-theme-id="sketchy"] .app-topbar kbd {
+[data-sketchy] .app-topbar kbd {
     border: 1.5px solid var(--border);
     border-radius: 2px;
     filter: url(#sketchy-subtle);
@@ -2431,42 +2437,42 @@ textarea {
 /* ── Sidebar ─────────────────────────────────────────────────────────────── */
 
 /* Sidebar right border */
-[data-theme-id="sketchy"] .flex.min-h-0.min-w-0.flex-col.border-border.border-r {
+[data-sketchy] .flex.min-h-0.min-w-0.flex-col.border-border.border-r {
     border-right: 2px solid var(--border);
 }
 
 /* Sidebar header border-bottom */
-[data-theme-id="sketchy"] .flex.h-9.shrink-0.items-center.justify-between.border-border.border-b {
+[data-sketchy] .flex.h-9.shrink-0.items-center.justify-between.border-border.border-b {
     border-bottom: 2px solid var(--border);
 }
 
 /* Sidebar "open project" dashed button */
-[data-theme-id="sketchy"] button[class*="border-dashed"] {
+[data-sketchy] button[class*="border-dashed"] {
     border: 2px dashed var(--border);
     border-radius: 3px;
     filter: url(#sketchy-subtle);
 }
 
 /* Sidebar project dividers */
-[data-theme-id="sketchy"] .border-border.border-t.pt-2 {
+[data-sketchy] .border-border.border-t.pt-2 {
     border-top: 2px solid var(--border);
 }
 
 /* ── Right Panel ─────────────────────────────────────────────────────────── */
 
-[data-theme-id="sketchy"] aside.border-border.border-l {
+[data-sketchy] aside.border-border.border-l {
     border-left: 2px solid var(--border);
 }
 
 /* Right panel header */
-[data-theme-id="sketchy"] aside .border-border.border-b {
+[data-sketchy] aside .border-border.border-b {
     border-bottom: 2px solid var(--border);
 }
 
 /* ── QuickSearch / command palette ────────────────────────────────────────── */
 
-[data-theme-id="sketchy"] .quick-search-dialog,
-[data-theme-id="sketchy"] div[class*="rounded-xl"][class*="border-border"][class*="bg-surface-dialog"] {
+[data-sketchy] .quick-search-dialog,
+[data-sketchy] div[class*="rounded-xl"][class*="border-border"][class*="bg-surface-dialog"] {
     border: 2px solid var(--border);
     border-radius: 4px;
     filter: url(#sketchy-subtle);
@@ -2474,19 +2480,19 @@ textarea {
 
 /* ── Agent QuickBar ──────────────────────────────────────────────────────── */
 
-[data-theme-id="sketchy"] .agent-quickbar {
+[data-sketchy] .agent-quickbar {
     border-bottom: 2px solid var(--border);
 }
 
 /* Agent quickbar buttons (run, open-with split) */
-[data-theme-id="sketchy"] .agent-quickbar button[class*="rounded-md"][class*="border"] {
+[data-sketchy] .agent-quickbar button[class*="rounded-md"][class*="border"] {
     border: 1.5px solid var(--border);
     border-radius: 3px;
     filter: url(#sketchy-subtle);
 }
 
 /* Agent quickbar split button group */
-[data-theme-id="sketchy"] .agent-quickbar div[class*="rounded-lg"][class*="border-border"] {
+[data-sketchy] .agent-quickbar div[class*="rounded-lg"][class*="border-border"] {
     border: 1.5px solid var(--border);
     border-radius: 3px;
     filter: url(#sketchy-subtle);
@@ -2495,74 +2501,74 @@ textarea {
 /* ── Settings panel ──────────────────────────────────────────────────────── */
 
 /* Settings sidebar */
-[data-theme-id="sketchy"] .flex.w-\\[200px\\].shrink-0.flex-col.border-border.border-r {
+[data-sketchy] .flex.w-\\[200px\\].shrink-0.flex-col.border-border.border-r {
     border-right: 2px solid var(--border);
 }
 
 /* Settings sidebar header */
-[data-theme-id="sketchy"] .flex.h-12.items-center.border-border.border-b {
+[data-sketchy] .flex.h-12.items-center.border-border.border-b {
     border-bottom: 2px solid var(--border);
 }
 
 /* Settings divider */
-[data-theme-id="sketchy"] .my-4.border-border.border-t,
-[data-theme-id="sketchy"] .my-5.border-border.border-t {
+[data-sketchy] .my-4.border-border.border-t,
+[data-sketchy] .my-5.border-border.border-t {
     border-top: 2px solid var(--border);
 }
 
 /* Settings inputs (select, text inputs) */
-[data-theme-id="sketchy"] .h-8.rounded-md.border.border-border,
-[data-theme-id="sketchy"] .h-8.w-48.rounded-md.border.border-border,
-[data-theme-id="sketchy"] .h-8.w-full.rounded-md.border.border-border {
+[data-sketchy] .h-8.rounded-md.border.border-border,
+[data-sketchy] .h-8.w-48.rounded-md.border.border-border,
+[data-sketchy] .h-8.w-full.rounded-md.border.border-border {
     border: 2px solid var(--border);
     border-radius: 3px;
     filter: url(#sketchy-subtle);
 }
 
 /* Settings select dropdowns */
-[data-theme-id="sketchy"] select.border-border {
+[data-sketchy] select.border-border {
     border: 2px solid var(--border);
     border-radius: 3px;
     filter: url(#sketchy-subtle);
 }
 
 /* Settings agent preset cards */
-[data-theme-id="sketchy"] .flex.items-center.gap-3.rounded-lg.border {
+[data-sketchy] .flex.items-center.gap-3.rounded-lg.border {
     border: 1.5px solid var(--border);
     border-radius: 3px;
     filter: url(#sketchy-subtle);
 }
 
 /* Settings nav items — active state */
-[data-theme-id="sketchy"] .flex.h-9.items-center.gap-2\\.5.rounded-lg.border {
+[data-sketchy] .flex.h-9.items-center.gap-2\\.5.rounded-lg.border {
     border: 1.5px solid var(--border);
     border-radius: 3px;
     filter: url(#sketchy-subtle);
 }
 
 /* Settings diff preview container */
-[data-theme-id="sketchy"] .overflow-hidden.rounded-lg.border.border-border {
+[data-sketchy] .overflow-hidden.rounded-lg.border.border-border {
     border: 2px solid var(--border);
     border-radius: 3px;
     filter: url(#sketchy-subtle);
 }
 
 /* Settings keyboard shortcuts table container */
-[data-theme-id="sketchy"] .divide-y.divide-border.rounded-lg.border.border-border {
+[data-sketchy] .divide-y.divide-border.rounded-lg.border.border-border {
     border: 2px solid var(--border);
     border-radius: 3px;
 }
 
 /* ── TerminalDock ────────────────────────────────────────────────────────── */
 
-[data-theme-id="sketchy"] .border-border.border-t.bg-surface-terminal {
+[data-sketchy] .border-border.border-t.bg-surface-terminal {
     border-top: 2px solid var(--border);
 }
 
 /* ── Context menu ────────────────────────────────────────────────────────── */
 
-[data-theme-id="sketchy"] .grid.min-w-\\[150px\\].gap-\\[3px\\].rounded-\\[7px\\].border.border-border,
-[data-theme-id="sketchy"] .grid.w-max.min-w-\\[160px\\].gap-\\[3px\\].rounded-\\[7px\\].border.border-border {
+[data-sketchy] .grid.min-w-\\[150px\\].gap-\\[3px\\].rounded-\\[7px\\].border.border-border,
+[data-sketchy] .grid.w-max.min-w-\\[160px\\].gap-\\[3px\\].rounded-\\[7px\\].border.border-border {
     border: 2px solid var(--border);
     border-radius: 4px;
     filter: url(#sketchy-subtle);
@@ -2570,23 +2576,23 @@ textarea {
 
 /* ── LspSymbolPeek ───────────────────────────────────────────────────────── */
 
-[data-theme-id="sketchy"] .symbol-peek-panel {
+[data-sketchy] .symbol-peek-panel {
     border-top: 2px solid var(--border);
     filter: url(#sketchy-subtle);
 }
 
 /* ── DiffViewer / FileEditor headers ─────────────────────────────────────── */
 
-[data-theme-id="sketchy"] .flex.min-h-11.items-center.gap-3.border-border.border-b,
-[data-theme-id="sketchy"] .flex.min-h-12.items-center.justify-between.gap-3.border-border.border-b,
-[data-theme-id="sketchy"] .flex.min-h-\\[42px\\].items-center.justify-between.gap-3.border-border.border-b,
-[data-theme-id="sketchy"] .flex.min-h-\\[38px\\].items-center.gap-2.border-border.border-b {
+[data-sketchy] .flex.min-h-11.items-center.gap-3.border-border.border-b,
+[data-sketchy] .flex.min-h-12.items-center.justify-between.gap-3.border-border.border-b,
+[data-sketchy] .flex.min-h-\\[42px\\].items-center.justify-between.gap-3.border-border.border-b,
+[data-sketchy] .flex.min-h-\\[38px\\].items-center.gap-2.border-border.border-b {
     border-bottom: 2px solid var(--border);
 }
 
 /* Diff / file content cards */
-[data-theme-id="sketchy"] .rounded-lg.border.border-border.bg-panel,
-[data-theme-id="sketchy"] .rounded-lg.border.border-border.bg-surface-card {
+[data-sketchy] .rounded-lg.border.border-border.bg-panel,
+[data-sketchy] .rounded-lg.border.border-border.bg-surface-card {
     border: 1.5px solid var(--border);
     border-radius: 3px;
     filter: url(#sketchy-subtle);
@@ -2594,7 +2600,7 @@ textarea {
 
 /* ── ContextPanel cards ──────────────────────────────────────────────────── */
 
-[data-theme-id="sketchy"] .grid.gap-2.rounded-lg.border.border-border {
+[data-sketchy] .grid.gap-2.rounded-lg.border.border-border {
     border: 1.5px solid var(--border);
     border-radius: 3px;
     filter: url(#sketchy-subtle);
@@ -2602,18 +2608,18 @@ textarea {
 
 /* ── ChangesPanel footer border ──────────────────────────────────────────── */
 
-[data-theme-id="sketchy"] .grid.gap-2.border-border.border-t {
+[data-sketchy] .grid.gap-2.border-border.border-t {
     border-top: 2px solid var(--border);
 }
 
 /* ── BrowserTab toolbar ──────────────────────────────────────────────────── */
 
-[data-theme-id="sketchy"] .flex.h-10.shrink-0.items-center.gap-1.border-border.border-b {
+[data-sketchy] .flex.h-10.shrink-0.items-center.gap-1.border-border.border-b {
     border-bottom: 2px solid var(--border);
 }
 
 /* Browser webview container */
-[data-theme-id="sketchy"] .relative.shrink-0.overflow-hidden.rounded-xl.border.border-border {
+[data-sketchy] .relative.shrink-0.overflow-hidden.rounded-xl.border.border-border {
     border: 2px solid var(--border);
     border-radius: 4px;
     filter: url(#sketchy-subtle);
@@ -2621,12 +2627,12 @@ textarea {
 
 /* ── BrowserConsolePanel ─────────────────────────────────────────────────── */
 
-[data-theme-id="sketchy"] .surface-toolbar.flex.h-9.shrink-0.items-center.gap-1\\.5.border-border.border-b {
+[data-sketchy] .surface-toolbar.flex.h-9.shrink-0.items-center.gap-1\\.5.border-border.border-b {
     border-bottom: 2px solid var(--border);
 }
 
 /* Console search input */
-[data-theme-id="sketchy"] .h-\\[26px\\].w-36.rounded-\\[4px\\].border.border-border {
+[data-sketchy] .h-\\[26px\\].w-36.rounded-\\[4px\\].border.border-border {
     border: 1.5px solid var(--border);
     border-radius: 3px;
     filter: url(#sketchy-subtle);
@@ -2634,14 +2640,14 @@ textarea {
 
 /* ── UrlBar input ────────────────────────────────────────────────────────── */
 
-[data-theme-id="sketchy"] .h-7.w-full.rounded.border.border-border {
+[data-sketchy] .h-7.w-full.rounded.border.border-border {
     border: 1.5px solid var(--border);
     border-radius: 3px;
     filter: url(#sketchy-subtle);
 }
 
 /* UrlBar suggestions dropdown */
-[data-theme-id="sketchy"] .rounded-lg.border.border-border.bg-panel.shadow-xl {
+[data-sketchy] .rounded-lg.border.border-border.bg-panel.shadow-xl {
     border: 2px solid var(--border);
     border-radius: 4px;
     filter: url(#sketchy-subtle);
@@ -2649,15 +2655,15 @@ textarea {
 
 /* ── RunSetupDialog inputs ───────────────────────────────────────────────── */
 
-[data-theme-id="sketchy"] .h-8.w-full.rounded-md.border.border-border.bg-panel-2,
-[data-theme-id="sketchy"] .h-8.min-w-0.flex-1.rounded-md.border.border-border.bg-panel-2 {
+[data-sketchy] .h-8.w-full.rounded-md.border.border-border.bg-panel-2,
+[data-sketchy] .h-8.min-w-0.flex-1.rounded-md.border.border-border.bg-panel-2 {
     border: 2px solid var(--border);
     border-radius: 3px;
     filter: url(#sketchy-subtle);
 }
 
 /* RunSetupDialog preset chips */
-[data-theme-id="sketchy"] .flex.items-center.gap-1\\.5.rounded-md.border {
+[data-sketchy] .flex.items-center.gap-1\\.5.rounded-md.border {
     border-width: 1.5px;
     border-radius: 3px;
     filter: url(#sketchy-subtle);
@@ -2665,14 +2671,14 @@ textarea {
 
 /* ── AppearancePanel theme cards ─────────────────────────────────────────── */
 
-[data-theme-id="sketchy"] button[aria-pressed].rounded-xl.border {
+[data-sketchy] button[aria-pressed].rounded-xl.border {
     border: 2px solid var(--border);
     border-radius: 4px;
     filter: url(#sketchy-subtle);
 }
 
 /* Appearance panel action buttons (import/export) */
-[data-theme-id="sketchy"] .flex.items-center.gap-1\\.5.rounded-lg.border.border-border.bg-panel-2 {
+[data-sketchy] .flex.items-center.gap-1\\.5.rounded-lg.border.border-border.bg-panel-2 {
     border: 1.5px solid var(--border);
     border-radius: 3px;
     filter: url(#sketchy-subtle);
@@ -2680,14 +2686,14 @@ textarea {
 
 /* ── NotificationsSection ────────────────────────────────────────────────── */
 
-[data-theme-id="sketchy"] .group.relative.flex.cursor-pointer.select-none.flex-col.rounded-xl.border {
+[data-sketchy] .group.relative.flex.cursor-pointer.select-none.flex-col.rounded-xl.border {
     border: 1.5px solid var(--border);
     border-radius: 4px;
     filter: url(#sketchy-subtle);
 }
 
 /* Notifications empty state dashed border */
-[data-theme-id="sketchy"] .flex.min-h-\\[120px\\].flex-col.items-center.justify-center.gap-2.rounded-xl.border.border-border.border-dashed {
+[data-sketchy] .flex.min-h-\\[120px\\].flex-col.items-center.justify-center.gap-2.rounded-xl.border.border-border.border-dashed {
     border: 2px dashed var(--border);
     border-radius: 4px;
     filter: url(#sketchy-subtle);
@@ -2695,7 +2701,7 @@ textarea {
 
 /* ── ShortcutRecorder ────────────────────────────────────────────────────── */
 
-[data-theme-id="sketchy"] .inline-flex.min-w-\\[60px\\].items-center.justify-center.rounded-md.border {
+[data-sketchy] .inline-flex.min-w-\\[60px\\].items-center.justify-center.rounded-md.border {
     border: 1.5px solid var(--border);
     border-radius: 3px;
     filter: url(#sketchy-subtle);
@@ -2703,7 +2709,7 @@ textarea {
 
 /* ── RenameModal ─────────────────────────────────────────────────────────── */
 
-[data-theme-id="sketchy"] .flex.w-72.flex-col.gap-3.rounded-lg.border.border-border {
+[data-sketchy] .flex.w-72.flex-col.gap-3.rounded-lg.border.border-border {
     border: 2px solid var(--border);
     border-radius: 4px;
     filter: url(#sketchy-subtle);
@@ -2711,7 +2717,7 @@ textarea {
 
 /* ── NewWorktreeDialog ───────────────────────────────────────────────────── */
 
-[data-theme-id="sketchy"] .rounded-xl.border.border-border.bg-panel-2 {
+[data-sketchy] .rounded-xl.border.border-border.bg-panel-2 {
     border: 2px solid var(--border);
     border-radius: 4px;
     filter: url(#sketchy-subtle);
@@ -2719,26 +2725,26 @@ textarea {
 
 /* ── Toggle switches ─────────────────────────────────────────────────────── */
 
-[data-theme-id="sketchy"] button[role="switch"] {
+[data-sketchy] button[role="switch"] {
     filter: url(#sketchy-subtle);
 }
 
 /* ── Generic: all remaining border-b / border-t section dividers ─────────── */
 /* Catch-all for dialog footers and headers with border-t / border-b          */
 
-[data-theme-id="sketchy"] .flex.shrink-0.items-center.justify-between.border-border.border-t,
-[data-theme-id="sketchy"] .flex.shrink-0.items-center.justify-end.gap-2.border-border.border-t,
-[data-theme-id="sketchy"] .flex.items-center.justify-between.border-border.border-b,
-[data-theme-id="sketchy"] .flex.items-center.justify-end.gap-2.border-border.border-t,
-[data-theme-id="sketchy"] .flex.justify-end.gap-2.border-border.border-t,
-[data-theme-id="sketchy"] .flex.h-12.shrink-0.items-center.justify-between.border-border.border-b {
+[data-sketchy] .flex.shrink-0.items-center.justify-between.border-border.border-t,
+[data-sketchy] .flex.shrink-0.items-center.justify-end.gap-2.border-border.border-t,
+[data-sketchy] .flex.items-center.justify-between.border-border.border-b,
+[data-sketchy] .flex.items-center.justify-end.gap-2.border-border.border-t,
+[data-sketchy] .flex.justify-end.gap-2.border-border.border-t,
+[data-sketchy] .flex.h-12.shrink-0.items-center.justify-between.border-border.border-b {
     border-width: 2px;
 }
 
 /* ── ToastStack — border variant based on kind ───────────────────────────── */
 
-[data-theme-id="sketchy"] .toast-item,
-[data-theme-id="sketchy"] .grid.items-center.rounded-lg.border.border-border {
+[data-sketchy] .toast-item,
+[data-sketchy] .grid.items-center.rounded-lg.border.border-border {
     border: 2px solid var(--border);
     border-radius: 3px;
 }
@@ -2749,14 +2755,14 @@ textarea {
 /* precedence over the SVG filter approach for supported elements.            */
 
 @supports (border-shape: circle(50%)) {
-    [data-theme-id="sketchy"] .primary-button,
-    [data-theme-id="sketchy"] .secondary-button {
+    [data-sketchy] .primary-button,
+    [data-sketchy] .secondary-button {
         border-shape:
             path("M3,1 C10,0 30,2 50,0.5 C70,2 90,0 97,1 C100,10 98,30 100,50 C98,70 100,90 97,99 C90,100 70,98 50,100 C30,98 10,100 3,99 C0,90 2,70 0,50 C2,30 0,10 3,1 Z")
             path("M8,6 C15,4 35,7 50,5 C65,7 85,4 92,6 C95,15 93,35 95,50 C93,65 95,85 92,94 C85,96 65,93 50,95 C35,93 15,96 8,94 C5,85 7,65 5,50 C7,35 5,15 8,6 Z");
     }
 
-    [data-theme-id="sketchy"] .icon-button {
+    [data-sketchy] .icon-button {
         border-shape:
             path("M2,2 C15,0 85,0 98,2 C100,15 100,85 98,98 C85,100 15,100 2,98 C0,85 0,15 2,2 Z")
             path("M7,7 C20,5 80,5 93,7 C95,20 95,80 93,93 C80,95 20,95 7,93 C5,80 5,20 7,7 Z");
@@ -2766,23 +2772,23 @@ textarea {
 /* ── Performance safeguards ──────────────────────────────────────────────── */
 
 /* GPU compositing hints for filtered elements */
-[data-theme-id="sketchy"] .primary-button,
-[data-theme-id="sketchy"] .secondary-button,
-[data-theme-id="sketchy"] .icon-button,
-[data-theme-id="sketchy"] .mini-button,
-[data-theme-id="sketchy"] .segmented-control {
+[data-sketchy] .primary-button,
+[data-sketchy] .secondary-button,
+[data-sketchy] .icon-button,
+[data-sketchy] .mini-button,
+[data-sketchy] .segmented-control {
     will-change: filter;
     contain: layout style;
 }
 
 /* Disable sketchy filters during panel resize animations to avoid jank */
-[data-theme-id="sketchy"] .panel-animating * {
+[data-sketchy] .panel-animating * {
     filter: none !important;
 }
 
 /* Respect reduced-motion preference — disable all sketchy filters */
 @media (prefers-reduced-motion: reduce) {
-    [data-theme-id="sketchy"] * {
+    [data-sketchy] * {
         filter: none !important;
     }
 }

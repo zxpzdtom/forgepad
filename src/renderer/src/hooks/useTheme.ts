@@ -41,6 +41,7 @@ function clearThemeTokens(tokens: ThemeTokens): void {
 export function useTheme(): ResolvedTheme {
   const themeId = useAppStore((s) => s.settings.themeId);
   const customThemes = useAppStore((s) => s.settings.customThemes ?? []);
+  const sketchyMode = useAppStore((s) => s.settings.sketchyMode);
 
   const activeTheme = useMemo(() => {
     const allThemes: ThemeDefinition[] = [...BUILTIN_THEMES, ...customThemes];
@@ -80,6 +81,18 @@ export function useTheme(): ResolvedTheme {
       clearThemeTokens(activeTheme.tokens);
     };
   }, [activeTheme, resolved]);
+
+  // Sync sketchy mode overlay attribute
+  useEffect(() => {
+    if (sketchyMode) {
+      document.documentElement.dataset.sketchy = '';
+    } else {
+      delete document.documentElement.dataset.sketchy;
+    }
+    return () => {
+      delete document.documentElement.dataset.sketchy;
+    };
+  }, [sketchyMode]);
 
   return resolved;
 }

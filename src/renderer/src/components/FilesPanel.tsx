@@ -170,7 +170,7 @@ export function FilesPanel() {
   const rightPanelMode = useAppStore((state) => state.rightPanelMode);
   const spinnerStyle = useAppStore((state) => state.settings.spinnerStyle);
   const tabs = useAppStore((state) => state.tabs);
-  const themeId = useAppStore((state) => state.settings.themeId);
+  const sketchyMode = useAppStore((state) => state.settings.sketchyMode);
 
   const contextFileSet = useMemo(() => {
     return new Set(
@@ -178,7 +178,7 @@ export function FilesPanel() {
     );
   }, [contextItems, workspace?.id]);
 
-  /* Inject sketchy styles into the Shadow DOM when the Sketchy theme is active.
+  /* Inject sketchy styles into the Shadow DOM when sketchy mode is active.
      The `unsafeCSS` option injects a <style> into the web component's Shadow DOM
      so we can override internal styles.
 
@@ -191,7 +191,7 @@ export function FilesPanel() {
      We use an inline SVG data-URI so the filter definition is self-contained
      and works inside Shadow DOM without needing to reference a fragment in
      the host document (url(#id) cannot cross the shadow boundary). */
-  const sketchyUnsafeCSS = themeId === 'sketchy'
+  const sketchyUnsafeCSS = sketchyMode
     ? `[data-file-tree-search-input] {
          border: 2px solid var(--trees-border-color);
          filter: url('data:image/svg+xml,<svg%20xmlns=%22http://www.w3.org/2000/svg%22><filter%20id=%22f%22%20x=%22-5%25%22%20y=%22-5%25%22%20width=%22110%25%22%20height=%22110%25%22><feTurbulence%20type=%22turbulence%22%20baseFrequency=%220.03%22%20numOctaves=%224%22%20seed=%2215%22%20result=%22noise%22/><feDisplacementMap%20in=%22SourceGraphic%22%20in2=%22noise%22%20scale=%222%22%20xChannelSelector=%22R%22%20yChannelSelector=%22G%22/></filter></svg>#f');

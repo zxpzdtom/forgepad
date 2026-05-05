@@ -2,7 +2,7 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import { useAppStore } from '@renderer/store/app-store';
 import { useTranslation } from '@renderer/i18n';
 import { BUILTIN_THEMES, THEME_SCHEMA_VERSION, type ThemeDefinition, type ThemeTokens } from '@shared/types';
-import { Check, Download, ExternalLink, Upload, X } from 'lucide-react';
+import { Check, Download, ExternalLink, Pencil, Upload, X } from 'lucide-react';
 
 /* ─── Theme validation ─── */
 
@@ -211,11 +211,35 @@ function ImportErrorBanner({ errors, onDismiss, t }: { errors: string[]; onDismi
   );
 }
 
+/* ─── Toggle switch ─── */
+
+function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
+  return (
+    <button
+      className={`relative inline-flex h-5 w-8 items-center rounded-full transition-colors ${
+        checked ? 'bg-accent' : 'bg-panel-3'
+      }`}
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      onClick={() => onChange(!checked)}
+    >
+      <span
+        className={`inline-block size-3.5 translate-x-0.5 rounded-full bg-white shadow transition-transform ${
+          checked ? 'translate-x-[14px]' : ''
+        }`}
+      />
+    </button>
+  );
+}
+
 /* ─── Main AppearancePanel ─── */
 
 export function AppearancePanel() {
   const { t } = useTranslation();
   const themeId = useAppStore((s) => s.settings.themeId);
+  const sketchyMode = useAppStore((s) => s.settings.sketchyMode);
   const customThemes = useAppStore((s) => s.settings.customThemes ?? []);
   const addCustomTheme = useAppStore((s) => s.addCustomTheme);
   const removeCustomTheme = useAppStore((s) => s.removeCustomTheme);
@@ -322,6 +346,18 @@ export function AppearancePanel() {
 
   return (
     <div className="flex flex-col gap-6 p-6">
+      {/* ── Sketchy mode toggle ── */}
+      <div className="flex items-center justify-between rounded-lg border border-border bg-panel-2 px-4 py-3">
+        <div className="flex items-center gap-2.5">
+          <Pencil size={15} className="shrink-0 text-muted" />
+          <div>
+            <div className="font-[510] text-[13px] text-text">{t('appearance.sketchyMode')}</div>
+            <div className="text-[11px] text-muted">{t('appearance.sketchyModeDesc')}</div>
+          </div>
+        </div>
+        <Toggle checked={sketchyMode} onChange={(v) => updateSettings({ sketchyMode: v })} label={t('appearance.sketchyMode')} />
+      </div>
+
       {/* ── Header actions ── */}
       <div className="flex flex-wrap items-center gap-2">
         <button
