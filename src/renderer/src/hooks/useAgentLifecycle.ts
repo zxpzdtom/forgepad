@@ -96,6 +96,33 @@ export function useAgentLifecycle(): void {
 
     const removeFocusListener = window.forgepad.agent.onFocusTab((ptyId) => {
       const state = useAppStore.getState();
+
+      // Special signal from pet overlay click: find the most urgent agent tab
+      if (ptyId === '__pet_click__') {
+        const priorityMap: Record<string, number> = { idle: 0, working: 1, review: 2, permission: 3 };
+        const agentTabs = state.tabs.filter(
+          (t) => t.type === 'terminal' && t.isAgent && t.workspaceId === state.activeWorkspaceId,
+        );
+        let bestTab = agentTabs[0];
+        let bestPri = -1;
+        for (const t of agentTabs) {
+          if (t.type !== 'terminal') continue;
+          const status = state.agentStatuses[t.ptyId] ?? 'idle';
+          const pri = priorityMap[status] ?? 0;
+          if (pri > bestPri) {
+            bestPri = pri;
+            bestTab = t;
+          }
+        }
+        if (bestTab) {
+          state.setActiveTab(bestTab.id);
+          if (bestTab.workspaceId !== state.activeWorkspaceId) {
+            state.setActiveWorkspace(bestTab.workspaceId);
+          }
+        }
+        return;
+      }
+
       const tab = state.tabs.find((t) => t.type === 'terminal' && t.ptyId === ptyId);
       if (tab) {
         state.setActiveTab(tab.id);
@@ -109,10 +136,25 @@ export function useAgentLifecycle(): void {
       useAppStore.getState().renameTab(ptyId, title);
     });
 
+    // Listen for PermissionRequest details (tool name, tool input) from HookServer
+    const removePermissionListener = window.forgepad.agent.onPermissionRequest((data) => {
+      // If resolved flag is set, clear the pending permission
+      if ('resolved' in data && (data as { resolved?: boolean }).resolved) {
+        const state = useAppStore.getState();
+        if (state.pendingPermission?.ptyId === data.ptyId) {
+          state.setPendingPermission(null);
+        }
+        return;
+      }
+      // Set the pending permission so the pet approval UI can display it
+      useAppStore.getState().setPendingPermission(data);
+    });
+
     return () => {
       removeStatusListener();
       removeFocusListener();
       removeRenameListener();
+      removePermissionListener();
     };
   }, []);
 }
