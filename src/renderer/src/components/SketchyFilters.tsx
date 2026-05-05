@@ -1,5 +1,5 @@
 /**
- * Hidden SVG filter definitions for the "Sketchy" hand-drawn theme.
+ * Hidden SVG filter definitions for Sketchy Mode (hand-drawn overlay).
  *
  * Uses feTurbulence + feDisplacementMap to make edges appear wobbly/organic.
  * Three intensity presets are provided:
@@ -10,7 +10,8 @@
  *   - #sketchy-border  — scale=4, strongest wobble for standalone borders.
  *
  * Mount once at the app root. The SVG is visually hidden but its filters are
- * referenced by CSS rules scoped to [data-theme-id="sketchy"].
+ * referenced by CSS rules scoped to [data-sketchy] (the sketchy mode overlay
+ * attribute, independent of which color theme is active).
  */
 export function SketchyFilters() {
   return (

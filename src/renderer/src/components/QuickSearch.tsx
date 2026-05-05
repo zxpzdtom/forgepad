@@ -14,6 +14,7 @@ import {
   Moon,
   Paintbrush,
   Palette,
+  Pencil,
   PanelRight,
   Search,
   SendHorizontal,
@@ -241,6 +242,15 @@ export function QuickSearch({ open, onClose }: QuickSearchProps) {
       });
     }
 
+    // Sketchy mode toggle
+    next.push({
+      id: 'sketchy-mode',
+      label: settings.sketchyMode ? 'Disable Sketchy Mode' : 'Enable Sketchy Mode',
+      detail: settings.sketchyMode ? 'Sketchy · Active' : 'Theme',
+      icon: <Pencil size={16} />,
+      run: () => updateSettings({ sketchyMode: !settings.sketchyMode }),
+    });
+
     // Settings sections
     const settingsItems: {
       id: string;
@@ -329,6 +339,7 @@ export function QuickSearch({ open, onClose }: QuickSearchProps) {
     setActiveWorkspace,
     setRightPanelMode,
     settings.agentPresets,
+    settings.sketchyMode,
     settings.themeId,
     tabs,
     updateSettings,
