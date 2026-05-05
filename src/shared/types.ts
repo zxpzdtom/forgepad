@@ -1072,10 +1072,10 @@ export const BUILTIN_THEME_NOTEBOOK: ThemeDefinition = {
   builtIn: true,
 };
 
-export const BUILTIN_THEME_SKETCHY: ThemeDefinition = {
+export const BUILTIN_THEME_PAPER: ThemeDefinition = {
   schemaVersion: THEME_SCHEMA_VERSION,
-  id: 'sketchy',
-  name: 'Sketchy',
+  id: 'paper',
+  name: 'Paper',
   author: 'ForgePad',
   mode: 'light',
   version: '1.0.0',
@@ -1155,7 +1155,7 @@ export const BUILTIN_THEMES: ThemeDefinition[] = [
   BUILTIN_THEME_SLACK,
   BUILTIN_THEME_PERPETUITY,
   BUILTIN_THEME_NOTEBOOK,
-  BUILTIN_THEME_SKETCHY,
+  BUILTIN_THEME_PAPER,
 ];
 
 export type DiffViewStyle = 'split' | 'unified';
@@ -1500,6 +1500,8 @@ export type AppSettings = {
   autoFetchEnabled: boolean;
   /** Minutes between automatic fetches (1–60) */
   autoFetchIntervalMinutes: number;
+  /** Apply hand-drawn sketchy visual effects on top of any theme */
+  sketchyMode: boolean;
   /** Desktop pet settings */
   pets: PetSettings;
 };
@@ -1531,6 +1533,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   worktreeAutoDeleteBranch: true,
   autoFetchEnabled: false,
   autoFetchIntervalMinutes: 5,
+  sketchyMode: false,
   pets: { ...DEFAULT_PET_SETTINGS },
 };
 
