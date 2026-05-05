@@ -1,9 +1,11 @@
 import { join } from 'node:path';
+import path from 'node:path';
 import { IPC } from '@shared/ipc';
 import type { PetSettings } from '@shared/types';
-import { app, BrowserWindow, ipcMain, Menu, shell } from 'electron';
+import { app, BrowserWindow, ipcMain, Menu, net, protocol, shell } from 'electron';
 
 import { ptyService, registerIpcHandlers } from './ipc/register-handlers';
+import { registerPetHandlers } from './ipc/pet-handlers';
 import { createPetWindow, destroyPetWindow, getPetWindow, registerPetIpcHandlers, sendPetSettings, setPetWindowVisible } from './pet-window';
 import { AgentHooksService } from './services/agent-hooks-service';
 import { HookServer } from './services/hook-server';
@@ -13,6 +15,19 @@ import { HookServer } from './services/hook-server';
 if (!app.isPackaged) {
   app.setPath('userData', `${app.getPath('userData')}-dev`);
 }
+
+// Register custom-pet:// protocol scheme (must happen before app.ready)
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: 'custom-pet',
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      bypassCSP: false,
+    },
+  },
+]);
 
 let hookServer: HookServer | null = null;
 
@@ -163,6 +178,24 @@ function createWindow(): void {
 app.whenReady().then(async () => {
   app.setName('ForgePad');
 
+  // Handle custom-pet:// protocol — serves custom pet assets from userData/custom-pets/
+  protocol.handle('custom-pet', (request) => {
+    const url = new URL(request.url);
+    const segments = url.pathname.split('/').filter(Boolean);
+    // Sanitize each segment to prevent path traversal
+    for (const seg of segments) {
+      if (seg === '..' || seg !== path.basename(seg)) {
+        return new Response('Forbidden', { status: 403 });
+      }
+    }
+    const filePath = path.join(app.getPath('userData'), 'custom-pets', ...segments);
+    const customPetsRoot = path.resolve(path.join(app.getPath('userData'), 'custom-pets'));
+    if (!path.resolve(filePath).startsWith(customPetsRoot)) {
+      return new Response('Forbidden', { status: 403 });
+    }
+    return net.fetch(`file://${path.resolve(filePath)}`);
+  });
+
   // Start agent hook server
   hookServer = new HookServer();
   let hookPort = 0;
@@ -183,6 +216,7 @@ app.whenReady().then(async () => {
   buildAppMenu();
   registerIpcHandlers(hookPort);
   registerPetIpcHandlers();
+  registerPetHandlers();
   createWindow();
 
   // Listen for pet settings changes from the main renderer.
@@ -204,6 +238,16 @@ app.whenReady().then(async () => {
     } else {
       setPetWindowVisible(false);
     }
+  });
+
+  // Listen for permission decisions from the pet overlay window.
+  ipcMain.on(IPC.PET_PERMISSION_DECISION, (_event, ptyId: string, decision: 'allow' | 'deny') => {
+    hookServer?.resolvePermission(ptyId, decision);
+  });
+
+  // Listen for permission decisions from the main renderer window.
+  ipcMain.on(IPC.AGENT_PERMISSION_DECISION, (_event, ptyId: string, decision: 'allow' | 'deny') => {
+    hookServer?.resolvePermission(ptyId, decision);
   });
 
   app.on('activate', () => {

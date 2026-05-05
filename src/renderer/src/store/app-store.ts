@@ -9,6 +9,7 @@ import type {
   ContextFileItem,
   ContextItem,
   ContextTaskItem,
+  CustomPetMeta,
   DiffCommentItem,
   DiffFileData,
   FileStatus,
@@ -83,6 +84,8 @@ type AppState = {
   gitRefreshEpoch: number;
   /** Agent lifecycle statuses keyed by ptyId */
   agentStatuses: Record<string, AgentStatus>;
+  /** Pending permission request awaiting user approval (shown in pet UI) */
+  pendingPermission: import('@shared/types').PendingPermission | null;
   /** ptyIds whose process has exited */
   exitedPtyIds: Set<string>;
   /** Browser select mode active state, keyed by tabId */
@@ -96,6 +99,7 @@ type AppState = {
   /** LSP symbol peek panel state (Cmd+Click results) */
   symbolPeek: LspSymbolPeekState;
   handleAgentStatusUpdate: (ptyId: string, status: AgentStatus) => void;
+  setPendingPermission: (permission: import('@shared/types').PendingPermission | null) => void;
   clearAgentStatus: (ptyId: string) => void;
   notifyAgentInput: (ptyId: string) => void;
   markPtyExited: (ptyId: string) => void;
@@ -210,6 +214,10 @@ type AppState = {
   addCustomSound: (sound: NotificationSound) => void;
   removeCustomSound: (soundId: string) => void;
   renameCustomSound: (soundId: string, name: string) => void;
+  // Custom pets
+  addCustomPet: (pet: CustomPetMeta) => void;
+  removeCustomPet: (petId: string) => void;
+  setCustomPets: (pets: CustomPetMeta[]) => void;
 };
 
 function id(): string {
@@ -386,6 +394,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   branchStats: {},
   gitRefreshEpoch: 0,
   agentStatuses: {},
+  pendingPermission: null,
   exitedPtyIds: new Set<string>(),
   browserSelectMode: {},
   browserHistory: [],
@@ -470,6 +479,9 @@ export const useAppStore = create<AppState>((set, get) => ({
 
       return patch;
     });
+  },
+  setPendingPermission: (permission) => {
+    set({ pendingPermission: permission });
   },
   clearAgentStatus: (ptyId) => {
     const t = agentWorkingTimers.get(ptyId);
@@ -617,6 +629,13 @@ export const useAppStore = create<AppState>((set, get) => ({
       ...(rawSettings.notifications ?? {}),
       // Ensure customSounds is always an array
       customSounds: rawSettings.notifications?.customSounds ?? [],
+    };
+
+    // Schema migration: ensure pets.customPets is always an array
+    rawSettings.pets = {
+      ...DEFAULT_SETTINGS.pets,
+      ...(rawSettings.pets ?? {}),
+      customPets: rawSettings.pets?.customPets ?? [],
     };
 
     const settings = rawSettings;
@@ -964,6 +983,10 @@ export const useAppStore = create<AppState>((set, get) => ({
         const agentStatus = state.agentStatuses[tab.ptyId];
         if (agentStatus === 'review' || agentStatus === 'permission') {
           patch.agentStatuses = { ...state.agentStatuses, [tab.ptyId]: 'idle' };
+          // Clear pending permission UI when user manually switches to agent tab
+          if (agentStatus === 'permission' && state.pendingPermission?.ptyId === tab.ptyId) {
+            patch.pendingPermission = null;
+          }
         }
       } else if (tab?.type === 'terminal') {
         patch.activeShellTabId = tabId;
@@ -1624,6 +1647,9 @@ export const useAppStore = create<AppState>((set, get) => ({
           const agentStatus = state.agentStatuses[activeTab.ptyId];
           if (agentStatus === 'review' || agentStatus === 'permission') {
             patch.agentStatuses = { ...state.agentStatuses, [activeTab.ptyId]: 'idle' };
+            if (agentStatus === 'permission' && state.pendingPermission?.ptyId === activeTab.ptyId) {
+              patch.pendingPermission = null;
+            }
           }
         }
       }
@@ -2140,6 +2166,40 @@ export const useAppStore = create<AppState>((set, get) => ({
           ...state.settings.notifications,
           customSounds: state.settings.notifications.customSounds.map((s) => (s.id === soundId ? { ...s, name } : s)),
         },
+      },
+    })),
+
+  // ── Custom pets ──
+
+  addCustomPet: (pet) =>
+    set((state) => ({
+      settings: {
+        ...state.settings,
+        pets: {
+          ...state.settings.pets,
+          // Overwrite if same id exists
+          customPets: [...(state.settings.pets.customPets ?? []).filter((p) => p.id !== pet.id), pet],
+        },
+      },
+    })),
+
+  removeCustomPet: (petId) =>
+    set((state) => {
+      const customPets = (state.settings.pets.customPets ?? []).filter((p) => p.id !== petId);
+      const selectedPetId = state.settings.pets.selectedPetId === petId ? 'clawd' : state.settings.pets.selectedPetId;
+      return {
+        settings: {
+          ...state.settings,
+          pets: { ...state.settings.pets, customPets, selectedPetId },
+        },
+      };
+    }),
+
+  setCustomPets: (pets) =>
+    set((state) => ({
+      settings: {
+        ...state.settings,
+        pets: { ...state.settings.pets, customPets: pets },
       },
     })),
 }));

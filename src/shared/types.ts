@@ -1411,13 +1411,36 @@ export type PetDefinition = {
   description: string;
   spritesheetPath: string;
   kind?: 'person' | 'animal' | 'object';
+  /** True for user-imported pets (vs built-in) */
+  isCustom?: boolean;
 };
+
+/** Lightweight metadata for a user-imported custom pet, persisted in the store.
+ *  The actual files (pet.json + spritesheet.webp) live on disk at {userData}/custom-pets/{id}/. */
+export type CustomPetMeta = {
+  id: string;
+  displayName: string;
+  description: string;
+  kind: 'person' | 'animal' | 'object';
+  /** ISO 8601 timestamp of import */
+  importedAt: string;
+};
+
+export type ImportPetResult =
+  | { success: true; pet: CustomPetMeta }
+  | { success: false; error: string };
+
+export type DeletePetResult = { success: true } | { success: false; error: string };
 
 export type PetSettings = {
   enabled: boolean;
   selectedPetId: string;
   petSize: number;
   petSpeed: number;
+  /** Allow pet to randomly wander and interact autonomously. */
+  allowRandomMove: boolean;
+  /** User-imported custom pets metadata */
+  customPets: CustomPetMeta[];
 };
 
 export const DEFAULT_PET_SETTINGS: PetSettings = {
@@ -1425,6 +1448,15 @@ export const DEFAULT_PET_SETTINGS: PetSettings = {
   selectedPetId: 'clawd',
   petSize: 0.8,
   petSpeed: 2,
+  allowRandomMove: true,
+  customPets: [],
+};
+
+/** A PermissionRequest pending user approval (forwarded from HookServer). */
+export type PendingPermission = {
+  ptyId: string;
+  toolName: string;
+  toolInput?: Record<string, unknown>;
 };
 
 export type Locale = 'en' | 'zh-CN';

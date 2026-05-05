@@ -1,7 +1,8 @@
+import { useState } from 'react';
 import { useTranslation } from '@renderer/i18n';
 import { useAppStore } from '@renderer/store/app-store';
 import { SpriteAnimator } from 'codex-pets-react';
-import { PET_REGISTRY, forgePetAtlas, getPetSpritesheetUrl, type ForgePetAnimationName } from './pets/pet-registry';
+import { getAllPets, forgePetAtlas, getPetSpritesheetUrl, type ForgePetAnimationName } from './pets/pet-registry';
 
 /* ─── Reusable primitives (same style as SettingsPanel) ─── */
 
@@ -48,22 +49,48 @@ function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: 
 
 /* ─── Pet preview card (uses SpriteAnimator for animated preview) ─── */
 
-function PetCard({ petId, displayName, selected, onClick }: {
+function PetCard({ petId, displayName, selected, isCustom, cacheBust, onClick, onDelete }: {
   petId: string;
   displayName: string;
   selected: boolean;
+  isCustom?: boolean;
+  cacheBust?: string;
   onClick: () => void;
+  onDelete?: () => void;
 }) {
-  const src = getPetSpritesheetUrl(petId);
+  const src = getPetSpritesheetUrl(petId, cacheBust);
 
   return (
     <button
       type="button"
       onClick={onClick}
-      className={`group flex flex-col items-center gap-2 rounded-xl border-2 p-3 transition-all hover:bg-panel-2 ${
+      className={`group relative flex flex-col items-center gap-2 rounded-xl border-2 p-3 transition-all hover:bg-panel-2 ${
         selected ? 'border-accent bg-panel-2' : 'border-transparent'
-      }`}
+      } ${isCustom ? 'border-dashed' : ''}`}
     >
+      {/* Custom badge */}
+      {isCustom && (
+        <span className="absolute top-1.5 left-1.5 rounded bg-accent/10 px-1 py-0.5 text-[9px] font-[590] text-accent">
+          Custom
+        </span>
+      )}
+
+      {/* Delete button for custom pets */}
+      {isCustom && onDelete && (
+        <span
+          role="button"
+          tabIndex={0}
+          onClick={(e) => { e.stopPropagation(); onDelete(); }}
+          onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); onDelete(); } }}
+          className="absolute top-1.5 right-1.5 flex size-5 items-center justify-center rounded-full opacity-0 transition-opacity hover:bg-danger/15 group-hover:opacity-100"
+          title="Delete"
+        >
+          <svg width="10" height="10" viewBox="0 0 10 10" className="text-danger">
+            <path d="M1 1L9 9M9 1L1 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+          </svg>
+        </span>
+      )}
+
       <div className="overflow-hidden rounded-lg">
         <SpriteAnimator<ForgePetAnimationName>
           src={src}
@@ -114,11 +141,52 @@ export function PetsSection() {
   const { t } = useTranslation();
   const settings = useAppStore((s) => s.settings);
   const updateSettings = useAppStore((s) => s.updateSettings);
+  const addCustomPet = useAppStore((s) => s.addCustomPet);
+  const removeCustomPet = useAppStore((s) => s.removeCustomPet);
+  const addToast = useAppStore((s) => s.addToast);
+
+  const [importing, setImporting] = useState(false);
 
   const petSettings = settings.pets;
+  const allPets = getAllPets(petSettings.customPets ?? []);
 
   const updatePets = (partial: Partial<typeof petSettings>) => {
     updateSettings({ pets: { ...petSettings, ...partial } });
+  };
+
+  const handleImport = async () => {
+    setImporting(true);
+    try {
+      const result = await window.forgepad.pet.importPet();
+      if (!result.success) {
+        if (result.error === 'cancelled') return;
+        const errorMessages: Record<string, string> = {
+          missing_pet_json: t('settings.pets.error.missingPetJson'),
+          missing_spritesheet: t('settings.pets.error.missingSpritesheet'),
+          invalid_pet_json: t('settings.pets.error.invalidPetJson'),
+          invalid_pet_schema: t('settings.pets.error.invalidPetSchema'),
+          invalid_spritesheet: t('settings.pets.error.invalidSpritesheet'),
+          import_failed: t('settings.pets.error.importFailed'),
+        };
+        addToast('error', errorMessages[result.error] ?? t('settings.pets.error.importFailed'));
+        return;
+      }
+      addCustomPet(result.pet);
+      addToast('success', `${result.pet.displayName} ${t('settings.pets.importSuccess')}`);
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const handleDelete = async (petId: string, displayName: string) => {
+    if (!window.confirm(t('settings.pets.deleteConfirm'))) return;
+    const result = await window.forgepad.pet.deletePet(petId);
+    if (result.success) {
+      removeCustomPet(petId);
+      addToast('success', `${displayName} ${t('settings.pets.deleteSuccess')}`);
+    } else {
+      addToast('error', t('settings.pets.error.deleteFailed'));
+    }
   };
 
   return (
@@ -140,20 +208,43 @@ export function PetsSection() {
         <Slider value={petSettings.petSpeed} min={0.5} max={5} step={0.5} onChange={(v) => updatePets({ petSpeed: v })} label="Pet speed" />
       </SettingRow>
 
+      <SettingRow label={t('settings.pets.randomMove')} description={t('settings.pets.randomMoveDesc')}>
+        <Toggle
+          checked={petSettings.allowRandomMove ?? true}
+          onChange={(v) => updatePets({ allowRandomMove: v })}
+          label="Allow random movement"
+        />
+      </SettingRow>
+
       <Divider />
 
       {/* Pet selection grid */}
-      <div className="mb-2 font-[510] text-[13px] text-text">{t('settings.pets.choosePet')}</div>
-      <p className="mb-4 text-[11px] text-subtle">{t('settings.pets.choosePetDesc')}</p>
+      <div className="mb-2 flex items-center justify-between">
+        <div>
+          <div className="font-[510] text-[13px] text-text">{t('settings.pets.choosePet')}</div>
+          <p className="mt-0.5 text-[11px] text-subtle">{t('settings.pets.choosePetDesc')}</p>
+        </div>
+        <button
+          type="button"
+          onClick={handleImport}
+          disabled={importing}
+          className="shrink-0 rounded-lg border border-dashed border-border px-3 py-1.5 text-[12px] font-[510] text-muted transition-colors hover:border-accent hover:text-accent disabled:opacity-50"
+        >
+          {importing ? t('settings.pets.importing') : t('settings.pets.importCustomPet')}
+        </button>
+      </div>
 
-      <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-2">
-        {PET_REGISTRY.map((pet) => (
+      <div className="mt-4 grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-2">
+        {allPets.map((pet) => (
           <PetCard
             key={pet.id}
             petId={pet.id}
             displayName={pet.displayName}
             selected={petSettings.selectedPetId === pet.id}
+            isCustom={pet.isCustom}
+            cacheBust={pet.isCustom ? (petSettings.customPets ?? []).find((p) => p.id === pet.id)?.importedAt : undefined}
             onClick={() => updatePets({ selectedPetId: pet.id })}
+            onDelete={pet.isCustom ? () => handleDelete(pet.id, pet.displayName) : undefined}
           />
         ))}
       </div>
