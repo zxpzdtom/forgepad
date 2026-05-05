@@ -598,6 +598,8 @@ const zhCN: Record<TranslationKeys, string> = {
   'appearance.missingToken': '缺少必需的 token："{key}"。',
   'appearance.conflictBuiltIn': '主题 ID "{id}" 与内置主题冲突。请修改 JSON 中的 ID 后重新导入。',
   'appearance.invalidJsonFile': '无效的 JSON 文件。请检查文件后重试。',
+  'appearance.sketchyMode': '手绘模式',
+  'appearance.sketchyModeDesc': '为任意主题添加手绘风格效果',
 
   // ── Store (toast messages) ──
   'store.changes': '变更',
