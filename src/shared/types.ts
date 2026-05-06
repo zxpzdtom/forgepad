@@ -1452,11 +1452,31 @@ export const DEFAULT_PET_SETTINGS: PetSettings = {
   customPets: [],
 };
 
+/** A single permission suggestion from Claude Code's PermissionRequest payload. */
+export type PermissionSuggestion = {
+  type: string;
+  rules: Array<{ toolName: string; ruleContent: string }>;
+  behavior: string;
+  destination: string;
+};
+
+/** A single question item from Claude Code's AskUserQuestion tool. */
+export type AskUserQuestionItem = {
+  question: string;
+  header?: string;
+  options: Array<{ label: string; description?: string }>;
+  multiSelect?: boolean;
+};
+
 /** A PermissionRequest pending user approval (forwarded from HookServer). */
 export type PendingPermission = {
   ptyId: string;
   toolName: string;
   toolInput?: Record<string, unknown>;
+  /** Permission suggestions from Claude Code (e.g. "always allow this tool"). */
+  permissionSuggestions?: PermissionSuggestion[];
+  /** Parsed questions from AskUserQuestion tool — if present, show question UI instead of approval UI. */
+  questions?: AskUserQuestionItem[];
 };
 
 export type Locale = 'en' | 'zh-CN';

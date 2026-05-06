@@ -21,9 +21,13 @@ const petApi = {
     ipcRenderer.on(IPC.PET_PERMISSION_REQUEST, handler);
     return () => ipcRenderer.removeListener(IPC.PET_PERMISSION_REQUEST, handler);
   },
-  /** Send a permission decision (allow/deny) back to the main process. */
-  sendPermissionDecision: (ptyId: string, decision: 'allow' | 'deny') => {
-    ipcRenderer.send(IPC.PET_PERMISSION_DECISION, ptyId, decision);
+  /** Send a permission decision back to the main process. */
+  sendPermissionDecision: (
+    ptyId: string,
+    decision: 'allow' | 'deny' | 'allowAlways' | 'answer',
+    answers?: Record<string, string>,
+  ) => {
+    ipcRenderer.send(IPC.PET_PERMISSION_DECISION, ptyId, decision, answers);
   },
   /** Move the pet window to screen coordinates (x, y). */
   moveWindow: (x: number, y: number) => {
