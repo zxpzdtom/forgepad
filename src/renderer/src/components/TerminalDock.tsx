@@ -1,9 +1,9 @@
 import { type MouseEvent, useCallback, useMemo, useRef, useState } from 'react';
+import { closestCenter, DndContext, type DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { horizontalListSortingStrategy, SortableContext } from '@dnd-kit/sortable';
 import { useHorizontalScroll } from '@renderer/hooks/useHorizontalScroll';
 import { useTranslation } from '@renderer/i18n';
 import { getDroppedPaths, hasDraggableFiles } from '@renderer/lib/drag-utils';
-import { closestCenter, DndContext, type DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
-import { horizontalListSortingStrategy, SortableContext } from '@dnd-kit/sortable';
 import { useAppStore } from '@renderer/store/app-store';
 import type { Tab, Workspace } from '@shared/types';
 import { Bot, Minimize2, Plus, TerminalSquare } from 'lucide-react';
@@ -164,7 +164,12 @@ export function TerminalDock() {
         >
           <Plus size={14} />
         </button>
-        <button className="icon-button small" type="button" title={t('terminalDock.hideTerminal')} onClick={() => setTerminalPanelOpen(false)}>
+        <button
+          className="icon-button small"
+          type="button"
+          title={t('terminalDock.hideTerminal')}
+          onClick={() => setTerminalPanelOpen(false)}
+        >
           <Minimize2 size={13} />
         </button>
       </div>

@@ -1,9 +1,9 @@
 import type { CSSProperties } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FileTreeContextMenuItem, GitStatusEntry } from '@pierre/trees';
-import { useTranslation } from '@renderer/i18n';
 import { FileTree, useFileTree, useFileTreeSelection } from '@pierre/trees/react';
 import { useResolvedTheme } from '@renderer/App';
+import { useTranslation } from '@renderer/i18n';
 import { useAppStore } from '@renderer/store/app-store';
 import type { FileNode, Tab, Workspace } from '@shared/types';
 
@@ -14,7 +14,13 @@ import { Spinner } from './Spinner';
 function IconFile() {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none">
-      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path
+        d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
       <path d="M14 2v6h6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
@@ -32,8 +38,20 @@ function IconContext() {
 function IconClipboard() {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none">
-      <path d="M11.502 13h9M13.502 10s-3 2.21-3 3 3 3 3 3M13.998 2h-5a1.5 1.5 0 0 0 0 3h5a1.5 1.5 0 1 0 0-3z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M15.498 3.5c1.554.047 2.48.22 3.121.862.828.827.876 2.129.879 4.638m-12-5.5c-1.553.047-2.48.22-3.121.862-.879.878-.879 2.293-.879 5.121V16c0 2.828 0 4.242.879 5.121C5.255 22 6.67 22 9.498 22h4c2.829 0 4.243 0 5.121-.879.769-.768.865-1.946.877-4.12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path
+        d="M11.502 13h9M13.502 10s-3 2.21-3 3 3 3 3 3M13.998 2h-5a1.5 1.5 0 0 0 0 3h5a1.5 1.5 0 1 0 0-3z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M15.498 3.5c1.554.047 2.48.22 3.121.862.828.827.876 2.129.879 4.638m-12-5.5c-1.553.047-2.48.22-3.121.862-.879.878-.879 2.293-.879 5.121V16c0 2.828 0 4.242.879 5.121C5.255 22 6.67 22 9.498 22h4c2.829 0 4.243 0 5.121-.879.769-.768.865-1.946.877-4.12"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }
@@ -41,8 +59,19 @@ function IconClipboard() {
 function IconFolder() {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none">
-      <path d="M2 19V7.549c0-1.444 0-2.166.243-2.733a3 3 0 0 1 1.573-1.573C4.383 3 5.098 3 6.55 3h.494a2 2 0 0 1 1.557.745L10.418 6m0 0H16c1.4 0 2.1 0 2.635.272a2.5 2.5 0 0 1 1.092 1.093C20 7.9 20 8.6 20 10v1m-9.582-5H7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-      <path d="M3.158 15.514l.298-.742c.734-1.827 1.101-2.74 1.866-3.256C6.088 11 7.076 11 9.052 11h8.06c2.688 0 4.033 0 4.63.879.598.879.098 2.121-.9 4.607l-.298.742c-.734 1.827-1.101 2.74-1.866 3.256-.766.516-1.754.516-3.73.516h-8.06c-2.688 0-4.033 0-4.63-.879-.598-.878-.098-2.121.9-4.607z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+      <path
+        d="M2 19V7.549c0-1.444 0-2.166.243-2.733a3 3 0 0 1 1.573-1.573C4.383 3 5.098 3 6.55 3h.494a2 2 0 0 1 1.557.745L10.418 6m0 0H16c1.4 0 2.1 0 2.635.272a2.5 2.5 0 0 1 1.092 1.093C20 7.9 20 8.6 20 10v1m-9.582-5H7"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M3.158 15.514l.298-.742c.734-1.827 1.101-2.74 1.866-3.256C6.088 11 7.076 11 9.052 11h8.06c2.688 0 4.033 0 4.63.879.598.879.098 2.121-.9 4.607l-.298.742c-.734 1.827-1.101 2.74-1.866 3.256-.766.516-1.754.516-3.73.516h-8.06c-2.688 0-4.033 0-4.63-.879-.598-.878-.098-2.121.9-4.607z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }
@@ -319,7 +348,12 @@ export function FilesPanel() {
     (relPaths: string[]) => {
       if (!workspace || relPaths.length === 0) return;
       addContextFiles(workspace.id, relPaths);
-      addToast('success', relPaths.length === 1 ? t('files.addedToContext', { count: relPaths.length }) : t('files.addedToContextPlural', { count: relPaths.length }));
+      addToast(
+        'success',
+        relPaths.length === 1
+          ? t('files.addedToContext', { count: relPaths.length })
+          : t('files.addedToContextPlural', { count: relPaths.length }),
+      );
     },
     [addContextFiles, addToast, workspace],
   );
@@ -339,7 +373,9 @@ export function FilesPanel() {
             className="flex h-7 items-center gap-[7px] rounded-[5px] bg-transparent px-[9px] text-left text-text hover:bg-panel-3"
             onClick={() => closeAfter(() => openFileTab(workspace.id, item.path))}
           >
-            <span className="flex size-4 shrink-0 items-center justify-center text-subtle"><IconFile /></span>
+            <span className="flex size-4 shrink-0 items-center justify-center text-subtle">
+              <IconFile />
+            </span>
             <span className="text-[13px]">{t('common.open')}</span>
           </button>
         ) : null}
@@ -352,7 +388,9 @@ export function FilesPanel() {
           <span className="flex size-4 shrink-0 items-center justify-center text-subtle">
             {item.kind === 'file' ? <IconContext /> : <IconFolder />}
           </span>
-          <span className="text-[13px]">{item.kind === 'file' ? t('files.addToContext') : t('files.addFolder', { count: itemFiles.length })}</span>
+          <span className="text-[13px]">
+            {item.kind === 'file' ? t('files.addToContext') : t('files.addFolder', { count: itemFiles.length })}
+          </span>
         </button>
         <button
           type="button"
@@ -364,7 +402,9 @@ export function FilesPanel() {
             })
           }
         >
-          <span className="flex size-4 shrink-0 items-center justify-center text-subtle"><IconClipboard /></span>
+          <span className="flex size-4 shrink-0 items-center justify-center text-subtle">
+            <IconClipboard />
+          </span>
           <span className="text-[13px]">{t('files.copyPath')}</span>
         </button>
         <button
@@ -377,7 +417,9 @@ export function FilesPanel() {
             })
           }
         >
-          <span className="flex size-4 shrink-0 items-center justify-center text-subtle"><IconClipboard /></span>
+          <span className="flex size-4 shrink-0 items-center justify-center text-subtle">
+            <IconClipboard />
+          </span>
           <span className="text-[13px]">{t('files.copyRelativePath')}</span>
         </button>
       </div>

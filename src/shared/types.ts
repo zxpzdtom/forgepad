@@ -46,6 +46,23 @@ export type Tab =
       isLoading: boolean;
       canGoBack: boolean;
       canGoForward: boolean;
+    }
+  | {
+      id: string;
+      workspaceId: string;
+      type: 'simulator';
+      /** serve-sim per-device port (0 = not started) */
+      serveSimPort: number;
+      /** Selected device UDID */
+      udid: string;
+      /** Display name, e.g. "iPhone 16 Pro" */
+      deviceName: string;
+      /** Runtime label, e.g. "iOS 18.0" */
+      runtime: string;
+      /** Whether frames are actively streaming */
+      isStreaming: boolean;
+      /** Whether the WebSocket is connected */
+      isConnected: boolean;
     };
 
 /** A URL visited in the browser tab, stored for history/autocomplete */
@@ -55,6 +72,45 @@ export type BrowserHistoryEntry = {
   /** Google favicon API URL, empty string if unavailable */
   favicon: string;
   visitedAt: number;
+};
+
+/** A simulator device returned by simctl */
+export type SimulatorDevice = {
+  id: string;
+  name: string;
+  state: string;
+  isBooted: boolean;
+  runtime: string;
+};
+
+/** Inspectable WebKit target (Safari page, WKWebView) from CDP bridge */
+export type InspectTarget = {
+  id: string;
+  title: string;
+  url: string;
+  appName: string;
+  bundleId?: string;
+};
+
+/** DOM node from CDP DOM.getDocument */
+export type DOMNode = {
+  nodeId: number;
+  backendNodeId: number;
+  nodeType: number;
+  nodeName: string;
+  localName: string;
+  attributes: string[];
+  children?: DOMNode[];
+  childNodeCount?: number;
+};
+
+/** Detailed info about a selected DOM node */
+export type NodeInfo = {
+  selector: string;
+  tagName: string;
+  outerHTML: string;
+  boundingRect: { x: number; y: number; width: number; height: number };
+  computedStyle?: Record<string, string>;
 };
 
 /** Element selected via the in-browser element picker */
@@ -1426,9 +1482,7 @@ export type CustomPetMeta = {
   importedAt: string;
 };
 
-export type ImportPetResult =
-  | { success: true; pet: CustomPetMeta }
-  | { success: false; error: string };
+export type ImportPetResult = { success: true; pet: CustomPetMeta } | { success: false; error: string };
 
 export type DeletePetResult = { success: true } | { success: false; error: string };
 

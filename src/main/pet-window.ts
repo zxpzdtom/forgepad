@@ -1,8 +1,8 @@
 import { join } from 'node:path';
-import { app, BrowserWindow, ipcMain, screen } from 'electron';
-import { IPC } from '@shared/ipc';
 import type { AgentStatus } from '@shared/agent-lifecycle';
+import { IPC } from '@shared/ipc';
 import type { PetSettings } from '@shared/types';
+import { app, BrowserWindow, ipcMain, screen } from 'electron';
 
 let petWindow: BrowserWindow | null = null;
 
@@ -156,11 +156,7 @@ export function sendPetAgentStatus(status: AgentStatus): void {
 }
 
 /** Forward a PermissionRequest with tool details to the pet overlay. */
-export function sendPetPermissionRequest(
-  ptyId: string,
-  toolName: string,
-  toolInput?: Record<string, unknown>,
-): void {
+export function sendPetPermissionRequest(ptyId: string, toolName: string, toolInput?: Record<string, unknown>): void {
   if (!petWindow || petWindow.isDestroyed()) return;
   petWindow.webContents.send(IPC.PET_PERMISSION_REQUEST, { ptyId, toolName, toolInput });
 }

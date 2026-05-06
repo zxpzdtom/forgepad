@@ -1,5 +1,5 @@
-import { IPC } from '@shared/ipc';
 import type { AgentStatus } from '@shared/agent-lifecycle';
+import { IPC } from '@shared/ipc';
 import type { PendingPermission, PetSettings } from '@shared/types';
 import { contextBridge, ipcRenderer } from 'electron';
 

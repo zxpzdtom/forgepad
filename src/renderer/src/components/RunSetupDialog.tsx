@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { Check, FileJson2, Plus, Save, Trash2, X } from 'lucide-react';
 import { useTranslation } from '@renderer/i18n';
+import { Check, FileJson2, Plus, Save, Trash2, X } from 'lucide-react';
 
 interface RunCommandEntry {
   name: string;
@@ -51,7 +51,7 @@ export function RunSetupDialog({
   return (
     <div className="fixed inset-0 z-[60] grid place-items-center bg-black/85" onMouseDown={onClose}>
       <div
-        className="flex w-[min(480px,calc(100vw-32px))] max-h-[min(560px,calc(100vh-64px))] flex-col overflow-hidden rounded-xl border border-border bg-surface-dialog shadow-[0_28px_70px_rgba(0,0,0,0.46)]"
+        className="flex max-h-[min(560px,calc(100vh-64px))] w-[min(480px,calc(100vw-32px))] flex-col overflow-hidden rounded-xl border border-border bg-surface-dialog shadow-[0_28px_70px_rgba(0,0,0,0.46)]"
         onMouseDown={(e) => e.stopPropagation()}
       >
         {/* ── Header ── */}
@@ -76,7 +76,7 @@ export function RunSetupDialog({
                       className="group flex items-center gap-2.5 rounded-md border border-border bg-panel-2 px-3 py-1.5"
                     >
                       <div className="min-w-0 flex-1">
-                        <div className="truncate text-[13px] font-[510] text-text">{entry.name}</div>
+                        <div className="truncate font-[510] text-[13px] text-text">{entry.name}</div>
                         <div className="truncate font-mono text-[11px] text-subtle">{entry.command}</div>
                       </div>
                       <button

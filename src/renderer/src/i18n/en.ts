@@ -384,6 +384,7 @@ const en = {
 
   // ── Tab Bar ──
   'tabBar.openBrowser': 'Open Browser',
+  'tabBar.openSimulator': 'Open Simulator',
 
   // ── Tab Context Menu ──
   'tabMenu.rename': 'Rename',
@@ -513,6 +514,50 @@ const en = {
   'browser.noActiveAgent': 'No active agent terminal. Please open an agent tab first.',
   'browser.consoleLogHeader': '[Browser Console — {count} log]',
   'browser.consoleLogHeaderPlural': '[Browser Console — {count} logs]',
+
+  // ── Simulator ──
+  'simulator.title': 'Simulator',
+  'simulator.connect': 'Connect',
+  'simulator.disconnect': 'Disconnect',
+  'simulator.selectDevice': 'Select device',
+  'simulator.loadingDevices': 'Loading devices...',
+  'simulator.noDevices': 'No simulator devices found',
+  'simulator.connectionFailed': 'Connection failed',
+  'simulator.connectionFailedDetail': 'Could not start the simulator stream. Make sure Xcode and a simulator are available.',
+  'simulator.refreshDevices': 'Refresh devices',
+  'simulator.startStream': 'Start streaming',
+  'simulator.inspect': 'Inspect',
+  'simulator.screenshot': 'Screenshot',
+  'simulator.screenshotSaved': 'Screenshot saved',
+  'simulator.connecting': 'Connecting to simulator...',
+  'simulator.reconnecting': 'Reconnecting...',
+  'simulator.statusConnected': 'Connected',
+  'simulator.statusConnecting': 'Connecting',
+  'simulator.statusReconnecting': 'Reconnecting',
+  'simulator.statusIdle': 'Idle',
+  'simulator.emptyTitle': 'iOS Simulator',
+  'simulator.emptyDescription': 'Stream and interact with iOS simulators. Select a device to get started.',
+  'simulator.inspectHint': 'Click and drag to select a region, ESC to cancel',
+  'simulator.startingServer': 'Starting simulator stream...',
+  'simulator.xcodeRequired': 'Xcode is required to use the iOS Simulator.',
+  'simulator.xcodeRequiredDetail':
+    'Please install Xcode from the Mac App Store and ensure Xcode Command Line Tools are configured.',
+  'simulator.streamReady': 'Simulator stream ready',
+  'simulator.streamError': 'Failed to start simulator stream',
+  'simulator.homeButton': 'Home',
+  'simulator.lockButton': 'Lock',
+  'simulator.inspectElement': 'Inspect Element',
+  'simulator.regionSelect': 'Region Select',
+  'simulator.elements': 'Elements',
+  'simulator.styles': 'Styles',
+  'simulator.noWebTargets': 'No inspectable WebViews found',
+  'simulator.refreshTargets': 'Refresh targets',
+  'simulator.refreshTree': 'Refresh tree',
+  'simulator.loadingTree': 'Loading DOM tree…',
+  'simulator.loadingStyles': 'Loading styles…',
+  'simulator.noStyles': 'No computed styles',
+  'simulator.selectElement': 'Select an element to view styles',
+  'simulator.sendFeedback': 'Send Feedback',
 
   // ── Browser Feedback Modal ──
   'browserFeedback.title': 'Element Feedback',

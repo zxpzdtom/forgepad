@@ -1,6 +1,7 @@
-import { createContext, useContext, useCallback, useMemo } from 'react';
+import { createContext, useCallback, useContext, useMemo } from 'react';
 import { useAppStore } from '@renderer/store/app-store';
 import type { Locale } from '@shared/types';
+
 import en, { type TranslationKeys } from './en';
 import zhCN from './zh-CN';
 
@@ -61,10 +62,7 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
     [locale],
   );
 
-  const value = useMemo<I18nContextValue>(
-    () => ({ locale, t, setLocale }),
-    [locale, t, setLocale],
-  );
+  const value = useMemo<I18nContextValue>(() => ({ locale, t, setLocale }), [locale, t, setLocale]);
 
   return <I18nContext value={value}>{children}</I18nContext>;
 }

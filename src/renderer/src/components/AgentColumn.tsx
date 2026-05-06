@@ -1,6 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
-import { useAppStore } from '@renderer/store/app-store';
 import { getDroppedPaths, hasDraggableFiles } from '@renderer/lib/drag-utils';
+import { useAppStore } from '@renderer/store/app-store';
 import type { Workspace } from '@shared/types';
 
 import { TerminalPanel } from './TerminalPanel';
@@ -68,7 +68,7 @@ export function AgentColumn() {
 
   return (
     <div
-      className={`flex size-full min-h-0 min-w-0 flex-col bg-bg relative ${dropHighlight ? 'drop-target-active' : ''}`}
+      className={`relative flex size-full min-h-0 min-w-0 flex-col bg-bg ${dropHighlight ? 'drop-target-active' : ''}`}
       onMouseDown={handleMouseDown}
       onDragOver={handleDragOver}
       onDragEnter={handleDragEnter}

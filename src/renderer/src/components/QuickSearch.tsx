@@ -1,6 +1,7 @@
 import { type KeyboardEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
-import { getTabTitle, type SettingsSection, useAppStore } from '@renderer/store/app-store';
 import { useTranslation } from '@renderer/i18n';
+import { getTabTitle, type SettingsSection, useAppStore } from '@renderer/store/app-store';
+import { BUILTIN_THEMES } from '@shared/types';
 import {
   Bell,
   Bot,
@@ -9,13 +10,14 @@ import {
   FolderOpen,
   GitBranch,
   GitCompare,
+  Globe,
   Keyboard,
   Monitor,
   Moon,
   Paintbrush,
   Palette,
-  Pencil,
   PanelRight,
+  Pencil,
   Search,
   SendHorizontal,
   Settings,
@@ -24,7 +26,7 @@ import {
   Terminal,
   TerminalSquare,
 } from 'lucide-react';
-import { BUILTIN_THEMES } from '@shared/types';
+
 import { agentPresetIcon } from './AgentIcons';
 import { FileIcon } from './FileIcon';
 
@@ -154,6 +156,15 @@ export function QuickSearch({ open, onClose }: QuickSearchProps) {
         tabIcon = <FileIcon filePath={tab.relPath} size={16} />;
       } else if (tab.type === 'diff') {
         tabIcon = <GitCompare size={16} />;
+      } else if (tab.type === 'browser') {
+        tabIcon = <Globe size={16} />;
+      } else if (tab.type === 'simulator') {
+        tabIcon = (
+          <svg width="16" height="16" viewBox="0 0 14 14" fill="none">
+            <rect x="3.5" y="1" width="7" height="12" rx="1.5" stroke="currentColor" strokeWidth="1.2" />
+            <line x1="5.5" y1="11" x2="8.5" y2="11" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+          </svg>
+        );
       } else {
         tabIcon = <FileCode2 size={16} />;
       }

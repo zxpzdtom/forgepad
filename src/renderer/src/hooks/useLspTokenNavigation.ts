@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from 'react';
-import { useAppStore } from '@renderer/store/app-store';
 import type { DiffTokenEventBaseProps, TokenEventBase } from '@pierre/diffs';
+import { useAppStore } from '@renderer/store/app-store';
 
 /** Alias mappings mirroring electron.vite.config.ts resolve.alias */
 const PATH_ALIASES: Record<string, string> = {
@@ -48,11 +48,7 @@ function looksLikeImportPath(text: string): boolean {
  * expanding aliases and trying common file extensions.
  * Returns the resolved relPath or null if no file found.
  */
-async function resolveImportPath(
-  worktreePath: string,
-  importPath: string,
-  currentFilePath: string,
-): Promise<string | null> {
+async function resolveImportPath(worktreePath: string, importPath: string, currentFilePath: string): Promise<string | null> {
   let resolvedBase: string;
 
   // 1. Try alias expansion
@@ -233,16 +229,13 @@ export function useLspTokenNavigation(
     [mode],
   );
 
-  const onTokenLeave = useCallback(
-    (props: DiffTokenEventBaseProps | TokenEventBase, _event: PointerEvent) => {
-      if (hoveredTokenRef.current === props.tokenElement) {
-        hoveredTokenRef.current.style.textDecoration = '';
-        hoveredTokenRef.current.style.cursor = '';
-        hoveredTokenRef.current = null;
-      }
-    },
-    [],
-  );
+  const onTokenLeave = useCallback((props: DiffTokenEventBaseProps | TokenEventBase, _event: PointerEvent) => {
+    if (hoveredTokenRef.current === props.tokenElement) {
+      hoveredTokenRef.current.style.textDecoration = '';
+      hoveredTokenRef.current.style.cursor = '';
+      hoveredTokenRef.current = null;
+    }
+  }, []);
 
   return { onTokenClick, onTokenEnter, onTokenLeave };
 }

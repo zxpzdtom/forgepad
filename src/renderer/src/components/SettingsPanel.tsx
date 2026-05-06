@@ -28,6 +28,7 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
+
 import { agentPresetIcon } from './AgentIcons';
 import { AppearancePanel } from './AppearancePanel';
 import { DOTMATRIX_SPINNERS } from './dotmatrix';
@@ -196,8 +197,12 @@ function AgentPresetRow({
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <span className="font-[510] text-[13px] text-text">{preset.label}</span>
-          {isDefault && <span className="rounded-full bg-accent/20 px-1.5 py-0.5 text-[10px] text-accent">{t('common.default')}</span>}
-          {preset.builtIn && <span className="rounded-full bg-panel-3 px-1.5 py-0.5 text-[10px] text-subtle">{t('common.builtIn')}</span>}
+          {isDefault && (
+            <span className="rounded-full bg-accent/20 px-1.5 py-0.5 text-[10px] text-accent">{t('common.default')}</span>
+          )}
+          {preset.builtIn && (
+            <span className="rounded-full bg-panel-3 px-1.5 py-0.5 text-[10px] text-subtle">{t('common.builtIn')}</span>
+          )}
         </div>
         <code className="mt-0.5 block truncate font-mono text-[11px] text-subtle">{preset.command}</code>
       </div>
@@ -265,7 +270,9 @@ function EditPresetDialog({
         onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="flex h-12 items-center justify-between border-border border-b px-4">
-          <span className="font-[590] text-[15px] text-text">{preset ? t('settings.agent.editPresetTitle') : t('settings.agent.addPresetTitle')}</span>
+          <span className="font-[590] text-[15px] text-text">
+            {preset ? t('settings.agent.editPresetTitle') : t('settings.agent.addPresetTitle')}
+          </span>
           <button className="icon-button border-transparent" type="button" onClick={onClose}>
             <X size={16} />
           </button>
@@ -311,7 +318,8 @@ function EditPresetDialog({
             {showAdvanced && (
               <div className="mt-3 space-y-1.5">
                 <label className="font-[510] text-[12px] text-subtle" htmlFor="preset-restore">
-                  {t('settings.agent.restoreTemplate')} <span className="text-subtle/60">{t('settings.agent.restoreTemplateOptional')}</span>
+                  {t('settings.agent.restoreTemplate')}{' '}
+                  <span className="text-subtle/60">{t('settings.agent.restoreTemplateOptional')}</span>
                 </label>
                 <input
                   id="preset-restore"
@@ -517,10 +525,7 @@ function AgentSection() {
         />
       </SettingRow>
 
-      <SettingRow
-        label={t('settings.agent.clearComments')}
-        description={t('settings.agent.clearCommentsDesc')}
-      >
+      <SettingRow label={t('settings.agent.clearComments')} description={t('settings.agent.clearCommentsDesc')}>
         <Toggle
           checked={settings.sendAndClearComments}
           onChange={(v) => updateSettings({ sendAndClearComments: v })}
@@ -772,7 +777,9 @@ function ShortcutsSection() {
           if (defs.length === 0) return null;
           return (
             <div key={cat}>
-              <div className="mb-2 font-semibold text-[11px] text-subtle uppercase tracking-wider">{t(`settings.shortcuts.category.${cat}` as any)}</div>
+              <div className="mb-2 font-semibold text-[11px] text-subtle uppercase tracking-wider">
+                {t(`settings.shortcuts.category.${cat}` as any)}
+              </div>
               <div className="divide-y divide-border rounded-lg border border-border bg-panel">
                 {defs.map((def) => (
                   <div key={def.id} className="flex items-center justify-between px-3 py-2">
@@ -818,9 +825,7 @@ function GitSection() {
       {/* Worktree Base Directory — full-width layout for long paths */}
       <div className="py-2">
         <div className="font-[510] text-[13px] text-text">{t('settings.git.worktreeBaseDir')}</div>
-        <div className="mt-0.5 mb-2 text-[11px] text-subtle leading-tight">
-          {t('settings.git.worktreeBaseDirDesc')}
-        </div>
+        <div className="mt-0.5 mb-2 text-[11px] text-subtle leading-tight">{t('settings.git.worktreeBaseDirDesc')}</div>
         <div className="flex gap-2">
           <input
             className="h-8 min-w-0 flex-1 rounded-md border border-border bg-panel-2 px-3 font-mono text-[12px] text-text outline-none placeholder:text-muted focus:border-accent/60 focus:ring-1 focus:ring-accent/30"
@@ -835,9 +840,12 @@ function GitSection() {
         </div>
         {settings.worktreeBaseDir && (
           <button
-            className="mt-1.5 text-[11px] text-subtle hover:text-text transition-colors"
+            className="mt-1.5 text-[11px] text-subtle transition-colors hover:text-text"
             type="button"
-            onClick={() => { updateSettings({ worktreeBaseDir: '' }); setTimeout(() => syncWorktrees(), 100); }}
+            onClick={() => {
+              updateSettings({ worktreeBaseDir: '' });
+              setTimeout(() => syncWorktrees(), 100);
+            }}
           >
             {t('settings.git.resetToDefault')}
           </button>

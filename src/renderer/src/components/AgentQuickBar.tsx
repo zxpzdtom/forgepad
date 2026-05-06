@@ -82,9 +82,7 @@ export function AgentQuickBar() {
               }
             }
           }
-          setPkgScripts(
-            Object.entries(pkg.scripts).map(([name]) => ({ name, command: `${pm} ${name}` })),
-          );
+          setPkgScripts(Object.entries(pkg.scripts).map(([name]) => ({ name, command: `${pm} ${name}` })));
         }
       } catch {
         if (!cancelled) setPkgScripts([]);
@@ -213,7 +211,11 @@ export function AgentQuickBar() {
               className="flex h-7 items-center gap-1.5 px-2.5 text-[13px] text-text transition-colors hover:bg-panel-3 disabled:cursor-not-allowed disabled:text-subtle"
               type="button"
               disabled={!activeWorkspaceId}
-              title={activeEntry ? t('agent.runCommandDetail', { name: activeEntry.name, command: activeEntry.command }) : t('agent.configureRun')}
+              title={
+                activeEntry
+                  ? t('agent.runCommandDetail', { name: activeEntry.name, command: activeEntry.command })
+                  : t('agent.configureRun')
+              }
               onClick={handleRun}
             >
               <Play size={14} className="text-ok" />
@@ -251,9 +253,7 @@ export function AgentQuickBar() {
             <div className="px-2 py-1.5 text-[11px] text-subtle">{t('agent.runCommands')}</div>
 
             {menuEntries.length === 0 && (
-              <div className="px-2 py-2 text-center text-[12px] text-subtle/60">
-                {t('agent.noCommandsYet')}
-              </div>
+              <div className="px-2 py-2 text-center text-[12px] text-subtle/60">{t('agent.noCommandsYet')}</div>
             )}
 
             {menuEntries.map((entry, i) => {

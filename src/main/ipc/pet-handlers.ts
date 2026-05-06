@@ -1,8 +1,8 @@
-import path from 'node:path';
 import fs from 'node:fs/promises';
-import { app, BrowserWindow, dialog, ipcMain } from 'electron';
+import path from 'node:path';
 import { IPC } from '@shared/ipc';
 import type { CustomPetMeta, DeletePetResult, ImportPetResult } from '@shared/types';
+import { app, BrowserWindow, dialog, ipcMain } from 'electron';
 
 function customPetsDir(): string {
   return path.join(app.getPath('userData'), 'custom-pets');
@@ -45,8 +45,14 @@ export function registerPetHandlers(): void {
 
       // Check files exist
       const [petJsonExists, spritesheetExists] = await Promise.all([
-        fs.access(petJsonPath).then(() => true).catch(() => false),
-        fs.access(spritesheetPath).then(() => true).catch(() => false),
+        fs
+          .access(petJsonPath)
+          .then(() => true)
+          .catch(() => false),
+        fs
+          .access(spritesheetPath)
+          .then(() => true)
+          .catch(() => false),
       ]);
 
       if (!petJsonExists) {
@@ -156,10 +162,7 @@ export function registerPetHandlers(): void {
             importedAt: '',
           });
         }
-      } catch {
-        // Skip malformed entries
-        continue;
-      }
+      } catch {}
     }
 
     return pets;

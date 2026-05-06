@@ -1,6 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode, useCallback, useRef, useState } from 'react';
 import { useTranslation } from '@renderer/i18n';
-
 import { getDroppedPaths, hasDraggableFiles, isInternalDrop } from '@renderer/lib/drag-utils';
 import { useAppStore } from '@renderer/store/app-store';
 import type { Workspace } from '@shared/types';
@@ -10,9 +9,13 @@ import { ContextPreview } from './ContextPreview';
 import { DiffViewer } from './DiffViewer';
 import { FileEditor } from './FileEditor';
 import { LspSymbolPeek } from './LspSymbolPeek';
+import { SimulatorTab } from './SimulatorTab';
 
 /** Error boundary so a crashing BrowserTab doesn't take down the whole column */
-class BrowserErrorBoundary extends Component<{ children: ReactNode; onRetry: () => void; crashMessage: string; reloadLabel: string }, { hasError: boolean; error: string }> {
+class BrowserErrorBoundary extends Component<
+  { children: ReactNode; onRetry: () => void; crashMessage: string; reloadLabel: string },
+  { hasError: boolean; error: string }
+> {
   state = { hasError: false, error: '' };
   static getDerivedStateFromError(error: Error) {
     return { hasError: true, error: error.message };
@@ -153,8 +156,26 @@ export function FileColumn() {
           if (tab.type === 'browser') {
             return (
               <div key={tab.id} className="absolute inset-0" style={{ display: isActive ? 'block' : 'none' }}>
-                <BrowserErrorBoundary onRetry={() => {}} crashMessage={t('fileColumn.browserCrashed')} reloadLabel={t('common.reload')}>
+                <BrowserErrorBoundary
+                  onRetry={() => {}}
+                  crashMessage={t('fileColumn.browserCrashed')}
+                  reloadLabel={t('common.reload')}
+                >
                   <BrowserTab tab={tab} />
+                </BrowserErrorBoundary>
+              </div>
+            );
+          }
+          // Simulator tabs stay mounted (hidden) to preserve WebSocket state
+          if (tab.type === 'simulator') {
+            return (
+              <div key={tab.id} className="absolute inset-0" style={{ display: isActive ? 'block' : 'none' }}>
+                <BrowserErrorBoundary
+                  onRetry={() => {}}
+                  crashMessage={t('fileColumn.browserCrashed')}
+                  reloadLabel={t('common.reload')}
+                >
+                  <SimulatorTab tab={tab} />
                 </BrowserErrorBoundary>
               </div>
             );

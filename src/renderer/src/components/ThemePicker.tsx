@@ -1,6 +1,6 @@
+import { useTranslation } from '@renderer/i18n';
 import { Monitor, Moon, Sun } from 'lucide-react';
 
-import { useTranslation } from '@renderer/i18n';
 import { SegmentedControl } from './SegmentedControl';
 
 /**

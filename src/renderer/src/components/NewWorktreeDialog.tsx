@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { useAppStore } from '@renderer/store/app-store';
-import { generateRandomBranchName } from '@renderer/lib/random-branch-name';
-import { RefreshCw } from 'lucide-react';
 import { useTranslation } from '@renderer/i18n';
+import { generateRandomBranchName } from '@renderer/lib/random-branch-name';
+import { useAppStore } from '@renderer/store/app-store';
+import { RefreshCw } from 'lucide-react';
 
 export function NewWorktreeDialog({
   projectName,

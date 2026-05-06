@@ -72,9 +72,7 @@ export function PetApprovalPopup({
         position: isOverlay ? 'relative' : 'absolute',
         bottom: isOverlay ? undefined : '100%',
         left: isOverlay ? '50%' : '50%',
-        transform: isOverlay
-          ? `translateX(-50%) scale(${visible ? 1 : 0.9})`
-          : `translateX(-50%) scale(${visible ? 1 : 0.9})`,
+        transform: isOverlay ? `translateX(-50%) scale(${visible ? 1 : 0.9})` : `translateX(-50%) scale(${visible ? 1 : 0.9})`,
         marginBottom: isOverlay ? 4 : 8,
         opacity: visible ? 1 : 0,
         transition: 'opacity 0.2s ease, transform 0.2s ease',

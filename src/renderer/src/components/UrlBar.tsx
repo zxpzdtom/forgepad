@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-
 import { useTranslation } from '@renderer/i18n';
 import type { BrowserHistoryEntry } from '@shared/types';
 
@@ -25,16 +24,7 @@ function GlobeIcon() {
 function FaviconImg({ src, alt }: { src: string; alt: string }) {
   const [failed, setFailed] = useState(!src);
   if (failed || !src) return <GlobeIcon />;
-  return (
-    <img
-      src={src}
-      alt={alt}
-      width={14}
-      height={14}
-      className="shrink-0 rounded-sm"
-      onError={() => setFailed(true)}
-    />
-  );
+  return <img src={src} alt={alt} width={14} height={14} className="shrink-0 rounded-sm" onError={() => setFailed(true)} />;
 }
 
 export function UrlBar({ value, onChange, onNavigate, history }: UrlBarProps) {
@@ -48,9 +38,7 @@ export function UrlBar({ value, onChange, onNavigate, history }: UrlBarProps) {
   const suggestions = useMemo(() => {
     const q = value.trim().toLowerCase();
     if (!q) return history.slice(0, 10);
-    return history
-      .filter((h) => h.url.toLowerCase().includes(q) || h.title.toLowerCase().includes(q))
-      .slice(0, 10);
+    return history.filter((h) => h.url.toLowerCase().includes(q) || h.title.toLowerCase().includes(q)).slice(0, 10);
   }, [value, history]);
 
   // Close on outside click
@@ -157,7 +145,7 @@ export function UrlBar({ value, onChange, onNavigate, history }: UrlBarProps) {
           onKeyDown={handleKeyDown}
           placeholder={t('urlBar.placeholder')}
           spellCheck={false}
-          className="h-7 w-full rounded border border-border bg-panel-2 py-0 pl-2.5 pr-7 text-text text-xs transition-colors placeholder:text-subtle focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/30"
+          className="h-7 w-full rounded border border-border bg-panel-2 py-0 pr-7 pl-2.5 text-text text-xs transition-colors placeholder:text-subtle focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/30"
         />
         {/* Chevron / history toggle */}
         <button
@@ -181,7 +169,7 @@ export function UrlBar({ value, onChange, onNavigate, history }: UrlBarProps) {
 
       {/* Dropdown */}
       {open && suggestions.length > 0 && (
-        <div className="absolute top-full left-0 right-0 z-50 mt-1 max-h-72 overflow-auto rounded-lg border border-border bg-panel shadow-xl">
+        <div className="absolute top-full right-0 left-0 z-50 mt-1 max-h-72 overflow-auto rounded-lg border border-border bg-panel shadow-xl">
           {suggestions.map((entry, idx) => {
             const isActive = idx === activeIdx;
             return (

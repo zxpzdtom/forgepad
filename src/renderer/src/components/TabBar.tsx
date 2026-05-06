@@ -1,9 +1,9 @@
 import { type MouseEvent, useCallback, useEffect, useMemo, useState } from 'react';
-import { useTranslation } from '@renderer/i18n';
 import { closestCenter, DndContext, type DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { restrictToHorizontalAxis, restrictToParentElement } from '@dnd-kit/modifiers';
 import { horizontalListSortingStrategy, SortableContext } from '@dnd-kit/sortable';
 import { useHorizontalScroll } from '@renderer/hooks/useHorizontalScroll';
+import { useTranslation } from '@renderer/i18n';
 import { getDroppedPaths, hasDraggableFiles, isInternalDrop } from '@renderer/lib/drag-utils';
 import { getTabTitle, useAppStore } from '@renderer/store/app-store';
 import type { Tab } from '@shared/types';
@@ -18,6 +18,13 @@ function tabIcon(tab: Tab) {
   if (tab.type === 'diff') return <GitCompare size={14} />;
   if (tab.type === 'context-preview') return <ClipboardList size={14} />;
   if (tab.type === 'browser') return <Globe size={14} />;
+  if (tab.type === 'simulator')
+    return (
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+        <rect x="3.5" y="1" width="7" height="12" rx="1.5" stroke="currentColor" strokeWidth="1.2" />
+        <line x1="5.5" y1="11" x2="8.5" y2="11" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+      </svg>
+    );
   return <FileIcon filePath={tab.relPath} size={16} />;
 }
 
@@ -120,7 +127,7 @@ export function TabBar() {
 
   return (
     <div
-      className={`workspace-tabbar tabbar relative flex h-9 shrink-0 items-center border-b border-border bg-bg ${dropHighlight ? 'drop-target-active' : ''}`}
+      className={`workspace-tabbar tabbar relative flex h-9 shrink-0 items-center border-border border-b bg-bg ${dropHighlight ? 'drop-target-active' : ''}`}
       onDragOver={handleFileDragOver}
       onDragEnter={handleFileDragEnter}
       onDragLeave={handleFileDragLeave}
@@ -154,11 +161,7 @@ export function TabBar() {
                   onContextMenu={(event) => handleContextMenu(event, tab)}
                   className="min-w-[80px] max-w-[240px]"
                   data-tab-id={tab.id}
-                  suffix={
-                    isExternal ? (
-                      <ExternalLink size={10} className="shrink-0 text-subtle" />
-                    ) : undefined
-                  }
+                  suffix={isExternal ? <ExternalLink size={10} className="shrink-0 text-subtle" /> : undefined}
                 />
               );
             })}
@@ -173,6 +176,18 @@ export function TabBar() {
         className="mx-1 flex h-7 w-7 shrink-0 items-center justify-center rounded text-(--color-text-3) transition-colors hover:bg-(--color-bg-3) hover:text-(--color-text-1)"
       >
         <Globe size={14} />
+      </button>
+      {/* Open Simulator tab button */}
+      <button
+        type="button"
+        onClick={() => useAppStore.getState().createSimulatorTab()}
+        title={t('tabBar.openSimulator')}
+        className="mr-1 flex h-7 w-7 shrink-0 items-center justify-center rounded text-(--color-text-3) transition-colors hover:bg-(--color-bg-3) hover:text-(--color-text-1)"
+      >
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <rect x="3.5" y="1" width="7" height="12" rx="1.5" stroke="currentColor" strokeWidth="1.2" />
+          <line x1="5.5" y1="11" x2="8.5" y2="11" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+        </svg>
       </button>
       {contextMenu && (
         <TabContextMenu

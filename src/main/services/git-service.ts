@@ -1,6 +1,6 @@
 import { execFile } from 'node:child_process';
 import { existsSync } from 'node:fs';
-import { mkdir, readFile, readdir, rm } from 'node:fs/promises';
+import { mkdir, readdir, readFile, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import type { DiffFileData, FileStatus, GitBucket, GitStatusKind } from '@shared/types';
@@ -476,9 +476,7 @@ export class GitService {
 
           const actualBranch = await GitService.getCurrentBranch(worktreePath).catch(() => branch);
           results.push({ repoName, repoPath, branch: actualBranch, worktreePath });
-        } catch {
-          continue;
-        }
+        } catch {}
       }
     }
 
@@ -506,7 +504,10 @@ export class GitService {
     // HTTPS: https://host/owner/repo.git
     try {
       const url = new URL(trimmed);
-      const segments = url.pathname.replace(/\.git$/, '').split('/').filter(Boolean);
+      const segments = url.pathname
+        .replace(/\.git$/, '')
+        .split('/')
+        .filter(Boolean);
       if (segments.length >= 2) {
         const repo = segments.pop()!;
         return { host: url.host, owner: segments.join('/'), repo };
@@ -554,18 +555,12 @@ export class GitService {
       }
 
       // Get the SHA of the branch on the remote
-      const branchRefOutput = await git(
-        ['ls-remote', '--heads', 'origin', `refs/heads/${branch}`],
-        worktreePath,
-      ).catch(() => '');
+      const branchRefOutput = await git(['ls-remote', '--heads', 'origin', `refs/heads/${branch}`], worktreePath).catch(() => '');
       const branchSha = branchRefOutput.split(/\s+/)[0];
       if (!branchSha) return null;
 
       // Fetch all PR/MR head refs from the remote
-      const prRefsOutput = await git(
-        ['ls-remote', 'origin', `${refPrefix}*/head`],
-        worktreePath,
-      ).catch(() => '');
+      const prRefsOutput = await git(['ls-remote', 'origin', `${refPrefix}*/head`], worktreePath).catch(() => '');
       if (!prRefsOutput) return null;
 
       // Find the PR whose head SHA matches our branch's remote SHA

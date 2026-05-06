@@ -202,10 +202,12 @@ function AppInner() {
         const state = useAppStore.getState();
         const tab = state.tabs.find((t) => t.id === state.activeFileTabId);
         if (!tab || tab.type !== 'file') return;
-        const path = tab.absPath ?? (() => {
-          const ws = state.workspaces.find((w) => w.id === tab.workspaceId);
-          return ws ? `${ws.worktreePath}/${tab.relPath}` : null;
-        })();
+        const path =
+          tab.absPath ??
+          (() => {
+            const ws = state.workspaces.find((w) => w.id === tab.workspaceId);
+            return ws ? `${ws.worktreePath}/${tab.relPath}` : null;
+          })();
         if (!path) return;
         void navigator.clipboard.writeText(path);
         state.addToast('info', t('app.toast.pathCopied'));
@@ -412,9 +414,7 @@ function AppInner() {
             <FolderOpen size={32} />
           </div>
           <h1 className="m-0 font-semibold text-[22px]">{t('app.emptyState.title')}</h1>
-          <p className="m-0 max-w-[460px] text-muted leading-relaxed">
-            {t('app.emptyState.description')}
-          </p>
+          <p className="m-0 max-w-[460px] text-muted leading-relaxed">{t('app.emptyState.description')}</p>
           <button className="primary-button" type="button" onClick={openProject}>
             <FolderOpen size={16} />
             {t('app.emptyState.openProject')}
@@ -514,7 +514,7 @@ function AppInner() {
     // Agent only (no file tabs)
     if (hasAgentTabs) {
       return (
-        <div className={`flex size-full min-h-0 flex-col bg-bg${focusedColumn === 'agent' ? ' pane-focused' : ''}`}>
+        <div className={`flex size-full min-h-0 flex-col bg-bg${focusedColumn === 'agent' ? 'pane-focused' : ''}`}>
           <AgentTabBar />
           <AgentQuickBar />
           <div className="relative min-h-0 flex-1 overflow-hidden">

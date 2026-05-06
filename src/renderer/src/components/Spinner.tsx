@@ -1,4 +1,4 @@
-import { DOTMATRIX_MAP, DEFAULT_DOTMATRIX_STYLE } from './dotmatrix';
+import { DEFAULT_DOTMATRIX_STYLE, DOTMATRIX_MAP } from './dotmatrix';
 
 /**
  * Renders a DotMatrix loading spinner by style id.

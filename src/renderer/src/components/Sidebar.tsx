@@ -1,13 +1,13 @@
-import { type KeyboardEvent, type ReactNode, memo, useEffect, useMemo, useState } from 'react';
+import { type KeyboardEvent, memo, type ReactNode, useEffect, useMemo, useState } from 'react';
 import { closestCenter, DndContext, type DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import data from '@emoji-mart/data';
+import EmojiPicker from '@emoji-mart/react';
 import { useTranslation } from '@renderer/i18n';
 import { useAppStore } from '@renderer/store/app-store';
 import type { AgentStatus } from '@shared/agent-lifecycle';
 import type { Project, WorkspacePanel } from '@shared/types';
-import data from '@emoji-mart/data';
-import EmojiPicker from '@emoji-mart/react';
 import { FolderOpen, FolderPlus, Plus, Settings } from 'lucide-react';
 
 import { ContextMenu, type ContextMenuSection } from './ContextMenu';
@@ -58,13 +58,7 @@ function GitBranchIcon({ className }: { className?: string }) {
         strokeLinecap="round"
         strokeLinejoin="round"
       />
-      <path
-        d="M18 9c0 3-2 4-6 6"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
+      <path d="M18 9c0 3-2 4-6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
@@ -169,7 +163,13 @@ function CancelIcon({ className }: { className?: string }) {
 function PencilIcon({ className }: { className?: string }) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" className={className}>
-      <path d="M17 3a2.83 2.83 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path
+        d="M17 3a2.83 2.83 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }
@@ -177,7 +177,13 @@ function PencilIcon({ className }: { className?: string }) {
 function TrashIcon({ className }: { className?: string }) {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" className={className}>
-      <path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path
+        d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m3 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6h14z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }
@@ -543,24 +549,36 @@ function ProjectContextMenu({
     {
       label: t('sidebar.menu.openInFinder'),
       icon: <FolderIcon className="size-4" />,
-      action: () => { void window.forgepad.shell.openPath(project.repoPath); onClose(); },
+      action: () => {
+        void window.forgepad.shell.openPath(project.repoPath);
+        onClose();
+      },
     },
     {
       label: t('sidebar.menu.copyPath'),
       icon: <ClipboardCopyIcon className="size-4" />,
-      action: () => { void navigator.clipboard.writeText(project.repoPath); onClose(); },
+      action: () => {
+        void navigator.clipboard.writeText(project.repoPath);
+        onClose();
+      },
     },
     {
       label: t('sidebar.menu.newWorktree'),
       icon: <FolderTreeIcon className="size-4" />,
-      action: () => { onClose(); onNewWorktree(); },
+      action: () => {
+        onClose();
+        onNewWorktree();
+      },
     },
     'divider',
     {
       label: t('sidebar.menu.closeProject'),
       icon: <CancelIcon className="size-4" />,
       danger: true,
-      action: () => { onClose(); onCloseProject(); },
+      action: () => {
+        onClose();
+        onCloseProject();
+      },
     },
   ];
 
@@ -587,17 +605,26 @@ function WorkspaceContextMenu({
     {
       label: t('sidebar.menu.openInFinder'),
       icon: <FolderIcon className="size-4" />,
-      action: () => { void window.forgepad.shell.openPath(workspace.worktreePath); onClose(); },
+      action: () => {
+        void window.forgepad.shell.openPath(workspace.worktreePath);
+        onClose();
+      },
     },
     {
       label: t('sidebar.menu.copyProjectPath'),
       icon: <ClipboardCopyIcon className="size-4" />,
-      action: () => { void navigator.clipboard.writeText(workspace.worktreePath); onClose(); },
+      action: () => {
+        void navigator.clipboard.writeText(workspace.worktreePath);
+        onClose();
+      },
     },
     {
       label: t('sidebar.menu.copyBranchName'),
       icon: <GitMergeIcon className="size-4" />,
-      action: () => { void navigator.clipboard.writeText(workspace.branch); onClose(); },
+      action: () => {
+        void navigator.clipboard.writeText(workspace.branch);
+        onClose();
+      },
     },
     ...(onDelete
       ? [
@@ -606,7 +633,10 @@ function WorkspaceContextMenu({
             label: t('sidebar.menu.deleteWorktree'),
             icon: <CancelIcon className="size-4" />,
             danger: true,
-            action: () => { onClose(); onDelete(); },
+            action: () => {
+              onClose();
+              onDelete();
+            },
           },
         ]
       : []),
@@ -644,7 +674,8 @@ function DeleteWorktreeDialog({ branch, onClose, onConfirm }: { branch: string; 
           <span className="font-[590] text-[14px] text-text">{t('sidebar.deleteWorktree.title')}</span>
         </div>
         <div className="px-4 py-4 text-[13px] text-subtle leading-relaxed">
-          {t('sidebar.deleteWorktree.message')} <span className="font-[590] font-mono text-text">{branch}</span>{t('sidebar.deleteWorktree.detail')}
+          {t('sidebar.deleteWorktree.message')} <span className="font-[590] font-mono text-text">{branch}</span>
+          {t('sidebar.deleteWorktree.detail')}
         </div>
         <div className="flex justify-end gap-2 border-border border-t px-4 py-3">
           <button
@@ -711,7 +742,7 @@ const PanelDot = memo(function PanelDot({
     <Tooltip label={panel.name} shortcut={`⌥${globalIndex + 1}`}>
       <button
         type="button"
-        className={`panel-dot${isActive ? ' panel-dot--active' : ''}`}
+        className={`panel-dot${isActive ? 'panel-dot--active' : ''}`}
         onClick={onClick}
         onContextMenu={onContextMenu}
       >
@@ -765,7 +796,7 @@ function NewPanelDialog({ onClose, onCreate }: { onClose: () => void; onCreate: 
           {/* Emoji + Name row */}
           <div className="flex items-end gap-2.5">
             <div className="relative flex flex-col gap-1.5">
-              <span className="text-[11px] font-[510] text-muted uppercase tracking-wider">{t('sidebar.newPanel.icon')}</span>
+              <span className="font-[510] text-[11px] text-muted uppercase tracking-wider">{t('sidebar.newPanel.icon')}</span>
               <button
                 type="button"
                 className="emoji-picker-btn"
@@ -793,7 +824,7 @@ function NewPanelDialog({ onClose, onCreate }: { onClose: () => void; onCreate: 
               )}
             </div>
             <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-              <label className="text-[11px] font-[510] text-muted uppercase tracking-wider" htmlFor="panel-name">
+              <label className="font-[510] text-[11px] text-muted uppercase tracking-wider" htmlFor="panel-name">
                 {t('sidebar.newPanel.name')}
               </label>
               <input
@@ -803,7 +834,9 @@ function NewPanelDialog({ onClose, onCreate }: { onClose: () => void; onCreate: 
                 placeholder={t('sidebar.newPanel.namePlaceholder')}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(); }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleSubmit();
+                }}
                 autoFocus
               />
             </div>
@@ -834,13 +867,7 @@ function NewPanelDialog({ onClose, onCreate }: { onClose: () => void; onCreate: 
 /**
  * Dialog to edit an existing panel (rename + change emoji).
  */
-function EditPanelDialog({
-  panel,
-  onClose,
-}: {
-  panel: WorkspacePanel;
-  onClose: () => void;
-}) {
+function EditPanelDialog({ panel, onClose }: { panel: WorkspacePanel; onClose: () => void }) {
   const { t } = useTranslation();
   const [name, setName] = useState(panel.name);
   const [emoji, setEmoji] = useState(panel.emoji);
@@ -879,7 +906,7 @@ function EditPanelDialog({
         <div className="flex flex-col gap-3 px-4 py-4">
           <div className="flex items-end gap-2.5">
             <div className="relative flex flex-col gap-1.5">
-              <span className="text-[11px] font-[510] text-muted uppercase tracking-wider">{t('sidebar.newPanel.icon')}</span>
+              <span className="font-[510] text-[11px] text-muted uppercase tracking-wider">{t('sidebar.newPanel.icon')}</span>
               <button
                 type="button"
                 className="emoji-picker-btn"
@@ -907,7 +934,7 @@ function EditPanelDialog({
               )}
             </div>
             <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-              <label className="text-[11px] font-[510] text-muted uppercase tracking-wider" htmlFor="edit-panel-name">
+              <label className="font-[510] text-[11px] text-muted uppercase tracking-wider" htmlFor="edit-panel-name">
                 {t('sidebar.newPanel.name')}
               </label>
               <input
@@ -917,7 +944,9 @@ function EditPanelDialog({
                 placeholder={t('sidebar.newPanel.namePlaceholder')}
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(); }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleSubmit();
+                }}
                 autoFocus
               />
             </div>
@@ -968,13 +997,19 @@ function PanelContextMenu({
   const sections: ContextMenuSection[] = [
     {
       label: t('sidebar.menu.editPanel'),
-      action: () => { onClose(); onEdit(); },
+      action: () => {
+        onClose();
+        onEdit();
+      },
     },
     {
       label: t('sidebar.menu.deletePanel'),
       danger: true,
       disabled: panelCount <= 1,
-      action: () => { onClose(); onDelete(); },
+      action: () => {
+        onClose();
+        onDelete();
+      },
     },
   ];
 
@@ -1015,8 +1050,11 @@ function DeletePanelDialog({
         </div>
 
         <div className="px-4 py-4">
-          <p className="text-[13px] leading-relaxed text-muted">
-            {t('sidebar.deletePanel.panel')} <span className="font-[590] text-text">{panel.emoji} {panel.name}</span>{' '}
+          <p className="text-[13px] text-muted leading-relaxed">
+            {t('sidebar.deletePanel.panel')}{' '}
+            <span className="font-[590] text-text">
+              {panel.emoji} {panel.name}
+            </span>{' '}
             {t('sidebar.deletePanel.contains')} <span className="font-[590] text-text">{projectCount}</span>{' '}
             {projectCount > 1 ? t('sidebar.deletePanel.projects') : t('sidebar.deletePanel.project')}.{' '}
             {t('sidebar.deletePanel.detail')}
@@ -1089,11 +1127,7 @@ function PanelSwitcher() {
 
         {panels.length < MAX_PANELS && (
           <Tooltip label={t('sidebar.newPanel')}>
-            <button
-              type="button"
-              className="switcher-add"
-              onClick={() => setShowNewDialog(true)}
-            >
+            <button type="button" className="switcher-add" onClick={() => setShowNewDialog(true)}>
               <Plus size={11} />
             </button>
           </Tooltip>
@@ -1101,18 +1135,10 @@ function PanelSwitcher() {
       </div>
 
       {showNewDialog && (
-        <NewPanelDialog
-          onClose={() => setShowNewDialog(false)}
-          onCreate={(name, emojiVal) => createPanel(name, emojiVal)}
-        />
+        <NewPanelDialog onClose={() => setShowNewDialog(false)} onCreate={(name, emojiVal) => createPanel(name, emojiVal)} />
       )}
 
-      {editPanel && (
-        <EditPanelDialog
-          panel={editPanel}
-          onClose={() => setEditPanel(null)}
-        />
-      )}
+      {editPanel && <EditPanelDialog panel={editPanel} onClose={() => setEditPanel(null)} />}
 
       {panelMenu && (
         <PanelContextMenu
@@ -1131,7 +1157,10 @@ function PanelSwitcher() {
           panel={deleteConfirm}
           projectCount={allProjects.filter((p) => p.panelId === deleteConfirm.id).length}
           onClose={() => setDeleteConfirm(null)}
-          onConfirm={() => { removePanel(deleteConfirm.id); setDeleteConfirm(null); }}
+          onConfirm={() => {
+            removePanel(deleteConfirm.id);
+            setDeleteConfirm(null);
+          }}
         />
       )}
     </>
@@ -1179,10 +1208,7 @@ export function Sidebar() {
   const createWorktree = useAppStore((state) => state.createWorktree);
 
   // Filter projects by active panel
-  const projects = useMemo(
-    () => allProjects.filter((p) => p.panelId === activePanelId),
-    [allProjects, activePanelId],
-  );
+  const projects = useMemo(() => allProjects.filter((p) => p.panelId === activePanelId), [allProjects, activePanelId]);
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: { distance: 5 },
@@ -1259,7 +1285,10 @@ export function Sidebar() {
           <Settings size={15} />
         </button>
       </div>
-      <div key={activePanelId} className="sidebar-panel-content scrollbar-thin scroll-mask-y flex min-h-0 min-w-0 flex-1 flex-col gap-0.5 overflow-y-auto overflow-x-hidden px-2 py-1.5">
+      <div
+        key={activePanelId}
+        className="sidebar-panel-content scrollbar-thin scroll-mask-y flex min-h-0 min-w-0 flex-1 flex-col gap-0.5 overflow-y-auto overflow-x-hidden px-2 py-1.5"
+      >
         {!hydrated ? (
           <SidebarSkeleton />
         ) : projects.length === 0 ? (

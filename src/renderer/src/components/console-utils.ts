@@ -115,7 +115,7 @@ export function parseStyledConsole(args: ConsoleArg[]): StyledSegment[] {
   const segments: StyledSegment[] = [];
   const formatStr = first.value;
   let argIdx = 1;
-  let lastIdx = 0;
+  const lastIdx = 0;
 
   // Split on %c to get styled segments
   const parts = formatStr.split('%c');

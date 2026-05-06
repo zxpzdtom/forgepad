@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from '@renderer/i18n';
 import { comboFromEvent, comboToDisplay, comboToString, findConflict } from '@renderer/lib/shortcut-utils';
 import { useAppStore } from '@renderer/store/app-store';
-import { useTranslation } from '@renderer/i18n';
 import type { ShortcutActionId, ShortcutCombo } from '@shared/types';
 import { DEFAULT_SHORTCUTS, SHORTCUT_DEFINITIONS } from '@shared/types';
 import { RotateCcw } from 'lucide-react';

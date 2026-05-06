@@ -5,12 +5,15 @@ import type {
   CreateBundleInput,
   CustomPetMeta,
   DeletePetResult,
+  DOMNode,
   FileNode,
   FileStatus,
   GitBucket,
   GitStatusKind,
   ImportPetResult,
+  InspectTarget,
   LspLocation,
+  NodeInfo,
   OpenProjectResult,
   PendingPermission,
   PersistedAppState,
@@ -69,10 +72,8 @@ const api = {
       ipcRenderer.invoke(IPC.FS_READ_FILE, worktreePath, relPath) as Promise<string>,
     readFileAsDataUrl: (worktreePath: string, relPath: string) =>
       ipcRenderer.invoke(IPC.FS_READ_FILE_DATA_URL, worktreePath, relPath) as Promise<string>,
-    readAbsFile: (absPath: string) =>
-      ipcRenderer.invoke(IPC.FS_READ_ABS_FILE, absPath) as Promise<string>,
-    readAbsFileAsDataUrl: (absPath: string) =>
-      ipcRenderer.invoke(IPC.FS_READ_ABS_FILE_DATA_URL, absPath) as Promise<string>,
+    readAbsFile: (absPath: string) => ipcRenderer.invoke(IPC.FS_READ_ABS_FILE, absPath) as Promise<string>,
+    readAbsFileAsDataUrl: (absPath: string) => ipcRenderer.invoke(IPC.FS_READ_ABS_FILE_DATA_URL, absPath) as Promise<string>,
     writeFile: (worktreePath: string, relPath: string, content: string) =>
       ipcRenderer.invoke(IPC.FS_WRITE_FILE, worktreePath, relPath, content) as Promise<void>,
     watchWorkspace: (worktreePath: string) => ipcRenderer.invoke(IPC.FS_WATCH, worktreePath) as Promise<string>,
@@ -195,8 +196,7 @@ const api = {
       ipcRenderer.invoke(IPC.BROWSER_CAPTURE_SCREENSHOT, { webContentsId, rect }) as Promise<string>,
     setTouchEmulation: (webContentsId: number, enabled: boolean) =>
       ipcRenderer.invoke(IPC.BROWSER_SET_TOUCH_EMULATION, { webContentsId, enabled }) as Promise<void>,
-    enableConsole: (webContentsId: number) =>
-      ipcRenderer.invoke(IPC.BROWSER_ENABLE_CONSOLE, { webContentsId }) as Promise<void>,
+    enableConsole: (webContentsId: number) => ipcRenderer.invoke(IPC.BROWSER_ENABLE_CONSOLE, { webContentsId }) as Promise<void>,
     disableConsole: (webContentsId: number) =>
       ipcRenderer.invoke(IPC.BROWSER_DISABLE_CONSOLE, { webContentsId }) as Promise<void>,
     onConsoleEvent: (callback: (raw: unknown) => void) => {
@@ -208,6 +208,34 @@ const api = {
   lsp: {
     getDefinition: (worktreePath: string, token: string) =>
       ipcRenderer.invoke(IPC.LSP_GET_DEFINITION, worktreePath, token) as Promise<LspLocation[]>,
+  },
+  simulator: {
+    proxyFetch: (url: string, method?: string, body?: string) =>
+      ipcRenderer.invoke(IPC.SIMULATOR_PROXY_FETCH, { url, method, body }) as Promise<{
+        status: number;
+        statusText: string;
+        body: string;
+      }>,
+    checkXcode: () => ipcRenderer.invoke(IPC.SIMULATOR_CHECK_XCODE) as Promise<{ available: boolean; message?: string }>,
+    listDevices: () =>
+      ipcRenderer.invoke(IPC.SIMULATOR_LIST_DEVICES) as Promise<
+        Array<{ id: string; name: string; state: string; isBooted: boolean; runtime: string }>
+      >,
+    bootDevice: (udid: string) => ipcRenderer.invoke(IPC.SIMULATOR_BOOT_DEVICE, udid) as Promise<void>,
+    shutdownDevice: (udid: string) => ipcRenderer.invoke(IPC.SIMULATOR_SHUTDOWN_DEVICE, udid) as Promise<void>,
+    startStream: (udid: string) => ipcRenderer.invoke(IPC.SIMULATOR_START_STREAM, udid) as Promise<{ port: number }>,
+    stopStream: (udid: string) => ipcRenderer.invoke(IPC.SIMULATOR_STOP_STREAM, udid) as Promise<void>,
+    getActiveStreams: () => ipcRenderer.invoke(IPC.SIMULATOR_STREAM_STATUS) as Promise<Array<{ udid: string; port: number }>>,
+    // WebKit Inspector (CDP bridge)
+    inspectStart: () => ipcRenderer.invoke(IPC.SIMULATOR_INSPECT_START) as Promise<{ port: number }>,
+    inspectTargets: (udid?: string) => ipcRenderer.invoke(IPC.SIMULATOR_INSPECT_TARGETS, udid) as Promise<InspectTarget[]>,
+    inspectDocument: (targetId: string) => ipcRenderer.invoke(IPC.SIMULATOR_INSPECT_DOCUMENT, targetId) as Promise<DOMNode>,
+    inspectHighlight: (targetId: string, backendNodeId: number) =>
+      ipcRenderer.invoke(IPC.SIMULATOR_INSPECT_HIGHLIGHT, targetId, backendNodeId) as Promise<void>,
+    inspectHide: (targetId: string) => ipcRenderer.invoke(IPC.SIMULATOR_INSPECT_HIDE, targetId) as Promise<void>,
+    inspectNodeInfo: (targetId: string, backendNodeId: number) =>
+      ipcRenderer.invoke(IPC.SIMULATOR_INSPECT_NODE_INFO, targetId, backendNodeId) as Promise<NodeInfo>,
+    inspectStop: () => ipcRenderer.invoke(IPC.SIMULATOR_INSPECT_STOP) as Promise<void>,
   },
   pet: {
     /** Send updated pet settings to the main process, which forwards them to the pet overlay window. */

@@ -13,7 +13,7 @@ import { PtyService } from '@main/services/pty-service';
 import { StateService } from '@main/services/state-service';
 import { IPC } from '@shared/ipc';
 import type { CreateBundleInput, PersistedAppState, WorkspaceChangeEvent } from '@shared/types';
-import { app, BrowserWindow, dialog, ipcMain, shell, webContents } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, net, shell, webContents } from 'electron';
 
 export const ptyService = new PtyService();
 const execFileAsync = promisify(execFile);
@@ -300,12 +300,8 @@ export function registerIpcHandlers(hookPort?: number): void {
   ipcMain.handle(IPC.FS_WRITE_FILE, async (_event, worktreePath: string, relPath: string, content: string) =>
     FileService.writeFile(worktreePath, relPath, content),
   );
-  ipcMain.handle(IPC.FS_READ_ABS_FILE, async (_event, absPath: string) =>
-    FileService.readAbsFile(absPath),
-  );
-  ipcMain.handle(IPC.FS_READ_ABS_FILE_DATA_URL, async (_event, absPath: string) =>
-    FileService.readAbsFileAsDataUrl(absPath),
-  );
+  ipcMain.handle(IPC.FS_READ_ABS_FILE, async (_event, absPath: string) => FileService.readAbsFile(absPath));
+  ipcMain.handle(IPC.FS_READ_ABS_FILE_DATA_URL, async (_event, absPath: string) => FileService.readAbsFileAsDataUrl(absPath));
   ipcMain.handle(IPC.FS_WATCH, async (_event, worktreePath: string) => {
     const rootPath = await resolveInsideRoot(worktreePath);
     const win = BrowserWindow.fromWebContents(_event.sender);
@@ -607,5 +603,93 @@ export function registerIpcHandlers(hookPort?: number): void {
   // ── System emoji picker ────────────────────────────────────────────────
   ipcMain.handle(IPC.APP_SHOW_EMOJI_PANEL, () => {
     app.showEmojiPanel();
+  });
+
+  // ── Simulator proxy fetch (bypass CORS) ─────────────────────────────────
+  ipcMain.handle(IPC.SIMULATOR_PROXY_FETCH, async (_event, args: { url: string; method?: string; body?: string }) => {
+    // Only allow localhost / 127.0.0.1 URLs for security
+    const parsed = new URL(args.url);
+    if (parsed.hostname !== 'localhost' && parsed.hostname !== '127.0.0.1') {
+      throw new Error('Simulator proxy only allows localhost URLs');
+    }
+    const res = await net.fetch(args.url, {
+      method: args.method ?? 'GET',
+      ...(args.body != null ? { body: args.body } : {}),
+    });
+    const text = await res.text();
+    return { status: res.status, statusText: res.statusText, body: text };
+  });
+
+  // ── Simulator (serve-sim) ─────────────────────────────────────────────
+  ipcMain.handle(IPC.SIMULATOR_CHECK_XCODE, async () => {
+    const { serveSimService } = await import('@main/services/serve-sim-service');
+    return serveSimService.checkXcode();
+  });
+
+  ipcMain.handle(IPC.SIMULATOR_LIST_DEVICES, async () => {
+    const { serveSimService } = await import('@main/services/serve-sim-service');
+    return serveSimService.listDevices();
+  });
+
+  ipcMain.handle(IPC.SIMULATOR_BOOT_DEVICE, async (_event, udid: string) => {
+    const { serveSimService } = await import('@main/services/serve-sim-service');
+    return serveSimService.bootDevice(udid);
+  });
+
+  ipcMain.handle(IPC.SIMULATOR_SHUTDOWN_DEVICE, async (_event, udid: string) => {
+    const { serveSimService } = await import('@main/services/serve-sim-service');
+    return serveSimService.shutdownDevice(udid);
+  });
+
+  ipcMain.handle(IPC.SIMULATOR_START_STREAM, async (_event, udid: string) => {
+    const { serveSimService } = await import('@main/services/serve-sim-service');
+    return serveSimService.startStream(udid);
+  });
+
+  ipcMain.handle(IPC.SIMULATOR_STOP_STREAM, async (_event, udid: string) => {
+    const { serveSimService } = await import('@main/services/serve-sim-service');
+    return serveSimService.stopStream(udid);
+  });
+
+  ipcMain.handle(IPC.SIMULATOR_STREAM_STATUS, async () => {
+    const { serveSimService } = await import('@main/services/serve-sim-service');
+    return serveSimService.getActiveStreams();
+  });
+
+  // ── Simulator WebKit Inspector (CDP bridge) ──
+
+  ipcMain.handle(IPC.SIMULATOR_INSPECT_START, async () => {
+    const { webkitInspectService } = await import('@main/services/webkit-inspect-service');
+    return webkitInspectService.startBridge();
+  });
+
+  ipcMain.handle(IPC.SIMULATOR_INSPECT_TARGETS, async (_event, udid?: string) => {
+    const { webkitInspectService } = await import('@main/services/webkit-inspect-service');
+    return webkitInspectService.listTargets(udid);
+  });
+
+  ipcMain.handle(IPC.SIMULATOR_INSPECT_DOCUMENT, async (_event, targetId: string) => {
+    const { webkitInspectService } = await import('@main/services/webkit-inspect-service');
+    return webkitInspectService.getDocument(targetId);
+  });
+
+  ipcMain.handle(IPC.SIMULATOR_INSPECT_HIGHLIGHT, async (_event, targetId: string, backendNodeId: number) => {
+    const { webkitInspectService } = await import('@main/services/webkit-inspect-service');
+    return webkitInspectService.highlightNode(targetId, backendNodeId);
+  });
+
+  ipcMain.handle(IPC.SIMULATOR_INSPECT_HIDE, async (_event, targetId: string) => {
+    const { webkitInspectService } = await import('@main/services/webkit-inspect-service');
+    return webkitInspectService.hideHighlight(targetId);
+  });
+
+  ipcMain.handle(IPC.SIMULATOR_INSPECT_NODE_INFO, async (_event, targetId: string, backendNodeId: number) => {
+    const { webkitInspectService } = await import('@main/services/webkit-inspect-service');
+    return webkitInspectService.getNodeInfo(targetId, backendNodeId);
+  });
+
+  ipcMain.handle(IPC.SIMULATOR_INSPECT_STOP, async () => {
+    const { webkitInspectService } = await import('@main/services/webkit-inspect-service');
+    return webkitInspectService.stopBridge();
   });
 }

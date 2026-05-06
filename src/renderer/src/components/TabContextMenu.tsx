@@ -1,8 +1,9 @@
+import { useTranslation } from '@renderer/i18n';
+import { comboToDisplay } from '@renderer/lib/shortcut-utils';
+import { useAppStore } from '@renderer/store/app-store';
 import type { Tab } from '@shared/types';
 import { DEFAULT_SHORTCUTS } from '@shared/types';
-import { useTranslation } from '@renderer/i18n';
-import { useAppStore } from '@renderer/store/app-store';
-import { comboToDisplay } from '@renderer/lib/shortcut-utils';
+
 import { ContextMenu, type ContextMenuSection } from './ContextMenu';
 
 /* ── Component ─── */
@@ -42,11 +43,7 @@ export function TabContextMenu({
   const isFileType = tab.type === 'file';
   const isTerminalType = tab.type === 'terminal';
   const isExternal = isFileType && Boolean(tab.absPath);
-  const fullPath = isExternal
-    ? tab.absPath!
-    : workspacePath && isFileType
-      ? `${workspacePath}/${tab.relPath}`
-      : null;
+  const fullPath = isExternal ? tab.absPath! : workspacePath && isFileType ? `${workspacePath}/${tab.relPath}` : null;
 
   const sections: ContextMenuSection[] = [];
 

@@ -1,20 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
-import {
-  PetWidget as CodexPetWidget,
-  usePetController,
-  usePetDragGestureAnimations,
-  type PetAction,
-  type PetDragGestureAnimationMap,
-} from 'codex-pets-react';
 import { useAppStore } from '@renderer/store/app-store';
 import type { AgentStatus } from '@shared/agent-lifecycle';
 import {
-  agentStatusToAnimation,
-  forgePetAtlas,
-  getPetSpritesheetUrl,
-  type ForgePetAnimationName,
-} from './pet-registry';
+  PetWidget as CodexPetWidget,
+  type PetAction,
+  type PetDragGestureAnimationMap,
+  usePetController,
+  usePetDragGestureAnimations,
+} from 'codex-pets-react';
+
 import { PetApprovalPopup } from './PetApprovalPopup';
+import { agentStatusToAnimation, type ForgePetAnimationName, forgePetAtlas, getPetSpritesheetUrl } from './pet-registry';
 
 /** Priority for each agent status — higher = more urgent. */
 const STATUS_PRIORITY: Record<AgentStatus, number> = {
@@ -218,9 +214,7 @@ export function PetWidget() {
 
   const handlePetClick = useCallback(() => {
     const state = useAppStore.getState();
-    const agentTabs = state.tabs.filter(
-      (t) => t.type === 'terminal' && t.isAgent && t.workspaceId === state.activeWorkspaceId,
-    );
+    const agentTabs = state.tabs.filter((t) => t.type === 'terminal' && t.isAgent && t.workspaceId === state.activeWorkspaceId);
     if (agentTabs.length === 0) return;
 
     // Find the agent tab with the most urgent status
@@ -301,12 +295,7 @@ export function PetWidget() {
     >
       {/* Approval popup positioned above the pet */}
       {showApproval && pendingPermission && (
-        <PetApprovalPopup
-          permission={pendingPermission}
-          onAllow={handleApprove}
-          onDeny={handleDeny}
-          variant="widget"
-        />
+        <PetApprovalPopup permission={pendingPermission} onAllow={handleApprove} onDeny={handleDeny} variant="widget" />
       )}
       <CodexPetWidget
         src={src}

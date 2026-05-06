@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-
 import { useTranslation } from '@renderer/i18n';
+
 import type { ConsoleArg, ConsoleEntry } from './console-utils';
 import { parseStyledConsole, sanitizeConsoleStyle, stringifyArg, stringifyConsoleArgs } from './console-utils';
 
@@ -208,7 +208,7 @@ function LevelBadge({ level }: { level: ConsoleEntry['level'] }) {
   };
   const { color } = LEVEL_STYLE[level];
   return (
-    <span className={`inline-flex w-[28px] shrink-0 justify-center font-mono text-[10px] font-semibold ${color}`}>
+    <span className={`inline-flex w-[28px] shrink-0 justify-center font-mono font-semibold text-[10px] ${color}`}>
       {labels[level]}
     </span>
   );
@@ -291,7 +291,7 @@ export function BrowserConsolePanel({ entries, onClear, onSendToAgent, onExecute
       {/* ── Toolbar ──────────────────────────────────────────────────── */}
       <div className="surface-toolbar flex h-9 shrink-0 items-center gap-1.5 border-border border-b px-2">
         {/* Title */}
-        <span className="mr-0.5 font-medium text-muted text-[13px] select-none">{t('browserConsole.title')}</span>
+        <span className="mr-0.5 select-none font-medium text-[13px] text-muted">{t('browserConsole.title')}</span>
 
         {/* Level filter pills — segmented control style */}
         <div className="segmented-control" role="radiogroup">
@@ -336,7 +336,7 @@ export function BrowserConsolePanel({ entries, onClear, onSendToAgent, onExecute
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={t('browserConsole.filterPlaceholder')}
-            className="h-[26px] w-36 rounded-[4px] border border-border bg-surface-input pl-7 pr-5 text-text text-[12px] transition-all placeholder:text-[11px] placeholder:text-subtle focus:w-48 focus:border-accent focus:outline-none"
+            className="h-[26px] w-36 rounded-[4px] border border-border bg-surface-input pr-5 pl-7 text-[12px] text-text transition-all placeholder:text-[11px] placeholder:text-subtle focus:w-48 focus:border-accent focus:outline-none"
           />
           {searchQuery && (
             <span
@@ -367,7 +367,7 @@ export function BrowserConsolePanel({ entries, onClear, onSendToAgent, onExecute
               if (e.key === 'Enter' || e.key === ' ') toggleSelectAll();
             }}
             title={allFilteredSelected ? t('browserConsole.deselectAll') : t('browserConsole.selectAll')}
-            className="flex cursor-pointer items-center gap-1 rounded px-1.5 py-0.5 text-subtle text-[12px] transition-colors hover:text-muted"
+            className="flex cursor-pointer items-center gap-1 rounded px-1.5 py-0.5 text-[12px] text-subtle transition-colors hover:text-muted"
           >
             {allFilteredSelected ? (
               <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
@@ -395,7 +395,9 @@ export function BrowserConsolePanel({ entries, onClear, onSendToAgent, onExecute
                 <rect x="1.5" y="1.5" width="13" height="13" rx="2" stroke="currentColor" strokeWidth="1.3" />
               </svg>
             )}
-            <span className="select-none">{allFilteredSelected ? t('browserConsole.deselect') : t('browserConsole.selectAll')}</span>
+            <span className="select-none">
+              {allFilteredSelected ? t('browserConsole.deselect') : t('browserConsole.selectAll')}
+            </span>
           </span>
         )}
 
@@ -408,7 +410,7 @@ export function BrowserConsolePanel({ entries, onClear, onSendToAgent, onExecute
             if (e.key === 'Enter' && selectedIds.size > 0) handleSend();
           }}
           className={[
-            'flex h-[26px] items-center gap-1 rounded-[4px] px-2.5 font-medium text-[12px] transition-colors select-none',
+            'flex h-[26px] select-none items-center gap-1 rounded-[4px] px-2.5 font-medium text-[12px] transition-colors',
             selectedIds.size > 0
               ? 'cursor-pointer bg-accent text-white hover:bg-accent/90 active:bg-accent/80'
               : 'cursor-not-allowed bg-accent/40 text-white/50',
@@ -447,7 +449,7 @@ export function BrowserConsolePanel({ entries, onClear, onSendToAgent, onExecute
       </div>
 
       {/* ── Log entries ─────────────────────────────────────────────── */}
-      <div ref={listRef} className="min-h-0 flex-1 overflow-auto scrollbar-thin">
+      <div ref={listRef} className="scrollbar-thin min-h-0 flex-1 overflow-auto">
         {filteredEntries.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center gap-1.5 text-subtle">
             <svg width="24" height="24" viewBox="0 0 32 32" fill="none" className="opacity-25">
@@ -456,7 +458,11 @@ export function BrowserConsolePanel({ entries, onClear, onSendToAgent, onExecute
               <line x1="15" y1="20" x2="22" y2="20" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
             </svg>
             <span className="text-[11px]">
-              {entries.length === 0 ? t('browserConsole.noOutput') : searchQuery ? t('browserConsole.noMatching') : t('browserConsole.noEntries', { level: levelFilter })}
+              {entries.length === 0
+                ? t('browserConsole.noOutput')
+                : searchQuery
+                  ? t('browserConsole.noMatching')
+                  : t('browserConsole.noEntries', { level: levelFilter })}
             </span>
           </div>
         ) : (
@@ -489,15 +495,29 @@ export function BrowserConsolePanel({ entries, onClear, onSendToAgent, onExecute
                       isSelected ? 'border-accent bg-accent' : 'border-subtle/40 group-hover:border-muted',
                     ].join(' ')}
                   >
-                    <svg width="8" height="8" viewBox="0 0 10 10" fill="none" className={isSelected ? 'opacity-100' : 'opacity-0'}>
-                      <path d="M2 5.5l2.5 2.5L8 3" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                    <svg
+                      width="8"
+                      height="8"
+                      viewBox="0 0 10 10"
+                      fill="none"
+                      className={isSelected ? 'opacity-100' : 'opacity-0'}
+                    >
+                      <path
+                        d="M2 5.5l2.5 2.5L8 3"
+                        stroke="white"
+                        strokeWidth="1.5"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
                     </svg>
                   </div>
                 )}
 
                 {/* Prefix: › for input, ‹ for result, badge for page logs */}
                 {isInput ? (
-                  <span className="inline-flex w-[28px] shrink-0 justify-center font-mono text-[13px] font-semibold text-accent">›</span>
+                  <span className="inline-flex w-[28px] shrink-0 justify-center font-mono font-semibold text-[13px] text-accent">
+                    ›
+                  </span>
                 ) : isResult ? (
                   <span className="inline-flex w-[28px] shrink-0 justify-center font-mono text-[13px] text-subtle">‹</span>
                 ) : (

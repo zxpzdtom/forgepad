@@ -17,10 +17,7 @@ import { Terminal } from '@xterm/xterm';
  * which can be off when the terminal has padding or fractional scaling.
  * (This is the same approach used by Superset/Warp.)
  */
-function getTerminalCoordsFromEvent(
-  terminal: Terminal,
-  event: MouseEvent,
-): { col: number; row: number } | null {
+function getTerminalCoordsFromEvent(terminal: Terminal, event: MouseEvent): { col: number; row: number } | null {
   const element = terminal.element;
   if (!element) return null;
 
@@ -65,10 +62,7 @@ function getTerminalCoordsFromEvent(
  *
  * Returns a cleanup function.
  */
-function setupClickToMoveCursor(
-  terminal: Terminal,
-  writeToPty: (data: string) => void,
-): () => void {
+function setupClickToMoveCursor(terminal: Terminal, writeToPty: (data: string) => void): () => void {
   const handleClick = (event: MouseEvent) => {
     // Skip alternate-screen apps (vim, less, htop…) — they handle mouse themselves.
     if (terminal.buffer.active !== terminal.buffer.normal) return;
@@ -177,16 +171,17 @@ function tryExtractSessionId(data: string): string | null {
 // Detects file paths in terminal output and makes them Cmd+Click-able
 // to open in the app's built-in editor.
 
-const FILE_EXT = 'ts|tsx|js|jsx|mjs|cjs|json|jsonc|css|scss|less|html|htm|md|mdx|py|go|rs|toml|yaml|yml|sh|bash|zsh|vue|svelte|rb|java|kt|c|cpp|h|hpp|cs|swift|php|sql|graphql|gql|xml|svg|txt|env|lock|cfg|ini|conf|dockerfile|makefile';
+const FILE_EXT =
+  'ts|tsx|js|jsx|mjs|cjs|json|jsonc|css|scss|less|html|htm|md|mdx|py|go|rs|toml|yaml|yml|sh|bash|zsh|vue|svelte|rb|java|kt|c|cpp|h|hpp|cs|swift|php|sql|graphql|gql|xml|svg|txt|env|lock|cfg|ini|conf|dockerfile|makefile';
 
 // Match file paths with known extensions, optionally followed by :line or :line:col
 // Supports: src/foo.ts, ./foo/bar.tsx, ../utils.js, /abs/path/file.go, foo.ts:42, foo.ts:42:10
 const FILE_PATH_RE = new RegExp(
-  `(?:^|[\\s"'(\`[{,;=])` +                        // boundary before path
-  `((?:\\./|\\.\\.(?:/|(?=[^.]))|/|[a-zA-Z0-9@_])` + // path start: ./ ../ / or word char
-  `[^\\s"'()\`\\]},;:]*\\.(?:${FILE_EXT})` +       // path body with known extension (excludes parens)
-  `(?::\\d+(?::\\d+)?)?)` +                          // optional :line:col
-  `(?=[\\s"'()\`\\]},;:]|$)`,                       // boundary after path
+  `(?:^|[\\s"'(\`[{,;=])` + // boundary before path
+    `((?:\\./|\\.\\.(?:/|(?=[^.]))|/|[a-zA-Z0-9@_])` + // path start: ./ ../ / or word char
+    `[^\\s"'()\`\\]},;:]*\\.(?:${FILE_EXT})` + // path body with known extension (excludes parens)
+    `(?::\\d+(?::\\d+)?)?)` + // optional :line:col
+    `(?=[\\s"'()\`\\]},;:]|$)`, // boundary after path
   'gi',
 );
 
@@ -199,11 +194,7 @@ function stripAnsi(str: string): string {
   return str.replace(/\x1b\[[0-9;]*[a-zA-Z]|\x1b\].*?(?:\x1b\\|\x07)|\x1b[()][AB012]/g, '');
 }
 
-function createFilePathLinkProvider(
-  terminal: Terminal,
-  workspaceId: string,
-  worktreePath: string,
-): ILinkProvider {
+function createFilePathLinkProvider(terminal: Terminal, workspaceId: string, worktreePath: string): ILinkProvider {
   return {
     provideLinks(bufferLineNumber: number, callback: (links: ILink[] | undefined) => void): void {
       const line = terminal.buffer.active.getLine(bufferLineNumber - 1);
@@ -379,10 +370,7 @@ export function TerminalPanel({ tab, workspace, active }: TerminalPanelProps) {
     // Click-to-move-cursor: clicking on the prompt line sends arrow-key sequences.
     // Works for shell prompts and TUIs like Claude Code (Ink uses normal buffer).
     // Automatically skips alternate-screen apps (vim, htop, etc.).
-    const cleanupClickToMove = setupClickToMoveCursor(
-      terminal,
-      (data) => window.forgepad.pty.write(tab.ptyId, data),
-    );
+    const cleanupClickToMove = setupClickToMoveCursor(terminal, (data) => window.forgepad.pty.write(tab.ptyId, data));
 
     const removeDataListener = window.forgepad.pty.onData(tab.ptyId, (data) => {
       terminal.write(data);

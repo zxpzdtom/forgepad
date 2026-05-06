@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useTranslation } from '@renderer/i18n';
 import { useNotificationSound } from '@renderer/hooks/useNotificationSound';
+import { useTranslation } from '@renderer/i18n';
 import { BUILTIN_SOUNDS } from '@renderer/lib/builtin-sounds';
 import { useAppStore } from '@renderer/store/app-store';
 import type { NotificationSound } from '@shared/types';
@@ -400,14 +400,21 @@ export function NotificationsSection() {
 
       {/* ─── Sound master toggle ─── */}
       <SettingRow label={t('settings.notifications.sounds')} description={t('settings.notifications.soundsDesc')}>
-        <Toggle checked={ns.enabled} onChange={(v) => updateNotifications({ enabled: v })} label={t('settings.notifications.sounds')} />
+        <Toggle
+          checked={ns.enabled}
+          onChange={(v) => updateNotifications({ enabled: v })}
+          label={t('settings.notifications.sounds')}
+        />
       </SettingRow>
 
       <SettingRow label={t('settings.notifications.volume')} description={t('settings.notifications.volumeDesc')}>
         <VolumeSlider value={ns.volume} onChange={(v) => updateNotifications({ volume: v })} />
       </SettingRow>
 
-      <SettingRow label={t('settings.notifications.playWhenFocused')} description={t('settings.notifications.playWhenFocusedDesc')}>
+      <SettingRow
+        label={t('settings.notifications.playWhenFocused')}
+        description={t('settings.notifications.playWhenFocusedDesc')}
+      >
         <Toggle
           checked={ns.playWhenAppFocused}
           onChange={(v) => updateNotifications({ playWhenAppFocused: v })}
@@ -437,7 +444,10 @@ export function NotificationsSection() {
         />
       </SettingRow>
 
-      <SettingRow label={t('settings.notifications.agentNeedsApproval')} description={t('settings.notifications.agentNeedsApprovalDesc')}>
+      <SettingRow
+        label={t('settings.notifications.agentNeedsApproval')}
+        description={t('settings.notifications.agentNeedsApprovalDesc')}
+      >
         <Toggle
           checked={ns.notifyOnAgentNeedsApproval}
           onChange={(v) => updateNotifications({ notifyOnAgentNeedsApproval: v })}
@@ -510,8 +520,9 @@ export function NotificationsSection() {
       </div>
 
       <p className="mt-3 text-[11px] text-subtle">
-        {t('settings.notifications.supportedFormats')} <code className="text-text-code-inline">.mp3</code>, <code className="text-text-code-inline">.wav</code>,{' '}
-        <code className="text-text-code-inline">.ogg</code> {t('settings.notifications.audioFiles')}
+        {t('settings.notifications.supportedFormats')} <code className="text-text-code-inline">.mp3</code>,{' '}
+        <code className="text-text-code-inline">.wav</code>, <code className="text-text-code-inline">.ogg</code>{' '}
+        {t('settings.notifications.audioFiles')}
       </p>
 
       {/* Rename dialog */}

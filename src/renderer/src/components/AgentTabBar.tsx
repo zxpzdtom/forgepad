@@ -1,8 +1,8 @@
 import { type MouseEvent, useCallback, useMemo, useState } from 'react';
-import { useHorizontalScroll } from '@renderer/hooks/useHorizontalScroll';
-import { useTranslation } from '@renderer/i18n';
 import { closestCenter, DndContext, type DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { horizontalListSortingStrategy, SortableContext } from '@dnd-kit/sortable';
+import { useHorizontalScroll } from '@renderer/hooks/useHorizontalScroll';
+import { useTranslation } from '@renderer/i18n';
 import { useAppStore } from '@renderer/store/app-store';
 import type { AgentStatus } from '@shared/agent-lifecycle';
 import type { Tab } from '@shared/types';

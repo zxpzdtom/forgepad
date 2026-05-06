@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { useAppStore } from '@renderer/store/app-store';
 import { useTranslation } from '@renderer/i18n';
+import { useAppStore } from '@renderer/store/app-store';
 import { BUILTIN_THEMES, THEME_SCHEMA_VERSION, type ThemeDefinition, type ThemeTokens } from '@shared/types';
 import { Check, Download, ExternalLink, Pencil, Upload, X } from 'lucide-react';
 
@@ -118,7 +118,17 @@ function TerminalPreview({ theme }: { theme: ThemeDefinition }) {
 
 /* ─── Theme card ─── */
 
-function ThemeCard({ theme, isSelected, onSelect, t }: { theme: ThemeDefinition; isSelected: boolean; onSelect: () => void; t: (key: string, params?: Record<string, unknown>) => string }) {
+function ThemeCard({
+  theme,
+  isSelected,
+  onSelect,
+  t,
+}: {
+  theme: ThemeDefinition;
+  isSelected: boolean;
+  onSelect: () => void;
+  t: (key: string, params?: Record<string, unknown>) => string;
+}) {
   const swatches = resolveSwatches(theme);
   const isSystem = theme.id === 'system';
 
@@ -186,7 +196,15 @@ function ThemeCard({ theme, isSelected, onSelect, t }: { theme: ThemeDefinition;
 
 /* ─── Import error banner ─── */
 
-function ImportErrorBanner({ errors, onDismiss, t }: { errors: string[]; onDismiss: () => void; t: (key: string, params?: Record<string, unknown>) => string }) {
+function ImportErrorBanner({
+  errors,
+  onDismiss,
+  t,
+}: {
+  errors: string[];
+  onDismiss: () => void;
+  t: (key: string, params?: Record<string, unknown>) => string;
+}) {
   return (
     <div className="flex items-start gap-2 rounded-lg border border-danger/30 bg-danger/8 px-3 py-2.5">
       <div className="min-w-0 flex-1">
@@ -279,9 +297,7 @@ export function AppearancePanel() {
         }
         const incoming = raw as ThemeDefinition;
         if (BUILTIN_THEMES.some((bt) => bt.id === incoming.id)) {
-          setImportErrors([
-            t('appearance.conflictBuiltIn', { id: incoming.id }),
-          ]);
+          setImportErrors([t('appearance.conflictBuiltIn', { id: incoming.id })]);
           return;
         }
         addCustomTheme({ ...incoming, schemaVersion: THEME_SCHEMA_VERSION });
@@ -404,9 +420,7 @@ export function AppearancePanel() {
       {importSuccess && (
         <div className="flex items-center gap-2 rounded-lg border border-ok/30 bg-ok/8 px-3 py-2 text-[12px] text-ok">
           <Check size={13} />
-          <span>
-            {t('appearance.importSuccess', { name: importSuccess })}
-          </span>
+          <span>{t('appearance.importSuccess', { name: importSuccess })}</span>
           <button
             type="button"
             aria-label={t('common.dismiss')}
@@ -430,7 +444,13 @@ export function AppearancePanel() {
           aria-label={t('appearance.selectBuiltIn')}
         >
           {BUILTIN_THEMES.map((theme) => (
-            <ThemeCard key={theme.id} theme={theme} isSelected={themeId === theme.id} onSelect={() => handleSelect(theme.id)} t={t} />
+            <ThemeCard
+              key={theme.id}
+              theme={theme}
+              isSelected={themeId === theme.id}
+              onSelect={() => handleSelect(theme.id)}
+              t={t}
+            />
           ))}
         </div>
       </section>
@@ -466,7 +486,6 @@ export function AppearancePanel() {
           </div>
         </section>
       )}
-
     </div>
   );
 }

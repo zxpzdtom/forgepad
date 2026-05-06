@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useTranslation } from '@renderer/i18n';
 import type { FileDiffOptions, SelectedLineRange } from '@pierre/diffs';
 import { getFiletypeFromFileName, processFile } from '@pierre/diffs';
 import type { DiffLineAnnotation } from '@pierre/diffs/react';
 import { FileDiff, PatchDiff } from '@pierre/diffs/react';
 import { useResolvedTheme } from '@renderer/App';
 import { useLspTokenNavigation } from '@renderer/hooks/useLspTokenNavigation';
+import { useTranslation } from '@renderer/i18n';
 import { useAppStore } from '@renderer/store/app-store';
 import type { DiffCommentItem, DiffFileData, FileStatus, Tab, Workspace } from '@shared/types';
 import { MessageSquarePlus, RefreshCw } from 'lucide-react';

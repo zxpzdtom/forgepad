@@ -59,6 +59,9 @@ importers:
       codex-pets-react:
         specifier: ^0.2.0
         version: 0.2.0(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
+      inspect-webkit:
+        specifier: ^0.0.3
+        version: 0.0.3(typescript@5.9.3)
       lucide-react:
         specifier: ^0.577.0
         version: 0.577.0(react@19.2.5)
@@ -74,6 +77,9 @@ importers:
       react-dom:
         specifier: ^19.2.4
         version: 19.2.5(react@19.2.5)
+      serve-sim:
+        specifier: ^0.1.14
+        version: 0.1.14(typescript@5.9.3)
       streamdown:
         specifier: ^2.5.0
         version: 2.5.0(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
@@ -2036,6 +2042,12 @@ packages:
   inline-style-parser@0.2.7:
     resolution: {integrity: sha512-Nb2ctOyNR8DqQoR0OwRG95uNWIC0C1lCgf5Naz5H6Ji72KZ8OcFZLz2P5sNgwlyoJ8Yif11oMuYs5pBQa86csA==}
 
+  inspect-webkit@0.0.3:
+    resolution: {integrity: sha512-UCU5yjLiWyZxYh9pbZ41dz5fVMDqpluunkPersmi7bhiLCSZifATXSrISopRArafSVX3RcN6hGvRfV5BAyOpjw==}
+    hasBin: true
+    peerDependencies:
+      typescript: ^5
+
   internmap@1.0.1:
     resolution: {integrity: sha512-lDB5YccMydFBtasVtxnZ3MRBHuaoE8GKsppq+EchKL2U4nK/DmEpPHNH8MZe5HkMtpSiTSOZwfN0tzYjO/lJEw==}
 
@@ -2745,6 +2757,11 @@ packages:
   serialize-error@7.0.1:
     resolution: {integrity: sha512-8I8TjW5KMOKsZQTvoxjuSIa7foAwPWGOts+6o7sgjz41/qMD9VQHEDxi6PBvK2l0MXUmqZyNpUK+T2tQaaElvw==}
     engines: {node: '>=10'}
+
+  serve-sim@0.1.14:
+    resolution: {integrity: sha512-eAGPrgHi6GNY0YUpoT6GOVN3cVrvdzwyQRMQhCGUe07xBFLUDh9jcprs3aJPVkciYaZv2suL3Ak3bc4tYb57yA==}
+    engines: {node: '>=18'}
+    hasBin: true
 
   shebang-command@2.0.0:
     resolution: {integrity: sha512-kHxr2zZpYtdmrN1qDjrrX/Z1rR1kG8Dx+gkpK1G4eXmvXswmcE1hTWBWYUzlraYw1/yZp6YuDY77YtvbN0dmDA==}
@@ -5168,6 +5185,10 @@ snapshots:
 
   inline-style-parser@0.2.7: {}
 
+  inspect-webkit@0.0.3(typescript@5.9.3):
+    dependencies:
+      typescript: 5.9.3
+
   internmap@1.0.1: {}
 
   internmap@2.0.3: {}
@@ -6097,6 +6118,12 @@ snapshots:
     dependencies:
       type-fest: 0.13.1
     optional: true
+
+  serve-sim@0.1.14(typescript@5.9.3):
+    dependencies:
+      inspect-webkit: 0.0.3(typescript@5.9.3)
+    transitivePeerDependencies:
+      - typescript
 
   shebang-command@2.0.0:
     dependencies:

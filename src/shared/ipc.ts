@@ -67,6 +67,23 @@ export const IPC = {
   PET_MOVE_WINDOW: 'pet:move-window',
   PET_AGENT_STATUS_UPDATE: 'pet:agent-status-update',
   PET_FOCUS_AGENT: 'pet:focus-agent',
+  // Simulator (serve-sim)
+  SIMULATOR_PROXY_FETCH: 'simulator:proxy-fetch',
+  SIMULATOR_CHECK_XCODE: 'simulator:check-xcode',
+  SIMULATOR_LIST_DEVICES: 'simulator:list-devices',
+  SIMULATOR_BOOT_DEVICE: 'simulator:boot-device',
+  SIMULATOR_SHUTDOWN_DEVICE: 'simulator:shutdown-device',
+  SIMULATOR_START_STREAM: 'simulator:start-stream',
+  SIMULATOR_STOP_STREAM: 'simulator:stop-stream',
+  SIMULATOR_STREAM_STATUS: 'simulator:stream-status',
+  // Simulator WebKit Inspector (CDP bridge via inspect-webkit)
+  SIMULATOR_INSPECT_START: 'simulator:inspect-start',
+  SIMULATOR_INSPECT_TARGETS: 'simulator:inspect-targets',
+  SIMULATOR_INSPECT_DOCUMENT: 'simulator:inspect-document',
+  SIMULATOR_INSPECT_HIGHLIGHT: 'simulator:inspect-highlight',
+  SIMULATOR_INSPECT_HIDE: 'simulator:inspect-hide',
+  SIMULATOR_INSPECT_NODE_INFO: 'simulator:inspect-node-info',
+  SIMULATOR_INSPECT_STOP: 'simulator:inspect-stop',
   // Pet approval UI
   PET_PERMISSION_REQUEST: 'pet:permission-request',
   PET_PERMISSION_DECISION: 'pet:permission-decision',

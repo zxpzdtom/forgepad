@@ -80,7 +80,10 @@ type AppState = {
   hydrated: boolean;
   workspaceLoadingIds: Set<string>;
   focusedColumn: 'sidebar' | 'agent' | 'file' | 'rightPanel';
-  branchStats: Record<string, { ahead: number; behind: number; additions: number; deletions: number; prNumber?: number | null; prUrl?: string | null }>;
+  branchStats: Record<
+    string,
+    { ahead: number; behind: number; additions: number; deletions: number; prNumber?: number | null; prUrl?: string | null }
+  >;
   gitRefreshEpoch: number;
   /** Agent lifecycle statuses keyed by ptyId */
   agentStatuses: Record<string, AgentStatus>;
@@ -188,6 +191,19 @@ type AppState = {
   deleteWorktree: (workspaceId: string) => Promise<void>;
   createWorktree: (projectId: string, branch: string, trackRemote?: boolean) => Promise<void>;
   syncWorktreesFromDisk: () => Promise<void>;
+  // Simulator tab actions
+  createSimulatorTab: () => void;
+  updateSimulatorState: (
+    tabId: string,
+    partial: Partial<{
+      serveSimPort: number;
+      udid: string;
+      deviceName: string;
+      runtime: string;
+      isStreaming: boolean;
+      isConnected: boolean;
+    }>,
+  ) => void;
   // Browser tab actions
   createBrowserTab: (url?: string) => void;
   addBrowserHistoryEntry: (url: string, title: string, favicon?: string) => void;
@@ -233,6 +249,7 @@ function tabTitle(tab: Tab): string {
   if (tab.type === 'diff') return 'Changes';
   if (tab.type === 'context-preview') return 'Context';
   if (tab.type === 'browser') return tab.title || 'Browser';
+  if (tab.type === 'simulator') return tab.deviceName || 'Simulator';
   return tab.relPath.split('/').pop() || tab.relPath;
 }
 
@@ -260,6 +277,7 @@ function serializeForSave(state: AppState): PersistedAppState {
       .filter(
         (tab) =>
           tab.type === 'browser' ||
+          tab.type === 'simulator' ||
           tab.type !== 'terminal' ||
           (tab.type === 'terminal' && tab.isAgent && tab.sessionId && tab.sessionConfirmed),
       )
@@ -561,8 +579,8 @@ export const useAppStore = create<AppState>((set, get) => ({
     // ── Schema migration v1 → v2: add panels ──────────────────────
     // v1 data has no panels/activePanelId. Create a default panel and
     // assign all existing projects to it.
-    let migratedPanels: WorkspacePanel[] = (state as Record<string, unknown>)?.panels as WorkspacePanel[] ?? [];
-    let migratedActivePanelId: string | null = (state as Record<string, unknown>)?.activePanelId as string | null ?? null;
+    let migratedPanels: WorkspacePanel[] = ((state as Record<string, unknown>)?.panels as WorkspacePanel[]) ?? [];
+    let migratedActivePanelId: string | null = ((state as Record<string, unknown>)?.activePanelId as string | null) ?? null;
     const isV1 = !state?.schemaVersion || state.schemaVersion === 1;
     if (isV1 || migratedPanels.length === 0) {
       const defaultPanelId = crypto.randomUUID();
@@ -572,14 +590,14 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (state?.projects) {
         state.projects = state.projects.map((p: Project) => ({
           ...p,
-          panelId: (p as Record<string, unknown>).panelId as string || defaultPanelId,
+          panelId: ((p as Record<string, unknown>).panelId as string) || defaultPanelId,
         }));
       }
     }
     // Backfill emoji for panels that don't have it (pre-emoji v2 data)
     migratedPanels = migratedPanels.map((p) => ({
       ...p,
-      emoji: (p as Record<string, unknown>).emoji as string || '📁',
+      emoji: ((p as Record<string, unknown>).emoji as string) || '📁',
     }));
 
     const rawSettings = {
@@ -658,8 +676,12 @@ export const useAppStore = create<AppState>((set, get) => ({
     const tabs = (state?.tabs ?? [])
       .filter((tab) => workspaces.some((workspace) => workspace.id === tab.workspaceId))
       .map((tab) =>
-        // Reset browser tab transient state on restore
-        tab.type === 'browser' ? { ...tab, isLoading: false } : tab,
+        // Reset browser/simulator tab transient state on restore
+        tab.type === 'browser'
+          ? { ...tab, isLoading: false }
+          : tab.type === 'simulator'
+            ? { ...tab, isStreaming: false, isConnected: false }
+            : tab,
       );
     const contextItems = (state?.contextItems ?? []).filter((item) => {
       if (!workspaces.some((workspace) => workspace.id === item.workspaceId)) return false;
@@ -695,8 +717,9 @@ export const useAppStore = create<AppState>((set, get) => ({
       activeWorkspaceId,
       activeTabId: restoredActiveTabId,
       activeAgentTabId:
-        (rememberedAgentTabId && restoredAgentTabs.some((t) => t.id === rememberedAgentTabId) ? rememberedAgentTabId : null)
-        ?? restoredAgentTabs.at(-1)?.id ?? null,
+        (rememberedAgentTabId && restoredAgentTabs.some((t) => t.id === rememberedAgentTabId) ? rememberedAgentTabId : null) ??
+        restoredAgentTabs.at(-1)?.id ??
+        null,
       activeShellTabId: restoredShellTabs.at(-1)?.id ?? null,
       activeFileTabId: restoredFileTabs.at(-1)?.id ?? null,
       workspaceActiveAgentTabIds,
@@ -1100,9 +1123,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   openExternalFileTab: (workspaceId, absPath) => {
-    const existing = get().tabs.find(
-      (tab) => tab.workspaceId === workspaceId && tab.type === 'file' && tab.absPath === absPath,
-    );
+    const existing = get().tabs.find((tab) => tab.workspaceId === workspaceId && tab.type === 'file' && tab.absPath === absPath);
     if (existing) {
       get().setActiveTab(existing.id);
       return;
@@ -1978,7 +1999,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   refreshBranchStats: async (workspaceId) => {
     const state = get();
     const targets = workspaceId ? state.workspaces.filter((w) => w.id === workspaceId) : state.workspaces;
-    const updates: Record<string, { ahead: number; behind: number; additions: number; deletions: number; prNumber?: number | null; prUrl?: string | null }> = {};
+    const updates: Record<
+      string,
+      { ahead: number; behind: number; additions: number; deletions: number; prNumber?: number | null; prUrl?: string | null }
+    > = {};
     await Promise.all(
       targets.map(async (w) => {
         try {
@@ -1997,6 +2021,32 @@ export const useAppStore = create<AppState>((set, get) => ({
       }),
     );
     set((s) => ({ branchStats: { ...s.branchStats, ...updates } }));
+  },
+
+  // ── Simulator tab actions ────────────────────────────────────────────────
+
+  createSimulatorTab: () => {
+    const state = get();
+    const workspaceId = state.activeWorkspaceId;
+    if (!workspaceId) return;
+    const tab: Tab = {
+      id: id(),
+      workspaceId,
+      type: 'simulator',
+      serveSimPort: 0,
+      udid: '',
+      deviceName: '',
+      runtime: '',
+      isStreaming: false,
+      isConnected: false,
+    };
+    get().addTab(tab);
+  },
+
+  updateSimulatorState: (tabId, partial) => {
+    set((state) => ({
+      tabs: state.tabs.map((tab) => (tab.id === tabId && tab.type === 'simulator' ? { ...tab, ...partial } : tab)),
+    }));
   },
 
   // ── Browser tab actions ──────────────────────────────────────────────────

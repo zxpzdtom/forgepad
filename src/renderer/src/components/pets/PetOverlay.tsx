@@ -1,13 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type { PendingPermission, PetSettings } from '@shared/types';
 import { SpriteAnimator } from 'codex-pets-react';
-import type { PetSettings, PendingPermission } from '@shared/types';
-import {
-  agentStatusToAnimation,
-  forgePetAtlas,
-  getPetSpritesheetUrl,
-  type ForgePetAnimationName,
-} from './pet-registry';
+
 import { PetApprovalPopup } from './PetApprovalPopup';
+import { agentStatusToAnimation, type ForgePetAnimationName, forgePetAtlas, getPetSpritesheetUrl } from './pet-registry';
 
 // ── Random-walk constants (same as PetWidget) ──
 const WANDER_INTERVAL_MIN = 5_000;
@@ -322,12 +318,7 @@ export function PetOverlay() {
     >
       {/* Approval popup above the pet sprite */}
       {showApproval && pendingPermission && (
-        <PetApprovalPopup
-          permission={pendingPermission}
-          onAllow={handleApprove}
-          onDeny={handleDeny}
-          variant="overlay"
-        />
+        <PetApprovalPopup permission={pendingPermission} onAllow={handleApprove} onDeny={handleDeny} variant="overlay" />
       )}
       <div
         onPointerDown={handlePointerDown}

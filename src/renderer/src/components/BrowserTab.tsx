@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useTranslation } from '@renderer/i18n';
 import { Allotment } from 'allotment';
 
-import { useTranslation } from '@renderer/i18n';
 import { getElementSelectionScript } from '../lib/element-selection-script';
 import { useAppStore } from '../store/app-store';
 import { BrowserConsolePanel } from './BrowserConsolePanel';
@@ -34,7 +34,12 @@ type LoadError = {
 };
 
 /** Map common Chromium error codes to user-friendly messages */
-function friendlyErrorMessage(code: number, desc: string, url: string, t: (key: string, params?: Record<string, string | number>) => string): { title: string; detail: string; canRetry: boolean } {
+function friendlyErrorMessage(
+  code: number,
+  desc: string,
+  url: string,
+  t: (key: string, params?: Record<string, string | number>) => string,
+): { title: string; detail: string; canRetry: boolean } {
   const host = (() => {
     try {
       return new URL(url).host;
@@ -305,8 +310,20 @@ export function BrowserTab({ tab }: BrowserTabProps) {
     // On load complete: sync nav state AND capture favicon as data URL
     const handleDidStopLoading = () => {
       sendNavState();
-      const url = (() => { try { return wv.getURL(); } catch { return ''; } })();
-      const title = (() => { try { return wv.getTitle(); } catch { return ''; } })();
+      const url = (() => {
+        try {
+          return wv.getURL();
+        } catch {
+          return '';
+        }
+      })();
+      const title = (() => {
+        try {
+          return wv.getTitle();
+        } catch {
+          return '';
+        }
+      })();
       if (!url || url === 'about:blank') return;
 
       // Run inside the webview to grab the best favicon <link> and convert to data URL
@@ -644,14 +661,30 @@ export function BrowserTab({ tab }: BrowserTabProps) {
       // Deserialize the envelope back into a ConsoleArg
       let arg: import('./console-utils').ConsoleArg;
       switch (envelope?.__type) {
-        case 'null':      arg = { type: 'object', subtype: 'null' }; break;
-        case 'undefined': arg = { type: 'undefined' }; break;
-        case 'string':    arg = { type: 'string', value: envelope.__value }; break;
-        case 'number':    arg = { type: 'number', value: envelope.__value }; break;
-        case 'boolean':   arg = { type: 'boolean', value: envelope.__value }; break;
-        case 'function':  arg = { type: 'function', description: envelope.__desc ?? 'function()' }; break;
-        case 'object':    arg = { type: 'object', description: envelope.__json ?? envelope.__desc ?? '[object Object]' }; break;
-        default:          arg = serializeResult(envelope); break;
+        case 'null':
+          arg = { type: 'object', subtype: 'null' };
+          break;
+        case 'undefined':
+          arg = { type: 'undefined' };
+          break;
+        case 'string':
+          arg = { type: 'string', value: envelope.__value };
+          break;
+        case 'number':
+          arg = { type: 'number', value: envelope.__value };
+          break;
+        case 'boolean':
+          arg = { type: 'boolean', value: envelope.__value };
+          break;
+        case 'function':
+          arg = { type: 'function', description: envelope.__desc ?? 'function()' };
+          break;
+        case 'object':
+          arg = { type: 'object', description: envelope.__json ?? envelope.__desc ?? '[object Object]' };
+          break;
+        default:
+          arg = serializeResult(envelope);
+          break;
       }
 
       const resultEntry: ConsoleEntry = {
@@ -947,7 +980,12 @@ export function BrowserTab({ tab }: BrowserTabProps) {
         </Allotment.Pane>
 
         <Allotment.Pane preferredSize={200} minSize={consoleOpen ? 80 : 0} visible={consoleOpen}>
-          <BrowserConsolePanel entries={consoleEntries} onClear={handleConsoleClear} onSendToAgent={handleSendToAgent} onExecuteScript={handleExecuteScript} />
+          <BrowserConsolePanel
+            entries={consoleEntries}
+            onClear={handleConsoleClear}
+            onSendToAgent={handleSendToAgent}
+            onExecuteScript={handleExecuteScript}
+          />
         </Allotment.Pane>
       </Allotment>
 
@@ -984,7 +1022,7 @@ function ErrorOverlay({
         <h3 className="font-medium text-sm text-text">{error.title}</h3>
 
         {/* Detail */}
-        <p className="text-xs leading-relaxed text-muted">{error.detail}</p>
+        <p className="text-muted text-xs leading-relaxed">{error.detail}</p>
 
         {/* Error code badge */}
         <span className="rounded bg-panel-2 px-2 py-0.5 font-mono text-[10px] text-subtle">ERR_{Math.abs(errorCode)}</span>

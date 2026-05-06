@@ -9,10 +9,24 @@ import { useAppStore } from '@renderer/store/app-store';
 import type { CodeSelectionItem, Tab, Workspace } from '@shared/types';
 import { code as streamdownCode } from '@streamdown/code';
 import { createMermaidPlugin } from '@streamdown/mermaid';
-import { Check, ChevronDown, ChevronUp, Code, Copy, FileVideo, Image, List, MessageSquarePlus, Music, Search, X } from 'lucide-react';
+import {
+  Check,
+  ChevronDown,
+  ChevronUp,
+  Code,
+  Copy,
+  FileVideo,
+  Image,
+  List,
+  MessageSquarePlus,
+  Music,
+  Search,
+  X,
+} from 'lucide-react';
 import type { Components } from 'streamdown';
 import { Streamdown } from 'streamdown';
 import 'streamdown/styles.css';
+
 import { FileIcon } from './FileIcon';
 
 type FileTab = Extract<Tab, { type: 'file' }>;
@@ -163,11 +177,7 @@ const RAIL_X_STEP = 12; // extra x per indentation level
  * The diagonal always consumes a fixed portion of the vertical gap so the
  * slope stays consistent regardless of the distance between items.
  */
-function buildRailPath(
-  itemYCenters: number[],
-  itemLevels: number[],
-  minLevel: number,
-): { d: string; segmentLengths: number[] } {
+function buildRailPath(itemYCenters: number[], itemLevels: number[], minLevel: number): { d: string; segmentLengths: number[] } {
   if (itemYCenters.length === 0) return { d: '', segmentLengths: [] };
 
   const xOf = (level: number) => RAIL_X_LEFT + (level - minLevel) * RAIL_X_STEP;
@@ -197,15 +207,15 @@ function buildRailPath(
       if (curX > prevX) {
         // Going deeper (e.g. H2 → H3): vertical first, then diagonal
         const midY = curY - diagonalDy;
-        d += ` L ${prevX} ${midY}`;                 // vertical down
-        d += ` L ${curX} ${curY}`;                   // diagonal to child
+        d += ` L ${prevX} ${midY}`; // vertical down
+        d += ` L ${curX} ${curY}`; // diagonal to child
         const vertLen = Math.abs(midY - prevY);
         segmentLengths.push(vertLen + diagLen(dx, diagonalDy));
       } else {
         // Going shallower (e.g. H3 → H2): diagonal first, then vertical
         const midY = prevY + diagonalDy;
-        d += ` L ${curX} ${midY}`;                   // diagonal back
-        d += ` L ${curX} ${curY}`;                   // vertical down
+        d += ` L ${curX} ${midY}`; // diagonal back
+        d += ` L ${curX} ${curY}`; // vertical down
         const vertLen = Math.abs(curY - midY);
         segmentLengths.push(diagLen(dx, diagonalDy) + vertLen);
       }
@@ -286,10 +296,7 @@ function MarkdownToc({
       const { d, segmentLengths } = buildRailPath(yCenters, levels, minLevel);
       const totalLength = segmentLengths.reduce((a, b) => a + b, 0);
       const svgHeight = navRect.height;
-      const points: [number, number][] = yCenters.map((y, idx) => [
-        RAIL_X_LEFT + (levels[idx] - minLevel) * RAIL_X_STEP,
-        y,
-      ]);
+      const points: [number, number][] = yCenters.map((y, idx) => [RAIL_X_LEFT + (levels[idx] - minLevel) * RAIL_X_STEP, y]);
 
       setRailData({ d, totalLength, segmentLengths, svgHeight, points });
     });
@@ -383,12 +390,7 @@ function MarkdownToc({
       {railData && railData.d && (
         <svg className="markdown-toc-rail" height={railData.svgHeight} aria-hidden="true">
           {/* Background track */}
-          <path
-            ref={trackPathRef}
-            d={railData.d}
-            className="markdown-toc-rail-track"
-            strokeDasharray="none"
-          />
+          <path ref={trackPathRef} d={railData.d} className="markdown-toc-rail-track" strokeDasharray="none" />
           {/* Active highlight */}
           <path
             d={railData.d}
@@ -828,8 +830,9 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
         if (!root || !scrollContainer) return;
         // data-line-index is 0-based
         const lineIndex = lineNumber - 1;
-        const lineEl = root.querySelector(`[data-content] [data-line-index="${lineIndex}"]`) as HTMLElement
-          ?? root.querySelector(`[data-gutter] [data-column-number="${lineNumber}"]`) as HTMLElement;
+        const lineEl =
+          (root.querySelector(`[data-content] [data-line-index="${lineIndex}"]`) as HTMLElement) ??
+          (root.querySelector(`[data-gutter] [data-column-number="${lineNumber}"]`) as HTMLElement);
         if (lineEl) {
           // Delay briefly so the browser finishes layout after render
           requestAnimationFrame(() => {
@@ -957,7 +960,9 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
         return;
       }
       // Also try gutter as fallback
-      const gutterItem = root.querySelector(`[data-gutter] [data-column-number="${pendingScrollLineRef.current}"]`) as HTMLElement | null;
+      const gutterItem = root.querySelector(
+        `[data-gutter] [data-column-number="${pendingScrollLineRef.current}"]`,
+      ) as HTMLElement | null;
       if (gutterItem) {
         scrollToLineElement(gutterItem, scrollContainer);
         pendingScrollLineRef.current = undefined;
@@ -1215,7 +1220,7 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
           {!isMediaFile && <span className="text-muted">{lineCount} lines</span>}
         </div>
         <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
-          {(isImage || isAudio || isVideo) ? (
+          {isImage || isAudio || isVideo ? (
             <div className="view-mode-toggle" role="radiogroup" aria-label="Media view">
               <button
                 className={`view-mode-btn ${mediaViewMode === 'preview' ? 'active' : ''}`}
@@ -1283,9 +1288,13 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
           ) : null}
           <button className="icon-button" type="button" title="Copy file" onClick={copyContent}>
             {copied ? (
-              <span key="check" className="icon-swap"><Check size={16} /></span>
+              <span key="check" className="icon-swap">
+                <Check size={16} />
+              </span>
             ) : (
-              <span key="copy" className="icon-swap"><Copy size={16} /></span>
+              <span key="copy" className="icon-swap">
+                <Copy size={16} />
+              </span>
             )}
           </button>
         </div>
@@ -1359,7 +1368,10 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
         />
       ) : showRenderedMarkdown ? (
         <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
-          <div className="markdown-viewer-scroll scrollbar-thin scroll-mask-y min-h-0 min-w-0 flex-1 overflow-auto" ref={scrollRef}>
+          <div
+            className="markdown-viewer-scroll scrollbar-thin scroll-mask-y min-h-0 min-w-0 flex-1 overflow-auto"
+            ref={scrollRef}
+          >
             <div ref={previewRef} className="markdown-preview">
               <Streamdown
                 components={mdHeadingComponents}

@@ -1,12 +1,18 @@
-import { join } from 'node:path';
-import path from 'node:path';
+import path, { join } from 'node:path';
 import { IPC } from '@shared/ipc';
 import type { PetSettings } from '@shared/types';
 import { app, BrowserWindow, ipcMain, Menu, net, protocol, shell } from 'electron';
 
-import { ptyService, registerIpcHandlers } from './ipc/register-handlers';
 import { registerPetHandlers } from './ipc/pet-handlers';
-import { createPetWindow, destroyPetWindow, getPetWindow, registerPetIpcHandlers, sendPetSettings, setPetWindowVisible } from './pet-window';
+import { ptyService, registerIpcHandlers } from './ipc/register-handlers';
+import {
+  createPetWindow,
+  destroyPetWindow,
+  getPetWindow,
+  registerPetIpcHandlers,
+  sendPetSettings,
+  setPetWindowVisible,
+} from './pet-window';
 import { AgentHooksService } from './services/agent-hooks-service';
 import { HookServer } from './services/hook-server';
 
@@ -255,9 +261,7 @@ app.whenReady().then(async () => {
     // non-focusable) doesn't count.  Without this, clicking the Dock icon
     // after closing the main window does nothing because the pet window keeps
     // getAllWindows().length > 0.
-    const mainWindowExists = BrowserWindow.getAllWindows().some(
-      (w) => w !== getPetWindow() && !w.isDestroyed(),
-    );
+    const mainWindowExists = BrowserWindow.getAllWindows().some((w) => w !== getPetWindow() && !w.isDestroyed());
     if (!mainWindowExists) createWindow();
   });
 });
@@ -271,4 +275,6 @@ app.on('will-quit', () => {
   destroyPetWindow();
   ptyService.destroyAll();
   hookServer?.stop().catch(() => {});
+  // Kill all serve-sim processes
+  import('@main/services/serve-sim-service').then(({ serveSimService }) => serveSimService.stopAll()).catch(() => {});
 });

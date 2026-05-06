@@ -5,6 +5,7 @@ import { mapEventToStatus } from '@shared/agent-lifecycle';
 import { IPC } from '@shared/ipc';
 import type { PendingPermission } from '@shared/types';
 import { BrowserWindow } from 'electron';
+
 import { sendPetAgentStatus, sendPetPermissionRequest } from '../pet-window';
 
 /** Timeout for held PermissionRequest connections (2 minutes). */
@@ -122,13 +123,8 @@ export class HookServer {
             const json = JSON.parse(body) as Record<string, unknown>;
             // Claude Code sends tool_name / tool_input at top level
             toolName =
-              (json.tool_name as string) ??
-              (json.toolName as string) ??
-              (json.tool as string) ??
-              (json.name as string) ??
-              '';
-            const rawInput =
-              json.tool_input ?? json.toolInput ?? json.input ?? json.arguments ?? json.args ?? json.params;
+              (json.tool_name as string) ?? (json.toolName as string) ?? (json.tool as string) ?? (json.name as string) ?? '';
+            const rawInput = json.tool_input ?? json.toolInput ?? json.input ?? json.arguments ?? json.args ?? json.params;
             if (rawInput && typeof rawInput === 'object' && !Array.isArray(rawInput)) {
               toolInput = rawInput as Record<string, unknown>;
             }
@@ -249,11 +245,7 @@ export class HookServer {
   }
 
   /** Broadcast a PermissionRequest with tool details to all windows + pet overlay. */
-  private broadcastPermissionRequest(
-    ptyId: string,
-    toolName: string,
-    toolInput?: Record<string, unknown>,
-  ): void {
+  private broadcastPermissionRequest(ptyId: string, toolName: string, toolInput?: Record<string, unknown>): void {
     const payload: PendingPermission = { ptyId, toolName, toolInput };
     for (const win of BrowserWindow.getAllWindows()) {
       if (!win.webContents.isDestroyed()) {

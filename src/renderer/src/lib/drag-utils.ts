@@ -3,10 +3,7 @@
  * either an internal forgepad path token or one or more external OS files.
  */
 export function hasDraggableFiles(e: React.DragEvent): boolean {
-  return (
-    e.dataTransfer.types.includes('application/x-forgepad-path') ||
-    e.dataTransfer.types.includes('Files')
-  );
+  return e.dataTransfer.types.includes('application/x-forgepad-path') || e.dataTransfer.types.includes('Files');
 }
 
 /**
