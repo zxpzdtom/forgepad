@@ -3,7 +3,7 @@ import { URL } from 'node:url';
 import type { AgentStatusUpdate } from '@shared/agent-lifecycle';
 import { mapEventToStatus } from '@shared/agent-lifecycle';
 import { IPC } from '@shared/ipc';
-import type { PendingPermission } from '@shared/types';
+import type { AskUserQuestionItem, PendingPermission, PermissionSuggestion } from '@shared/types';
 import { BrowserWindow } from 'electron';
 import { sendPetAgentStatus, sendPetPermissionRequest } from '../pet-window';
 
@@ -25,6 +25,10 @@ export class HookServer {
     {
       res: http.ServerResponse;
       timeout: ReturnType<typeof setTimeout>;
+      permissionSuggestions?: PermissionSuggestion[];
+      questions?: AskUserQuestionItem[];
+      /** Original tool_input — needed to echo back in updatedInput (which replaces the entire input). */
+      toolInput?: Record<string, unknown>;
     }
   >();
 
@@ -69,17 +73,51 @@ export class HookServer {
    * the held HTTP response. Called from IPC handlers when the user clicks
    * Allow/Deny in the pet approval UI.
    */
-  resolvePermission(ptyId: string, decision: 'allow' | 'deny'): void {
+  resolvePermission(
+    ptyId: string,
+    decision: 'allow' | 'deny' | 'allowAlways' | 'answer',
+    answers?: Record<string, string>,
+  ): void {
     const pending = this.pendingPermissions.get(ptyId);
     if (!pending) return;
 
     clearTimeout(pending.timeout);
     this.pendingPermissions.delete(ptyId);
 
-    const body =
-      decision === 'allow'
-        ? '{"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"allow"}}}'
-        : '{"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"deny"}}}';
+    let body: string;
+    if (decision === 'deny') {
+      body = '{"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"deny"}}}';
+    } else if (decision === 'answer' && answers) {
+      // AskUserQuestion: return selected answers via updatedInput.
+      // updatedInput replaces the ENTIRE tool input, so we must echo back
+      // the original fields (especially `questions`) alongside `answers`.
+      body = JSON.stringify({
+        hookSpecificOutput: {
+          hookEventName: 'PermissionRequest',
+          decision: {
+            behavior: 'allow',
+            updatedInput: {
+              ...(pending.toolInput ?? {}),
+              answers,
+            },
+          },
+        },
+      });
+    } else if (decision === 'allowAlways' && pending.permissionSuggestions?.length) {
+      // Echo back the permission suggestions as updatedPermissions so Claude Code
+      // persists them as "always allow" rules.
+      body = JSON.stringify({
+        hookSpecificOutput: {
+          hookEventName: 'PermissionRequest',
+          decision: {
+            behavior: 'allow',
+            updatedPermissions: pending.permissionSuggestions,
+          },
+        },
+      });
+    } else {
+      body = '{"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"allow"}}}';
+    }
 
     try {
       if (!pending.res.writableEnded) {
@@ -118,6 +156,7 @@ export class HookServer {
           const body = await this.readBody(req);
           let toolName = '';
           let toolInput: Record<string, unknown> | undefined;
+          let permissionSuggestions: PermissionSuggestion[] | undefined;
           try {
             const json = JSON.parse(body) as Record<string, unknown>;
             // Claude Code sends tool_name / tool_input at top level
@@ -132,8 +171,32 @@ export class HookServer {
             if (rawInput && typeof rawInput === 'object' && !Array.isArray(rawInput)) {
               toolInput = rawInput as Record<string, unknown>;
             }
+            // Extract permission suggestions (e.g. "always allow this tool" options)
+            if (Array.isArray(json.permission_suggestions)) {
+              permissionSuggestions = json.permission_suggestions as PermissionSuggestion[];
+            }
           } catch {
             // ignore parse errors
+          }
+
+          // Parse AskUserQuestion questions from tool_input
+          let questions: AskUserQuestionItem[] | undefined;
+          if (toolName === 'AskUserQuestion' && toolInput) {
+            const rawQuestions = toolInput.questions;
+            if (Array.isArray(rawQuestions)) {
+              questions = (rawQuestions as Array<Record<string, unknown>>).map((q) => ({
+                question: (q.question as string) ?? 'Question',
+                header: q.header as string | undefined,
+                multiSelect: q.multiSelect as boolean | undefined,
+                options: Array.isArray(q.options)
+                  ? (q.options as Array<Record<string, unknown> | string>).map((opt) =>
+                      typeof opt === 'string'
+                        ? { label: opt }
+                        : { label: (opt.label as string) ?? '', description: opt.description as string | undefined },
+                    )
+                  : [],
+              }));
+            }
           }
 
           // If there's already a pending permission for this ptyId, deny the old one
@@ -146,7 +209,7 @@ export class HookServer {
             this.resolvePermission(ptyId, 'allow');
           }, PERMISSION_TIMEOUT_MS);
 
-          this.pendingPermissions.set(ptyId, { res, timeout });
+          this.pendingPermissions.set(ptyId, { res, timeout, permissionSuggestions, questions, toolInput });
 
           // Handle client disconnect (e.g. Ctrl+C in terminal kills curl)
           res.on('close', () => {
@@ -158,7 +221,7 @@ export class HookServer {
           });
 
           // Broadcast the permission request details to all windows + pet overlay
-          this.broadcastPermissionRequest(ptyId, toolName, toolInput);
+          this.broadcastPermissionRequest(ptyId, toolName, toolInput, permissionSuggestions, questions);
 
           // Do NOT respond — the response is held until resolvePermission is called
           return;
@@ -253,14 +316,16 @@ export class HookServer {
     ptyId: string,
     toolName: string,
     toolInput?: Record<string, unknown>,
+    permissionSuggestions?: PermissionSuggestion[],
+    questions?: AskUserQuestionItem[],
   ): void {
-    const payload: PendingPermission = { ptyId, toolName, toolInput };
+    const payload: PendingPermission = { ptyId, toolName, toolInput, permissionSuggestions, questions };
     for (const win of BrowserWindow.getAllWindows()) {
       if (!win.webContents.isDestroyed()) {
         win.webContents.send(IPC.AGENT_PERMISSION_REQUEST, payload);
       }
     }
-    sendPetPermissionRequest(ptyId, toolName, toolInput);
+    sendPetPermissionRequest(ptyId, toolName, toolInput, permissionSuggestions, questions);
   }
 
   /** Broadcast that a permission request was resolved (clear approval UI). */

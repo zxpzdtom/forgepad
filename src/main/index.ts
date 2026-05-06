@@ -241,14 +241,20 @@ app.whenReady().then(async () => {
   });
 
   // Listen for permission decisions from the pet overlay window.
-  ipcMain.on(IPC.PET_PERMISSION_DECISION, (_event, ptyId: string, decision: 'allow' | 'deny') => {
-    hookServer?.resolvePermission(ptyId, decision);
-  });
+  ipcMain.on(
+    IPC.PET_PERMISSION_DECISION,
+    (_event, ptyId: string, decision: 'allow' | 'deny' | 'allowAlways' | 'answer', answers?: Record<string, string>) => {
+      hookServer?.resolvePermission(ptyId, decision, answers);
+    },
+  );
 
   // Listen for permission decisions from the main renderer window.
-  ipcMain.on(IPC.AGENT_PERMISSION_DECISION, (_event, ptyId: string, decision: 'allow' | 'deny') => {
-    hookServer?.resolvePermission(ptyId, decision);
-  });
+  ipcMain.on(
+    IPC.AGENT_PERMISSION_DECISION,
+    (_event, ptyId: string, decision: 'allow' | 'deny' | 'allowAlways' | 'answer', answers?: Record<string, string>) => {
+      hookServer?.resolvePermission(ptyId, decision, answers);
+    },
+  );
 
   app.on('activate', () => {
     // Check whether the *main* window exists – the pet overlay (skipTaskbar,

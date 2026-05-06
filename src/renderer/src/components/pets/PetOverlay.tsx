@@ -124,6 +124,21 @@ export function PetOverlay() {
     setPendingPermission(null);
   }, [pendingPermission]);
 
+  const handleAllowAlways = useCallback(() => {
+    if (!pendingPermission) return;
+    window.forgepadPet?.sendPermissionDecision(pendingPermission.ptyId, 'allowAlways');
+    setPendingPermission(null);
+  }, [pendingPermission]);
+
+  const handleAnswer = useCallback(
+    (answers: Record<string, string>) => {
+      if (!pendingPermission) return;
+      window.forgepadPet?.sendPermissionDecision(pendingPermission.ptyId, 'answer', answers);
+      setPendingPermission(null);
+    },
+    [pendingPermission],
+  );
+
   const handleDeny = useCallback(() => {
     if (!pendingPermission) return;
     window.forgepadPet?.sendPermissionDecision(pendingPermission.ptyId, 'deny');
@@ -158,30 +173,62 @@ export function PetOverlay() {
         let dy = 0;
         let walkAnim: ForgePetAnimationName;
 
-        if (direction < 0.35) {
+        if (direction < 0.2) {
+          // Go left
           dx = -distance;
           dy = (Math.random() - 0.5) * 20;
           walkAnim = 'running-left';
-        } else if (direction < 0.7) {
+        } else if (direction < 0.4) {
+          // Go right
           dx = distance;
           dy = (Math.random() - 0.5) * 20;
           walkAnim = 'running-right';
-        } else if (direction < 0.85) {
+        } else if (direction < 0.5) {
+          // Jump up
           dy = -(distance * 0.5);
           dx = (Math.random() - 0.5) * 30;
           walkAnim = 'jumping';
-        } else {
+        } else if (direction < 0.6) {
+          // Move down
           dy = distance * 0.5;
           dx = (Math.random() - 0.5) * 30;
           walkAnim = 'waving';
+        } else if (direction < 0.7) {
+          // Diagonal upper-left
+          dx = -distance * 0.7;
+          dy = -distance * 0.4;
+          walkAnim = 'running-left';
+        } else if (direction < 0.8) {
+          // Diagonal upper-right
+          dx = distance * 0.7;
+          dy = -distance * 0.4;
+          walkAnim = 'running-right';
+        } else if (direction < 0.9) {
+          // Diagonal lower-left
+          dx = -distance * 0.7;
+          dy = distance * 0.4;
+          walkAnim = 'running-left';
+        } else {
+          // Diagonal lower-right
+          dx = distance * 0.7;
+          dy = distance * 0.4;
+          walkAnim = 'running-right';
         }
 
         isWanderingRef.current = true;
         setAnimation(walkAnim);
 
-        // Move the Electron window
-        const newX = window.screenX + dx;
-        const newY = window.screenY + dy;
+        // Move the Electron window, clamped to screen work area
+        const rawX = window.screenX + dx;
+        const rawY = window.screenY + dy;
+        const sw = window.screen.availWidth;
+        const sh = window.screen.availHeight;
+        const sl = window.screen.availLeft ?? 0;
+        const st = window.screen.availTop ?? 0;
+        const winW = window.outerWidth;
+        const winH = window.outerHeight;
+        const newX = Math.max(sl, Math.min(sl + sw - winW, rawX));
+        const newY = Math.max(st, Math.min(st + sh - winH, rawY));
         window.forgepadPet?.moveWindow(Math.round(newX), Math.round(newY));
 
         wanderStepTimerRef.current = setTimeout(() => {
@@ -296,9 +343,16 @@ export function PetOverlay() {
     const spriteH = Math.round(208 * scale);
 
     if (showApproval && !prevShowApproval.current) {
-      // Expand window upward to fit popup (~120px above sprite)
-      const popupH = 120;
-      const totalW = Math.max(spriteW, 280); // popup minWidth
+      // Expand window upward to fit popup.
+      // Questions with options need more vertical space than simple approval.
+      const isQuestion = pendingPermission?.questions && pendingPermission.questions.length > 0;
+      const optionCount = isQuestion ? (pendingPermission.questions![0].options.length ?? 0) : 0;
+      const hasDescription = isQuestion && pendingPermission.questions![0].options.some((o) => o.description);
+      // Each option button: ~30px + 4px gap; with description: ~44px + 4px gap
+      // Header ~20px + question text ~30px + bottom buttons ~32px + padding ~24px
+      const optionItemH = hasDescription ? 48 : 34;
+      const popupH = isQuestion ? 106 + optionCount * optionItemH : 120;
+      const totalW = Math.max(spriteW, isQuestion ? 320 : 280);
       const totalH = spriteH + popupH;
       api.resizeWindow(totalW, totalH);
     } else if (!showApproval && prevShowApproval.current) {
@@ -306,7 +360,7 @@ export function PetOverlay() {
       api.resizeWindow(spriteW, spriteH);
     }
     prevShowApproval.current = showApproval;
-  }, [showApproval, petSettings]);
+  }, [showApproval, petSettings, pendingPermission]);
 
   if (!petSettings || !petSettings.enabled) return null;
 
@@ -325,7 +379,9 @@ export function PetOverlay() {
         <PetApprovalPopup
           permission={pendingPermission}
           onAllow={handleApprove}
+          onAllowAlways={handleAllowAlways}
           onDeny={handleDeny}
+          onAnswer={handleAnswer}
           variant="overlay"
         />
       )}

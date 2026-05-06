@@ -2,7 +2,7 @@ import { join } from 'node:path';
 import { app, BrowserWindow, ipcMain, screen } from 'electron';
 import { IPC } from '@shared/ipc';
 import type { AgentStatus } from '@shared/agent-lifecycle';
-import type { PetSettings } from '@shared/types';
+import type { AskUserQuestionItem, PetSettings, PermissionSuggestion } from '@shared/types';
 
 let petWindow: BrowserWindow | null = null;
 
@@ -120,10 +120,16 @@ export function registerPetIpcHandlers(): void {
     petWindow.setPosition(Math.round(newX), Math.round(newY), false);
   });
 
-  // Move the pet window to a new screen position (called during drag)
+  // Move the pet window to a new screen position (called during drag / wander)
   ipcMain.on(IPC.PET_MOVE_WINDOW, (_event, x: number, y: number) => {
     if (!petWindow || petWindow.isDestroyed()) return;
-    petWindow.setPosition(Math.round(x), Math.round(y), false);
+    // Clamp to the work area of the nearest display so the pet never goes off-screen
+    const display = screen.getDisplayNearestPoint({ x: Math.round(x), y: Math.round(y) });
+    const { x: areaX, y: areaY, width: areaW, height: areaH } = display.workArea;
+    const [winW, winH] = petWindow.getSize();
+    const clampedX = Math.max(areaX, Math.min(areaX + areaW - winW, Math.round(x)));
+    const clampedY = Math.max(areaY, Math.min(areaY + areaH - winH, Math.round(y)));
+    petWindow.setPosition(clampedX, clampedY, false);
   });
 
   // Pet overlay click → focus the main ForgePad window and tell it to
@@ -160,9 +166,17 @@ export function sendPetPermissionRequest(
   ptyId: string,
   toolName: string,
   toolInput?: Record<string, unknown>,
+  permissionSuggestions?: PermissionSuggestion[],
+  questions?: AskUserQuestionItem[],
 ): void {
   if (!petWindow || petWindow.isDestroyed()) return;
-  petWindow.webContents.send(IPC.PET_PERMISSION_REQUEST, { ptyId, toolName, toolInput });
+  petWindow.webContents.send(IPC.PET_PERMISSION_REQUEST, {
+    ptyId,
+    toolName,
+    toolInput,
+    permissionSuggestions,
+    questions,
+  });
 }
 
 /** Destroy the pet window. */

@@ -233,7 +233,8 @@ function tabTitle(tab: Tab): string {
   if (tab.type === 'diff') return 'Changes';
   if (tab.type === 'context-preview') return 'Context';
   if (tab.type === 'browser') return tab.title || 'Browser';
-  return tab.relPath.split('/').pop() || tab.relPath;
+  if (tab.type === 'file') return tab.relPath.split('/').pop() || tab.relPath;
+  return 'Tab';
 }
 
 function agentLabelForCommand(command: string, presets: AgentPreset[]): string {

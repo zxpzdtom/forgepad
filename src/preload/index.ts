@@ -142,9 +142,13 @@ const api = {
         ipcRenderer.removeListener(IPC.AGENT_PERMISSION_REQUEST, handler);
       };
     },
-    /** Send a permission decision (allow/deny) back to the main process. */
-    sendPermissionDecision: (ptyId: string, decision: 'allow' | 'deny') => {
-      ipcRenderer.send(IPC.AGENT_PERMISSION_DECISION, ptyId, decision);
+    /** Send a permission decision back to the main process. */
+    sendPermissionDecision: (
+      ptyId: string,
+      decision: 'allow' | 'deny' | 'allowAlways' | 'answer',
+      answers?: Record<string, string>,
+    ) => {
+      ipcRenderer.send(IPC.AGENT_PERMISSION_DECISION, ptyId, decision, answers);
     },
   },
   menu: {

@@ -113,34 +113,61 @@ export function PetWidget() {
           return;
         }
 
-        // Pick a random direction: left, right, up, or down
+        // Pick a random direction: left, right, up, down, or diagonal
         const distance = WANDER_DISTANCE_MIN + Math.random() * (WANDER_DISTANCE_MAX - WANDER_DISTANCE_MIN);
         const direction = Math.random();
         let dx = 0;
         let dy = 0;
         let walkAnim: ForgePetAnimationName;
 
-        if (direction < 0.35) {
+        if (direction < 0.2) {
           // Go left
           dx = -distance;
           dy = (Math.random() - 0.5) * 20;
           walkAnim = 'running-left';
-        } else if (direction < 0.7) {
+        } else if (direction < 0.4) {
           // Go right
           dx = distance;
           dy = (Math.random() - 0.5) * 20;
           walkAnim = 'running-right';
-        } else if (direction < 0.85) {
+        } else if (direction < 0.5) {
           // Jump up
           dy = -(distance * 0.5);
           dx = (Math.random() - 0.5) * 30;
           walkAnim = 'jumping';
-        } else {
-          // Wave / move down
+        } else if (direction < 0.6) {
+          // Move down
           dy = distance * 0.5;
           dx = (Math.random() - 0.5) * 30;
           walkAnim = 'waving';
+        } else if (direction < 0.7) {
+          // Diagonal upper-left
+          dx = -distance * 0.7;
+          dy = -distance * 0.4;
+          walkAnim = 'running-left';
+        } else if (direction < 0.8) {
+          // Diagonal upper-right
+          dx = distance * 0.7;
+          dy = -distance * 0.4;
+          walkAnim = 'running-right';
+        } else if (direction < 0.9) {
+          // Diagonal lower-left
+          dx = -distance * 0.7;
+          dy = distance * 0.4;
+          walkAnim = 'running-left';
+        } else {
+          // Diagonal lower-right
+          dx = distance * 0.7;
+          dy = distance * 0.4;
+          walkAnim = 'running-right';
         }
+
+        // Clamp position to stay within viewport bounds
+        const spriteW = 192 * petSettings.petSize;
+        const spriteH = 208 * petSettings.petSize;
+        const margin = 8;
+        const newX = Math.max(margin, Math.min(window.innerWidth - spriteW - margin, pet.position.x + dx));
+        const newY = Math.max(40, Math.min(window.innerHeight - spriteH - margin, pet.position.y + dy));
 
         // Start walk animation
         isWanderingRef.current = true;
@@ -150,8 +177,8 @@ export function PetWidget() {
         petDispatch({
           type: 'setPosition',
           position: {
-            x: pet.position.x + dx,
-            y: pet.position.y + dy,
+            x: newX,
+            y: newY,
           },
         });
 
@@ -270,6 +297,21 @@ export function PetWidget() {
     useAppStore.getState().setPendingPermission(null);
   }, [pendingPermission]);
 
+  const handleAllowAlways = useCallback(() => {
+    if (!pendingPermission) return;
+    window.forgepad.agent.sendPermissionDecision(pendingPermission.ptyId, 'allowAlways');
+    useAppStore.getState().setPendingPermission(null);
+  }, [pendingPermission]);
+
+  const handleAnswer = useCallback(
+    (answers: Record<string, string>) => {
+      if (!pendingPermission) return;
+      window.forgepad.agent.sendPermissionDecision(pendingPermission.ptyId, 'answer', answers);
+      useAppStore.getState().setPendingPermission(null);
+    },
+    [pendingPermission],
+  );
+
   const handleDeny = useCallback(() => {
     if (!pendingPermission) return;
     window.forgepad.agent.sendPermissionDecision(pendingPermission.ptyId, 'deny');
@@ -304,7 +346,9 @@ export function PetWidget() {
         <PetApprovalPopup
           permission={pendingPermission}
           onAllow={handleApprove}
+          onAllowAlways={handleAllowAlways}
           onDeny={handleDeny}
+          onAnswer={handleAnswer}
           variant="widget"
         />
       )}
