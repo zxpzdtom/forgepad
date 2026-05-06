@@ -1,0 +1,7 @@
+{
+  "id": "aerith",
+  "displayName": "Aerith",
+  "description": "A gentle Codex digital pet inspired by a flower mage heroine, with brown braided hair, a pink dress, a red cropped jacket, green eyes, and one tiny flower.",
+  "spritesheetPath": "spritesheet.webp",
+  "kind": "object"
+}
