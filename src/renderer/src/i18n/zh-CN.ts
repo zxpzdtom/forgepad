@@ -39,6 +39,7 @@ const zhCN: Record<TranslationKeys, string> = {
   'app.emptyState.detached': '已分离',
   'app.emptyState.newAgent': '新建代理',
   'app.emptyState.terminal': '终端',
+  'app.emptyState.browser': '浏览器',
   'app.toast.failedLoadState': '加载工作区状态失败。',
   'app.toast.failedSaveState': '保存工作区状态失败。',
   'app.toast.failedWatchWorkspace': '监听工作区变更失败。',

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from '@renderer/i18n';
 import type { ConsoleArg, ConsoleEntry } from './console-utils';
 import { parseStyledConsole, sanitizeConsoleStyle, stringifyArg, stringifyConsoleArgs } from './console-utils';
+import { Tooltip } from './Tooltip';
 
 export type { ConsoleEntry };
 
@@ -182,17 +183,18 @@ function ConsoleInput({ onExecute }: { onExecute: (script: string) => void }) {
         spellCheck={false}
         className="min-w-0 flex-1 bg-transparent font-mono text-[12px] text-text outline-none placeholder:text-subtle"
       />
-      <button
-        type="button"
-        onClick={commit}
-        disabled={!value.trim()}
-        title={t('browserConsole.runScript')}
-        className="flex h-[22px] items-center rounded px-1.5 text-[11px] text-subtle transition-colors hover:text-muted disabled:opacity-30"
-      >
-        <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
-          <path d="M4 3l9 5-9 5V3z" fill="currentColor" />
-        </svg>
-      </button>
+      <Tooltip label={t('browserConsole.runScript')}>
+        <button
+          type="button"
+          onClick={commit}
+          disabled={!value.trim()}
+          className="flex h-[22px] items-center rounded px-1.5 text-[11px] text-subtle transition-colors hover:text-muted disabled:opacity-30"
+        >
+          <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+            <path d="M4 3l9 5-9 5V3z" fill="currentColor" />
+          </svg>
+        </button>
+      </Tooltip>
     </div>
   );
 }
@@ -336,7 +338,7 @@ export function BrowserConsolePanel({ entries, onClear, onSendToAgent, onExecute
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={t('browserConsole.filterPlaceholder')}
-            className="h-[26px] w-36 rounded-[4px] border border-border bg-surface-input pl-7 pr-5 text-text text-[12px] transition-all placeholder:text-[11px] placeholder:text-subtle focus:w-48 focus:border-accent focus:outline-none"
+            className="h-[26px] w-36 rounded-[4px] border border-border bg-surface-input pl-7 pr-5 text-text text-[12px] transition-all placeholder:text-[12px] placeholder:text-subtle focus:w-48 focus:border-accent focus:outline-none"
           />
           {searchQuery && (
             <span
@@ -366,7 +368,6 @@ export function BrowserConsolePanel({ entries, onClear, onSendToAgent, onExecute
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') toggleSelectAll();
             }}
-            title={allFilteredSelected ? t('browserConsole.deselectAll') : t('browserConsole.selectAll')}
             className="flex cursor-pointer items-center gap-1 rounded px-1.5 py-0.5 text-subtle text-[12px] transition-colors hover:text-muted"
           >
             {allFilteredSelected ? (
@@ -426,24 +427,25 @@ export function BrowserConsolePanel({ entries, onClear, onSendToAgent, onExecute
         </span>
 
         {/* Clear */}
-        <span
-          role="button"
-          tabIndex={0}
-          onClick={entries.length > 0 ? handleClear : undefined}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && entries.length > 0) handleClear();
-          }}
-          title={t('browserConsole.clearConsole')}
-          className={[
-            'flex size-[26px] items-center justify-center rounded-[4px] transition-colors',
-            entries.length > 0 ? 'cursor-pointer text-danger/70 hover:text-danger' : 'cursor-not-allowed text-subtle opacity-40',
-          ].join(' ')}
-        >
-          <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
-            <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.3" />
-            <path d="M5.5 5.5l5 5m-5 0l5-5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-          </svg>
-        </span>
+        <Tooltip label={t('browserConsole.clearConsole')} position="bottom">
+          <span
+            role="button"
+            tabIndex={0}
+            onClick={entries.length > 0 ? handleClear : undefined}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && entries.length > 0) handleClear();
+            }}
+            className={[
+              'flex size-[26px] items-center justify-center rounded-[4px] transition-colors',
+              entries.length > 0 ? 'cursor-pointer text-danger/70 hover:text-danger' : 'cursor-not-allowed text-subtle opacity-40',
+            ].join(' ')}
+          >
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none">
+              <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.3" />
+              <path d="M3.75 12.25L12.25 3.75" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+            </svg>
+          </span>
+        </Tooltip>
       </div>
 
       {/* ── Log entries ─────────────────────────────────────────────── */}

@@ -2,12 +2,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Allotment } from 'allotment';
 
 import { useTranslation } from '@renderer/i18n';
+import { ChevronLeft, ChevronRight, RefreshCw, X as XIcon } from 'lucide-react';
 import { getElementSelectionScript } from '../lib/element-selection-script';
 import { useAppStore } from '../store/app-store';
 import { BrowserConsolePanel } from './BrowserConsolePanel';
 import { BrowserFeedbackModal } from './BrowserFeedbackModal';
 import type { ConsoleEntry } from './console-utils';
 import { stringifyConsoleArgs } from './console-utils';
+import { Tooltip } from './Tooltip';
 import { UrlBar } from './UrlBar';
 
 type BrowserTabProps = {
@@ -748,54 +750,39 @@ export function BrowserTab({ tab }: BrowserTabProps) {
       {/* ── Toolbar ─────────────────────────────────────────────────────── */}
       <div className="flex h-10 shrink-0 items-center gap-1 border-border border-b bg-panel px-2">
         {/* Back */}
-        <button
-          type="button"
-          onClick={handleBack}
-          disabled={!tab.canGoBack}
-          title={t('browser.back')}
-          className="rounded p-1.5 text-subtle transition-colors hover:bg-panel-3 hover:text-text disabled:cursor-not-allowed disabled:opacity-30"
-        >
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-            <path d="M9 2L4 7l5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </button>
+        <Tooltip label={t('browser.back')} position="bottom">
+          <button
+            type="button"
+            onClick={handleBack}
+            disabled={!tab.canGoBack}
+            className="rounded p-1.5 text-subtle transition-[color,background-color,scale] duration-150 hover:bg-panel-3 hover:text-text active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-30"
+          >
+            <ChevronLeft size={14} />
+          </button>
+        </Tooltip>
 
         {/* Forward */}
-        <button
-          type="button"
-          onClick={handleForward}
-          disabled={!tab.canGoForward}
-          title={t('browser.forward')}
-          className="rounded p-1.5 text-subtle transition-colors hover:bg-panel-3 hover:text-text disabled:cursor-not-allowed disabled:opacity-30"
-        >
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-            <path d="M5 2l5 5-5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </button>
+        <Tooltip label={t('browser.forward')} position="bottom">
+          <button
+            type="button"
+            onClick={handleForward}
+            disabled={!tab.canGoForward}
+            className="rounded p-1.5 text-subtle transition-[color,background-color,scale] duration-150 hover:bg-panel-3 hover:text-text active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-30"
+          >
+            <ChevronRight size={14} />
+          </button>
+        </Tooltip>
 
         {/* Reload / Stop */}
-        <button
-          type="button"
-          onClick={handleReloadOrStop}
-          title={tab.isLoading ? t('browser.stop') : t('common.reload')}
-          className="rounded p-1.5 text-subtle transition-colors hover:bg-panel-3 hover:text-text"
-        >
-          {tab.isLoading ? (
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <path d="M2 2l10 10M12 2L2 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
-          ) : (
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <path
-                d="M12 7A5 5 0 1 1 7 2M7 2l2.5 2.5M7 2L4.5 4.5"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
-          )}
-        </button>
+        <Tooltip label={tab.isLoading ? t('browser.stop') : t('common.reload')} position="bottom">
+          <button
+            type="button"
+            onClick={handleReloadOrStop}
+            className="rounded p-1.5 text-subtle transition-[color,background-color,scale] duration-150 hover:bg-panel-3 hover:text-text active:scale-[0.96]"
+          >
+            {tab.isLoading ? <XIcon size={14} /> : <RefreshCw size={14} />}
+          </button>
+        </Tooltip>
 
         {/* URL bar */}
         <UrlBar
@@ -808,80 +795,74 @@ export function BrowserTab({ tab }: BrowserTabProps) {
           history={browserHistory}
         />
 
-        {/* Viewport mode toggle (PC / H5) */}
-        <button
-          type="button"
-          onClick={handleToggleViewport}
-          title={isMobile ? t('browser.switchDesktop') : t('browser.switchMobile')}
-          className={[
-            'flex h-7 items-center gap-1 rounded px-2 font-medium text-xs transition-colors',
-            isMobile ? 'bg-accent text-white' : 'border border-border bg-panel-2 text-muted hover:border-border hover:text-text',
-          ].join(' ')}
-        >
-          {isMobile ? (
-            // Phone icon
-            <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-              <rect x="3" y="1" width="7" height="11" rx="1.5" stroke="currentColor" strokeWidth="1.2" />
-              <line x1="5.5" y1="10" x2="7.5" y2="10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-            </svg>
-          ) : (
-            // Desktop icon
-            <svg width="14" height="13" viewBox="0 0 14 13" fill="none">
-              <rect x="1" y="1" width="12" height="8" rx="1.2" stroke="currentColor" strokeWidth="1.2" />
-              <line x1="5" y1="11" x2="9" y2="11" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-              <line x1="7" y1="9" x2="7" y2="11" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-            </svg>
-          )}
-          {isMobile ? 'H5' : 'PC'}
-        </button>
+        {/* Viewport mode toggle */}
+        <Tooltip label={isMobile ? t('browser.switchDesktop') : t('browser.switchMobile')} position="bottom">
+          <button
+            type="button"
+            onClick={handleToggleViewport}
+            className={[
+              'grid h-7 w-7 place-items-center rounded-md transition-[color,background-color,scale] duration-150 active:scale-[0.96]',
+              isMobile ? 'bg-accent text-white' : 'text-subtle hover:bg-panel-3 hover:text-text',
+            ].join(' ')}
+          >
+            {isMobile ? (
+              <svg width="14" height="14" viewBox="0 0 13 13" fill="none">
+                <rect x="3" y="1" width="7" height="11" rx="1.5" stroke="currentColor" strokeWidth="1.2" />
+                <line x1="5.5" y1="10" x2="7.5" y2="10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+              </svg>
+            ) : (
+              <svg width="14" height="14" viewBox="0 0 14 13" fill="none">
+                <rect x="1" y="1" width="12" height="8" rx="1.2" stroke="currentColor" strokeWidth="1.2" />
+                <line x1="5" y1="11" x2="9" y2="11" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+                <line x1="7" y1="9" x2="7" y2="11" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+              </svg>
+            )}
+          </button>
+        </Tooltip>
 
         {/* Select Element toggle */}
-        <button
-          type="button"
-          onClick={handleToggleSelect}
-          title={selectMode ? t('browser.exitElementSelection') : t('browser.selectElement')}
-          className={[
-            'flex h-7 items-center gap-1.5 rounded px-2.5 font-medium text-xs transition-colors',
-            selectMode
-              ? 'bg-accent text-white'
-              : 'border border-border bg-panel-2 text-muted hover:border-border hover:text-text',
-          ].join(' ')}
-        >
-          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-            <circle cx="6.5" cy="6.5" r="5" stroke="currentColor" strokeWidth="1.3" />
-            <circle cx="6.5" cy="6.5" r="1.5" fill="currentColor" />
-            <path d="M6.5 1v2M6.5 10v2M1 6.5h2M10 6.5h2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-          </svg>
-          {selectMode ? t('browser.selecting') : t('browser.inspect')}
-        </button>
+        <Tooltip label={selectMode ? t('browser.exitElementSelection') : t('browser.selectElement')} position="bottom">
+          <button
+            type="button"
+            onClick={handleToggleSelect}
+            className={[
+              'grid h-7 w-7 place-items-center rounded-md transition-[color,background-color,scale] duration-150 active:scale-[0.96]',
+              selectMode ? 'bg-accent text-white' : 'text-subtle hover:bg-panel-3 hover:text-text',
+            ].join(' ')}
+          >
+            <svg width="14" height="14" viewBox="0 0 13 13" fill="none">
+              <circle cx="6.5" cy="6.5" r="5" stroke="currentColor" strokeWidth="1.3" />
+              <circle cx="6.5" cy="6.5" r="1.5" fill="currentColor" />
+              <path d="M6.5 1v2M6.5 10v2M1 6.5h2M10 6.5h2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+            </svg>
+          </button>
+        </Tooltip>
 
         {/* Console toggle */}
-        <button
-          type="button"
-          onClick={() => setConsoleOpen((v) => !v)}
-          title={consoleOpen ? t('browser.hideConsole') : t('browser.showConsole')}
-          className={[
-            'flex h-7 items-center gap-1 rounded px-2 font-medium text-xs transition-colors',
-            consoleOpen
-              ? 'bg-accent text-white'
-              : 'border border-border bg-panel-2 text-muted hover:border-border hover:text-text',
-          ].join(' ')}
-        >
-          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-            <rect x="1" y="2" width="11" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.2" />
-            <path d="M3.5 5.5l2 1.5-2 1.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
-            <line x1="7" y1="8.5" x2="9.5" y2="8.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-          </svg>
-          {t('browser.console')}
-          {consoleErrorCount > 0 && !consoleOpen && (
-            <span
-              key={consoleErrorCount}
-              className="console-badge console-badge-pulse ml-0.5 inline-flex h-[16px] min-w-[16px] items-center justify-center rounded-full bg-danger px-1 font-mono text-[10px] text-white leading-none"
-            >
-              {consoleErrorCount > 99 ? '99+' : consoleErrorCount}
-            </span>
-          )}
-        </button>
+        <Tooltip label={consoleOpen ? t('browser.hideConsole') : t('browser.showConsole')} position="bottom">
+          <button
+            type="button"
+            onClick={() => setConsoleOpen((v) => !v)}
+            className={[
+              'relative grid h-7 w-7 place-items-center rounded-md transition-[color,background-color,scale] duration-150 active:scale-[0.96]',
+              consoleOpen ? 'bg-accent text-white' : 'text-subtle hover:bg-panel-3 hover:text-text',
+            ].join(' ')}
+          >
+            <svg width="14" height="14" viewBox="0 0 13 13" fill="none">
+              <rect x="1" y="2" width="11" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.2" />
+              <path d="M3.5 5.5l2 1.5-2 1.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+              <line x1="7" y1="8.5" x2="9.5" y2="8.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+            </svg>
+            {consoleErrorCount > 0 && !consoleOpen && (
+              <span
+                key={consoleErrorCount}
+                className="console-badge console-badge-pulse absolute -top-1 -right-1 inline-flex h-[14px] min-w-[14px] items-center justify-center rounded-full bg-danger px-0.5 font-mono text-[9px] text-white leading-none"
+              >
+                {consoleErrorCount > 99 ? '99+' : consoleErrorCount}
+              </span>
+            )}
+          </button>
+        </Tooltip>
       </div>
 
       {/* ── Loading bar ───────────────────────────────────────────────────── */}
@@ -994,17 +975,9 @@ function ErrorOverlay({
           <button
             type="button"
             onClick={onRetry}
-            className="mt-1 flex h-8 items-center gap-1.5 rounded-md bg-accent px-4 font-medium text-white text-xs transition-colors hover:bg-accent/90 active:bg-accent/80"
+            className="mt-1 flex h-8 items-center gap-1.5 rounded-md bg-accent px-4 font-medium text-white text-xs transition-[background-color,scale] duration-150 hover:bg-accent/90 active:scale-[0.96]"
           >
-            <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
-              <path
-                d="M12 7A5 5 0 1 1 7 2M7 2l2.5 2.5M7 2L4.5 4.5"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
+            <RefreshCw size={13} />
             {t('common.retry')}
           </button>
         )}

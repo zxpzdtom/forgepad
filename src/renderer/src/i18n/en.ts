@@ -37,6 +37,7 @@ const en = {
   'app.emptyState.detached': 'detached',
   'app.emptyState.newAgent': 'New Agent',
   'app.emptyState.terminal': 'Terminal',
+  'app.emptyState.browser': 'Browser',
   'app.toast.failedLoadState': 'Failed to load workspace state.',
   'app.toast.failedSaveState': 'Failed to save workspace state.',
   'app.toast.failedWatchWorkspace': 'Failed to watch workspace changes.',
