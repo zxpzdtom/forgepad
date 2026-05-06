@@ -7,14 +7,20 @@ import {
   ChevronRight,
   Code2,
   Folder,
+  Globe,
   PanelLeftClose,
   PanelLeftOpen,
   PanelRightClose,
   PanelRightOpen,
+  Pencil,
+  Play,
   Search,
+  TerminalSquare,
 } from 'lucide-react';
 
 import { appIcon, ideIcon } from './AgentIcons';
+import { RunSetupDialog } from './RunSetupDialog';
+import { Tooltip } from './Tooltip';
 
 /* ── Types ── */
 
@@ -164,11 +170,156 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
   const rightPanelOpen = useAppStore((state) => state.rightPanelOpen);
   const activeWorkspaceId = useAppStore((state) => state.activeWorkspaceId);
   const workspaces = useAppStore((state) => state.workspaces);
+  const projects = useAppStore((state) => state.projects);
   const defaultOpenWith = useAppStore((state) => state.settings.defaultOpenWith);
   const updateSettings = useAppStore((state) => state.updateSettings);
   const addToast = useAppStore((state) => state.addToast);
+  const settings = useAppStore((state) => state.settings);
+  const createTerminal = useAppStore((state) => state.createTerminal);
+  const createBrowserTab = useAppStore((state) => state.createBrowserTab);
+  const projectActiveRunIndex = useAppStore((state) => state.projectActiveRunIndex);
+  const setProjectActiveRunIndex = useAppStore((state) => state.setProjectActiveRunIndex);
 
   const activeWorkspace = workspaces.find((workspace) => workspace.id === activeWorkspaceId);
+  const activeProject = activeWorkspace ? projects.find((p) => p.id === activeWorkspace.projectId) : undefined;
+
+  // ── Run button state ──
+  const [runMenuOpen, setRunMenuOpen] = useState(false);
+  const [runFocusIndex, setRunFocusIndex] = useState(-1);
+  const [runSetupOpen, setRunSetupOpen] = useState(false);
+  const [pkgScripts, setPkgScripts] = useState<{ name: string; command: string }[]>([]);
+  const runMenuRef = useRef<HTMLDivElement>(null);
+
+  const runCommands = settings.runCommands ?? [];
+  const activeRunIndex = activeProject ? (projectActiveRunIndex[activeProject.id] ?? 0) : 0;
+  const setActiveRunIndex = useCallback(
+    (index: number) => {
+      if (activeProject) setProjectActiveRunIndex(activeProject.id, index);
+    },
+    [activeProject, setProjectActiveRunIndex],
+  );
+
+  const clampedRunIndex = Math.min(activeRunIndex, runCommands.length - 1);
+  const activeRunEntry = runCommands.length > 0 ? runCommands[Math.max(0, clampedRunIndex)] : undefined;
+  const runMenuEntries = runCommands;
+  const runTotalItems = runMenuEntries.length + 1;
+
+  const runLabel = activeRunEntry
+    ? activeRunEntry.name.length > 18
+      ? `${activeRunEntry.name.slice(0, 18)}…`
+      : activeRunEntry.name
+    : t('agent.runCommand');
+
+  // Detect package.json scripts
+  useEffect(() => {
+    if (!activeWorkspace) {
+      setPkgScripts([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const raw = await window.forgepad.fs.readFile(activeWorkspace.worktreePath, 'package.json');
+        const pkg = JSON.parse(raw) as { scripts?: Record<string, string> };
+        if (!cancelled && pkg.scripts) {
+          let pm = 'npm run';
+          try {
+            await window.forgepad.fs.readFile(activeWorkspace.worktreePath, 'bun.lockb');
+            pm = 'bun run';
+          } catch {
+            try {
+              await window.forgepad.fs.readFile(activeWorkspace.worktreePath, 'bun.lock');
+              pm = 'bun run';
+            } catch {
+              try {
+                await window.forgepad.fs.readFile(activeWorkspace.worktreePath, 'pnpm-lock.yaml');
+                pm = 'pnpm run';
+              } catch {
+                try {
+                  await window.forgepad.fs.readFile(activeWorkspace.worktreePath, 'yarn.lock');
+                  pm = 'yarn';
+                } catch {
+                  /* default npm */
+                }
+              }
+            }
+          }
+          setPkgScripts(
+            Object.entries(pkg.scripts).map(([name]) => ({ name, command: `${pm} ${name}` })),
+          );
+        }
+      } catch {
+        if (!cancelled) setPkgScripts([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeWorkspace]);
+
+  // Run menu outside click
+  useEffect(() => {
+    if (!runMenuOpen) return;
+    const onClick = (e: MouseEvent) => {
+      if (runMenuRef.current && !runMenuRef.current.contains(e.target as Node)) setRunMenuOpen(false);
+    };
+    document.addEventListener('mousedown', onClick);
+    return () => document.removeEventListener('mousedown', onClick);
+  }, [runMenuOpen]);
+
+  // Run menu keyboard navigation
+  const handleRunKeyDown = useCallback(
+    (e: KeyboardEvent) => {
+      if (!runMenuOpen) return;
+      switch (e.key) {
+        case 'ArrowDown':
+          e.preventDefault();
+          setRunFocusIndex((i) => (i + 1) % runTotalItems);
+          break;
+        case 'ArrowUp':
+          e.preventDefault();
+          setRunFocusIndex((i) => (i - 1 + runTotalItems) % runTotalItems);
+          break;
+        case 'Enter':
+          e.preventDefault();
+          if (runFocusIndex >= 0 && runFocusIndex < runMenuEntries.length) {
+            setActiveRunIndex(runFocusIndex);
+            setRunMenuOpen(false);
+          } else if (runFocusIndex === runMenuEntries.length) {
+            setRunMenuOpen(false);
+            setRunSetupOpen(true);
+          }
+          break;
+        case 'Escape':
+          e.preventDefault();
+          setRunMenuOpen(false);
+          break;
+      }
+    },
+    [activeWorkspaceId, runFocusIndex, runMenuEntries, runMenuOpen, runTotalItems],
+  );
+
+  useEffect(() => {
+    document.addEventListener('keydown', handleRunKeyDown);
+    return () => document.removeEventListener('keydown', handleRunKeyDown);
+  }, [handleRunKeyDown]);
+
+  useEffect(() => {
+    if (!runMenuOpen) setRunFocusIndex(-1);
+  }, [runMenuOpen]);
+
+  const handleRun = () => {
+    if (activeRunEntry) {
+      void createTerminal(activeWorkspaceId ?? undefined, activeRunEntry.command);
+    } else {
+      setRunSetupOpen(true);
+    }
+  };
+
+  const handleRunSetupSave = (commands: { name: string; command: string }[]) => {
+    updateSettings({ runCommands: commands.length > 0 ? commands : undefined });
+    setRunSetupOpen(false);
+  };
 
   // Detect IDEs + terminals on mount and when menu opens
   useEffect(() => {
@@ -252,14 +403,15 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
   return (
     <header className="app-topbar relative flex h-12 shrink-0 items-center border-border border-b bg-surface-toolbar px-3">
       <div className="flex items-center pl-[80px]">
-        <button
-          className="icon-button border-transparent"
-          type="button"
-          title={sidebarOpen ? t('topbar.collapseSidebar') : t('topbar.expandSidebar')}
-          onClick={() => useAppStore.setState({ sidebarOpen: !sidebarOpen })}
-        >
-          {sidebarOpen ? <PanelLeftClose size={17} /> : <PanelLeftOpen size={17} />}
-        </button>
+        <Tooltip label={sidebarOpen ? t('topbar.collapseSidebar') : t('topbar.expandSidebar')} position="bottom">
+          <button
+            className="icon-button border-transparent"
+            type="button"
+            onClick={() => useAppStore.setState({ sidebarOpen: !sidebarOpen })}
+          >
+            {sidebarOpen ? <PanelLeftClose size={17} /> : <PanelLeftOpen size={17} />}
+          </button>
+        </Tooltip>
       </div>
 
       <button
@@ -281,16 +433,141 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
         </kbd>
       </button>
 
-      {/* ── Open-with split button + dropdown ── */}
+      {/* ── Right toolbar: Run / Terminal / Browser / Panel / Open With ── */}
       <div className="ml-auto flex items-center gap-2" ref={menuRef}>
-        <button
-          className="icon-button border-transparent"
-          type="button"
-          title={rightPanelOpen ? t('topbar.closeSidePanel') : t('topbar.openSidePanel')}
-          onClick={() => useAppStore.setState({ rightPanelOpen: !rightPanelOpen })}
-        >
-          {rightPanelOpen ? <PanelRightClose size={17} /> : <PanelRightOpen size={17} />}
-        </button>
+        {/* ── Run split button ── */}
+        <div className="relative" ref={runMenuRef}>
+          <div className="flex overflow-hidden rounded-lg border border-border bg-surface-search">
+            <button
+              className="flex h-8 items-center gap-1.5 px-2.5 text-[13px] text-text transition-colors hover:bg-panel-3 disabled:cursor-not-allowed disabled:text-subtle"
+              type="button"
+              disabled={!activeWorkspaceId}
+              title={activeRunEntry ? t('agent.runCommandDetail', { name: activeRunEntry.name, command: activeRunEntry.command }) : t('agent.configureRun')}
+              onClick={handleRun}
+            >
+              <Play size={14} className="text-ok" />
+              <span className="max-w-[120px] truncate font-[510]">{runLabel}</span>
+            </button>
+            <button
+              className="grid h-8 w-7 place-items-center border-border border-l text-muted transition-colors hover:text-text disabled:cursor-not-allowed disabled:text-subtle"
+              type="button"
+              disabled={!activeWorkspaceId}
+              title={t('agent.defaultRunCommand')}
+              onClick={() => setRunMenuOpen((v) => !v)}
+              style={{ anchorName: '--topbar-run-trigger' } as CSSProperties}
+            >
+              <ChevronDown size={13} />
+            </button>
+          </div>
+
+          {/* Run dropdown menu */}
+          <div
+            className="anchor-menu"
+            style={
+              {
+                positionAnchor: '--topbar-run-trigger',
+                top: 'anchor(bottom)',
+                right: 'anchor(right)',
+                marginTop: '7px',
+                positionTryFallbacks: 'flip-block',
+              } as CSSProperties
+            }
+            hidden={!runMenuOpen || !activeWorkspaceId}
+            role="listbox"
+          >
+            <div className="px-2 py-1.5 text-[11px] text-subtle">{t('agent.runCommands')}</div>
+
+            {runMenuEntries.length === 0 && (
+              <div className="px-2 py-2 text-center text-[12px] text-subtle/60">
+                {t('agent.noCommandsYet')}
+              </div>
+            )}
+
+            {runMenuEntries.map((entry, i) => {
+              const focused = runFocusIndex === i;
+              const selected = i === Math.max(0, clampedRunIndex);
+              return (
+                <button
+                  key={entry.command}
+                  className={`flex h-8 w-full items-center gap-2.5 rounded-md px-2 text-left text-[13px] text-text transition-colors hover:bg-panel-3 ${
+                    focused ? 'bg-panel-3' : ''
+                  }`}
+                  type="button"
+                  role="option"
+                  aria-selected={selected}
+                  title={entry.command}
+                  onClick={() => {
+                    setActiveRunIndex(i);
+                    setRunMenuOpen(false);
+                  }}
+                  onMouseEnter={() => setRunFocusIndex(i)}
+                  onMouseLeave={() => setRunFocusIndex(-1)}
+                >
+                  <span className="grid size-4 shrink-0 place-items-center">
+                    {selected ? <Check size={14} className="text-ok" /> : <Play size={14} className="text-muted" />}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate">{entry.name}</span>
+                </button>
+              );
+            })}
+
+            {runMenuEntries.length > 0 && <div className="mx-2 my-1 border-border/60 border-t" />}
+
+            <button
+              className={`flex h-8 w-full items-center gap-2.5 rounded-md px-2 text-left text-[13px] text-text transition-colors hover:bg-panel-3 ${
+                runFocusIndex === runMenuEntries.length ? 'bg-panel-3' : ''
+              }`}
+              type="button"
+              onClick={() => {
+                setRunMenuOpen(false);
+                setRunSetupOpen(true);
+              }}
+              onMouseEnter={() => setRunFocusIndex(runMenuEntries.length)}
+              onMouseLeave={() => setRunFocusIndex(-1)}
+            >
+              <span className="grid size-4 shrink-0 place-items-center">
+                <Pencil size={13} className="text-muted" />
+              </span>
+              <span className="min-w-0 flex-1">{t('agent.editCommands')}</span>
+            </button>
+          </div>
+        </div>
+
+        {/* ── Terminal button ── */}
+        <Tooltip label={t('agent.newTerminal')} position="bottom">
+          <button
+            className="icon-button border-transparent"
+            type="button"
+            disabled={!activeWorkspaceId}
+            onClick={() => void createTerminal(activeWorkspaceId ?? undefined)}
+          >
+            <TerminalSquare size={17} />
+          </button>
+        </Tooltip>
+
+        {/* ── Browser button ── */}
+        <Tooltip label={t('tabBar.openBrowser')} position="bottom">
+          <button
+            className="icon-button border-transparent"
+            type="button"
+            disabled={!activeWorkspaceId}
+            onClick={() => createBrowserTab()}
+          >
+            <Globe size={17} />
+          </button>
+        </Tooltip>
+
+        <Tooltip label={rightPanelOpen ? t('topbar.closeSidePanel') : t('topbar.openSidePanel')} position="bottom">
+          <button
+            className="icon-button border-transparent"
+            type="button"
+            onClick={() => useAppStore.setState({ rightPanelOpen: !rightPanelOpen })}
+          >
+            {rightPanelOpen ? <PanelRightClose size={17} /> : <PanelRightOpen size={17} />}
+          </button>
+        </Tooltip>
+
+        {/* ── Open-with split button + dropdown ── */}
         <div className="relative">
           <div className="flex overflow-hidden rounded-lg border border-border bg-surface-search">
             {/* Left: execute default action */}
@@ -364,6 +641,15 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
           </div>
         </div>
       </div>
+
+      {runSetupOpen && (
+        <RunSetupDialog
+          initialCommands={settings.runCommands}
+          pkgScripts={pkgScripts}
+          onSave={handleRunSetupSave}
+          onClose={() => setRunSetupOpen(false)}
+        />
+      )}
     </header>
   );
 }

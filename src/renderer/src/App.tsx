@@ -21,7 +21,7 @@ import { useAppStore } from '@renderer/store/app-store';
 import type { ShortcutActionId } from '@shared/types';
 import { DEFAULT_SHORTCUTS } from '@shared/types';
 import { Allotment } from 'allotment';
-import { Bot, FolderOpen, GitBranch, TerminalSquare } from 'lucide-react';
+import { Bot, FolderOpen, GitBranch, Globe, TerminalSquare } from 'lucide-react';
 
 export const ThemeContext = createContext<ResolvedTheme>('dark');
 export const useResolvedTheme = () => useContext(ThemeContext);
@@ -61,6 +61,7 @@ function AppInner() {
   const openProject = useAppStore((state) => state.openProject);
   const createTerminal = useAppStore((state) => state.createTerminal);
   const createAgentTerminal = useAppStore((state) => state.createAgentTerminal);
+  const createBrowserTab = useAppStore((state) => state.createBrowserTab);
   const closeTab = useAppStore((state) => state.closeTab);
   const setActiveTab = useAppStore((state) => state.setActiveTab);
   const setActiveWorkspace = useAppStore((state) => state.setActiveWorkspace);
@@ -445,6 +446,10 @@ function AppInner() {
             <button className="secondary-button" type="button" onClick={() => createTerminal(activeWorkspace.id)}>
               <TerminalSquare size={16} />
               {t('app.emptyState.terminal')}
+            </button>
+            <button className="secondary-button" type="button" onClick={() => createBrowserTab()}>
+              <Globe size={16} />
+              {t('app.emptyState.browser')}
             </button>
           </div>
         ) : null}
