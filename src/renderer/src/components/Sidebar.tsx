@@ -372,7 +372,7 @@ function SortableProjectGroup({
           <AddIcon />
         </button>
         <ArrowDownIcon
-          className={`shrink-0 cursor-pointer text-subtle transition-transform duration-200 ease-[ease]${isCollapsed ? '-rotate-90' : ''}`}
+          className={`shrink-0 cursor-pointer text-subtle transition-transform duration-200 ease-[ease]${isCollapsed ? ' -rotate-90' : ''}`}
         />
       </div>
       {children}
