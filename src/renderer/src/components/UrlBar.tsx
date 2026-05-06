@@ -157,7 +157,7 @@ export function UrlBar({ value, onChange, onNavigate, history }: UrlBarProps) {
           onKeyDown={handleKeyDown}
           placeholder={t('urlBar.placeholder')}
           spellCheck={false}
-          className="h-7 w-full rounded border border-border bg-panel-2 py-0 pl-2.5 pr-7 text-text text-xs transition-colors placeholder:text-subtle focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/30"
+          className="h-7 w-full rounded-md border border-border bg-panel-2 py-0 pl-2.5 pr-7 text-text text-xs transition-[border-color,box-shadow] duration-150 placeholder:text-subtle focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/20"
         />
         {/* Chevron / history toggle */}
         <button

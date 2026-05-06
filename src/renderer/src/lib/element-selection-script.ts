@@ -172,10 +172,17 @@ function selectionIIFE(): void {
       pageTitle: document.title,
     };
 
-    // Communicate to main process via console protocol
-    console.log(`__FORGEPAD_SELECT__:${JSON.stringify(data)}`);
+    // Hide highlight & overlay immediately so they don't appear in the screenshot,
+    // then wait one frame for the render to flush before sending the message.
+    highlight.style.display = 'none';
+    tooltip.style.display = 'none';
+    overlay.style.display = 'none';
 
-    cleanup();
+    requestAnimationFrame(() => {
+      // Communicate to main process via console protocol
+      console.log(`__FORGEPAD_SELECT__:${JSON.stringify(data)}`);
+      cleanup();
+    });
   });
 
   function onKeyDown(e: KeyboardEvent): void {

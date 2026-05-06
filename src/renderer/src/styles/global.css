@@ -277,6 +277,8 @@ textarea,
 input,
 select {
     font: inherit;
+    font-size: 13px;
+    line-height: 1.4;
 }
 
 button {
@@ -851,6 +853,18 @@ textarea {
     color: var(--muted);
     border-color: var(--border);
     background: transparent;
+    transition-property: color, background-color, border-color, scale;
+    transition-duration: 150ms;
+    transition-timing-function: ease-out;
+}
+
+.icon-button:hover:not(:disabled) {
+    color: var(--text);
+    background: var(--panel-2);
+}
+
+.icon-button:active:not(:disabled) {
+    scale: 0.96;
 }
 
 .icon-button.small {
@@ -860,7 +874,6 @@ textarea {
 
 .primary-button:hover,
 .secondary-button:hover,
-.icon-button:hover,
 .mini-button:hover {
     filter: brightness(1.08);
 }
@@ -1155,7 +1168,7 @@ textarea {
 .panel-animating
     > .allotment-module_splitViewContainer__rQnVa
     > .allotment-module_splitViewView__MGZ6O {
-    transition: width 200ms ease-out;
+    transition: width 250ms cubic-bezier(0.2, 0, 0, 1);
 }
 
 /* Agent | File columns split – visible sash */
@@ -2058,12 +2071,9 @@ textarea {
 }
 
 .tooltip-bubble {
-    position: absolute;
-    left: 50%;
-    transform: translateX(-50%);
     white-space: nowrap;
     pointer-events: none;
-    z-index: 80;
+    z-index: 9999;
     display: inline-flex;
     align-items: center;
     gap: 5px;
@@ -2075,13 +2085,7 @@ textarea {
     animation: tooltip-fade-in 120ms ease both;
 }
 
-.tooltip-bubble--top {
-    bottom: calc(100% + 6px);
-}
-
-.tooltip-bubble--bottom {
-    top: calc(100% + 6px);
-}
+/* Position classes no longer needed — positioning is computed inline via portal */
 
 .tooltip-label {
     font-size: 11px;
@@ -2109,11 +2113,13 @@ textarea {
 @keyframes tooltip-fade-in {
     from {
         opacity: 0;
-        transform: translateX(-50%) translateY(2px);
+        filter: blur(4px);
+        scale: 0.96;
     }
     to {
         opacity: 1;
-        transform: translateX(-50%) translateY(0);
+        filter: blur(0);
+        scale: 1;
     }
 }
 
