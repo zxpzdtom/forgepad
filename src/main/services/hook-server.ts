@@ -28,6 +28,10 @@ export class HookServer {
   /** Cached settings for AI tab title generation. */
   private _autoGenerateTabTitle = false;
   private _tabTitlePromptTemplate = "";
+  /** Only rename on the first user message per tab. */
+  private _renameOnFirstMessageOnly = false;
+  /** Set of ptyIds that have already been renamed once. */
+  private _renamedPtyIds: Set<string> = new Set();
 
   /**
    * Map of ptyId → held HTTP response for PermissionRequest.
@@ -55,12 +59,16 @@ export class HookServer {
   updateSettings(settings: {
     autoGenerateTabTitle?: boolean;
     tabTitlePromptTemplate?: string;
+    renameOnFirstMessageOnly?: boolean;
   }): void {
     if (settings.autoGenerateTabTitle !== undefined) {
       this._autoGenerateTabTitle = settings.autoGenerateTabTitle;
     }
     if (settings.tabTitlePromptTemplate !== undefined) {
       this._tabTitlePromptTemplate = settings.tabTitlePromptTemplate;
+    }
+    if (settings.renameOnFirstMessageOnly !== undefined) {
+      this._renameOnFirstMessageOnly = settings.renameOnFirstMessageOnly;
     }
   }
 
@@ -308,6 +316,25 @@ export class HookServer {
           }
 
           if (prompt) {
+            // If "rename on first message only" is enabled and this tab was
+            // already renamed, skip renaming and respond immediately.
+            if (
+              this._renameOnFirstMessageOnly &&
+              this._renamedPtyIds.has(ptyId)
+            ) {
+              // Still broadcast the prompt for completion card display
+              this.broadcastUserPrompt(ptyId, prompt);
+              res.writeHead(200, { "Content-Type": "application/json" });
+              res.end(
+                JSON.stringify({
+                  hookSpecificOutput: {
+                    hookEventName: "UserPromptSubmit",
+                  },
+                }),
+              );
+              return;
+            }
+
             // Immediately broadcast a truncated title for fast UX
             const quickTitle = this.truncateTitle(prompt);
             this.broadcastRenameTab(ptyId, quickTitle);
@@ -323,6 +350,11 @@ export class HookServer {
                 },
               }),
             );
+
+            // Mark this ptyId as renamed (for "first message only" mode)
+            if (this._renameOnFirstMessageOnly) {
+              this._renamedPtyIds.add(ptyId);
+            }
 
             // If AI title generation is enabled, generate asynchronously and update
             if (this._autoGenerateTabTitle && this._tabTitlePromptTemplate) {
@@ -368,6 +400,9 @@ export class HookServer {
           if (aiMessage) {
             this.broadcastCompletion(ptyId, aiMessage);
           }
+
+          // Clean up the "already renamed" tracking when the session ends
+          this._renamedPtyIds.delete(ptyId);
 
           res.writeHead(200);
           res.end("ok");

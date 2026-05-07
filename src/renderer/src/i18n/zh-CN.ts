@@ -154,6 +154,9 @@ const zhCN: Record<TranslationKeys, string> = {
   "settings.agent.tabTitlePromptDesc":
     "用于生成标签标题的提示词模板。使用 {prompt} 作为用户消息的占位符。",
   "settings.agent.resetTabTitlePrompt": "恢复默认提示词",
+  "settings.agent.renameOnFirstMessageOnly": "仅首次命名",
+  "settings.agent.renameOnFirstMessageOnlyDesc":
+    "开启后，标签标题仅在收到第一条消息时设置，后续消息不再触发重命名，既防止标题频繁变化，也避免额外消耗 AI token。",
 
   // ── Settings > Terminal ──
   "settings.terminal.title": "终端",

@@ -302,6 +302,7 @@ export function registerIpcHandlers(
       hookServer.updateSettings({
         autoGenerateTabTitle: state.settings.autoGenerateTabTitle,
         tabTitlePromptTemplate: state.settings.tabTitlePromptTemplate,
+        renameOnFirstMessageOnly: state.settings.renameOnFirstMessageOnly,
       });
     }
   });
