@@ -1461,9 +1461,30 @@ export type PetSettings = {
   petPlayMode: "cozy" | "playful" | "adventure";
   /** Allow pet to randomly wander and interact autonomously. */
   allowRandomMove: boolean;
+  /** Let the focused main window steer the pet after the pet is clicked. */
+  keyboardControlEnabled: boolean;
   /** User-imported custom pets metadata */
   customPets: CustomPetMeta[];
 };
+
+export type PetPlayAction =
+  | "stroll"
+  | "hop"
+  | "stairs"
+  | "portal"
+  | "windowTop"
+  | "zigzag"
+  | "spring"
+  | "peek"
+  | "balloon"
+  | "rocket";
+
+export type PetNudgeDirection = "up" | "down" | "left" | "right";
+
+export type PetCommand =
+  | { type: "play"; action?: PetPlayAction | "random" }
+  | { type: "stop" }
+  | { type: "nudge"; direction: PetNudgeDirection; amount?: number };
 
 export const DEFAULT_PET_SETTINGS: PetSettings = {
   enabled: false,
@@ -1472,6 +1493,7 @@ export const DEFAULT_PET_SETTINGS: PetSettings = {
   petSpeed: 2,
   petPlayMode: "playful",
   allowRandomMove: true,
+  keyboardControlEnabled: true,
   customPets: [],
 };
 
