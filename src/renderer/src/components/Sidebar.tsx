@@ -32,6 +32,7 @@ import { ContextMenu, type ContextMenuSection } from "./ContextMenu";
 import { NewWorktreeDialog } from "./NewWorktreeDialog";
 import { Spinner } from "./Spinner";
 import { Tooltip } from "./Tooltip";
+import { getDroppedPaths, isInternalDrop } from "@renderer/lib/drag-utils";
 
 type SidebarWorkspace = {
   id: string;
@@ -525,6 +526,7 @@ function SortableWorkspaceRow({
   workspace,
   globalIndex,
   isActive,
+  isLoading,
   onClick,
   onDelete,
   onContextMenu,
@@ -532,11 +534,13 @@ function SortableWorkspaceRow({
   workspace: SidebarWorkspace;
   globalIndex: number;
   isActive: boolean;
+  isLoading?: boolean;
   onClick: () => void;
   onDelete?: () => void;
   onContextMenu?: (e: React.MouseEvent) => void;
 }) {
   const { t } = useTranslation();
+  const spinnerStyle = useAppStore((state) => state.settings.spinnerStyle);
   const branchStats = useAppStore((state) => state.branchStats[workspace.id]);
   const stats = branchStats ?? {
     ahead: 0,
@@ -582,20 +586,23 @@ function SortableWorkspaceRow({
     <div
       ref={setNodeRef}
       style={style}
-      className={`group/sidebar-workspace relative flex w-full min-w-0 cursor-grab items-start gap-2 rounded-md px-2 py-1.5 text-left transition-colors duration-150 active:cursor-grabbing ${isActive ? "" : "hover:bg-panel-2"} ${isDragging ? "bg-panel-2 ring-1 ring-accent/20" : ""}`}
+      className={`group/sidebar-workspace relative flex w-full min-w-0 items-start gap-2 rounded-md px-2 py-1.5 text-left transition-colors duration-150 ${isLoading ? "cursor-default opacity-60" : "cursor-grab active:cursor-grabbing"} ${!isLoading && !isActive ? "hover:bg-panel-2" : ""} ${isDragging ? "bg-panel-2 ring-1 ring-accent/20" : ""}`}
       role="button"
-      tabIndex={0}
-      onClick={onClick}
-      onKeyDown={handleKeyDown}
-      onContextMenu={onContextMenu}
-      {...attributes}
-      {...listeners}
+      tabIndex={isLoading ? -1 : 0}
+      onClick={isLoading ? undefined : onClick}
+      onKeyDown={isLoading ? undefined : handleKeyDown}
+      onContextMenu={isLoading ? undefined : onContextMenu}
+      {...(isLoading ? {} : { ...attributes, ...listeners })}
     >
       {isActive && (
         <span className="absolute top-1 bottom-1 left-0 w-[3px] rounded-full bg-accent" />
       )}
       <div className="mt-[2px] flex size-[14px] shrink-0 items-center justify-center">
-        {agentStatus && agentStatus !== "idle" ? (
+        {isLoading ? (
+          <span className="text-accent leading-none">
+            <Spinner name={spinnerStyle} size={14} dotSize={2} />
+          </span>
+        ) : agentStatus && agentStatus !== "idle" ? (
           <WorkspaceStatusDot isActive={isActive} agentStatus={agentStatus} />
         ) : prNumber && prMerged ? (
           <GitMergeIcon className="text-[#22c55e]" />
@@ -610,7 +617,7 @@ function SortableWorkspaceRow({
           >
             {workspace.branch || t("sidebar.detached")}
           </span>
-          {prNumber && (
+          {!isLoading && prNumber && (
             <span
               role="link"
               tabIndex={0}
@@ -634,7 +641,7 @@ function SortableWorkspaceRow({
               #{prNumber}
             </span>
           )}
-          {hasDiffStats && (
+          {!isLoading && hasDiffStats && (
             <span className="flex shrink-0 items-center gap-1 font-mono text-[10px]">
               {stats.additions > 0 && (
                 <span className="text-text-addition">+{stats.additions}</span>
@@ -647,16 +654,16 @@ function SortableWorkspaceRow({
         </div>
         <div className="flex min-w-0 items-center gap-2">
           <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[11px] text-subtle">
-            {formatRelativeTime(workspace.createdAt, t)}
+            {isLoading ? "Creating…" : formatRelativeTime(workspace.createdAt, t)}
           </span>
-          {hasRemoteStats && (
+          {!isLoading && hasRemoteStats && (
             <span className="shrink-0 font-mono text-[10px] text-subtle">
               {stats.ahead > 0 ? `↑${stats.ahead}` : ""}
               {stats.ahead > 0 && stats.behind > 0 ? " " : ""}
               {stats.behind > 0 ? `↓${stats.behind}` : ""}
             </span>
           )}
-          {globalIndex < 9 && (
+          {!isLoading && globalIndex < 9 && (
             <span className="shrink-0 text-[10px] text-subtle/40 tabular-nums">
               ⌘{globalIndex + 1}
             </span>
@@ -1436,6 +1443,7 @@ export function Sidebar() {
   const activeWorkspaceId = useAppStore((state) => state.activeWorkspaceId);
   const hydrated = useAppStore((state) => state.hydrated);
   const openProject = useAppStore((state) => state.openProject);
+  const openProjectFromPath = useAppStore((state) => state.openProjectFromPath);
   const setActiveWorkspace = useAppStore((state) => state.setActiveWorkspace);
   const setFocusedColumn = useAppStore((state) => state.setFocusedColumn);
   const reorderProjects = useAppStore((state) => state.reorderProjects);
@@ -1443,12 +1451,40 @@ export function Sidebar() {
   const removeProject = useAppStore((state) => state.removeProject);
   const deleteWorktree = useAppStore((state) => state.deleteWorktree);
   const createWorktree = useAppStore((state) => state.createWorktree);
+  const workspaceLoadingIds = useAppStore((state) => state.workspaceLoadingIds);
 
   // Filter projects by active panel
   const projects = useMemo(
     () => allProjects.filter((p) => p.panelId === activePanelId),
     [allProjects, activePanelId],
   );
+  const [isDragOver, setIsDragOver] = useState(false);
+
+  const handleDragOver = (e: React.DragEvent) => {
+    // Only respond to external OS file drops, not dnd-kit internal sorts
+    if (isInternalDrop(e)) return;
+    if (!e.dataTransfer.types.includes("Files")) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    // Only clear if leaving the aside entirely (not entering a child)
+    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+    setIsDragOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    if (isInternalDrop(e)) return;
+    e.preventDefault();
+    setIsDragOver(false);
+    const paths = getDroppedPaths(e);
+    for (const p of paths) {
+      void openProjectFromPath(p);
+    }
+  };
+
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: { distance: 5 },
@@ -1515,8 +1551,11 @@ export function Sidebar() {
 
   return (
     <aside
-      className="flex h-full min-h-0 min-w-0 flex-col border-border border-r bg-sidebar-bg"
+      className={`flex h-full min-h-0 min-w-0 flex-col border-border border-r bg-sidebar-bg transition-colors duration-100 ${isDragOver ? "bg-accent/5 ring-2 ring-inset ring-accent/30" : ""}`}
       onMouseDown={() => setFocusedColumn("sidebar")}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
     >
       <div className="flex h-9 shrink-0 items-center justify-between border-border border-b px-3">
         <span className="font-semibold text-[11px] text-muted uppercase tracking-wider">
@@ -1612,6 +1651,7 @@ export function Sidebar() {
                                     workspaceIndexMap.get(workspace.id) ?? 0
                                   }
                                   isActive={workspace.id === activeWorkspaceId}
+                                  isLoading={workspaceLoadingIds.has(workspace.id)}
                                   onClick={() =>
                                     setActiveWorkspace(workspace.id)
                                   }
