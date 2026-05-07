@@ -881,58 +881,77 @@ export function registerIpcHandlers(
     session.defaultSession.removeExtension(id);
   });
 
+  type ExtensionScriptingExecuteArgs = {
+    tabId: number;
+    func?: string;
+    files?: string[];
+    extId?: string;
+  };
+
+  async function executeExtensionScripting(
+    args: ExtensionScriptingExecuteArgs,
+  ): Promise<Array<{ result?: unknown; error?: { message: string } }>> {
+    const wc = webContents.fromId(args.tabId);
+    if (!wc || wc.isDestroyed()) return [{ result: undefined }];
+
+    // Execute a serialized function call in the target tab.
+    if (args.func) {
+      try {
+        const result = await wc.executeJavaScript(args.func);
+        return [{ result }];
+      } catch (err) {
+        return [{ error: { message: String(err) } }];
+      }
+    }
+
+    // Execute extension JS files in the target tab.
+    if (args.files && args.extId) {
+      const ext = session.defaultSession
+        .getAllExtensions()
+        .find((e) => e.id === args.extId);
+      if (!ext) return [{ error: { message: "Extension not found" } }];
+
+      const results: Array<{
+        result?: unknown;
+        error?: { message: string };
+      }> = [];
+      for (const file of args.files) {
+        try {
+          const code = await readFile(path.join(ext.path, file), "utf-8");
+          const result = await wc.executeJavaScript(code);
+          results.push({ result });
+        } catch (err) {
+          results.push({ error: { message: String(err) } });
+        }
+      }
+      return results;
+    }
+
+    return [{ result: undefined }];
+  }
+
+  async function insertExtensionCss(args: {
+    tabId: number;
+    css: string;
+  }): Promise<void> {
+    const wc = webContents.fromId(args.tabId);
+    if (!wc || wc.isDestroyed()) return;
+    await wc.insertCSS(args.css);
+  }
+
   // ── chrome.scripting polyfill — relay executeScript / insertCSS to webview ──
   ipcMain.handle(
     IPC.EXTENSION_SCRIPTING_EXECUTE,
     async (
       _event,
-      args: { tabId: number; func?: string; files?: string[]; extId?: string },
-    ) => {
-      const wc = webContents.fromId(args.tabId);
-      if (!wc || wc.isDestroyed()) return [{ result: undefined }];
-
-      // Execute a function string
-      if (args.func) {
-        try {
-          const result = await wc.executeJavaScript(args.func);
-          return [{ result }];
-        } catch (err) {
-          return [{ error: { message: String(err) } }];
-        }
-      }
-
-      // Execute extension JS files
-      if (args.files && args.extId) {
-        const ext = session.defaultSession
-          .getAllExtensions()
-          .find((e) => e.id === args.extId);
-        if (!ext) return [{ error: { message: "Extension not found" } }];
-        const results: Array<{
-          result?: unknown;
-          error?: { message: string };
-        }> = [];
-        for (const file of args.files) {
-          try {
-            const code = await readFile(path.join(ext.path, file), "utf-8");
-            const result = await wc.executeJavaScript(code);
-            results.push({ result });
-          } catch (err) {
-            results.push({ error: { message: String(err) } });
-          }
-        }
-        return results;
-      }
-
-      return [{ result: undefined }];
-    },
+      args: ExtensionScriptingExecuteArgs,
+    ) => executeExtensionScripting(args),
   );
 
   ipcMain.handle(
     IPC.EXTENSION_SCRIPTING_INSERT_CSS,
     async (_event, args: { tabId: number; css: string }) => {
-      const wc = webContents.fromId(args.tabId);
-      if (!wc || wc.isDestroyed()) return;
-      await wc.insertCSS(args.css);
+      await insertExtensionCss(args);
     },
   );
 
@@ -942,37 +961,44 @@ export function registerIpcHandlers(
   let extensionPopupSenderWin: BrowserWindow | null = null;
 
   // ── chrome.tabs.create — extension asks to open a new tab ──
-  // The popup preload calls this; we relay to the originating browser window
+  // The popup polyfill calls this; we relay to the originating browser window
   // and wait for the renderer to report the new webContentsId.
   const pendingTabCreates = new Map<
     string,
     { resolve: (tabId: number) => void; timer: NodeJS.Timeout }
   >();
 
+  function createExtensionTab(args: {
+    url: string;
+    active?: boolean;
+  }): Promise<{ id: number }> {
+    const win = extensionPopupSenderWin;
+    if (!win || win.isDestroyed()) return Promise.resolve({ id: 0 });
+
+    const requestId = `tab-create-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+    return new Promise<{ id: number }>((resolve) => {
+      const timer = setTimeout(() => {
+        pendingTabCreates.delete(requestId);
+        resolve({ id: 0 });
+      }, 10000);
+
+      pendingTabCreates.set(requestId, {
+        resolve: (tabId) => resolve({ id: tabId }),
+        timer,
+      });
+      win.webContents.send(IPC.EXTENSION_TAB_CREATE, {
+        requestId,
+        url: args.url,
+        active: args.active !== false,
+      });
+    });
+  }
+
   ipcMain.handle(
     IPC.EXTENSION_TAB_CREATE,
     async (_event, args: { url: string; active?: boolean }) => {
-      const win = extensionPopupSenderWin;
-      if (!win || win.isDestroyed()) return { id: 0 };
-
-      const requestId = `tab-create-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-
-      return new Promise<{ id: number }>((resolve) => {
-        const timer = setTimeout(() => {
-          pendingTabCreates.delete(requestId);
-          resolve({ id: 0 });
-        }, 10000);
-
-        pendingTabCreates.set(requestId, {
-          resolve: (tabId) => resolve({ id: tabId }),
-          timer,
-        });
-        win.webContents.send(IPC.EXTENSION_TAB_CREATE, {
-          requestId,
-          url: args.url,
-          active: args.active !== false,
-        });
-      });
+      return createExtensionTab(args);
     },
   );
 
@@ -988,6 +1014,331 @@ export function registerIpcHandlers(
       }
     },
   );
+
+  function buildExtensionPopupPolyfillSource(args: {
+    tabId: number;
+    tabUrl: string;
+    extId: string;
+    bridgeName: string;
+  }): string {
+    return `(function() {
+  var TAB_ID = ${JSON.stringify(args.tabId)};
+  var TAB_URL = ${JSON.stringify(args.tabUrl)};
+  var EXT_ID = ${JSON.stringify(args.extId)};
+  var BRIDGE_NAME = ${JSON.stringify(args.bridgeName)};
+  var bridgeSeq = 0;
+  var bridgePending = Object.create(null);
+  var logged = false;
+
+  function logInstalled() {
+    if (logged) return;
+    logged = true;
+    console.info('[forgepad-ext-polyfill] installed', {
+      tabId: TAB_ID,
+      tabUrl: TAB_URL,
+      extId: EXT_ID
+    });
+  }
+
+  function forceSet(obj, prop, value) {
+    if (!obj) return false;
+    try {
+      Object.defineProperty(obj, prop, {
+        value: value,
+        writable: true,
+        configurable: true,
+        enumerable: true
+      });
+      return true;
+    } catch (_) {
+      try {
+        obj[prop] = value;
+        return true;
+      } catch (_) {
+        return false;
+      }
+    }
+  }
+
+  function makeFakeTab(id, extra) {
+    var tab = {
+      id: id || TAB_ID,
+      active: true,
+      windowId: 1,
+      status: 'complete',
+      url: TAB_URL,
+      title: '',
+      index: 0,
+      pinned: false,
+      highlighted: true,
+      incognito: false
+    };
+    if (extra) {
+      for (var k in extra) tab[k] = extra[k];
+    }
+    return tab;
+  }
+
+  function stubEvent() {
+    return {
+      addListener: function() {},
+      removeListener: function() {},
+      hasListener: function() { return false; },
+      hasListeners: function() { return false; }
+    };
+  }
+
+  function settleCallback(promise, callback) {
+    if (typeof callback === 'function') {
+      promise.then(function(value) {
+        callback(value);
+      }).catch(function(error) {
+        console.warn('[forgepad-ext-polyfill] callback bridge failed', error);
+        callback(undefined);
+      });
+      return undefined;
+    }
+    return promise;
+  }
+
+  globalThis.__forgepadExtensionBridgeResolve = function(id, response) {
+    var pending = bridgePending[id];
+    if (!pending) return;
+    delete bridgePending[id];
+    if (response && response.ok) {
+      pending.resolve(response.value);
+    } else {
+      pending.reject(new Error((response && response.error) || 'ForgePad extension bridge failed'));
+    }
+  };
+
+  function callBridge(method, payload) {
+    return new Promise(function(resolve, reject) {
+      var bridge = globalThis[BRIDGE_NAME];
+      if (typeof bridge !== 'function') {
+        reject(new Error('ForgePad extension bridge is unavailable'));
+        return;
+      }
+      var id = 'bridge-' + Date.now() + '-' + (++bridgeSeq);
+      bridgePending[id] = { resolve: resolve, reject: reject };
+      try {
+        bridge(JSON.stringify({ id: id, method: method, payload: payload }));
+      } catch (error) {
+        delete bridgePending[id];
+        reject(error);
+      }
+    });
+  }
+
+  function serializeInjection(injection) {
+    var target = injection && injection.target ? injection.target : {};
+    var tabId = target.tabId || TAB_ID;
+    var fn = injection && (injection.func || injection.function);
+    var func = undefined;
+    if (typeof fn === 'function') {
+      var fnArgs = Array.isArray(injection.args) ? injection.args : [];
+      func = '(' + fn.toString() + ').apply(null, ' + JSON.stringify(fnArgs) + ')';
+    }
+    return {
+      tabId: tabId,
+      func: func,
+      files: injection && Array.isArray(injection.files) ? injection.files : undefined,
+      extId: EXT_ID
+    };
+  }
+
+  function patchTabs(chromeObj) {
+    if (!chromeObj.tabs) {
+      forceSet(chromeObj, 'tabs', {});
+    }
+    var tabs = chromeObj.tabs;
+    if (!tabs) return;
+    var originalQuery = tabs.query && !tabs.query.__forgepadPolyfill
+      ? tabs.query.bind(tabs)
+      : null;
+
+    function query(queryInfo, callback) {
+      if (!queryInfo || queryInfo.active || queryInfo.currentWindow) {
+        var tab = makeFakeTab(TAB_ID);
+        if (typeof callback === 'function') {
+          callback([tab]);
+          return undefined;
+        }
+        return Promise.resolve([tab]);
+      }
+      if (originalQuery) return originalQuery(queryInfo, callback);
+      var fallback = [makeFakeTab(TAB_ID)];
+      if (typeof callback === 'function') {
+        callback(fallback);
+        return undefined;
+      }
+      return Promise.resolve(fallback);
+    }
+    query.__forgepadPolyfill = true;
+
+    function get(tabId, callback) {
+      var tab = makeFakeTab(tabId || TAB_ID);
+      if (typeof callback === 'function') {
+        callback(tab);
+        return undefined;
+      }
+      return Promise.resolve(tab);
+    }
+    get.__forgepadPolyfill = true;
+
+    function create(createProperties, callback) {
+      var requestedUrl = (createProperties && createProperties.url) || 'about:blank';
+      var promise = callBridge('tabs.create', {
+        url: requestedUrl,
+        active: !createProperties || createProperties.active !== false
+      }).then(function(result) {
+        return makeFakeTab(result && result.id, { url: requestedUrl });
+      });
+      return settleCallback(promise, callback);
+    }
+    create.__forgepadPolyfill = true;
+
+    function update(tabId, updateProperties, callback) {
+      var actualTabId = typeof tabId === 'number' ? tabId : TAB_ID;
+      var actualProps = typeof tabId === 'object' ? tabId : updateProperties;
+      var actualCallback = typeof tabId === 'object' ? updateProperties : callback;
+      var tab = makeFakeTab(actualTabId, { url: (actualProps && actualProps.url) || TAB_URL });
+      if (typeof actualCallback === 'function') {
+        actualCallback(tab);
+        return undefined;
+      }
+      return Promise.resolve(tab);
+    }
+    update.__forgepadPolyfill = true;
+
+    function remove(_tabId, callback) {
+      if (typeof callback === 'function') {
+        callback();
+        return undefined;
+      }
+      return Promise.resolve();
+    }
+    remove.__forgepadPolyfill = true;
+
+    function sendMessage(_tabId, _message, options, callback) {
+      var actualCallback = typeof options === 'function' ? options : callback;
+      if (typeof actualCallback === 'function') {
+        actualCallback(undefined);
+        return undefined;
+      }
+      return Promise.resolve(undefined);
+    }
+    sendMessage.__forgepadPolyfill = true;
+
+    forceSet(tabs, 'query', query);
+    forceSet(tabs, 'get', get);
+    forceSet(tabs, 'create', create);
+    forceSet(tabs, 'update', update);
+    forceSet(tabs, 'remove', remove);
+    forceSet(tabs, 'sendMessage', sendMessage);
+    if (!tabs.onUpdated) forceSet(tabs, 'onUpdated', stubEvent());
+    if (!tabs.onCreated) forceSet(tabs, 'onCreated', stubEvent());
+    if (!tabs.onRemoved) forceSet(tabs, 'onRemoved', stubEvent());
+    if (!tabs.onActivated) forceSet(tabs, 'onActivated', stubEvent());
+  }
+
+  function patchStorage(chromeObj) {
+    if (!chromeObj.storage) return;
+    if (chromeObj.storage.local) {
+      forceSet(chromeObj.storage, 'sync', chromeObj.storage.local);
+    }
+  }
+
+  function patchWindows(chromeObj) {
+    if (!chromeObj.windows) {
+      forceSet(chromeObj, 'windows', {});
+    }
+    if (!chromeObj.windows) return;
+    forceSet(chromeObj.windows, 'WINDOW_ID_CURRENT', -2);
+    forceSet(chromeObj.windows, 'getCurrent', function(options, callback) {
+      var actualCallback = typeof options === 'function' ? options : callback;
+      var win = { id: 1, focused: true, type: 'normal', state: 'normal' };
+      if (typeof actualCallback === 'function') {
+        actualCallback(win);
+        return undefined;
+      }
+      return Promise.resolve(win);
+    });
+  }
+
+  function patchScripting(chromeObj) {
+    if (!chromeObj.scripting) {
+      forceSet(chromeObj, 'scripting', {});
+    }
+    if (!chromeObj.scripting) return;
+
+    function executeScript(injection, callback) {
+      var promise = callBridge('scripting.executeScript', serializeInjection(injection || {}));
+      return settleCallback(promise, callback);
+    }
+    executeScript.__forgepadPolyfill = true;
+
+    function insertCSS(injection, callback) {
+      var target = injection && injection.target ? injection.target : {};
+      var promise = callBridge('scripting.insertCSS', {
+        tabId: target.tabId || TAB_ID,
+        css: (injection && injection.css) || ''
+      }).then(function() { return undefined; });
+      return settleCallback(promise, callback);
+    }
+    insertCSS.__forgepadPolyfill = true;
+
+    function removeCSS(_injection, callback) {
+      if (typeof callback === 'function') {
+        callback();
+        return undefined;
+      }
+      return Promise.resolve();
+    }
+    removeCSS.__forgepadPolyfill = true;
+
+    forceSet(chromeObj.scripting, 'executeScript', executeScript);
+    forceSet(chromeObj.scripting, 'insertCSS', insertCSS);
+    forceSet(chromeObj.scripting, 'removeCSS', removeCSS);
+  }
+
+  function patchChrome(chromeObj) {
+    if (!chromeObj) return;
+    patchTabs(chromeObj);
+    patchStorage(chromeObj);
+    patchWindows(chromeObj);
+    patchScripting(chromeObj);
+    logInstalled();
+  }
+
+  var chromeValue = globalThis.chrome;
+  try {
+    Object.defineProperty(globalThis, 'chrome', {
+      configurable: true,
+      enumerable: true,
+      get: function() {
+        return chromeValue;
+      },
+      set: function(value) {
+        chromeValue = value;
+        patchChrome(value);
+      }
+    });
+  } catch (_) {
+    // Native extension bindings may already own window.chrome.
+  }
+
+  function patchNow() {
+    patchChrome(globalThis.chrome || chromeValue);
+  }
+
+  patchNow();
+  Promise.resolve().then(patchNow);
+  setTimeout(patchNow, 0);
+  setTimeout(patchNow, 50);
+  setTimeout(patchNow, 250);
+})();`;
+  }
 
   ipcMain.handle(
     IPC.EXTENSION_OPEN_POPUP,
@@ -1051,86 +1402,174 @@ export function registerIpcHandlers(
         },
       });
 
+      const activeTabWc = webContents.fromId(args.activeTabId);
+      const activeTabId =
+        activeTabWc && !activeTabWc.isDestroyed()
+          ? activeTabWc.id
+          : args.activeTabId;
+      const activeTabUrl =
+        args.activeTabUrl ||
+        (() => {
+          try {
+            return activeTabWc && !activeTabWc.isDestroyed()
+              ? activeTabWc.getURL()
+              : "";
+          } catch {
+            return "";
+          }
+        })();
+
       // ── Inject polyfills via CDP BEFORE any page JS executes ──
-      // The preload approach fails for chrome-extension:// pages because
-      // Electron's extension system overrides webPreferences. Instead, we
-      // use the Chrome DevTools Protocol's Page.addScriptToEvaluateOnNewDocument
-      // which runs our script before any <script> tags on the page.
-      //
-      // We only need to patch chrome.tabs.query to return a fake tab with
-      // the correct tabId (webContentsId) and URL so the extension can find
-      // the active tab. Electron's native chrome.scripting.executeScript
-      // should work once given a valid tabId.
+      // Extension popup BrowserWindow preloads are unreliable for
+      // chrome-extension:// pages, so this uses the DevTools protocol instead.
+      // Runtime.addBinding gives the page a request/response bridge to main,
+      // which lets us replace chrome.scripting without relying on Electron's
+      // native extension binding quirks.
       try {
         const wc = extensionPopup.webContents;
-        wc.debugger.attach("1.3");
+        const bridgeName = "__forgepadExtensionBridge";
+        ensureDebugger(wc.id);
+        addCdpUser(wc.id, "extension-popup-polyfill");
+        const dbg = wc.debugger;
 
-        const tabId = args.activeTabId;
-        const tabUrl = JSON.stringify(args.activeTabUrl || "");
+        const sendBridgeResponse = async (
+          contextId: number | undefined,
+          id: string,
+          response: { ok: boolean; value?: unknown; error?: string },
+        ) => {
+          const evalArgs: Record<string, unknown> = {
+            expression: `globalThis.__forgepadExtensionBridgeResolve && globalThis.__forgepadExtensionBridgeResolve(${JSON.stringify(id)}, ${JSON.stringify(response)})`,
+            awaitPromise: false,
+          };
+          if (typeof contextId === "number") evalArgs.contextId = contextId;
+          await dbg.sendCommand("Runtime.evaluate", evalArgs);
+        };
 
-        const injectionScript = `(function() {
-  var TAB_ID = ${tabId};
-  var TAB_URL = ${tabUrl};
-  console.log('[forgepad-ext-polyfill] TAB_ID =', TAB_ID, '| TAB_URL =', TAB_URL);
+        const bridgeHandler = (
+          _evt: Electron.Event,
+          method: string,
+          params: Record<string, unknown>,
+        ) => {
+          void (async () => {
+            if (method === "Runtime.consoleAPICalled") {
+              const rawArgs = Array.isArray(params.args) ? params.args : [];
+              const values = rawArgs
+                .map((arg) =>
+                  typeof arg === "object" && arg
+                    ? (arg as { value?: unknown }).value
+                    : undefined,
+                )
+                .filter((value) => value != null);
+              if (String(values[0] ?? "").startsWith("[forgepad-ext-polyfill]")) {
+                console.info("[ForgePad] extension popup:", ...values);
+              }
+              return;
+            }
 
-  function makeFakeTab(id, extra) {
-    var tab = {
-      id: id,
-      active: true,
-      windowId: 1,
-      status: 'complete',
-      url: TAB_URL,
-      title: '',
-      index: 0,
-      pinned: false,
-      highlighted: true,
-      incognito: false
-    };
-    if (extra) { for (var k in extra) tab[k] = extra[k]; }
-    return tab;
-  }
+            if (method !== "Runtime.bindingCalled") return;
+            if (params.name !== bridgeName || typeof params.payload !== "string")
+              return;
 
-  // ── Patch chrome.tabs.query ──
-  if (typeof chrome !== 'undefined' && chrome.tabs && chrome.tabs.query) {
-    var _origQuery = chrome.tabs.query.bind(chrome.tabs);
-    chrome.tabs.query = function(queryInfo, callback) {
-      if (queryInfo && (queryInfo.active || queryInfo.currentWindow)) {
-        var tab = makeFakeTab(TAB_ID);
-        if (typeof callback === 'function') { callback([tab]); return; }
-        return Promise.resolve([tab]);
-      }
-      return _origQuery(queryInfo, callback);
-    };
-  }
+            const contextId =
+              typeof params.executionContextId === "number"
+                ? params.executionContextId
+                : undefined;
+            let request: {
+              id?: string;
+              method?: string;
+              payload?: Record<string, unknown>;
+            };
+            try {
+              request = JSON.parse(params.payload);
+            } catch (err) {
+              console.warn("[ForgePad] Invalid extension bridge payload:", err);
+              return;
+            }
+            if (!request.id || !request.method) return;
 
-  // ── Patch chrome.tabs.get ──
-  if (typeof chrome !== 'undefined' && chrome.tabs) {
-    chrome.tabs.get = function(tabId, callback) {
-      var tab = makeFakeTab(tabId || TAB_ID);
-      if (typeof callback === 'function') { callback(tab); return; }
-      return Promise.resolve(tab);
-    };
-  }
+            try {
+              let value: unknown;
+              if (request.method === "scripting.executeScript") {
+                const payload = request.payload ?? {};
+                value = await executeExtensionScripting({
+                  tabId:
+                    typeof payload.tabId === "number"
+                      ? payload.tabId
+                      : activeTabId,
+                  func:
+                    typeof payload.func === "string"
+                      ? payload.func
+                      : undefined,
+                  files: Array.isArray(payload.files)
+                    ? payload.files.filter(
+                        (file): file is string => typeof file === "string",
+                      )
+                    : undefined,
+                  extId:
+                    typeof payload.extId === "string"
+                      ? payload.extId
+                      : args.extId,
+                });
+              } else if (request.method === "scripting.insertCSS") {
+                const payload = request.payload ?? {};
+                await insertExtensionCss({
+                  tabId:
+                    typeof payload.tabId === "number"
+                      ? payload.tabId
+                      : activeTabId,
+                  css: typeof payload.css === "string" ? payload.css : "",
+                });
+                value = undefined;
+              } else if (request.method === "tabs.create") {
+                const payload = request.payload ?? {};
+                value = await createExtensionTab({
+                  url:
+                    typeof payload.url === "string"
+                      ? payload.url
+                      : "about:blank",
+                  active:
+                    typeof payload.active === "boolean"
+                      ? payload.active
+                      : true,
+                });
+              } else {
+                throw new Error(`Unknown extension bridge method: ${request.method}`);
+              }
 
-  // ── Redirect chrome.storage.sync → chrome.storage.local ──
-  if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local && !chrome.storage.sync) {
-    chrome.storage.sync = chrome.storage.local;
-  }
-})();`;
+              await sendBridgeResponse(contextId, request.id, {
+                ok: true,
+                value,
+              });
+            } catch (err) {
+              await sendBridgeResponse(contextId, request.id, {
+                ok: false,
+                error: String(err),
+              });
+            }
+          })();
+        };
 
-        await wc.debugger.sendCommand("Page.addScriptToEvaluateOnNewDocument", {
-          source: injectionScript,
+        dbg.on("message", bridgeHandler);
+        extensionPopup.once("closed", () => {
+          dbg.removeListener("message", bridgeHandler);
+          removeCdpUser(wc.id, "extension-popup-polyfill");
         });
 
-        // Detach debugger after page load
-        wc.once("did-finish-load", () => {
-          try {
-            wc.debugger.detach();
-          } catch {
-            /* */
-          }
+        await dbg.sendCommand("Runtime.enable");
+        await dbg.sendCommand("Page.enable");
+        await dbg.sendCommand("Runtime.addBinding", { name: bridgeName });
+        await wc.debugger.sendCommand("Page.addScriptToEvaluateOnNewDocument", {
+          source: buildExtensionPopupPolyfillSource({
+            tabId: activeTabId,
+            tabUrl: activeTabUrl,
+            extId: args.extId,
+            bridgeName,
+          }),
+          runImmediately: true,
         });
       } catch (err) {
+        const wc = extensionPopup.webContents;
+        removeCdpUser(wc.id, "extension-popup-polyfill");
         console.warn(
           "[ForgePad] Failed to inject extension polyfills via CDP:",
           err,
