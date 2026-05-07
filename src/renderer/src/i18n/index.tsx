@@ -1,14 +1,14 @@
-import { createContext, useContext, useCallback, useMemo } from 'react';
-import { useAppStore } from '@renderer/store/app-store';
-import type { Locale } from '@shared/types';
-import en, { type TranslationKeys } from './en';
-import zhCN from './zh-CN';
+import { createContext, useContext, useCallback, useMemo } from "react";
+import { useAppStore } from "@renderer/store/app-store";
+import type { Locale } from "@shared/types";
+import en, { type TranslationKeys } from "./en";
+import zhCN from "./zh-CN";
 
 /* ─── Translation maps ─── */
 
 const messages: Record<Locale, Record<TranslationKeys, string>> = {
   en,
-  'zh-CN': zhCN,
+  "zh-CN": zhCN,
 };
 
 /* ─── Core translate function ─── */
@@ -17,10 +17,16 @@ const messages: Record<Locale, Record<TranslationKeys, string>> = {
  * Translate a key with optional interpolation.
  * Supports `{variable}` placeholders: `t('hello', { name: 'World' })` → "Hello World"
  */
-function translate(locale: Locale, key: TranslationKeys, params?: Record<string, string | number>): string {
+function translate(
+  locale: Locale,
+  key: TranslationKeys,
+  params?: Record<string, string | number>,
+): string {
   const msg = messages[locale]?.[key] ?? messages.en[key] ?? key;
   if (!params) return msg;
-  return msg.replace(/\{(\w+)\}/g, (_, k: string) => String(params[k] ?? `{${k}}`));
+  return msg.replace(/\{(\w+)\}/g, (_, k: string) =>
+    String(params[k] ?? `{${k}}`),
+  );
 }
 
 /* ─── React Context ─── */
@@ -32,7 +38,7 @@ type I18nContextValue = {
 };
 
 const I18nContext = createContext<I18nContextValue>({
-  locale: 'en',
+  locale: "en",
   t: (key) => messages.en[key] ?? key,
   setLocale: () => {},
 });
@@ -57,7 +63,8 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
   );
 
   const t = useCallback(
-    (key: TranslationKeys, params?: Record<string, string | number>) => translate(locale, key, params),
+    (key: TranslationKeys, params?: Record<string, string | number>) =>
+      translate(locale, key, params),
     [locale],
   );
 
@@ -77,7 +84,9 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
  */
 export function getT() {
   const locale = useAppStore.getState().settings.locale;
-  return (key: TranslationKeys, params?: Record<string, string | number>) => translate(locale, key, params);
+  return (key: TranslationKeys, params?: Record<string, string | number>) =>
+    translate(locale, key, params);
 }
 
+export { I18nContext, translate };
 export type { TranslationKeys };

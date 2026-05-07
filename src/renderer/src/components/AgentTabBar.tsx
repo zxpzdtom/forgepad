@@ -1,19 +1,29 @@
-import { type MouseEvent, useCallback, useMemo, useState } from 'react';
-import { useHorizontalScroll } from '@renderer/hooks/useHorizontalScroll';
-import { useTranslation } from '@renderer/i18n';
-import { closestCenter, DndContext, type DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
-import { horizontalListSortingStrategy, SortableContext } from '@dnd-kit/sortable';
-import { useAppStore } from '@renderer/store/app-store';
-import type { AgentStatus } from '@shared/agent-lifecycle';
-import type { Tab } from '@shared/types';
-import { Bot, Plus } from 'lucide-react';
+import { type MouseEvent, useCallback, useMemo, useState } from "react";
+import { useHorizontalScroll } from "@renderer/hooks/useHorizontalScroll";
+import { useTranslation } from "@renderer/i18n";
+import {
+  closestCenter,
+  DndContext,
+  type DragEndEvent,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import {
+  horizontalListSortingStrategy,
+  SortableContext,
+} from "@dnd-kit/sortable";
+import { useAppStore } from "@renderer/store/app-store";
+import type { AgentStatus } from "@shared/agent-lifecycle";
+import type { Tab } from "@shared/types";
+import { Bot, Plus } from "lucide-react";
 
-import { agentPresetIcon } from './AgentIcons';
-import { RenameModal } from './RenameModal';
-import { SortableTabItem } from './SortableTabItem';
-import { TabContextMenu } from './TabContextMenu';
+import { agentPresetIcon } from "./AgentIcons";
+import { RenameModal } from "./RenameModal";
+import { SortableTabItem } from "./SortableTabItem";
+import { TabContextMenu } from "./TabContextMenu";
 
-type TerminalTab = Extract<Tab, { type: 'terminal' }>;
+type TerminalTab = Extract<Tab, { type: "terminal" }>;
 
 function agentTabIcon(tab: TerminalTab, isWorking: boolean) {
   const inner = (() => {
@@ -24,18 +34,22 @@ function agentTabIcon(tab: TerminalTab, isWorking: boolean) {
     return <Bot size={13} />;
   })();
 
-  return <span className={`inline-flex${isWorking ? 'animate-breathe' : ''}`}>{inner}</span>;
+  return (
+    <span className={`inline-flex${isWorking ? " animate-breathe" : ""}`}>
+      {inner}
+    </span>
+  );
 }
 
 function StatusDot({ status }: { status: AgentStatus | undefined }) {
-  if (status === 'review') {
+  if (status === "review") {
     return (
       <span className="relative flex size-2 shrink-0">
         <span className="relative inline-flex size-2 rounded-full bg-ok" />
       </span>
     );
   }
-  if (status === 'permission') {
+  if (status === "permission") {
     return (
       <span className="relative flex size-2 shrink-0">
         <span className="absolute inline-flex size-full animate-ping rounded-full bg-warn opacity-75" />
@@ -62,7 +76,9 @@ export function AgentTabBar() {
   const reorderTabs = useAppStore((state) => state.reorderTabs);
   const renameTab = useAppStore((state) => state.renameTab);
 
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+  );
 
   const { ref: tabListRef, onWheel } = useHorizontalScroll<HTMLDivElement>();
 
@@ -72,10 +88,13 @@ export function AgentTabBar() {
     y: number;
   } | null>(null);
   const [renameTabId, setRenameTabId] = useState<string | null>(null);
-  const [renameValue, setRenameValue] = useState('');
+  const [renameValue, setRenameValue] = useState("");
 
   const agentTabs = tabs.filter(
-    (tab): tab is TerminalTab => tab.workspaceId === activeWorkspaceId && tab.type === 'terminal' && tab.isAgent === true,
+    (tab): tab is TerminalTab =>
+      tab.workspaceId === activeWorkspaceId &&
+      tab.type === "terminal" &&
+      tab.isAgent === true,
   );
 
   const activeId = activeAgentTabId ?? agentTabs[0]?.id;
@@ -99,8 +118,15 @@ export function AgentTabBar() {
 
   return (
     <div className="column-tabbar flex h-9 shrink-0 items-center gap-1 border-border border-b bg-bg px-2">
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-        <SortableContext items={tabIds} strategy={horizontalListSortingStrategy}>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={handleDragEnd}
+      >
+        <SortableContext
+          items={tabIds}
+          strategy={horizontalListSortingStrategy}
+        >
           <div
             ref={tabListRef}
             className="tabs-scroll scrollbar-none scroll-mask-x flex min-w-0 flex-1 items-center overflow-x-auto"
@@ -109,8 +135,9 @@ export function AgentTabBar() {
           >
             {agentTabs.map((tab) => {
               const isExited = exitedPtyIds.has(tab.ptyId);
-              const status: AgentStatus | undefined = agentStatuses[tab.ptyId] ?? (isExited ? undefined : 'idle');
-              const isWorking = status === 'working';
+              const status: AgentStatus | undefined =
+                agentStatuses[tab.ptyId] ?? (isExited ? undefined : "idle");
+              const isWorking = status === "working";
 
               return (
                 <SortableTabItem
@@ -122,7 +149,7 @@ export function AgentTabBar() {
                   title={tab.title}
                   onSelect={() => setActiveTab(tab.id)}
                   onClose={() => closeTab(tab.id)}
-                  closeTitle={t('agent.closeAgent')}
+                  closeTitle={t("agent.closeAgent")}
                   onContextMenu={(event) => handleContextMenu(event, tab)}
                   suffix={<StatusDot status={status} />}
                 />
@@ -135,7 +162,7 @@ export function AgentTabBar() {
       <button
         className="icon-button small"
         type="button"
-        title={t('agent.newAgent')}
+        title={t("agent.newAgent")}
         onClick={() => void createAgentTerminal(activeWorkspaceId ?? undefined)}
       >
         <Plus size={14} />
@@ -153,7 +180,7 @@ export function AgentTabBar() {
           onCloseToRight={closeTabsToRight}
           onRename={(id) => {
             const tab = agentTabs.find((t) => t.id === id);
-            setRenameValue(tab?.title ?? '');
+            setRenameValue(tab?.title ?? "");
             setRenameTabId(id);
           }}
         />

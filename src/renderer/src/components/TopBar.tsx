@@ -1,6 +1,13 @@
-import { type CSSProperties, type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
-import { useTranslation } from '@renderer/i18n';
-import { useAppStore } from '@renderer/store/app-store';
+import {
+  type CSSProperties,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+import { useTranslation } from "@renderer/i18n";
+import { useAppStore } from "@renderer/store/app-store";
 import {
   Check,
   ChevronDown,
@@ -16,11 +23,11 @@ import {
   Play,
   Search,
   TerminalSquare,
-} from 'lucide-react';
+} from "lucide-react";
 
-import { appIcon, ideIcon } from './AgentIcons';
-import { RunSetupDialog } from './RunSetupDialog';
-import { Tooltip } from './Tooltip';
+import { appIcon, ideIcon } from "./AgentIcons";
+import { RunSetupDialog } from "./RunSetupDialog";
+import { Tooltip } from "./Tooltip";
 
 /* ── Types ── */
 
@@ -58,13 +65,15 @@ function MenuItem({
 }) {
   return (
     <button
-      className={`flex h-8 w-full items-center gap-2.5 rounded-md px-2 text-left text-[13px] text-text transition-colors hover:bg-panel-3${selected ? 'bg-panel-3/60' : ''}`}
+      className={`flex h-8 w-full items-center gap-2.5 rounded-md px-2 text-left text-[13px] text-text transition-colors hover:bg-panel-3${selected ? "bg-panel-3/60" : ""}`}
       type="button"
       onClick={onClick}
     >
       <span className="grid size-4 shrink-0 place-items-center">{icon}</span>
       <span className="min-w-0 flex-1">{label}</span>
-      <span className="grid size-4 shrink-0 place-items-center text-accent">{selected && <Check size={13} />}</span>
+      <span className="grid size-4 shrink-0 place-items-center text-accent">
+        {selected && <Check size={13} />}
+      </span>
     </button>
   );
 }
@@ -100,18 +109,23 @@ function Submenu({
 
   useEffect(() => () => clearTimeout(closeTimer.current), []);
 
-  const isChildSelected = selectedId !== null && items.some((i) => i.id === selectedId);
+  const isChildSelected =
+    selectedId !== null && items.some((i) => i.id === selectedId);
 
   return (
     <div onMouseEnter={handleEnter} onMouseLeave={handleLeave}>
       {/* Parent row */}
       <div
-        className={`flex h-8 w-full cursor-default items-center gap-2.5 rounded-md px-2 text-[13px] text-text transition-colors hover:bg-panel-3${isChildSelected ? 'bg-panel-3/60' : ''}`}
+        className={`flex h-8 w-full cursor-default items-center gap-2.5 rounded-md px-2 text-[13px] text-text transition-colors hover:bg-panel-3${isChildSelected ? "bg-panel-3/60" : ""}`}
         style={{ anchorName } as CSSProperties}
       >
-        <span className="grid size-4 shrink-0 place-items-center">{parentIcon}</span>
+        <span className="grid size-4 shrink-0 place-items-center">
+          {parentIcon}
+        </span>
         <span className="min-w-0 flex-1">{parentLabel}</span>
-        <span className="grid size-4 shrink-0 place-items-center text-accent">{isChildSelected && <Check size={13} />}</span>
+        <span className="grid size-4 shrink-0 place-items-center text-accent">
+          {isChildSelected && <Check size={13} />}
+        </span>
         <ChevronRight size={13} className="shrink-0 text-subtle" />
       </div>
 
@@ -121,10 +135,10 @@ function Submenu({
         style={
           {
             positionAnchor: anchorName,
-            top: 'anchor(top)',
-            left: 'anchor(right)',
-            marginLeft: '4px',
-            positionTryFallbacks: 'flip-inline',
+            top: "anchor(top)",
+            left: "anchor(right)",
+            marginLeft: "4px",
+            positionTryFallbacks: "flip-inline",
           } as CSSProperties
         }
         hidden={!open}
@@ -142,7 +156,9 @@ function Submenu({
             />
           ))
         ) : (
-          <div className="px-3 py-2 text-subtle text-xs">{t('topbar.noneDetected')}</div>
+          <div className="px-3 py-2 text-subtle text-xs">
+            {t("topbar.noneDetected")}
+          </div>
         )}
       </div>
     </div>
@@ -156,9 +172,9 @@ type TopBarProps = {
 };
 
 /** IDE ids that map to a known category */
-const IDE_IDS = new Set(['zed', 'vscode', 'cursor', 'windsurf', 'intellij']);
+const IDE_IDS = new Set(["zed", "vscode", "cursor", "windsurf", "intellij"]);
 /** Terminal ids */
-const TERMINAL_IDS = new Set(['terminal', 'iterm', 'iterm2', 'ghostty']);
+const TERMINAL_IDS = new Set(["terminal", "iterm", "iterm2", "ghostty"]);
 
 export function TopBar({ onOpenSearch }: TopBarProps) {
   const { t } = useTranslation();
@@ -171,27 +187,41 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
   const activeWorkspaceId = useAppStore((state) => state.activeWorkspaceId);
   const workspaces = useAppStore((state) => state.workspaces);
   const projects = useAppStore((state) => state.projects);
-  const defaultOpenWith = useAppStore((state) => state.settings.defaultOpenWith);
+  const defaultOpenWith = useAppStore(
+    (state) => state.settings.defaultOpenWith,
+  );
   const updateSettings = useAppStore((state) => state.updateSettings);
   const addToast = useAppStore((state) => state.addToast);
   const settings = useAppStore((state) => state.settings);
   const createTerminal = useAppStore((state) => state.createTerminal);
   const createBrowserTab = useAppStore((state) => state.createBrowserTab);
-  const projectActiveRunIndex = useAppStore((state) => state.projectActiveRunIndex);
-  const setProjectActiveRunIndex = useAppStore((state) => state.setProjectActiveRunIndex);
+  const projectActiveRunIndex = useAppStore(
+    (state) => state.projectActiveRunIndex,
+  );
+  const setProjectActiveRunIndex = useAppStore(
+    (state) => state.setProjectActiveRunIndex,
+  );
 
-  const activeWorkspace = workspaces.find((workspace) => workspace.id === activeWorkspaceId);
-  const activeProject = activeWorkspace ? projects.find((p) => p.id === activeWorkspace.projectId) : undefined;
+  const activeWorkspace = workspaces.find(
+    (workspace) => workspace.id === activeWorkspaceId,
+  );
+  const activeProject = activeWorkspace
+    ? projects.find((p) => p.id === activeWorkspace.projectId)
+    : undefined;
 
   // ── Run button state ──
   const [runMenuOpen, setRunMenuOpen] = useState(false);
   const [runFocusIndex, setRunFocusIndex] = useState(-1);
   const [runSetupOpen, setRunSetupOpen] = useState(false);
-  const [pkgScripts, setPkgScripts] = useState<{ name: string; command: string }[]>([]);
+  const [pkgScripts, setPkgScripts] = useState<
+    { name: string; command: string }[]
+  >([]);
   const runMenuRef = useRef<HTMLDivElement>(null);
 
-  const runCommands = settings.runCommands ?? [];
-  const activeRunIndex = activeProject ? (projectActiveRunIndex[activeProject.id] ?? 0) : 0;
+  const runCommands = activeProject?.runCommands ?? [];
+  const activeRunIndex = activeProject
+    ? (projectActiveRunIndex[activeProject.id] ?? 0)
+    : 0;
   const setActiveRunIndex = useCallback(
     (index: number) => {
       if (activeProject) setProjectActiveRunIndex(activeProject.id, index);
@@ -200,7 +230,10 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
   );
 
   const clampedRunIndex = Math.min(activeRunIndex, runCommands.length - 1);
-  const activeRunEntry = runCommands.length > 0 ? runCommands[Math.max(0, clampedRunIndex)] : undefined;
+  const activeRunEntry =
+    runCommands.length > 0
+      ? runCommands[Math.max(0, clampedRunIndex)]
+      : undefined;
   const runMenuEntries = runCommands;
   const runTotalItems = runMenuEntries.length + 1;
 
@@ -208,7 +241,7 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
     ? activeRunEntry.name.length > 18
       ? `${activeRunEntry.name.slice(0, 18)}…`
       : activeRunEntry.name
-    : t('agent.runCommand');
+    : t("agent.runCommand");
 
   // Detect package.json scripts
   useEffect(() => {
@@ -219,25 +252,40 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
     let cancelled = false;
     (async () => {
       try {
-        const raw = await window.forgepad.fs.readFile(activeWorkspace.worktreePath, 'package.json');
+        const raw = await window.forgepad.fs.readFile(
+          activeWorkspace.worktreePath,
+          "package.json",
+        );
         const pkg = JSON.parse(raw) as { scripts?: Record<string, string> };
         if (!cancelled && pkg.scripts) {
-          let pm = 'npm run';
+          let pm = "npm run";
           try {
-            await window.forgepad.fs.readFile(activeWorkspace.worktreePath, 'bun.lockb');
-            pm = 'bun run';
+            await window.forgepad.fs.readFile(
+              activeWorkspace.worktreePath,
+              "bun.lockb",
+            );
+            pm = "bun run";
           } catch {
             try {
-              await window.forgepad.fs.readFile(activeWorkspace.worktreePath, 'bun.lock');
-              pm = 'bun run';
+              await window.forgepad.fs.readFile(
+                activeWorkspace.worktreePath,
+                "bun.lock",
+              );
+              pm = "bun run";
             } catch {
               try {
-                await window.forgepad.fs.readFile(activeWorkspace.worktreePath, 'pnpm-lock.yaml');
-                pm = 'pnpm run';
+                await window.forgepad.fs.readFile(
+                  activeWorkspace.worktreePath,
+                  "pnpm-lock.yaml",
+                );
+                pm = "pnpm run";
               } catch {
                 try {
-                  await window.forgepad.fs.readFile(activeWorkspace.worktreePath, 'yarn.lock');
-                  pm = 'yarn';
+                  await window.forgepad.fs.readFile(
+                    activeWorkspace.worktreePath,
+                    "yarn.lock",
+                  );
+                  pm = "yarn";
                 } catch {
                   /* default npm */
                 }
@@ -245,7 +293,10 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
             }
           }
           setPkgScripts(
-            Object.entries(pkg.scripts).map(([name]) => ({ name, command: `${pm} ${name}` })),
+            Object.entries(pkg.scripts).map(([name]) => ({
+              name,
+              command: `${pm} ${name}`,
+            })),
           );
         }
       } catch {
@@ -261,10 +312,11 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
   useEffect(() => {
     if (!runMenuOpen) return;
     const onClick = (e: MouseEvent) => {
-      if (runMenuRef.current && !runMenuRef.current.contains(e.target as Node)) setRunMenuOpen(false);
+      if (runMenuRef.current && !runMenuRef.current.contains(e.target as Node))
+        setRunMenuOpen(false);
     };
-    document.addEventListener('mousedown', onClick);
-    return () => document.removeEventListener('mousedown', onClick);
+    document.addEventListener("mousedown", onClick);
+    return () => document.removeEventListener("mousedown", onClick);
   }, [runMenuOpen]);
 
   // Run menu keyboard navigation
@@ -272,15 +324,15 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
     (e: KeyboardEvent) => {
       if (!runMenuOpen) return;
       switch (e.key) {
-        case 'ArrowDown':
+        case "ArrowDown":
           e.preventDefault();
           setRunFocusIndex((i) => (i + 1) % runTotalItems);
           break;
-        case 'ArrowUp':
+        case "ArrowUp":
           e.preventDefault();
           setRunFocusIndex((i) => (i - 1 + runTotalItems) % runTotalItems);
           break;
-        case 'Enter':
+        case "Enter":
           e.preventDefault();
           if (runFocusIndex >= 0 && runFocusIndex < runMenuEntries.length) {
             setActiveRunIndex(runFocusIndex);
@@ -290,18 +342,24 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
             setRunSetupOpen(true);
           }
           break;
-        case 'Escape':
+        case "Escape":
           e.preventDefault();
           setRunMenuOpen(false);
           break;
       }
     },
-    [activeWorkspaceId, runFocusIndex, runMenuEntries, runMenuOpen, runTotalItems],
+    [
+      activeWorkspaceId,
+      runFocusIndex,
+      runMenuEntries,
+      runMenuOpen,
+      runTotalItems,
+    ],
   );
 
   useEffect(() => {
-    document.addEventListener('keydown', handleRunKeyDown);
-    return () => document.removeEventListener('keydown', handleRunKeyDown);
+    document.addEventListener("keydown", handleRunKeyDown);
+    return () => document.removeEventListener("keydown", handleRunKeyDown);
   }, [handleRunKeyDown]);
 
   useEffect(() => {
@@ -310,14 +368,24 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
 
   const handleRun = () => {
     if (activeRunEntry) {
-      void createTerminal(activeWorkspaceId ?? undefined, activeRunEntry.command);
+      void createTerminal(
+        activeWorkspaceId ?? undefined,
+        activeRunEntry.command,
+      );
     } else {
       setRunSetupOpen(true);
     }
   };
 
-  const handleRunSetupSave = (commands: { name: string; command: string }[]) => {
-    updateSettings({ runCommands: commands.length > 0 ? commands : undefined });
+  const setProjectRunCommands = useAppStore(
+    (state) => state.setProjectRunCommands,
+  );
+  const handleRunSetupSave = (
+    commands: { name: string; command: string }[],
+  ) => {
+    if (activeProject) {
+      setProjectRunCommands(activeProject.id, commands);
+    }
     setRunSetupOpen(false);
   };
 
@@ -353,13 +421,13 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
       }
     };
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setMenuOpen(false);
+      if (event.key === "Escape") setMenuOpen(false);
     };
-    document.addEventListener('pointerdown', onPointerDown);
-    document.addEventListener('keydown', onKeyDown);
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
     return () => {
-      document.removeEventListener('pointerdown', onPointerDown);
-      document.removeEventListener('keydown', onKeyDown);
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
     };
   }, [menuOpen]);
 
@@ -368,21 +436,31 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
   const selectedIsTerminal = TERMINAL_IDS.has(defaultOpenWith);
 
   // Resolve the icon for the selected IDE / Terminal within the submenu parent row
-  const ideParentIcon = selectedIsIde ? resolveIcon(defaultOpenWith, ICON_SIZE) : resolveIcon('vscode', ICON_SIZE); // default icon: VSCode
-  const terminalParentIcon = selectedIsTerminal ? resolveIcon(defaultOpenWith, ICON_SIZE) : resolveIcon('terminal', ICON_SIZE); // default icon: Terminal.app
+  const ideParentIcon = selectedIsIde
+    ? resolveIcon(defaultOpenWith, ICON_SIZE)
+    : resolveIcon("vscode", ICON_SIZE); // default icon: VSCode
+  const terminalParentIcon = selectedIsTerminal
+    ? resolveIcon(defaultOpenWith, ICON_SIZE)
+    : resolveIcon("terminal", ICON_SIZE); // default icon: Terminal.app
 
   // Main button icon: always the selected item's icon
   const selectedIcon = resolveIcon(defaultOpenWith, ICON_SIZE);
 
   // Resolve action for selected option
-  const resolveAction = useCallback((id: string): ((path: string) => Promise<void>) | null => {
-    if (id === 'finder') return window.forgepad.shell.openPath;
-    if (TERMINAL_IDS.has(id)) return (path: string) => window.forgepad.shell.openWithTerminal(path, id);
-    if (IDE_IDS.has(id)) return (path: string) => window.forgepad.shell.openWithIde(path, id);
-    // Legacy fallback
-    if (id === 'terminal') return window.forgepad.shell.openInTerminal;
-    return null;
-  }, []);
+  const resolveAction = useCallback(
+    (id: string): ((path: string) => Promise<void>) | null => {
+      if (id === "finder") return window.forgepad.shell.openPath;
+      if (TERMINAL_IDS.has(id))
+        return (path: string) =>
+          window.forgepad.shell.openWithTerminal(path, id);
+      if (IDE_IDS.has(id))
+        return (path: string) => window.forgepad.shell.openWithIde(path, id);
+      // Legacy fallback
+      if (id === "terminal") return window.forgepad.shell.openInTerminal;
+      return null;
+    },
+    [],
+  );
 
   const handleOpen = async () => {
     if (!activeWorkspace) return;
@@ -391,7 +469,10 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
     try {
       await action(activeWorkspace.worktreePath);
     } catch (error) {
-      addToast('error', error instanceof Error ? error.message : t('topbar.failedToOpen'));
+      addToast(
+        "error",
+        error instanceof Error ? error.message : t("topbar.failedToOpen"),
+      );
     }
   };
 
@@ -403,13 +484,24 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
   return (
     <header className="app-topbar relative flex h-12 shrink-0 items-center border-border border-b bg-surface-toolbar px-3">
       <div className="flex items-center pl-[80px]">
-        <Tooltip label={sidebarOpen ? t('topbar.collapseSidebar') : t('topbar.expandSidebar')} position="bottom">
+        <Tooltip
+          label={
+            sidebarOpen
+              ? t("topbar.collapseSidebar")
+              : t("topbar.expandSidebar")
+          }
+          position="bottom"
+        >
           <button
             className="icon-button border-transparent"
             type="button"
             onClick={() => useAppStore.setState({ sidebarOpen: !sidebarOpen })}
           >
-            {sidebarOpen ? <PanelLeftClose size={17} /> : <PanelLeftOpen size={17} />}
+            {sidebarOpen ? (
+              <PanelLeftClose size={17} />
+            ) : (
+              <PanelLeftOpen size={17} />
+            )}
           </button>
         </Tooltip>
       </div>
@@ -417,13 +509,13 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
       <button
         className="absolute left-1/2 flex h-8 w-[min(460px,40vw)] -translate-x-1/2 items-center gap-2 rounded-lg border border-border bg-surface-search px-3 text-left text-muted shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] transition-colors hover:border-subtle hover:text-text"
         type="button"
-        title={t('topbar.searchForgePad')}
+        title={t("topbar.searchForgePad")}
         onClick={onOpenSearch}
       >
         <Search size={17} />
         <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[13px]">
-          {t('topbar.searchForgePad')}
-          {activeWorkspace ? ` - ${activeWorkspace.name}` : ''}
+          {t("topbar.searchForgePad")}
+          {activeWorkspace ? ` - ${activeWorkspace.name}` : ""}
         </span>
         <kbd className="grid size-[20px] place-items-center rounded border border-border bg-panel-2 text-[11px] text-subtle leading-none">
           ⌘
@@ -442,19 +534,28 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
               className="flex h-8 items-center gap-1.5 px-2.5 text-[13px] text-text transition-colors hover:bg-panel-3 disabled:cursor-not-allowed disabled:text-subtle"
               type="button"
               disabled={!activeWorkspaceId}
-              title={activeRunEntry ? t('agent.runCommandDetail', { name: activeRunEntry.name, command: activeRunEntry.command }) : t('agent.configureRun')}
+              title={
+                activeRunEntry
+                  ? t("agent.runCommandDetail", {
+                      name: activeRunEntry.name,
+                      command: activeRunEntry.command,
+                    })
+                  : t("agent.configureRun")
+              }
               onClick={handleRun}
             >
               <Play size={14} className="text-ok" />
-              <span className="max-w-[120px] truncate font-[510]">{runLabel}</span>
+              <span className="max-w-[120px] truncate font-[510]">
+                {runLabel}
+              </span>
             </button>
             <button
               className="grid h-8 w-7 place-items-center border-border border-l text-muted transition-colors hover:text-text disabled:cursor-not-allowed disabled:text-subtle"
               type="button"
               disabled={!activeWorkspaceId}
-              title={t('agent.defaultRunCommand')}
+              title={t("agent.defaultRunCommand")}
               onClick={() => setRunMenuOpen((v) => !v)}
-              style={{ anchorName: '--topbar-run-trigger' } as CSSProperties}
+              style={{ anchorName: "--topbar-run-trigger" } as CSSProperties}
             >
               <ChevronDown size={13} />
             </button>
@@ -465,21 +566,23 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
             className="anchor-menu"
             style={
               {
-                positionAnchor: '--topbar-run-trigger',
-                top: 'anchor(bottom)',
-                right: 'anchor(right)',
-                marginTop: '7px',
-                positionTryFallbacks: 'flip-block',
+                positionAnchor: "--topbar-run-trigger",
+                top: "anchor(bottom)",
+                right: "anchor(right)",
+                marginTop: "7px",
+                positionTryFallbacks: "flip-block",
               } as CSSProperties
             }
             hidden={!runMenuOpen || !activeWorkspaceId}
             role="listbox"
           >
-            <div className="px-2 py-1.5 text-[11px] text-subtle">{t('agent.runCommands')}</div>
+            <div className="px-2 py-1.5 text-[11px] text-subtle">
+              {t("agent.runCommands")}
+            </div>
 
             {runMenuEntries.length === 0 && (
               <div className="px-2 py-2 text-center text-[12px] text-subtle/60">
-                {t('agent.noCommandsYet')}
+                {t("agent.noCommandsYet")}
               </div>
             )}
 
@@ -490,7 +593,7 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
                 <button
                   key={entry.command}
                   className={`flex h-8 w-full items-center gap-2.5 rounded-md px-2 text-left text-[13px] text-text transition-colors hover:bg-panel-3 ${
-                    focused ? 'bg-panel-3' : ''
+                    focused ? "bg-panel-3" : ""
                   }`}
                   type="button"
                   role="option"
@@ -504,18 +607,24 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
                   onMouseLeave={() => setRunFocusIndex(-1)}
                 >
                   <span className="grid size-4 shrink-0 place-items-center">
-                    {selected ? <Check size={14} className="text-ok" /> : <Play size={14} className="text-muted" />}
+                    {selected ? (
+                      <Check size={14} className="text-ok" />
+                    ) : (
+                      <Play size={14} className="text-muted" />
+                    )}
                   </span>
                   <span className="min-w-0 flex-1 truncate">{entry.name}</span>
                 </button>
               );
             })}
 
-            {runMenuEntries.length > 0 && <div className="mx-2 my-1 border-border/60 border-t" />}
+            {runMenuEntries.length > 0 && (
+              <div className="mx-2 my-1 border-border/60 border-t" />
+            )}
 
             <button
               className={`flex h-8 w-full items-center gap-2.5 rounded-md px-2 text-left text-[13px] text-text transition-colors hover:bg-panel-3 ${
-                runFocusIndex === runMenuEntries.length ? 'bg-panel-3' : ''
+                runFocusIndex === runMenuEntries.length ? "bg-panel-3" : ""
               }`}
               type="button"
               onClick={() => {
@@ -528,13 +637,13 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
               <span className="grid size-4 shrink-0 place-items-center">
                 <Pencil size={13} className="text-muted" />
               </span>
-              <span className="min-w-0 flex-1">{t('agent.editCommands')}</span>
+              <span className="min-w-0 flex-1">{t("agent.editCommands")}</span>
             </button>
           </div>
         </div>
 
         {/* ── Terminal button ── */}
-        <Tooltip label={t('agent.newTerminal')} position="bottom">
+        <Tooltip label={t("agent.newTerminal")} position="bottom">
           <button
             className="icon-button border-transparent"
             type="button"
@@ -546,7 +655,7 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
         </Tooltip>
 
         {/* ── Browser button ── */}
-        <Tooltip label={t('tabBar.openBrowser')} position="bottom">
+        <Tooltip label={t("tabBar.openBrowser")} position="bottom">
           <button
             className="icon-button border-transparent"
             type="button"
@@ -557,13 +666,26 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
           </button>
         </Tooltip>
 
-        <Tooltip label={rightPanelOpen ? t('topbar.closeSidePanel') : t('topbar.openSidePanel')} position="bottom">
+        <Tooltip
+          label={
+            rightPanelOpen
+              ? t("topbar.closeSidePanel")
+              : t("topbar.openSidePanel")
+          }
+          position="bottom"
+        >
           <button
             className="icon-button border-transparent"
             type="button"
-            onClick={() => useAppStore.setState({ rightPanelOpen: !rightPanelOpen })}
+            onClick={() =>
+              useAppStore.setState({ rightPanelOpen: !rightPanelOpen })
+            }
           >
-            {rightPanelOpen ? <PanelRightClose size={17} /> : <PanelRightOpen size={17} />}
+            {rightPanelOpen ? (
+              <PanelRightClose size={17} />
+            ) : (
+              <PanelRightOpen size={17} />
+            )}
           </button>
         </Tooltip>
 
@@ -575,11 +697,13 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
               className="flex h-8 items-center gap-2 px-2.5 text-sm text-text disabled:cursor-not-allowed disabled:text-subtle"
               type="button"
               disabled={!activeWorkspace}
-              title={t('topbar.openWith', { tool: defaultOpenWith })}
+              title={t("topbar.openWith", { tool: defaultOpenWith })}
               onClick={handleOpen}
             >
-              <span className="grid size-4 place-items-center">{selectedIcon}</span>
-              <span className="font-[590]">{t('common.open')}</span>
+              <span className="grid size-4 place-items-center">
+                {selectedIcon}
+              </span>
+              <span className="font-[590]">{t("common.open")}</span>
             </button>
 
             {/* Right: chevron trigger (anchor for dropdown) */}
@@ -587,9 +711,9 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
               className="grid h-8 w-8 place-items-center border-border border-l text-muted hover:text-text disabled:cursor-not-allowed disabled:text-subtle"
               type="button"
               disabled={!activeWorkspace}
-              title={t('topbar.defaultOpenWith')}
+              title={t("topbar.defaultOpenWith")}
               onClick={() => setMenuOpen((v) => !v)}
-              style={{ anchorName: '--open-with-trigger' } as CSSProperties}
+              style={{ anchorName: "--open-with-trigger" } as CSSProperties}
             >
               <ChevronDown size={15} />
             </button>
@@ -600,28 +724,30 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
             className="anchor-menu"
             style={
               {
-                positionAnchor: '--open-with-trigger',
-                top: 'anchor(bottom)',
-                right: 'anchor(right)',
-                marginTop: '7px',
-                positionTryFallbacks: 'flip-block',
+                positionAnchor: "--open-with-trigger",
+                top: "anchor(bottom)",
+                right: "anchor(right)",
+                marginTop: "7px",
+                positionTryFallbacks: "flip-block",
               } as CSSProperties
             }
             hidden={!menuOpen || !activeWorkspace}
           >
-            <div className="px-2 py-1.5 text-[11px] text-subtle">{t('topbar.defaultOpenWith')}</div>
+            <div className="px-2 py-1.5 text-[11px] text-subtle">
+              {t("topbar.defaultOpenWith")}
+            </div>
 
             {/* Finder */}
             <MenuItem
-              icon={appIcon('finder', ICON_SIZE) ?? <Folder size={ICON_SIZE} />}
-              label={t('topbar.finder')}
-              selected={defaultOpenWith === 'finder'}
-              onClick={() => handleSelect('finder')}
+              icon={appIcon("finder", ICON_SIZE) ?? <Folder size={ICON_SIZE} />}
+              label={t("topbar.finder")}
+              selected={defaultOpenWith === "finder"}
+              onClick={() => handleSelect("finder")}
             />
 
             {/* IDE submenu */}
             <Submenu
-              parentLabel={t('topbar.ide')}
+              parentLabel={t("topbar.ide")}
               parentIcon={ideParentIcon}
               items={ides}
               selectedId={selectedIsIde ? defaultOpenWith : null}
@@ -631,7 +757,7 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
 
             {/* Terminal submenu */}
             <Submenu
-              parentLabel={t('topbar.terminal')}
+              parentLabel={t("topbar.terminal")}
               parentIcon={terminalParentIcon}
               items={terminals}
               selectedId={selectedIsTerminal ? defaultOpenWith : null}
@@ -644,7 +770,7 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
 
       {runSetupOpen && (
         <RunSetupDialog
-          initialCommands={settings.runCommands}
+          initialCommands={activeProject?.runCommands}
           pkgScripts={pkgScripts}
           onSave={handleRunSetupSave}
           onClose={() => setRunSetupOpen(false)}
