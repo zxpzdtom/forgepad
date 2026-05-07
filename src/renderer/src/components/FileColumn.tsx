@@ -1,24 +1,43 @@
-import { Component, type ErrorInfo, type ReactNode, useCallback, useRef, useState } from 'react';
-import { useTranslation } from '@renderer/i18n';
+import {
+  Component,
+  type ErrorInfo,
+  type ReactNode,
+  useCallback,
+  useRef,
+  useState,
+} from "react";
+import { useTranslation } from "@renderer/i18n";
 
-import { getDroppedPaths, hasDraggableFiles, isInternalDrop } from '@renderer/lib/drag-utils';
-import { useAppStore } from '@renderer/store/app-store';
-import type { Workspace } from '@shared/types';
+import {
+  getDroppedPaths,
+  hasDraggableFiles,
+  isInternalDrop,
+} from "@renderer/lib/drag-utils";
+import { useAppStore } from "@renderer/store/app-store";
+import type { Workspace } from "@shared/types";
 
-import { BrowserTab } from './BrowserTab';
-import { ContextPreview } from './ContextPreview';
-import { DiffViewer } from './DiffViewer';
-import { FileEditor } from './FileEditor';
-import { LspSymbolPeek } from './LspSymbolPeek';
+import { BrowserTab } from "./BrowserTab";
+import { ContextPreview } from "./ContextPreview";
+import { DiffViewer } from "./DiffViewer";
+import { FileEditor } from "./FileEditor";
+import { LspSymbolPeek } from "./LspSymbolPeek";
 
 /** Error boundary so a crashing BrowserTab doesn't take down the whole column */
-class BrowserErrorBoundary extends Component<{ children: ReactNode; onRetry: () => void; crashMessage: string; reloadLabel: string }, { hasError: boolean; error: string }> {
-  state = { hasError: false, error: '' };
+class BrowserErrorBoundary extends Component<
+  {
+    children: ReactNode;
+    onRetry: () => void;
+    crashMessage: string;
+    reloadLabel: string;
+  },
+  { hasError: boolean; error: string }
+> {
+  state = { hasError: false, error: "" };
   static getDerivedStateFromError(error: Error) {
     return { hasError: true, error: error.message };
   }
   componentDidCatch(error: Error, info: ErrorInfo) {
-    console.error('[BrowserTab crash]', error, info);
+    console.error("[BrowserTab crash]", error, info);
   }
   render() {
     if (this.state.hasError) {
@@ -27,17 +46,37 @@ class BrowserErrorBoundary extends Component<{ children: ReactNode; onRetry: () 
           <div className="flex flex-col items-center gap-3 text-center">
             <div className="flex size-10 items-center justify-center rounded-full bg-panel-2 text-subtle">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5" />
-                <path d="M12 8v5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                <circle cx="12" cy="16" r="0.5" fill="currentColor" stroke="currentColor" strokeWidth="0.5" />
+                <circle
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                />
+                <path
+                  d="M12 8v5"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                />
+                <circle
+                  cx="12"
+                  cy="16"
+                  r="0.5"
+                  fill="currentColor"
+                  stroke="currentColor"
+                  strokeWidth="0.5"
+                />
               </svg>
             </div>
             <p className="text-muted text-xs">{this.props.crashMessage}</p>
-            <p className="max-w-xs font-mono text-[10px] text-subtle">{this.state.error}</p>
+            <p className="max-w-xs font-mono text-[10px] text-subtle">
+              {this.state.error}
+            </p>
             <button
               type="button"
               onClick={() => {
-                this.setState({ hasError: false, error: '' });
+                this.setState({ hasError: false, error: "" });
                 this.props.onRetry();
               }}
               className="mt-1 rounded-md bg-accent px-3 py-1.5 font-medium text-white text-xs hover:bg-accent/90"
@@ -63,14 +102,22 @@ export function FileColumn() {
   const openExternalFileTab = useAppStore((state) => state.openExternalFileTab);
   const symbolPeek = useAppStore((state) => state.symbolPeek);
 
-  const fileTabs = tabs.filter((tab) => tab.workspaceId === activeWorkspaceId && tab.type !== 'terminal');
+  const fileTabs = tabs.filter(
+    (tab) => tab.workspaceId === activeWorkspaceId && tab.type !== "terminal",
+  );
+
+  // Keep ALL browser tabs across every workspace mounted so that webviews
+  // survive workspace switches without reloading (display:none preserves state).
+  const allBrowserTabs = tabs.filter((tab) => tab.type === "browser");
 
   const columnActiveId = activeFileTabId ?? fileTabs[0]?.id;
   const activeFileTab = fileTabs.find((t) => t.id === columnActiveId);
 
-  const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId) as Workspace | undefined;
+  const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId) as
+    | Workspace
+    | undefined;
 
-  const handleMouseDown = () => setFocusedColumn('file');
+  const handleMouseDown = () => setFocusedColumn("file");
 
   // ── External file drop: open files as tabs ────────────────────────────
   const dragCounterRef = useRef(0);
@@ -80,7 +127,7 @@ export function FileColumn() {
     // Only accept external OS files here — internal tree drags go to AgentColumn
     if (!isInternalDrop(e) && hasDraggableFiles(e)) {
       e.preventDefault();
-      e.dataTransfer.dropEffect = 'copy';
+      e.dataTransfer.dropEffect = "copy";
     }
   }, []);
 
@@ -119,9 +166,11 @@ export function FileColumn() {
       // All external files open as file tabs regardless of whether they are
       // inside or outside the workspace.
       for (const absPath of paths) {
-        if (absPath.startsWith(activeWorkspace.worktreePath + '/')) {
+        if (absPath.startsWith(activeWorkspace.worktreePath + "/")) {
           // Inside workspace → use relPath so the tab title and tooling work normally
-          const relPath = absPath.slice(activeWorkspace.worktreePath.length + 1);
+          const relPath = absPath.slice(
+            activeWorkspace.worktreePath.length + 1,
+          );
           openFileTab(activeWorkspace.id, relPath);
         } else {
           // Outside workspace → open as read-only external file tab
@@ -133,13 +182,11 @@ export function FileColumn() {
   );
   // ─────────────────────────────────────────────────────────────────────
 
-  if (!activeWorkspace) return null;
-
   // When there are no file tabs yet, still render the drop target so the user
   // can drag files in to open the first tab.
   return (
     <div
-      className={`relative flex size-full min-h-0 min-w-0 flex-col bg-bg ${dropHighlight ? 'drop-target-active' : ''}`}
+      className={`relative flex size-full min-h-0 min-w-0 flex-col bg-bg ${dropHighlight ? "drop-target-active" : ""}`}
       onMouseDown={handleMouseDown}
       onDragOver={handleDragOver}
       onDragEnter={handleDragEnter}
@@ -147,32 +194,67 @@ export function FileColumn() {
       onDrop={handleDrop}
     >
       <div className="relative min-h-0 flex-1 overflow-hidden">
-        {fileTabs.map((tab) => {
-          const isActive = tab.id === activeFileTab?.id;
-          // Browser tabs stay mounted (hidden) to preserve webview state
-          if (tab.type === 'browser') {
-            return (
-              <div key={tab.id} className="absolute inset-0" style={{ display: isActive ? 'block' : 'none' }}>
-                <BrowserErrorBoundary onRetry={() => {}} crashMessage={t('fileColumn.browserCrashed')} reloadLabel={t('common.reload')}>
-                  <BrowserTab tab={tab} />
-                </BrowserErrorBoundary>
-              </div>
-            );
-          }
-          if (!isActive) return null;
-          if (tab.type === 'file') {
-            return <FileEditor key={tab.id} tab={tab} workspace={activeWorkspace} />;
-          }
-          if (tab.type === 'diff') {
-            return <DiffViewer key={tab.id} tab={tab} workspace={activeWorkspace} />;
-          }
-          if (tab.type === 'context-preview') {
-            return <ContextPreview key={tab.id} />;
-          }
-          return null;
+        {/* Browser tabs from ALL workspaces stay mounted to preserve webview state across workspace switches */}
+        {allBrowserTabs.map((tab) => {
+          const isVisible =
+            tab.workspaceId === activeWorkspaceId &&
+            tab.id === activeFileTab?.id;
+          return (
+            <div
+              key={tab.id}
+              className="absolute inset-0"
+              style={{ display: isVisible ? "block" : "none" }}
+            >
+              <BrowserErrorBoundary
+                onRetry={() => {}}
+                crashMessage={t("fileColumn.browserCrashed")}
+                reloadLabel={t("common.reload")}
+              >
+                <BrowserTab
+                  tab={
+                    tab as Extract<
+                      import("@shared/types").Tab,
+                      { type: "browser" }
+                    >
+                  }
+                />
+              </BrowserErrorBoundary>
+            </div>
+          );
         })}
+        {/* Non-browser tabs: only render the active one in the current workspace */}
+        {activeWorkspace &&
+          fileTabs.map((tab) => {
+            if (tab.type === "browser") return null; // already rendered above
+            const isActive = tab.id === activeFileTab?.id;
+            if (!isActive) return null;
+            if (tab.type === "file") {
+              return (
+                <FileEditor
+                  key={tab.id}
+                  tab={tab}
+                  workspace={activeWorkspace}
+                />
+              );
+            }
+            if (tab.type === "diff") {
+              return (
+                <DiffViewer
+                  key={tab.id}
+                  tab={tab}
+                  workspace={activeWorkspace}
+                />
+              );
+            }
+            if (tab.type === "context-preview") {
+              return <ContextPreview key={tab.id} />;
+            }
+            return null;
+          })}
       </div>
-      {symbolPeek && <LspSymbolPeek workspace={activeWorkspace} />}
+      {symbolPeek && activeWorkspace && (
+        <LspSymbolPeek workspace={activeWorkspace} />
+      )}
     </div>
   );
 }

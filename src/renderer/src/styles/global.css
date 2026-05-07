@@ -674,7 +674,11 @@ textarea {
     gap: 1px;
     flex-shrink: 0;
     opacity: 1;
-    transition: width 0.25s ease, min-width 0.25s ease, opacity 0.2s ease, padding 0.25s ease;
+    transition:
+        width 0.25s ease,
+        min-width 0.25s ease,
+        opacity 0.2s ease,
+        padding 0.25s ease;
 }
 
 .markdown-toc.collapsed {
@@ -1123,7 +1127,8 @@ textarea {
 .column-tabbar,
 .surface-toolbar,
 .boot-screen,
-.empty-workspace {
+.empty-workspace,
+.popout-tabbar {
     -webkit-app-region: drag;
 }
 
@@ -1153,7 +1158,9 @@ textarea {
 .surface-toolbar [role="button"],
 .surface-toolbar [role="radiogroup"],
 .boot-screen button,
-.empty-workspace button {
+.empty-workspace button,
+.popout-tabbar button,
+.popout-tabbar .popout-tab-item {
     -webkit-app-region: no-drag;
 }
 
@@ -2010,7 +2017,11 @@ textarea {
     cursor: pointer;
     border-radius: 6px;
     margin-left: 2px;
-    transition: color 120ms ease, border-color 120ms ease, background-color 120ms ease, transform 120ms ease;
+    transition:
+        color 120ms ease,
+        border-color 120ms ease,
+        background-color 120ms ease,
+        transform 120ms ease;
     flex-shrink: 0;
 }
 
@@ -2039,7 +2050,9 @@ textarea {
     place-items: center;
     font-size: 18px;
     line-height: 1;
-    transition: border-color 150ms, transform 150ms cubic-bezier(0.34, 1.56, 0.64, 1);
+    transition:
+        border-color 150ms,
+        transform 150ms cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .emoji-picker-btn:hover {
@@ -2176,12 +2189,8 @@ textarea {
 
     /* Hand-drawn font stack */
     font-family:
-        "Comic Neue",
-        "Architects Daughter",
-        "Segoe Print",
-        "Bradley Hand",
-        cursive,
-        sans-serif;
+        "Comic Neue", "Architects Daughter", "Segoe Print", "Bradley Hand",
+        cursive, sans-serif;
 
     /* Slightly thicker borders for pencil-stroke feel */
     --sketchy-border-width: 1.5px;
@@ -2322,7 +2331,14 @@ textarea {
 /* Reset font to system default inside markdown viewer for readability */
 [data-sketchy] .markdown-viewer-scroll,
 [data-sketchy] .markdown-toc {
-    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-family:
+        Inter,
+        ui-sans-serif,
+        system-ui,
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        sans-serif;
 }
 
 [data-sketchy] .markdown-preview blockquote {
@@ -2379,13 +2395,25 @@ textarea {
 [data-sketchy] .columns-split [data-testid="sash"],
 [data-sketchy] .app-horizontal-split [data-testid="sash"] {
     background: transparent !important;
-    background-image: linear-gradient(to right, transparent calc(50% - 1px), var(--border) calc(50% - 1px), var(--border) calc(50% + 1px), transparent calc(50% + 1px)) !important;
+    background-image: linear-gradient(
+        to right,
+        transparent calc(50% - 1px),
+        var(--border) calc(50% - 1px),
+        var(--border) calc(50% + 1px),
+        transparent calc(50% + 1px)
+    ) !important;
 }
 
 /* Horizontal sashes (terminal dock divider) — visible 2px center stripe */
 [data-sketchy] .terminal-vertical-split [data-testid="sash"] {
     background: transparent !important;
-    background-image: linear-gradient(to bottom, transparent calc(50% - 1px), var(--border) calc(50% - 1px), var(--border) calc(50% + 1px), transparent calc(50% + 1px)) !important;
+    background-image: linear-gradient(
+        to bottom,
+        transparent calc(50% - 1px),
+        var(--border) calc(50% - 1px),
+        var(--border) calc(50% + 1px),
+        transparent calc(50% + 1px)
+    ) !important;
 }
 
 /* ── Tab active underline indicator ──────────────────────────────────────── */
@@ -2448,7 +2476,8 @@ textarea {
 }
 
 /* Sidebar header border-bottom */
-[data-sketchy] .flex.h-9.shrink-0.items-center.justify-between.border-border.border-b {
+[data-sketchy]
+    .flex.h-9.shrink-0.items-center.justify-between.border-border.border-b {
     border-bottom: 2px solid var(--border);
 }
 
@@ -2478,7 +2507,8 @@ textarea {
 /* ── QuickSearch / command palette ────────────────────────────────────────── */
 
 [data-sketchy] .quick-search-dialog,
-[data-sketchy] div[class*="rounded-xl"][class*="border-border"][class*="bg-surface-dialog"] {
+[data-sketchy]
+    div[class*="rounded-xl"][class*="border-border"][class*="bg-surface-dialog"] {
     border: 2px solid var(--border);
     border-radius: 4px;
     filter: url(#sketchy-subtle);
@@ -2498,7 +2528,9 @@ textarea {
 }
 
 /* Agent quickbar split button group */
-[data-sketchy] .agent-quickbar div[class*="rounded-lg"][class*="border-border"] {
+[data-sketchy]
+    .agent-quickbar
+    div[class*="rounded-lg"][class*="border-border"] {
     border: 1.5px solid var(--border);
     border-radius: 3px;
     filter: url(#sketchy-subtle);
@@ -2573,8 +2605,10 @@ textarea {
 
 /* ── Context menu ────────────────────────────────────────────────────────── */
 
-[data-sketchy] .grid.min-w-\\[150px\\].gap-\\[3px\\].rounded-\\[7px\\].border.border-border,
-[data-sketchy] .grid.w-max.min-w-\\[160px\\].gap-\\[3px\\].rounded-\\[7px\\].border.border-border {
+[data-sketchy]
+    .grid.min-w-\\[150px\\].gap-\\[3px\\].rounded-\\[7px\\].border.border-border,
+[data-sketchy]
+    .grid.w-max.min-w-\\[160px\\].gap-\\[3px\\].rounded-\\[7px\\].border.border-border {
     border: 2px solid var(--border);
     border-radius: 4px;
     filter: url(#sketchy-subtle);
@@ -2590,9 +2624,12 @@ textarea {
 /* ── DiffViewer / FileEditor headers ─────────────────────────────────────── */
 
 [data-sketchy] .flex.min-h-11.items-center.gap-3.border-border.border-b,
-[data-sketchy] .flex.min-h-12.items-center.justify-between.gap-3.border-border.border-b,
-[data-sketchy] .flex.min-h-\\[42px\\].items-center.justify-between.gap-3.border-border.border-b,
-[data-sketchy] .flex.min-h-\\[38px\\].items-center.gap-2.border-border.border-b {
+[data-sketchy]
+    .flex.min-h-12.items-center.justify-between.gap-3.border-border.border-b,
+[data-sketchy]
+    .flex.min-h-\\[42px\\].items-center.justify-between.gap-3.border-border.border-b,
+[data-sketchy]
+    .flex.min-h-\\[38px\\].items-center.gap-2.border-border.border-b {
     border-bottom: 2px solid var(--border);
 }
 
@@ -2625,7 +2662,8 @@ textarea {
 }
 
 /* Browser webview container */
-[data-sketchy] .relative.shrink-0.overflow-hidden.rounded-xl.border.border-border {
+[data-sketchy]
+    .relative.shrink-0.overflow-hidden.rounded-xl.border.border-border {
     border: 2px solid var(--border);
     border-radius: 4px;
     filter: url(#sketchy-subtle);
@@ -2633,7 +2671,8 @@ textarea {
 
 /* ── BrowserConsolePanel ─────────────────────────────────────────────────── */
 
-[data-sketchy] .surface-toolbar.flex.h-9.shrink-0.items-center.gap-1\\.5.border-border.border-b {
+[data-sketchy]
+    .surface-toolbar.flex.h-9.shrink-0.items-center.gap-1\\.5.border-border.border-b {
     border-bottom: 2px solid var(--border);
 }
 
@@ -2684,7 +2723,8 @@ textarea {
 }
 
 /* Appearance panel action buttons (import/export) */
-[data-sketchy] .flex.items-center.gap-1\\.5.rounded-lg.border.border-border.bg-panel-2 {
+[data-sketchy]
+    .flex.items-center.gap-1\\.5.rounded-lg.border.border-border.bg-panel-2 {
     border: 1.5px solid var(--border);
     border-radius: 3px;
     filter: url(#sketchy-subtle);
@@ -2692,14 +2732,16 @@ textarea {
 
 /* ── NotificationsSection ────────────────────────────────────────────────── */
 
-[data-sketchy] .group.relative.flex.cursor-pointer.select-none.flex-col.rounded-xl.border {
+[data-sketchy]
+    .group.relative.flex.cursor-pointer.select-none.flex-col.rounded-xl.border {
     border: 1.5px solid var(--border);
     border-radius: 4px;
     filter: url(#sketchy-subtle);
 }
 
 /* Notifications empty state dashed border */
-[data-sketchy] .flex.min-h-\\[120px\\].flex-col.items-center.justify-center.gap-2.rounded-xl.border.border-border.border-dashed {
+[data-sketchy]
+    .flex.min-h-\\[120px\\].flex-col.items-center.justify-center.gap-2.rounded-xl.border.border-border.border-dashed {
     border: 2px dashed var(--border);
     border-radius: 4px;
     filter: url(#sketchy-subtle);
@@ -2707,7 +2749,8 @@ textarea {
 
 /* ── ShortcutRecorder ────────────────────────────────────────────────────── */
 
-[data-sketchy] .inline-flex.min-w-\\[60px\\].items-center.justify-center.rounded-md.border {
+[data-sketchy]
+    .inline-flex.min-w-\\[60px\\].items-center.justify-center.rounded-md.border {
     border: 1.5px solid var(--border);
     border-radius: 3px;
     filter: url(#sketchy-subtle);
@@ -2738,12 +2781,15 @@ textarea {
 /* ── Generic: all remaining border-b / border-t section dividers ─────────── */
 /* Catch-all for dialog footers and headers with border-t / border-b          */
 
-[data-sketchy] .flex.shrink-0.items-center.justify-between.border-border.border-t,
-[data-sketchy] .flex.shrink-0.items-center.justify-end.gap-2.border-border.border-t,
+[data-sketchy]
+    .flex.shrink-0.items-center.justify-between.border-border.border-t,
+[data-sketchy]
+    .flex.shrink-0.items-center.justify-end.gap-2.border-border.border-t,
 [data-sketchy] .flex.items-center.justify-between.border-border.border-b,
 [data-sketchy] .flex.items-center.justify-end.gap-2.border-border.border-t,
 [data-sketchy] .flex.justify-end.gap-2.border-border.border-t,
-[data-sketchy] .flex.h-12.shrink-0.items-center.justify-between.border-border.border-b {
+[data-sketchy]
+    .flex.h-12.shrink-0.items-center.justify-between.border-border.border-b {
     border-width: 2px;
 }
 
@@ -2763,15 +2809,21 @@ textarea {
 @supports (border-shape: circle(50%)) {
     [data-sketchy] .primary-button,
     [data-sketchy] .secondary-button {
-        border-shape:
-            path("M3,1 C10,0 30,2 50,0.5 C70,2 90,0 97,1 C100,10 98,30 100,50 C98,70 100,90 97,99 C90,100 70,98 50,100 C30,98 10,100 3,99 C0,90 2,70 0,50 C2,30 0,10 3,1 Z")
-            path("M8,6 C15,4 35,7 50,5 C65,7 85,4 92,6 C95,15 93,35 95,50 C93,65 95,85 92,94 C85,96 65,93 50,95 C35,93 15,96 8,94 C5,85 7,65 5,50 C7,35 5,15 8,6 Z");
+        border-shape: path(
+                "M3,1 C10,0 30,2 50,0.5 C70,2 90,0 97,1 C100,10 98,30 100,50 C98,70 100,90 97,99 C90,100 70,98 50,100 C30,98 10,100 3,99 C0,90 2,70 0,50 C2,30 0,10 3,1 Z"
+            )
+            path(
+                "M8,6 C15,4 35,7 50,5 C65,7 85,4 92,6 C95,15 93,35 95,50 C93,65 95,85 92,94 C85,96 65,93 50,95 C35,93 15,96 8,94 C5,85 7,65 5,50 C7,35 5,15 8,6 Z"
+            );
     }
 
     [data-sketchy] .icon-button {
-        border-shape:
-            path("M2,2 C15,0 85,0 98,2 C100,15 100,85 98,98 C85,100 15,100 2,98 C0,85 0,15 2,2 Z")
-            path("M7,7 C20,5 80,5 93,7 C95,20 95,80 93,93 C80,95 20,95 7,93 C5,80 5,20 7,7 Z");
+        border-shape: path(
+                "M2,2 C15,0 85,0 98,2 C100,15 100,85 98,98 C85,100 15,100 2,98 C0,85 0,15 2,2 Z"
+            )
+            path(
+                "M7,7 C20,5 80,5 93,7 C95,20 95,80 93,93 C80,95 20,95 7,93 C5,80 5,20 7,7 Z"
+            );
     }
 }
 
