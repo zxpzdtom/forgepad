@@ -1,6 +1,6 @@
 import { IPC } from '@shared/ipc';
 import type { AgentStatus } from '@shared/agent-lifecycle';
-import type { PendingPermission, PetSettings } from '@shared/types';
+import type { PendingPermission, PetSettings, PetStageSnapshot } from '@shared/types';
 import { contextBridge, ipcRenderer } from 'electron';
 
 const petApi = {
@@ -33,6 +33,8 @@ const petApi = {
   moveWindow: (x: number, y: number) => {
     ipcRenderer.send(IPC.PET_MOVE_WINDOW, x, y);
   },
+  /** Read current screen/window surfaces the pet can play on. */
+  getStage: () => ipcRenderer.invoke(IPC.PET_GET_STAGE) as Promise<PetStageSnapshot>,
   /** Resize the pet window (used when approval popup appears/disappears). */
   resizeWindow: (width: number, height: number) => {
     ipcRenderer.send(IPC.PET_RESIZE_WINDOW, width, height);

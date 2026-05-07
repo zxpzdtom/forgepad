@@ -83,6 +83,11 @@ const zhCN: Record<TranslationKeys, string> = {
   "settings.pets.speedDesc": "宠物的移动速度",
   "settings.pets.randomMove": "随机移动",
   "settings.pets.randomMoveDesc": "允许宠物自主随机走动和互动",
+  "settings.pets.playMode": "玩法",
+  "settings.pets.playModeDesc": "控制宠物探索窗口和桌面的大胆程度",
+  "settings.pets.playMode.cozy": "悠闲",
+  "settings.pets.playMode.playful": "活泼",
+  "settings.pets.playMode.adventure": "冒险",
   "settings.pets.choosePet": "选择你的宠物",
   "settings.pets.choosePetDesc":
     "从内置或自定义宠物中选择。点击选择，在工作区中拖动进行互动。",
