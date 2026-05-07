@@ -135,6 +135,7 @@ type AppState = {
   addToast: (kind: Toast["kind"], message: string) => void;
   dismissToast: (id: string) => void;
   openProject: () => Promise<void>;
+  openProjectFromPath: (selectedPath: string) => Promise<void>;
   setActiveWorkspace: (workspaceId: string | null) => void;
   createTerminal: (
     workspaceId?: string,
@@ -1042,6 +1043,66 @@ export const useAppStore = create<AppState>((set, get) => ({
       next.delete(workspaceId);
       return { workspaceLoadingIds: next };
     });
+  },
+
+  openProjectFromPath: async (selectedPath) => {
+    const opened = await window.forgepad.app.openProjectFromPath(selectedPath);
+    if (!opened) return;
+
+    const existingProject = get().projects.find(
+      (project) => project.repoPath === opened.repoPath,
+    );
+    if (existingProject) {
+      const state = get();
+      const workspace = state.workspaces.find(
+        (item) => item.projectId === existingProject.id && item.isRoot,
+      );
+      if (existingProject.panelId !== state.activePanelId) {
+        const panel = state.panels.find(
+          (p) => p.id === existingProject.panelId,
+        );
+        if (panel) {
+          get().setActivePanel(panel.id);
+          get().addToast(
+            "info",
+            `"${existingProject.name}" is already in panel "${panel.name}". Switched to it.`,
+          );
+        }
+      }
+      get().setActiveWorkspace(workspace?.id ?? null);
+      return;
+    }
+
+    const projectId = id();
+    const workspaceId = id();
+
+    const project: Project = {
+      id: projectId,
+      panelId: get().activePanelId ?? "",
+      name: opened.name,
+      repoPath: opened.repoPath,
+      createdAt: now(),
+      updatedAt: now(),
+    };
+    const workspace: Workspace = {
+      id: workspaceId,
+      projectId,
+      name: opened.name,
+      branch: opened.branch,
+      worktreePath: opened.repoPath,
+      isRoot: true,
+      createdAt: now(),
+    };
+
+    set((state) => ({
+      projects: [...state.projects, project],
+      workspaces: [...state.workspaces, workspace],
+      activeWorkspaceId: workspaceId,
+      activeTabId: null,
+    }));
+
+    await get().createTerminal(workspaceId);
+    await get().refreshBranchStats(workspaceId);
   },
 
   setActiveWorkspace: (workspaceId) => {
@@ -2398,7 +2459,21 @@ export const useAppStore = create<AppState>((set, get) => ({
 
     const workspaceId = id();
 
+    // 先插入占位 workspace，让侧边栏立即显示 loading 项
+    const optimisticWorkspace: Workspace = {
+      id: workspaceId,
+      projectId,
+      name: branch,
+      branch,
+      worktreePath: "",
+      isRoot: false,
+      createdAt: now(),
+    };
+
     set((state) => ({
+      workspaces: [...state.workspaces, optimisticWorkspace],
+      activeWorkspaceId: workspaceId,
+      activeTabId: null,
       workspaceLoadingIds: new Set([...state.workspaceLoadingIds, workspaceId]),
     }));
 
@@ -2411,25 +2486,23 @@ export const useAppStore = create<AppState>((set, get) => ({
         settings.worktreeBaseDir || undefined,
       );
 
-      const workspace: Workspace = {
-        id: workspaceId,
-        projectId,
-        name: branch,
-        branch: result.branch,
-        worktreePath: result.worktreePath,
-        isRoot: false,
-        createdAt: now(),
-      };
-
+      // git 完成后用真实路径更新
       set((state) => ({
-        workspaces: [...state.workspaces, workspace],
-        activeWorkspaceId: workspaceId,
-        activeTabId: null,
+        workspaces: state.workspaces.map((w) =>
+          w.id === workspaceId
+            ? { ...w, branch: result.branch, worktreePath: result.worktreePath }
+            : w,
+        ),
       }));
 
       await get().createTerminal(workspaceId);
       await get().refreshBranchStats(workspaceId);
     } catch (error) {
+      // 失败时回滚，移除占位项
+      set((state) => ({
+        workspaces: state.workspaces.filter((w) => w.id !== workspaceId),
+        activeWorkspaceId: null,
+      }));
       get().addToast(
         "error",
         `Failed to create worktree: ${error instanceof Error ? error.message : String(error)}`,
