@@ -1457,6 +1457,8 @@ export type PetSettings = {
   selectedPetId: string;
   petSize: number;
   petSpeed: number;
+  /** How adventurous autonomous pet movement should be. */
+  petPlayMode: "cozy" | "playful" | "adventure";
   /** Allow pet to randomly wander and interact autonomously. */
   allowRandomMove: boolean;
   /** User-imported custom pets metadata */
@@ -1468,8 +1470,30 @@ export const DEFAULT_PET_SETTINGS: PetSettings = {
   selectedPetId: "clawd",
   petSize: 0.8,
   petSpeed: 2,
+  petPlayMode: "playful",
   allowRandomMove: true,
   customPets: [],
+};
+
+export type PetStageRect = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
+export type PetStageWindow = PetStageRect & {
+  id: string;
+  appName: string;
+  title: string;
+  source: "electron" | "system";
+};
+
+export type PetStageSnapshot = {
+  capturedAt: number;
+  workArea: PetStageRect;
+  displays: PetStageRect[];
+  windows: PetStageWindow[];
 };
 
 /** A single permission suggestion from Claude Code's PermissionRequest payload. */

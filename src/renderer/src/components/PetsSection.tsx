@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useTranslation } from '@renderer/i18n';
 import { useAppStore } from '@renderer/store/app-store';
 import { SpriteAnimator } from 'codex-pets-react';
+import { SegmentedControl } from './SegmentedControl';
 import { getAllPets, forgePetAtlas, getPetSpritesheetUrl, type ForgePetAnimationName } from './pets/pet-registry';
 
 /* ─── Reusable primitives (same style as SettingsPanel) ─── */
@@ -213,6 +214,19 @@ export function PetsSection() {
           checked={petSettings.allowRandomMove ?? true}
           onChange={(v) => updatePets({ allowRandomMove: v })}
           label="Allow random movement"
+        />
+      </SettingRow>
+
+      <SettingRow label={t('settings.pets.playMode')} description={t('settings.pets.playModeDesc')}>
+        <SegmentedControl
+          value={petSettings.petPlayMode ?? 'playful'}
+          label={t('settings.pets.playMode')}
+          options={[
+            { value: 'cozy', label: t('settings.pets.playMode.cozy') },
+            { value: 'playful', label: t('settings.pets.playMode.playful') },
+            { value: 'adventure', label: t('settings.pets.playMode.adventure') },
+          ]}
+          onChange={(v) => updatePets({ petPlayMode: v })}
         />
       </SettingRow>
 

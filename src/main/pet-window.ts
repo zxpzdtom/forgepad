@@ -1,20 +1,175 @@
+import { execFile } from 'node:child_process';
 import { join } from 'node:path';
+import { promisify } from 'node:util';
 import { app, BrowserWindow, ipcMain, screen } from 'electron';
 import { IPC } from '@shared/ipc';
 import type { AgentStatus } from '@shared/agent-lifecycle';
-import type { AskUserQuestionItem, PetSettings, PermissionSuggestion } from '@shared/types';
+import type {
+  AskUserQuestionItem,
+  PetSettings,
+  PetStageRect,
+  PetStageSnapshot,
+  PetStageWindow,
+  PermissionSuggestion,
+} from '@shared/types';
 
 let petWindow: BrowserWindow | null = null;
+const execFileAsync = promisify(execFile);
 
 // Default sprite dimensions (cellWidth × cellHeight at scale 1)
 const BASE_WIDTH = 192;
 const BASE_HEIGHT = 208;
+const MIN_STAGE_WINDOW_WIDTH = 220;
+const MIN_STAGE_WINDOW_HEIGHT = 120;
+const STAGE_CACHE_MS = 2_500;
+let stageCache: PetStageSnapshot | null = null;
+let stageCacheAt = 0;
+let systemWindowProbeDisabledUntil = 0;
 
 function getSpriteSize(scale: number) {
   return {
     width: Math.round(BASE_WIDTH * scale),
     height: Math.round(BASE_HEIGHT * scale),
   };
+}
+
+function rectFromWorkArea(rect: Electron.Rectangle): PetStageRect {
+  return {
+    x: Math.round(rect.x),
+    y: Math.round(rect.y),
+    width: Math.round(rect.width),
+    height: Math.round(rect.height),
+  };
+}
+
+function makeWindowId(win: Pick<PetStageWindow, 'appName' | 'title' | 'x' | 'y' | 'width' | 'height' | 'source'>): string {
+  return [win.source, win.appName, win.title, win.x, win.y, win.width, win.height].join(':');
+}
+
+function isUsableStageWindow(win: PetStageWindow): boolean {
+  if (win.width < MIN_STAGE_WINDOW_WIDTH || win.height < MIN_STAGE_WINDOW_HEIGHT) return false;
+  if (petWindow && !petWindow.isDestroyed()) {
+    const [petX, petY] = petWindow.getPosition();
+    const [petW, petH] = petWindow.getSize();
+    const sameRect =
+      Math.abs(win.x - petX) <= 4 &&
+      Math.abs(win.y - petY) <= 4 &&
+      Math.abs(win.width - petW) <= 4 &&
+      Math.abs(win.height - petH) <= 4;
+    if (sameRect) return false;
+  }
+  return true;
+}
+
+function getElectronStageWindows(): PetStageWindow[] {
+  return BrowserWindow.getAllWindows()
+    .filter((win) => win !== petWindow && !win.isDestroyed() && win.isVisible() && !win.isMinimized())
+    .map((win): PetStageWindow => {
+      const bounds = win.getBounds();
+      const title = win.getTitle();
+      const stageWindow = {
+        id: '',
+        appName: app.getName() || 'ForgePad',
+        title: title || 'ForgePad',
+        x: Math.round(bounds.x),
+        y: Math.round(bounds.y),
+        width: Math.round(bounds.width),
+        height: Math.round(bounds.height),
+        source: 'electron' as const,
+      };
+      return { ...stageWindow, id: makeWindowId(stageWindow) };
+    })
+    .filter(isUsableStageWindow);
+}
+
+const MAC_VISIBLE_WINDOWS_SCRIPT = `
+set rows to {}
+tell application "System Events"
+  repeat with proc in (application processes whose visible is true)
+    set appName to name of proc as text
+    try
+      repeat with win in windows of proc
+        try
+          set winName to name of win as text
+          set winPos to position of win
+          set winSize to size of win
+          set end of rows to appName & tab & winName & tab & (item 1 of winPos as text) & tab & (item 2 of winPos as text) & tab & (item 1 of winSize as text) & tab & (item 2 of winSize as text)
+        end try
+      end repeat
+    end try
+  end repeat
+end tell
+set AppleScript's text item delimiters to linefeed
+return rows as text
+`;
+
+async function getSystemStageWindows(): Promise<PetStageWindow[]> {
+  if (process.platform !== 'darwin') return [];
+  if (Date.now() < systemWindowProbeDisabledUntil) return [];
+  try {
+    const { stdout } = await execFileAsync('osascript', ['-e', MAC_VISIBLE_WINDOWS_SCRIPT], {
+      timeout: 1_200,
+      maxBuffer: 512 * 1024,
+    });
+
+    return String(stdout)
+      .split(/\r?\n/)
+      .map((line): PetStageWindow | null => {
+        const [appName, title, xRaw, yRaw, widthRaw, heightRaw] = line.split('\t');
+        const x = Number(xRaw);
+        const y = Number(yRaw);
+        const width = Number(widthRaw);
+        const height = Number(heightRaw);
+        if (!appName || !Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(width) || !Number.isFinite(height)) {
+          return null;
+        }
+        const stageWindow = {
+          id: '',
+          appName,
+          title: title || appName,
+          x: Math.round(x),
+          y: Math.round(y),
+          width: Math.round(width),
+          height: Math.round(height),
+          source: 'system' as const,
+        };
+        return { ...stageWindow, id: makeWindowId(stageWindow) };
+      })
+      .filter((win): win is PetStageWindow => Boolean(win))
+      .filter(isUsableStageWindow);
+  } catch {
+    systemWindowProbeDisabledUntil = Date.now() + 30_000;
+    return [];
+  }
+}
+
+function dedupeStageWindows(windows: PetStageWindow[]): PetStageWindow[] {
+  const seen = new Set<string>();
+  const deduped: PetStageWindow[] = [];
+  for (const win of windows) {
+    const rectKey = `${win.x}:${win.y}:${win.width}:${win.height}`;
+    if (seen.has(rectKey)) continue;
+    seen.add(rectKey);
+    deduped.push(win);
+  }
+  return deduped;
+}
+
+export async function getPetStageSnapshot(): Promise<PetStageSnapshot> {
+  const now = Date.now();
+  if (stageCache && now - stageCacheAt < STAGE_CACHE_MS) return stageCache;
+
+  const primary = screen.getPrimaryDisplay();
+  const snapshot: PetStageSnapshot = {
+    capturedAt: now,
+    workArea: rectFromWorkArea(primary.workArea),
+    displays: screen.getAllDisplays().map((display) => rectFromWorkArea(display.workArea)),
+    windows: dedupeStageWindows([...getElectronStageWindows(), ...(await getSystemStageWindows())]),
+  };
+
+  stageCache = snapshot;
+  stageCacheAt = now;
+  return snapshot;
 }
 
 /**
@@ -108,6 +263,8 @@ export function setPetWindowVisible(visible: boolean): void {
 
 /** Register IPC handlers for the pet overlay window. */
 export function registerPetIpcHandlers(): void {
+  ipcMain.handle(IPC.PET_GET_STAGE, async () => getPetStageSnapshot());
+
   // Resize the pet window (used when approval popup appears/disappears)
   ipcMain.on(IPC.PET_RESIZE_WINDOW, (_event, width: number, height: number) => {
     if (!petWindow || petWindow.isDestroyed()) return;
