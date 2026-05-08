@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useTranslation } from '@renderer/i18n';
 import { useAppStore } from '@renderer/store/app-store';
+import type { PetPlayAction } from '@shared/types';
 import { SpriteAnimator } from 'codex-pets-react';
 import { SegmentedControl } from './SegmentedControl';
 import { getAllPets, forgePetAtlas, getPetSpritesheetUrl, type ForgePetAnimationName } from './pets/pet-registry';
@@ -48,6 +49,23 @@ function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: 
   );
 }
 
+function ActionButton({ children, disabled, onClick }: {
+  children: React.ReactNode;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      className="rounded-md border border-border px-2.5 py-1.5 font-[510] text-[12px] text-muted transition-colors hover:border-accent hover:text-accent disabled:pointer-events-none disabled:opacity-45"
+    >
+      {children}
+    </button>
+  );
+}
+
 /* ─── Pet preview card (uses SpriteAnimator for animated preview) ─── */
 
 function PetCard({ petId, displayName, selected, isCustom, cacheBust, onClick, onDelete }: {
@@ -71,7 +89,7 @@ function PetCard({ petId, displayName, selected, isCustom, cacheBust, onClick, o
     >
       {/* Custom badge */}
       {isCustom && (
-        <span className="absolute top-1.5 left-1.5 rounded bg-accent/10 px-1 py-0.5 text-[9px] font-[590] text-accent">
+        <span className="absolute top-1.5 left-1.5 rounded bg-accent/10 px-1 py-0.5 font-[590] text-[9px] text-accent">
           Custom
         </span>
       )}
@@ -102,7 +120,7 @@ function PetCard({ petId, displayName, selected, isCustom, cacheBust, onClick, o
           ariaLabel={displayName}
         />
       </div>
-      <span className={`text-[12px] font-[510] ${selected ? 'text-accent' : 'text-muted group-hover:text-text'}`}>
+      <span className={`font-[510] text-[12px] ${selected ? 'text-accent' : 'text-muted group-hover:text-text'}`}>
         {displayName}
       </span>
     </button>
@@ -150,6 +168,13 @@ export function PetsSection() {
 
   const petSettings = settings.pets;
   const allPets = getAllPets(petSettings.customPets ?? []);
+  const quickActions: Array<{ action: PetPlayAction | 'random'; label: string }> = [
+    { action: 'random', label: t('settings.pets.action.random') },
+    { action: 'portal', label: t('settings.pets.action.portal') },
+    { action: 'spring', label: t('settings.pets.action.spring') },
+    { action: 'balloon', label: t('settings.pets.action.balloon') },
+    { action: 'rocket', label: t('settings.pets.action.rocket') },
+  ];
 
   const updatePets = (partial: Partial<typeof petSettings>) => {
     updateSettings({ pets: { ...petSettings, ...partial } });
@@ -230,6 +255,35 @@ export function PetsSection() {
         />
       </SettingRow>
 
+      <SettingRow label={t('settings.pets.keyboardControl')} description={t('settings.pets.keyboardControlDesc')}>
+        <Toggle
+          checked={petSettings.keyboardControlEnabled ?? true}
+          onChange={(v) => updatePets({ keyboardControlEnabled: v })}
+          label="Keyboard pet control"
+        />
+      </SettingRow>
+
+      <SettingRow label={t('settings.pets.controls')} description={t('settings.pets.controlsDesc')}>
+        <div className="flex max-w-[320px] flex-wrap justify-end gap-1.5">
+          {quickActions.map((item) => (
+            <ActionButton
+              key={item.action}
+              disabled={!petSettings.enabled}
+              onClick={() => window.forgepad.pet.play(item.action)}
+            >
+              {item.label}
+            </ActionButton>
+          ))}
+          <ActionButton disabled={!petSettings.enabled} onClick={() => window.forgepad.pet.stop()}>
+            {t('settings.pets.action.stop')}
+          </ActionButton>
+        </div>
+      </SettingRow>
+
+      <div className="mt-2 rounded-lg border border-border bg-panel-2 px-3 py-2 text-[11px] text-subtle leading-relaxed">
+        {t('settings.pets.howItWorks')}
+      </div>
+
       <Divider />
 
       {/* Pet selection grid */}
@@ -242,7 +296,7 @@ export function PetsSection() {
           type="button"
           onClick={handleImport}
           disabled={importing}
-          className="shrink-0 rounded-lg border border-dashed border-border px-3 py-1.5 text-[12px] font-[510] text-muted transition-colors hover:border-accent hover:text-accent disabled:opacity-50"
+          className="shrink-0 rounded-lg border border-border border-dashed px-3 py-1.5 font-[510] text-[12px] text-muted transition-colors hover:border-accent hover:text-accent disabled:opacity-50"
         >
           {importing ? t('settings.pets.importing') : t('settings.pets.importCustomPet')}
         </button>

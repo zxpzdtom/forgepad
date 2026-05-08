@@ -1,25 +1,62 @@
 import { IPC } from '@shared/ipc';
-import type { AgentStatus } from '@shared/agent-lifecycle';
-import type { PendingPermission, PetSettings, PetStageSnapshot } from '@shared/types';
+import type { AgentStatusUpdate } from '@shared/agent-lifecycle';
+import type {
+  AgentCompletionData,
+  AgentUserPromptData,
+  PendingPermission,
+  PetCommand,
+  PetSettings,
+  PetStageSnapshot,
+} from '@shared/types';
 import { contextBridge, ipcRenderer } from 'electron';
 
 const petApi = {
   onSettingsChanged: (callback: (settings: PetSettings) => void) => {
     const handler = (_event: Electron.IpcRendererEvent, settings: PetSettings) => callback(settings);
     ipcRenderer.on(IPC.PET_SETTINGS_CHANGED, handler);
-    return () => ipcRenderer.removeListener(IPC.PET_SETTINGS_CHANGED, handler);
+    return () => {
+      ipcRenderer.removeListener(IPC.PET_SETTINGS_CHANGED, handler);
+    };
   },
   /** Subscribe to agent lifecycle status updates forwarded from the main window. */
-  onAgentStatusUpdate: (callback: (status: AgentStatus) => void) => {
-    const handler = (_event: Electron.IpcRendererEvent, status: AgentStatus) => callback(status);
+  onAgentStatusUpdate: (callback: (update: AgentStatusUpdate) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, update: AgentStatusUpdate) => callback(update);
     ipcRenderer.on(IPC.PET_AGENT_STATUS_UPDATE, handler);
-    return () => ipcRenderer.removeListener(IPC.PET_AGENT_STATUS_UPDATE, handler);
+    return () => {
+      ipcRenderer.removeListener(IPC.PET_AGENT_STATUS_UPDATE, handler);
+    };
+  },
+  /** Subscribe to user prompt submissions for pet completion cards. */
+  onUserPrompt: (callback: (data: AgentUserPromptData) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, data: AgentUserPromptData) => callback(data);
+    ipcRenderer.on(IPC.AGENT_USER_PROMPT, handler);
+    return () => {
+      ipcRenderer.removeListener(IPC.AGENT_USER_PROMPT, handler);
+    };
+  },
+  /** Subscribe to agent completion payloads for pet completion cards. */
+  onCompletion: (callback: (data: AgentCompletionData) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, data: AgentCompletionData) => callback(data);
+    ipcRenderer.on(IPC.AGENT_COMPLETION, handler);
+    return () => {
+      ipcRenderer.removeListener(IPC.AGENT_COMPLETION, handler);
+    };
   },
   /** Subscribe to PermissionRequest details (tool name, tool input). */
   onPermissionRequest: (callback: (data: PendingPermission) => void) => {
     const handler = (_event: Electron.IpcRendererEvent, data: PendingPermission) => callback(data);
     ipcRenderer.on(IPC.PET_PERMISSION_REQUEST, handler);
-    return () => ipcRenderer.removeListener(IPC.PET_PERMISSION_REQUEST, handler);
+    return () => {
+      ipcRenderer.removeListener(IPC.PET_PERMISSION_REQUEST, handler);
+    };
+  },
+  /** Receive commands forwarded from the main ForgePad window. */
+  onCommand: (callback: (command: PetCommand) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, command: PetCommand) => callback(command);
+    ipcRenderer.on(IPC.PET_COMMAND, handler);
+    return () => {
+      ipcRenderer.removeListener(IPC.PET_COMMAND, handler);
+    };
   },
   /** Send a permission decision back to the main process. */
   sendPermissionDecision: (
@@ -40,8 +77,12 @@ const petApi = {
     ipcRenderer.send(IPC.PET_RESIZE_WINDOW, width, height);
   },
   /** Focus the main ForgePad window and jump to the most urgent agent tab. */
-  focusAgent: () => {
-    ipcRenderer.send(IPC.PET_FOCUS_AGENT);
+  focusAgent: (ptyId?: string) => {
+    ipcRenderer.send(IPC.PET_FOCUS_AGENT, ptyId);
+  },
+  /** Ask the main ForgePad window to become the active pet controller. */
+  requestControl: () => {
+    ipcRenderer.send(IPC.PET_CONTROL_REQUESTED);
   },
 };
 

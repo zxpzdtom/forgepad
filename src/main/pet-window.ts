@@ -3,9 +3,10 @@ import { join } from 'node:path';
 import { promisify } from 'node:util';
 import { app, BrowserWindow, ipcMain, screen } from 'electron';
 import { IPC } from '@shared/ipc';
-import type { AgentStatus } from '@shared/agent-lifecycle';
+import type { AgentStatusUpdate } from '@shared/agent-lifecycle';
 import type {
   AskUserQuestionItem,
+  PetCommand,
   PetSettings,
   PetStageRect,
   PetStageSnapshot,
@@ -261,9 +262,29 @@ export function setPetWindowVisible(visible: boolean): void {
   }
 }
 
+function focusFirstMainWindow(): BrowserWindow | null {
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (win === petWindow || win.isDestroyed()) continue;
+    win.show();
+    win.focus();
+    return win;
+  }
+  return null;
+}
+
 /** Register IPC handlers for the pet overlay window. */
 export function registerPetIpcHandlers(): void {
   ipcMain.handle(IPC.PET_GET_STAGE, async () => getPetStageSnapshot());
+
+  ipcMain.on(IPC.PET_COMMAND, (_event, command: PetCommand) => {
+    if (!petWindow || petWindow.isDestroyed()) return;
+    petWindow.webContents.send(IPC.PET_COMMAND, command);
+  });
+
+  ipcMain.on(IPC.PET_CONTROL_REQUESTED, () => {
+    const win = focusFirstMainWindow();
+    win?.webContents.send(IPC.PET_CONTROL_REQUESTED);
+  });
 
   // Resize the pet window (used when approval popup appears/disappears)
   ipcMain.on(IPC.PET_RESIZE_WINDOW, (_event, width: number, height: number) => {
@@ -291,19 +312,12 @@ export function registerPetIpcHandlers(): void {
 
   // Pet overlay click → focus the main ForgePad window and tell it to
   // jump to the most urgent agent tab (via AGENT_FOCUS_TAB broadcast).
-  ipcMain.on(IPC.PET_FOCUS_AGENT, () => {
-    for (const win of BrowserWindow.getAllWindows()) {
-      // Skip the pet window itself
-      if (win === petWindow) continue;
-      if (win.isDestroyed()) continue;
-      win.show();
-      win.focus();
-      // Tell the renderer to jump to the most urgent agent tab.
-      // We send a special ptyId '__pet_click__' which the renderer
-      // interprets as "find the best agent tab yourself".
-      win.webContents.send(IPC.AGENT_FOCUS_TAB, '__pet_click__');
-      break; // Only focus the first main window
-    }
+  ipcMain.on(IPC.PET_FOCUS_AGENT, (_event, ptyId?: string) => {
+    const win = focusFirstMainWindow();
+    // Tell the renderer to jump to a concrete agent tab when provided.
+    // Without a ptyId, use the special signal interpreted as
+    // "find the best agent tab yourself".
+    win?.webContents.send(IPC.AGENT_FOCUS_TAB, ptyId || '__pet_click__');
   });
 }
 
@@ -313,9 +327,9 @@ export function getPetWindow(): BrowserWindow | null {
 }
 
 /** Forward agent lifecycle status to the pet overlay so it can animate accordingly. */
-export function sendPetAgentStatus(status: AgentStatus): void {
+export function sendPetAgentStatus(update: AgentStatusUpdate): void {
   if (!petWindow || petWindow.isDestroyed()) return;
-  petWindow.webContents.send(IPC.PET_AGENT_STATUS_UPDATE, status);
+  petWindow.webContents.send(IPC.PET_AGENT_STATUS_UPDATE, update);
 }
 
 /** Forward a PermissionRequest with tool details to the pet overlay. */

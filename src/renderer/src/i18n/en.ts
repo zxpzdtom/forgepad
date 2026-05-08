@@ -88,6 +88,22 @@ const en = {
   "settings.pets.playMode.cozy": "Cozy",
   "settings.pets.playMode.playful": "Playful",
   "settings.pets.playMode.adventure": "Adventure",
+  "settings.pets.keyboardControl": "Keyboard Control",
+  "settings.pets.keyboardControlDesc":
+    "Click the desktop pet, then use Arrow keys to move it and Space for a random trick",
+  "settings.pets.controls": "Manual Controls",
+  "settings.pets.controlsDesc":
+    "Trigger pet actions from the main window without touching the transparent overlay",
+  "settings.pets.action.random": "Random",
+  "settings.pets.action.portal": "Portal",
+  "settings.pets.action.spring": "Spring",
+  "settings.pets.action.balloon": "Balloon",
+  "settings.pets.action.rocket": "Rocket",
+  "settings.pets.action.stop": "Stop",
+  "settings.pets.howItWorks":
+    "The desktop pet window only renders the animation. Keyboard control, debug commands, and manual actions are owned by the main ForgePad window.",
+  "settings.pets.controlActivatedToast":
+    "Pet control active: Arrow keys move it, Space plays a random trick, Esc stops.",
   "settings.pets.choosePet": "Choose Your Pet",
   "settings.pets.choosePetDesc":
     "Select from built-in or custom pets. Click to select, drag in the workspace to interact.",

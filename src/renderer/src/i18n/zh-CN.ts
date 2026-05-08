@@ -88,6 +88,22 @@ const zhCN: Record<TranslationKeys, string> = {
   "settings.pets.playMode.cozy": "悠闲",
   "settings.pets.playMode.playful": "活泼",
   "settings.pets.playMode.adventure": "冒险",
+  "settings.pets.keyboardControl": "键盘控制",
+  "settings.pets.keyboardControlDesc":
+    "点击桌面宠物后，用方向键移动它，空格触发随机玩法",
+  "settings.pets.controls": "手动控制",
+  "settings.pets.controlsDesc":
+    "从主窗口触发宠物动作，不依赖透明窗口是否有焦点",
+  "settings.pets.action.random": "随机",
+  "settings.pets.action.portal": "传送门",
+  "settings.pets.action.spring": "弹簧",
+  "settings.pets.action.balloon": "气球",
+  "settings.pets.action.rocket": "火箭",
+  "settings.pets.action.stop": "停止",
+  "settings.pets.howItWorks":
+    "桌面宠物透明窗口只负责展示动画；键盘控制、调试命令和手动玩法都绑定在 ForgePad 主窗口。",
+  "settings.pets.controlActivatedToast":
+    "已进入宠物控制：方向键移动，空格随机玩法，Esc 停止。",
   "settings.pets.choosePet": "选择你的宠物",
   "settings.pets.choosePetDesc":
     "从内置或自定义宠物中选择。点击选择，在工作区中拖动进行互动。",
