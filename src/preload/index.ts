@@ -17,7 +17,6 @@ import type {
   OpenProjectResult,
   PendingPermission,
   PetCommand,
-  PetNudgeDirection,
   PetPlayAction,
   PersistedAppState,
   PetSettings,
@@ -515,19 +514,6 @@ const api = {
       } satisfies PetCommand),
     stop: () =>
       ipcRenderer.send(IPC.PET_COMMAND, { type: "stop" } satisfies PetCommand),
-    nudge: (direction: PetNudgeDirection, amount?: number) =>
-      ipcRenderer.send(IPC.PET_COMMAND, {
-        type: "nudge",
-        direction,
-        amount,
-      } satisfies PetCommand),
-    onControlRequested: (callback: () => void) => {
-      const handler = () => callback();
-      ipcRenderer.on(IPC.PET_CONTROL_REQUESTED, handler);
-      return () => {
-        ipcRenderer.removeListener(IPC.PET_CONTROL_REQUESTED, handler);
-      };
-    },
     /** Open folder picker, validate, and import a custom pet. */
     importPet: () =>
       ipcRenderer.invoke(IPC.PET_IMPORT) as Promise<ImportPetResult>,
