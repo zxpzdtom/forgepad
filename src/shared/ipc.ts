@@ -71,6 +71,8 @@ export const IPC = {
   PET_SETTINGS_CHANGED: "pet:settings-changed",
   PET_MOVE_WINDOW: "pet:move-window",
   PET_GET_STAGE: "pet:get-stage",
+  PET_COMMAND: "pet:command",
+  PET_CONTROL_REQUESTED: "pet:control-requested",
   PET_AGENT_STATUS_UPDATE: "pet:agent-status-update",
   PET_FOCUS_AGENT: "pet:focus-agent",
   // Pet approval UI

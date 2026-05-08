@@ -1,95 +1,119 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { SpriteAnimator } from 'codex-pets-react';
-import type { PendingPermission, PetSettings, PetStageRect, PetStageSnapshot, PetStageWindow } from '@shared/types';
-import { agentStatusToAnimation, forgePetAtlas, getPetSpritesheetUrl, type ForgePetAnimationName } from './pet-registry';
-import { PetApprovalPopup } from './PetApprovalPopup';
+import { useCallback, useEffect, useRef, useState } from "react";
+import { SpriteAnimator } from "codex-pets-react";
+import type { AgentStatus, AgentStatusUpdate } from "@shared/agent-lifecycle";
+import type {
+  CompletionCard,
+  PendingPermission,
+  PetCommand,
+  PetNudgeDirection,
+  PetPlayAction,
+  PetSettings,
+  PetStageRect,
+  PetStageSnapshot,
+  PetStageWindow,
+} from "@shared/types";
+import {
+  agentStatusToAnimation,
+  forgePetAtlas,
+  getPetSpritesheetUrl,
+  type ForgePetAnimationName,
+} from "./pet-registry";
+import { PetApprovalPopup } from "./PetApprovalPopup";
+import { PetCompletionCard, type WorkingAgentSummary } from "./PetCompletionCard";
 
 const BASE_SPRITE_WIDTH = 192;
 const BASE_SPRITE_HEIGHT = 208;
 const EDGE_MARGIN = 8;
 
 type MotionPoint = { x: number; y: number };
-type MotionAction = 'stroll' | 'hop' | 'stairs' | 'portal' | 'windowTop' | 'zigzag' | 'spring' | 'peek' | 'balloon' | 'rocket';
-type PortalPhase = 'enter' | 'exit' | 'close';
+type MotionAction = PetPlayAction;
+type PortalPhase = "enter" | "exit" | "close";
 type PortalEffect = { phase: PortalPhase; seed: number } | null;
-type PropEffect = { kind: 'springPad' | 'balloon' | 'rocket' | 'sparkTrail'; seed: number } | null;
+type PropEffect = { kind: "springPad" | "balloon" | "rocket" | "sparkTrail"; seed: number } | null;
 type MotionLayout = {
   width: number;
   height: number;
   spriteOffsetX: number;
   spriteOffsetY: number;
 };
-type PetDebugAction = MotionAction | 'random';
-type PetDebugApi = {
-  play: (action?: PetDebugAction) => void;
-  stop: () => void;
-  list: () => PetDebugAction[];
-  status: () => {
-    enabled: boolean | undefined;
-    playMode: PetSettings['petPlayMode'] | undefined;
-    moving: boolean;
-    animation: ForgePetAnimationName;
-    position: MotionPoint;
-    layout: MotionLayout;
-  };
-  help: () => string;
+type PetDebugAction = MotionAction | "random";
+type AgentMessagePreview = { userPrompt?: string; aiResponse?: string };
+
+const STATUS_PRIORITY: Record<AgentStatus, number> = {
+  idle: 0,
+  working: 1,
+  review: 2,
+  permission: 3,
 };
 
 const DEBUG_ACTIONS: MotionAction[] = [
-  'stroll',
-  'hop',
-  'stairs',
-  'portal',
-  'windowTop',
-  'zigzag',
-  'spring',
-  'peek',
-  'balloon',
-  'rocket',
+  "stroll",
+  "hop",
+  "stairs",
+  "portal",
+  "windowTop",
+  "zigzag",
+  "spring",
+  "peek",
+  "balloon",
+  "rocket",
 ];
 
-const PLAY_MODE_INTERVALS: Record<PetSettings['petPlayMode'], { min: number; max: number }> = {
+function highestAgentStatus(statuses: Record<string, AgentStatus>): AgentStatus {
+  let highest: AgentStatus = "idle";
+  for (const status of Object.values(statuses)) {
+    if (STATUS_PRIORITY[status] > STATUS_PRIORITY[highest]) {
+      highest = status;
+    }
+  }
+  return highest;
+}
+
+const PLAY_MODE_INTERVALS: Record<PetSettings["petPlayMode"], { min: number; max: number }> = {
   cozy: { min: 8_000, max: 16_000 },
   playful: { min: 4_500, max: 10_000 },
   adventure: { min: 3_000, max: 7_000 },
 };
 
-const PLAY_MODE_WEIGHTS: Record<PetSettings['petPlayMode'], Array<{ action: MotionAction; weight: number }>> = {
+const PLAY_MODE_WEIGHTS: Record<
+  PetSettings["petPlayMode"],
+  Array<{ action: MotionAction; weight: number }>
+> = {
   cozy: [
-    { action: 'stroll', weight: 32 },
-    { action: 'hop', weight: 18 },
-    { action: 'stairs', weight: 12 },
-    { action: 'portal', weight: 7 },
-    { action: 'windowTop', weight: 7 },
-    { action: 'zigzag', weight: 8 },
-    { action: 'spring', weight: 10 },
-    { action: 'peek', weight: 6 },
-    { action: 'balloon', weight: 5 },
-    { action: 'rocket', weight: 2 },
+    { action: "stroll", weight: 32 },
+    { action: "hop", weight: 18 },
+    { action: "stairs", weight: 12 },
+    { action: "portal", weight: 7 },
+    { action: "windowTop", weight: 7 },
+    { action: "zigzag", weight: 8 },
+    { action: "spring", weight: 10 },
+    { action: "peek", weight: 6 },
+    { action: "balloon", weight: 5 },
+    { action: "rocket", weight: 2 },
   ],
   playful: [
-    { action: 'stroll', weight: 16 },
-    { action: 'hop', weight: 17 },
-    { action: 'stairs', weight: 15 },
-    { action: 'portal', weight: 14 },
-    { action: 'windowTop', weight: 16 },
-    { action: 'zigzag', weight: 9 },
-    { action: 'spring', weight: 8 },
-    { action: 'peek', weight: 5 },
-    { action: 'balloon', weight: 7 },
-    { action: 'rocket', weight: 4 },
+    { action: "stroll", weight: 16 },
+    { action: "hop", weight: 17 },
+    { action: "stairs", weight: 15 },
+    { action: "portal", weight: 14 },
+    { action: "windowTop", weight: 16 },
+    { action: "zigzag", weight: 9 },
+    { action: "spring", weight: 8 },
+    { action: "peek", weight: 5 },
+    { action: "balloon", weight: 7 },
+    { action: "rocket", weight: 4 },
   ],
   adventure: [
-    { action: 'stroll', weight: 8 },
-    { action: 'hop', weight: 14 },
-    { action: 'stairs', weight: 16 },
-    { action: 'portal', weight: 18 },
-    { action: 'windowTop', weight: 18 },
-    { action: 'zigzag', weight: 10 },
-    { action: 'spring', weight: 8 },
-    { action: 'peek', weight: 8 },
-    { action: 'balloon', weight: 7 },
-    { action: 'rocket', weight: 6 },
+    { action: "stroll", weight: 8 },
+    { action: "hop", weight: 14 },
+    { action: "stairs", weight: 16 },
+    { action: "portal", weight: 18 },
+    { action: "windowTop", weight: 18 },
+    { action: "zigzag", weight: 10 },
+    { action: "spring", weight: 8 },
+    { action: "peek", weight: 8 },
+    { action: "balloon", weight: 7 },
+    { action: "rocket", weight: 6 },
   ],
 };
 
@@ -370,19 +394,24 @@ function chooseWeighted<T extends string>(choices: Array<{ action: T; weight: nu
   return choices[choices.length - 1].action;
 }
 
-function choosePlayModeAction(stage: PetStageSnapshot, mode: PetSettings['petPlayMode']): MotionAction {
+function choosePlayModeAction(
+  stage: PetStageSnapshot,
+  mode: PetSettings["petPlayMode"],
+): MotionAction {
   const weights =
     stage.windows.length > 0
       ? PLAY_MODE_WEIGHTS[mode]
       : PLAY_MODE_WEIGHTS[mode].map((choice) =>
-          choice.action === 'windowTop' || choice.action === 'peek' ? { ...choice, action: 'spring' as const } : choice,
+          choice.action === "windowTop" || choice.action === "peek"
+            ? { ...choice, action: "spring" as const }
+            : choice,
         );
   return chooseWeighted(weights);
 }
 
 function animationForDelta(dx: number): ForgePetAnimationName {
-  if (Math.abs(dx) < 10) return 'jumping';
-  return dx < 0 ? 'running-left' : 'running-right';
+  if (Math.abs(dx) < 10) return "jumping";
+  return dx < 0 ? "running-left" : "running-right";
 }
 
 function spriteSize(settings: PetSettings | null): { width: number; height: number } {
@@ -423,12 +452,16 @@ function paddedMotionLayout(
 
 function propMotionLayout(
   settings: PetSettings | null,
-  kind: 'portal' | 'spring' | 'balloon' | 'rocket' | 'spark',
+  kind: "portal" | "spring" | "balloon" | "rocket" | "spark",
 ): MotionLayout {
-  if (kind === 'portal') return paddedMotionLayout(settings, { left: 38, top: 68, right: 38, bottom: 24 });
-  if (kind === 'spring') return paddedMotionLayout(settings, { left: 42, top: 58, right: 42, bottom: 36 });
-  if (kind === 'balloon') return paddedMotionLayout(settings, { left: 58, top: 150, right: 58, bottom: 36 });
-  if (kind === 'rocket') return paddedMotionLayout(settings, { left: 92, top: 78, right: 54, bottom: 48 });
+  if (kind === "portal")
+    return paddedMotionLayout(settings, { left: 38, top: 68, right: 38, bottom: 24 });
+  if (kind === "spring")
+    return paddedMotionLayout(settings, { left: 42, top: 58, right: 42, bottom: 36 });
+  if (kind === "balloon")
+    return paddedMotionLayout(settings, { left: 58, top: 150, right: 58, bottom: 36 });
+  if (kind === "rocket")
+    return paddedMotionLayout(settings, { left: 92, top: 78, right: 54, bottom: 48 });
   return paddedMotionLayout(settings, { left: 42, top: 48, right: 42, bottom: 30 });
 }
 
@@ -474,7 +507,11 @@ function nearestDisplay(stage: PetStageSnapshot, point: MotionPoint): PetStageRe
   }, displays[0]);
 }
 
-function clampToStage(stage: PetStageSnapshot, point: MotionPoint, size: { width: number; height: number }): MotionPoint {
+function clampToStage(
+  stage: PetStageSnapshot,
+  point: MotionPoint,
+  size: { width: number; height: number },
+): MotionPoint {
   const area = nearestDisplay(stage, point);
   return {
     x: clamp(point.x, area.x + EDGE_MARGIN, area.x + area.width - size.width - EDGE_MARGIN),
@@ -487,8 +524,13 @@ function desktopY(stage: PetStageSnapshot, x: number, size: { height: number }):
   return area.y + area.height - size.height - EDGE_MARGIN;
 }
 
-function pickWindow(stage: PetStageSnapshot, size: { width: number; height: number }): PetStageWindow | null {
-  const usable = stage.windows.filter((win) => win.width > size.width + 80 && win.height > size.height * 0.7);
+function pickWindow(
+  stage: PetStageSnapshot,
+  size: { width: number; height: number },
+): PetStageWindow | null {
+  const usable = stage.windows.filter(
+    (win) => win.width > size.width + 80 && win.height > size.height * 0.7,
+  );
   if (usable.length === 0) return null;
 
   const current = { x: window.screenX, y: window.screenY };
@@ -504,7 +546,10 @@ function pickWindow(stage: PetStageSnapshot, size: { width: number; height: numb
   return nearby[Math.floor(Math.random() * nearby.length)]?.win ?? usable[0];
 }
 
-function randomDesktopPoint(stage: PetStageSnapshot, size: { width: number; height: number }): MotionPoint {
+function randomDesktopPoint(
+  stage: PetStageSnapshot,
+  size: { width: number; height: number },
+): MotionPoint {
   const area = nearestDisplay(stage, { x: window.screenX, y: window.screenY });
   return {
     x: randomBetween(area.x + EDGE_MARGIN, area.x + area.width - size.width - EDGE_MARGIN),
@@ -542,10 +587,10 @@ function PortalDoorEffect({ effect, scale }: { effect: NonNullable<PortalEffect>
 function PropEffectView({ effect }: { effect: NonNullable<PropEffect> }) {
   return (
     <div className="pet-prop" aria-hidden>
-      {effect.kind === 'springPad' && <div className="pet-prop__spring" />}
-      {effect.kind === 'balloon' && <div className="pet-prop__balloon" />}
-      {effect.kind === 'rocket' && <div className="pet-prop__rocket" />}
-      {(effect.kind === 'sparkTrail' || effect.kind === 'rocket') && (
+      {effect.kind === "springPad" && <div className="pet-prop__spring" />}
+      {effect.kind === "balloon" && <div className="pet-prop__balloon" />}
+      {effect.kind === "rocket" && <div className="pet-prop__rocket" />}
+      {(effect.kind === "sparkTrail" || effect.kind === "rocket") && (
         <>
           <div className="pet-prop__spark one" />
           <div className="pet-prop__spark two" />
@@ -567,10 +612,14 @@ function PropEffectView({ effect }: { effect: NonNullable<PropEffect> }) {
  */
 export function PetOverlay() {
   const [petSettings, setPetSettings] = useState<PetSettings | null>(null);
-  const [animation, setAnimation] = useState<ForgePetAnimationName>('idle');
+  const [animation, setAnimation] = useState<ForgePetAnimationName>("idle");
   const [dragging, setDragging] = useState(false);
   const [pendingPermission, setPendingPermission] = useState<PendingPermission | null>(null);
   const [isPermissionStatus, setIsPermissionStatus] = useState(false);
+  const [agentStatuses, setAgentStatuses] = useState<Record<string, AgentStatus>>({});
+  const [agentMessages, setAgentMessages] = useState<Record<string, AgentMessagePreview>>({});
+  const [completionCards, setCompletionCards] = useState<CompletionCard[]>([]);
+  const [completionHovered, setCompletionHovered] = useState(false);
   const [portalEffect, setPortalEffect] = useState<PortalEffect>(null);
   const [propEffect, setPropEffect] = useState<PropEffect>(null);
   const [petHidden, setPetHidden] = useState(false);
@@ -587,12 +636,14 @@ export function PetOverlay() {
   const frameRef = useRef<number>();
   const scheduleNextRef = useRef<(delayOverride?: number) => void>(() => {});
 
-  const agentStatusRef = useRef<string>('idle');
+  const agentStatusRef = useRef<AgentStatus>("idle");
   const isPermissionStatusRef = useRef(false);
   const isWanderingRef = useRef(false);
   const draggingRef = useRef(false);
   const petSettingsRef = useRef<PetSettings | null>(null);
   const pendingPermissionRef = useRef<PendingPermission | null>(null);
+  const agentStatusesRef = useRef<Record<string, AgentStatus>>({});
+  const agentMessagesRef = useRef<Record<string, AgentMessagePreview>>({});
   const stageRef = useRef<PetStageSnapshot | null>(null);
   const motionLayoutRef = useRef<MotionLayout>(normalMotionLayout(null));
   const motionRunIdRef = useRef(0);
@@ -601,8 +652,8 @@ export function PetOverlay() {
   const resetIdleTimer = useCallback(() => {
     clearTimeout(idleTimer.current);
     idleTimer.current = setTimeout(() => {
-      if (agentStatusRef.current === 'idle' && !isWanderingRef.current && !draggingRef.current) {
-        setAnimation('waiting');
+      if (agentStatusRef.current === "idle" && !isWanderingRef.current && !draggingRef.current) {
+        setAnimation("waiting");
       }
     }, 8000);
   }, []);
@@ -611,7 +662,7 @@ export function PetOverlay() {
     const settings = petSettingsRef.current;
     return Boolean(
       settings?.enabled &&
-        agentStatusRef.current === 'idle' &&
+        agentStatusRef.current === "idle" &&
         !isPermissionStatusRef.current &&
         !pendingPermissionRef.current &&
         !draggingRef.current,
@@ -635,7 +686,7 @@ export function PetOverlay() {
   const restoreStatusAnimation = useCallback(() => {
     if (draggingRef.current) return;
     setAnimation(agentStatusToAnimation(agentStatusRef.current));
-    if (agentStatusRef.current === 'idle') {
+    if (agentStatusRef.current === "idle") {
       resetIdleTimer();
     }
   }, [resetIdleTimer]);
@@ -665,12 +716,45 @@ export function PetOverlay() {
     restoreStatusAnimation();
   }, [clearAutonomousTimers, resetMotionLayout, restoreStatusAnimation]);
 
+  const applyAgentStatusUpdate = useCallback(
+    (update: AgentStatusUpdate) => {
+      const currentStatus = agentStatusesRef.current[update.ptyId];
+      const effectiveStatus =
+        currentStatus === "permission" && (update.status === "working" || update.status === "idle")
+          ? currentStatus
+          : update.status;
+      const nextStatuses = {
+        ...agentStatusesRef.current,
+        [update.ptyId]: effectiveStatus,
+      };
+      agentStatusesRef.current = nextStatuses;
+      setAgentStatuses(nextStatuses);
+
+      const primaryStatus = highestAgentStatus(nextStatuses);
+      agentStatusRef.current = primaryStatus;
+      setIsPermissionStatus(primaryStatus === "permission");
+
+      if (primaryStatus === "idle") {
+        restoreStatusAnimation();
+        scheduleNextRef.current(900);
+      } else {
+        cancelAutonomousMotion();
+        setAnimation(agentStatusToAnimation(primaryStatus));
+        clearTimeout(idleTimer.current);
+      }
+    },
+    [cancelAutonomousMotion, restoreStatusAnimation],
+  );
+
   const moveWindowTo = useCallback((point: MotionPoint) => {
     const x = Math.round(point.x);
     const y = Math.round(point.y);
     const layout = motionLayoutRef.current;
     positionRef.current = { x, y };
-    window.forgepadPet?.moveWindow(Math.round(x - layout.spriteOffsetX), Math.round(y - layout.spriteOffsetY));
+    window.forgepadPet?.moveWindow(
+      Math.round(x - layout.spriteOffsetX),
+      Math.round(y - layout.spriteOffsetY),
+    );
   }, []);
 
   const readStage = useCallback(async () => {
@@ -764,7 +848,7 @@ export function PetOverlay() {
       await animateTo(target, {
         runId,
         duration: 850 + distance * 4,
-        animation: direction < 0 ? 'running-left' : 'running-right',
+        animation: direction < 0 ? "running-left" : "running-right",
       });
     },
     [animateTo],
@@ -785,7 +869,7 @@ export function PetOverlay() {
         runId,
         duration: 760,
         jumpHeight: randomBetween(52, 104),
-        animation: 'jumping',
+        animation: "jumping",
       });
     },
     [animateTo],
@@ -811,7 +895,7 @@ export function PetOverlay() {
           runId,
           duration: 210,
           jumpHeight: 16,
-          animation: 'jumping',
+          animation: "jumping",
         });
         if (!ok) return;
       }
@@ -831,21 +915,21 @@ export function PetOverlay() {
           }
         : randomDesktopPoint(stage, size);
 
-      applyMotionLayout(propMotionLayout(petSettingsRef.current, 'portal'));
-      setAnimation('waving');
+      applyMotionLayout(propMotionLayout(petSettingsRef.current, "portal"));
+      setAnimation("waving");
       const enterSeed = Math.random();
       const exitSeed = Math.random();
-      setPortalEffect({ phase: 'enter', seed: enterSeed });
+      setPortalEffect({ phase: "enter", seed: enterSeed });
       if (!(await pause(500, runId))) return;
       setPetHidden(true);
       if (!(await pause(90, runId))) return;
       moveWindowTo(clampToStage(stage, target, size));
-      setPortalEffect({ phase: 'exit', seed: exitSeed });
-      setAnimation('jumping');
+      setPortalEffect({ phase: "exit", seed: exitSeed });
+      setAnimation("jumping");
       if (!(await pause(180, runId))) return;
       setPetHidden(false);
       if (!(await pause(420, runId))) return;
-      setPortalEffect({ phase: 'close', seed: exitSeed });
+      setPortalEffect({ phase: "close", seed: exitSeed });
       await pause(280, runId);
       setPortalEffect(null);
     },
@@ -854,8 +938,8 @@ export function PetOverlay() {
 
   const doZigzag = useCallback(
     async (stage: PetStageSnapshot, runId: number) => {
-      applyMotionLayout(propMotionLayout(petSettingsRef.current, 'spark'));
-      setPropEffect({ kind: 'sparkTrail', seed: Math.random() });
+      applyMotionLayout(propMotionLayout(petSettingsRef.current, "spark"));
+      setPropEffect({ kind: "sparkTrail", seed: Math.random() });
       let direction = Math.random() < 0.5 ? -1 : 1;
       const steps = randomInt(3, 5);
       for (let i = 0; i < steps; i += 1) {
@@ -873,7 +957,7 @@ export function PetOverlay() {
           runId,
           duration: 230,
           jumpHeight: 10,
-          animation: direction < 0 ? 'running-left' : 'running-right',
+          animation: direction < 0 ? "running-left" : "running-right",
         });
         if (!ok) return;
         direction *= -1;
@@ -886,8 +970,8 @@ export function PetOverlay() {
 
   const doSpring = useCallback(
     async (stage: PetStageSnapshot, runId: number) => {
-      applyMotionLayout(propMotionLayout(petSettingsRef.current, 'spring'));
-      setPropEffect({ kind: 'springPad', seed: Math.random() });
+      applyMotionLayout(propMotionLayout(petSettingsRef.current, "spring"));
+      setPropEffect({ kind: "springPad", seed: Math.random() });
       const size = spriteSize(petSettingsRef.current);
       const direction = Math.random() < 0.5 ? -1 : 1;
       const crouch = clampToStage(
@@ -898,9 +982,9 @@ export function PetOverlay() {
         },
         size,
       );
-      setAnimation('waving');
+      setAnimation("waving");
       if (!(await pause(160, runId))) return;
-      if (!(await animateTo(crouch, { runId, duration: 140, animation: 'waving' }))) return;
+      if (!(await animateTo(crouch, { runId, duration: 140, animation: "waving" }))) return;
       const rebound = clampToStage(
         stage,
         {
@@ -909,7 +993,10 @@ export function PetOverlay() {
         },
         size,
       );
-      if (!(await animateTo(rebound, { runId, duration: 180, jumpHeight: 26, animation: 'jumping' }))) return;
+      if (
+        !(await animateTo(rebound, { runId, duration: 180, jumpHeight: 26, animation: "jumping" }))
+      )
+        return;
       const target = clampToStage(
         stage,
         {
@@ -922,7 +1009,7 @@ export function PetOverlay() {
         runId,
         duration: 820,
         jumpHeight: randomBetween(112, 168),
-        animation: 'jumping',
+        animation: "jumping",
       });
       setPropEffect(null);
     },
@@ -944,7 +1031,8 @@ export function PetOverlay() {
       const target = topPeek
         ? {
             x: clamp(
-              (fromLeft ? win.x + 18 : win.x + win.width - size.width - 18) + randomBetween(-18, 18),
+              (fromLeft ? win.x + 18 : win.x + win.width - size.width - 18) +
+                randomBetween(-18, 18),
               win.x + EDGE_MARGIN,
               win.x + win.width - size.width - EDGE_MARGIN,
             ),
@@ -953,7 +1041,10 @@ export function PetOverlay() {
         : {
             x: fromLeft
               ? Math.max(display.x + EDGE_MARGIN, win.x - size.width + 8)
-              : Math.min(display.x + display.width - size.width - EDGE_MARGIN, win.x + win.width - 8),
+              : Math.min(
+                  display.x + display.width - size.width - EDGE_MARGIN,
+                  win.x + win.width - 8,
+                ),
             y: clamp(
               win.y + randomBetween(42, Math.max(58, win.height - size.height * 0.5)),
               display.y + EDGE_MARGIN,
@@ -966,13 +1057,13 @@ export function PetOverlay() {
           runId,
           duration: 880,
           jumpHeight: topPeek ? randomBetween(68, 104) : randomBetween(42, 76),
-          animation: 'jumping',
+          animation: "jumping",
         }))
       ) {
         return;
       }
 
-      setAnimation('waving');
+      setAnimation("waving");
       if (!(await pause(520, runId))) return;
 
       const nudge = topPeek
@@ -982,7 +1073,7 @@ export function PetOverlay() {
         !(await animateTo(nudge, {
           runId,
           duration: 260,
-          animation: fromLeft ? 'running-right' : 'running-left',
+          animation: fromLeft ? "running-right" : "running-left",
         }))
       ) {
         return;
@@ -998,7 +1089,7 @@ export function PetOverlay() {
         {
           runId,
           duration: 780,
-          animation: 'jumping',
+          animation: "jumping",
           fall: true,
         },
       );
@@ -1008,9 +1099,9 @@ export function PetOverlay() {
 
   const doBalloon = useCallback(
     async (stage: PetStageSnapshot, runId: number) => {
-      applyMotionLayout(propMotionLayout(petSettingsRef.current, 'balloon'));
-      setPropEffect({ kind: 'balloon', seed: Math.random() });
-      setAnimation('waving');
+      applyMotionLayout(propMotionLayout(petSettingsRef.current, "balloon"));
+      setPropEffect({ kind: "balloon", seed: Math.random() });
+      setAnimation("waving");
       if (!(await pause(360, runId))) return;
 
       const size = spriteSize(petSettingsRef.current);
@@ -1028,7 +1119,7 @@ export function PetOverlay() {
           runId,
           duration: 1_120,
           jumpHeight: 18,
-          animation: 'jumping',
+          animation: "jumping",
         }))
       ) {
         return;
@@ -1046,7 +1137,7 @@ export function PetOverlay() {
         !(await animateTo(glide, {
           runId,
           duration: 1_060,
-          animation: drift < 0 ? 'running-left' : 'running-right',
+          animation: drift < 0 ? "running-left" : "running-right",
         }))
       ) {
         return;
@@ -1056,14 +1147,17 @@ export function PetOverlay() {
       const landingX = clamp(
         glide.x + drift * randomBetween(20, 64),
         nearestDisplay(stage, glide).x + EDGE_MARGIN,
-        nearestDisplay(stage, glide).x + nearestDisplay(stage, glide).width - size.width - EDGE_MARGIN,
+        nearestDisplay(stage, glide).x +
+          nearestDisplay(stage, glide).width -
+          size.width -
+          EDGE_MARGIN,
       );
       await animateTo(
         { x: landingX, y: desktopY(stage, landingX, size) },
         {
           runId,
           duration: 740,
-          animation: 'jumping',
+          animation: "jumping",
           fall: true,
         },
       );
@@ -1073,9 +1167,9 @@ export function PetOverlay() {
 
   const doRocket = useCallback(
     async (stage: PetStageSnapshot, runId: number) => {
-      applyMotionLayout(propMotionLayout(petSettingsRef.current, 'rocket'));
-      setPropEffect({ kind: 'rocket', seed: Math.random() });
-      setAnimation('running-right');
+      applyMotionLayout(propMotionLayout(petSettingsRef.current, "rocket"));
+      setPropEffect({ kind: "rocket", seed: Math.random() });
+      setAnimation("running-right");
       if (!(await pause(220, runId))) return;
 
       const size = spriteSize(petSettingsRef.current);
@@ -1093,7 +1187,7 @@ export function PetOverlay() {
           runId,
           duration: 520,
           jumpHeight: randomBetween(44, 82),
-          animation: direction < 0 ? 'running-left' : 'running-right',
+          animation: direction < 0 ? "running-left" : "running-right",
         }))
       ) {
         return;
@@ -1107,13 +1201,13 @@ export function PetOverlay() {
           size.width -
           EDGE_MARGIN,
       );
-      setPropEffect({ kind: 'sparkTrail', seed: Math.random() });
+      setPropEffect({ kind: "sparkTrail", seed: Math.random() });
       await animateTo(
         { x: landingX, y: desktopY(stage, landingX, size) },
         {
           runId,
           duration: 760,
-          animation: 'jumping',
+          animation: "jumping",
           fall: true,
         },
       );
@@ -1138,7 +1232,11 @@ export function PetOverlay() {
         const sideX = onLeft
           ? Math.max(display.x + EDGE_MARGIN, win.x - size.width + 6)
           : Math.min(display.x + display.width - size.width - EDGE_MARGIN, win.x + win.width - 6);
-        const minY = clamp(win.y + 24, display.y + EDGE_MARGIN, display.y + display.height - size.height - EDGE_MARGIN);
+        const minY = clamp(
+          win.y + 24,
+          display.y + EDGE_MARGIN,
+          display.y + display.height - size.height - EDGE_MARGIN,
+        );
         const maxY = clamp(
           win.y + win.height - size.height - 24,
           display.y + EDGE_MARGIN,
@@ -1151,19 +1249,23 @@ export function PetOverlay() {
             runId,
             duration: 940,
             jumpHeight: randomBetween(54, 96),
-            animation: 'jumping',
+            animation: "jumping",
           },
         );
         if (!entered) return;
 
         const edgeDirection = Math.random() < 0.5 ? -1 : 1;
-        const endY = clamp(startY + edgeDirection * randomBetween(70, 180), Math.min(minY, maxY), Math.max(minY, maxY));
+        const endY = clamp(
+          startY + edgeDirection * randomBetween(70, 180),
+          Math.min(minY, maxY),
+          Math.max(minY, maxY),
+        );
         const edgeWalked = await animateTo(
           { x: sideX, y: endY },
           {
             runId,
             duration: 880 + Math.abs(endY - startY) * 3.2,
-            animation: onLeft ? 'running-right' : 'running-left',
+            animation: onLeft ? "running-right" : "running-left",
           },
         );
         if (!edgeWalked) return;
@@ -1178,11 +1280,11 @@ export function PetOverlay() {
           {
             runId,
             duration: 820,
-            animation: 'jumping',
+            animation: "jumping",
             fall: true,
           },
         );
-        setAnimation('waving');
+        setAnimation("waving");
         await pause(240, runId);
         return;
       }
@@ -1197,20 +1299,23 @@ export function PetOverlay() {
           runId,
           duration: 980,
           jumpHeight: randomBetween(68, 112),
-          animation: 'jumping',
+          animation: "jumping",
         },
       );
       if (!ok) return;
 
       const direction = Math.random() < 0.5 ? -1 : 1;
-      const walkDistance = randomBetween(Math.min(90, win.width * 0.18), Math.min(260, win.width * 0.55));
+      const walkDistance = randomBetween(
+        Math.min(90, win.width * 0.18),
+        Math.min(260, win.width * 0.55),
+      );
       const endX = clamp(startX + direction * walkDistance, minX, maxX);
       const walked = await animateTo(
         { x: endX, y: topY },
         {
           runId,
           duration: 1_000 + Math.abs(endX - startX) * 3.5,
-          animation: direction < 0 ? 'running-left' : 'running-right',
+          animation: direction < 0 ? "running-left" : "running-right",
         },
       );
       if (!walked) return;
@@ -1220,7 +1325,10 @@ export function PetOverlay() {
         .sort(() => Math.random() - 0.5)[0];
       if (nextWindow && Math.random() < 0.34) {
         const nextDisplay = nearestDisplay(stage, nextWindow);
-        const nextX = randomBetween(nextWindow.x + EDGE_MARGIN, nextWindow.x + nextWindow.width - size.width - EDGE_MARGIN);
+        const nextX = randomBetween(
+          nextWindow.x + EDGE_MARGIN,
+          nextWindow.x + nextWindow.width - size.width - EDGE_MARGIN,
+        );
         const nextY = Math.max(nextDisplay.y + EDGE_MARGIN, nextWindow.y - size.height + 6);
         const landed = await animateTo(
           { x: nextX, y: nextY },
@@ -1228,11 +1336,11 @@ export function PetOverlay() {
             runId,
             duration: 1_040,
             jumpHeight: randomBetween(98, 152),
-            animation: 'jumping',
+            animation: "jumping",
           },
         );
         if (!landed) return;
-        setAnimation('waving');
+        setAnimation("waving");
         await pause(360, runId);
       }
 
@@ -1248,11 +1356,11 @@ export function PetOverlay() {
           {
             runId,
             duration: 880,
-            animation: 'jumping',
+            animation: "jumping",
             fall: true,
           },
         );
-        setAnimation('waving');
+        setAnimation("waving");
         await pause(260, runId);
       }
     },
@@ -1261,18 +1369,29 @@ export function PetOverlay() {
 
   const playMotionAction = useCallback(
     async (action: MotionAction, stage: PetStageSnapshot, runId: number) => {
-      if (action === 'stroll') await doStroll(stage, runId);
-      if (action === 'hop') await doHop(stage, runId);
-      if (action === 'stairs') await doStairs(stage, runId);
-      if (action === 'portal') await doPortal(stage, runId);
-      if (action === 'windowTop') await doWindowTopWalk(stage, runId);
-      if (action === 'zigzag') await doZigzag(stage, runId);
-      if (action === 'spring') await doSpring(stage, runId);
-      if (action === 'peek') await doPeek(stage, runId);
-      if (action === 'balloon') await doBalloon(stage, runId);
-      if (action === 'rocket') await doRocket(stage, runId);
+      if (action === "stroll") await doStroll(stage, runId);
+      if (action === "hop") await doHop(stage, runId);
+      if (action === "stairs") await doStairs(stage, runId);
+      if (action === "portal") await doPortal(stage, runId);
+      if (action === "windowTop") await doWindowTopWalk(stage, runId);
+      if (action === "zigzag") await doZigzag(stage, runId);
+      if (action === "spring") await doSpring(stage, runId);
+      if (action === "peek") await doPeek(stage, runId);
+      if (action === "balloon") await doBalloon(stage, runId);
+      if (action === "rocket") await doRocket(stage, runId);
     },
-    [doHop, doPortal, doStairs, doStroll, doWindowTopWalk, doBalloon, doPeek, doRocket, doSpring, doZigzag],
+    [
+      doHop,
+      doPortal,
+      doStairs,
+      doStroll,
+      doWindowTopWalk,
+      doBalloon,
+      doPeek,
+      doRocket,
+      doSpring,
+      doZigzag,
+    ],
   );
 
   const runAutonomousAction = useCallback(async () => {
@@ -1291,7 +1410,7 @@ export function PetOverlay() {
       const stage = await readStage();
       if (runId !== motionRunIdRef.current || !isAutonomousAllowed()) return;
 
-      const mode = petSettingsRef.current?.petPlayMode ?? 'playful';
+      const mode = petSettingsRef.current?.petPlayMode ?? "playful";
       await playMotionAction(choosePlayModeAction(stage, mode), stage, runId);
     } finally {
       if (runId === motionRunIdRef.current) {
@@ -1311,10 +1430,11 @@ export function PetOverlay() {
       clearTimeout(wanderTimerRef.current);
       if (!isAutonomousAllowed()) return;
 
-      const mode = petSettingsRef.current?.petPlayMode ?? 'playful';
+      const mode = petSettingsRef.current?.petPlayMode ?? "playful";
       const interval = PLAY_MODE_INTERVALS[mode];
       const speed = clamp(petSettingsRef.current?.petSpeed ?? 2, 0.5, 5);
-      const delay = delayOverride ?? randomBetween(interval.min, interval.max) / Math.sqrt(speed / 2);
+      const delay =
+        delayOverride ?? randomBetween(interval.min, interval.max) / Math.sqrt(speed / 2);
       wanderTimerRef.current = setTimeout(() => {
         void runAutonomousAction();
       }, delay);
@@ -1327,7 +1447,7 @@ export function PetOverlay() {
   }, [isMotionAllowed]);
 
   const playInteractiveAction = useCallback(
-    async (requestedAction: PetDebugAction = 'random') => {
+    async (requestedAction: PetDebugAction = "random") => {
       if (!canPlayInteractiveAction()) return;
 
       const runId = motionRunIdRef.current + 1;
@@ -1344,8 +1464,9 @@ export function PetOverlay() {
         const stage = await readStage();
         if (runId !== motionRunIdRef.current || !canPlayInteractiveAction()) return;
 
-        const mode = petSettingsRef.current?.petPlayMode ?? 'playful';
-        const action = requestedAction === 'random' ? choosePlayModeAction(stage, mode) : requestedAction;
+        const mode = petSettingsRef.current?.petPlayMode ?? "playful";
+        const action =
+          requestedAction === "random" ? choosePlayModeAction(stage, mode) : requestedAction;
         await playMotionAction(action, stage, runId);
       } finally {
         if (runId === motionRunIdRef.current) {
@@ -1359,7 +1480,74 @@ export function PetOverlay() {
         }
       }
     },
-    [canPlayInteractiveAction, clearAutonomousTimers, playMotionAction, readStage, resetMotionLayout, restoreStatusAnimation],
+    [
+      canPlayInteractiveAction,
+      clearAutonomousTimers,
+      playMotionAction,
+      readStage,
+      resetMotionLayout,
+      restoreStatusAnimation,
+    ],
+  );
+
+  const nudgePet = useCallback(
+    async (direction: PetNudgeDirection, amount = 56) => {
+      if (!canPlayInteractiveAction()) return;
+
+      const step = clamp(amount, 16, 180);
+      const runId = motionRunIdRef.current + 1;
+      motionRunIdRef.current = runId;
+      clearAutonomousTimers();
+      clearTimeout(idleTimer.current);
+      isWanderingRef.current = true;
+      positionRef.current = {
+        x: window.screenX + motionLayoutRef.current.spriteOffsetX,
+        y: window.screenY + motionLayoutRef.current.spriteOffsetY,
+      };
+
+      try {
+        const stage = await readStage();
+        if (runId !== motionRunIdRef.current || !canPlayInteractiveAction()) return;
+
+        const dx = direction === "left" ? -step : direction === "right" ? step : 0;
+        const dy = direction === "up" ? -step : direction === "down" ? step : 0;
+        await animateTo(
+          {
+            x: positionRef.current.x + dx,
+            y: positionRef.current.y + dy,
+          },
+          {
+            runId,
+            duration: 170 + step * 2,
+            jumpHeight: direction === "down" ? 0 : 12,
+            animation:
+              direction === "left"
+                ? "running-left"
+                : direction === "right"
+                  ? "running-right"
+                  : "jumping",
+          },
+        );
+      } finally {
+        if (runId === motionRunIdRef.current) {
+          isWanderingRef.current = false;
+          setPortalEffect(null);
+          setPropEffect(null);
+          setPetHidden(false);
+          resetMotionLayout();
+          restoreStatusAnimation();
+          scheduleNextRef.current(1_400);
+        }
+      }
+    },
+    [
+      animateTo,
+      canPlayInteractiveAction,
+      clearAutonomousTimers,
+      readStage,
+      resetMotionLayout,
+      restoreStatusAnimation,
+    ],
   );
 
   useEffect(() => {
@@ -1367,70 +1555,24 @@ export function PetOverlay() {
   }, [scheduleNextAutonomous]);
 
   useEffect(() => {
-    const isDev = Boolean((import.meta as unknown as { env?: { DEV?: boolean } }).env?.DEV);
-    if (!isDev) return;
-
-    const debugWindow = window as Window & { forgepadPetDebug?: PetDebugApi };
-    const api: PetDebugApi = {
-      play: (action = 'random') => {
-        const normalized = action === 'random' || DEBUG_ACTIONS.includes(action as MotionAction) ? action : 'random';
-        void playInteractiveAction(normalized);
-      },
-      stop: cancelAutonomousMotion,
-      list: () => ['random', ...DEBUG_ACTIONS] as PetDebugAction[],
-      status: () => ({
-        enabled: petSettingsRef.current?.enabled,
-        playMode: petSettingsRef.current?.petPlayMode,
-        moving: isWanderingRef.current,
-        animation,
-        position: { ...positionRef.current },
-        layout: { ...motionLayoutRef.current },
-      }),
-      help: () => 'forgepadPetDebug.play("portal" | "spring" | "balloon" | "rocket" | "random"); stop(); list(); status();',
-    };
-
-    debugWindow.forgepadPetDebug = api;
-    return () => {
-      if (debugWindow.forgepadPetDebug === api) delete debugWindow.forgepadPetDebug;
-    };
-  }, [animation, cancelAutonomousMotion, playInteractiveAction]);
-
-  useEffect(() => {
-    const isDev = Boolean((import.meta as unknown as { env?: { DEV?: boolean } }).env?.DEV);
-    if (!isDev) return;
-
-    const actionByKey: Record<string, PetDebugAction | 'stop'> = {
-      ' ': 'random',
-      '1': 'stroll',
-      '2': 'hop',
-      '3': 'stairs',
-      '4': 'portal',
-      '5': 'windowTop',
-      '6': 'zigzag',
-      '7': 'spring',
-      '8': 'balloon',
-      '9': 'rocket',
-      Escape: 'stop',
-    };
-
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.repeat) return;
-      const target = event.target as HTMLElement | null;
-      if (target?.matches('input, textarea, select, [contenteditable="true"]')) return;
-
-      const action = actionByKey[event.key];
-      if (!action) return;
-      event.preventDefault();
-      if (action === 'stop') {
+    const api = window.forgepadPet;
+    if (!api?.onCommand) return;
+    return api.onCommand((command: PetCommand) => {
+      if (command.type === "stop") {
         cancelAutonomousMotion();
         return;
       }
-      void playInteractiveAction(action);
-    };
+      if (command.type === "nudge") {
+        void nudgePet(command.direction, command.amount);
+        return;
+      }
 
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [cancelAutonomousMotion, playInteractiveAction]);
+      const action = command.action ?? "random";
+      if (action === "random" || DEBUG_ACTIONS.includes(action)) {
+        void playInteractiveAction(action);
+      }
+    });
+  }, [cancelAutonomousMotion, nudgePet, playInteractiveAction]);
 
   useEffect(() => {
     const api = window.forgepadPet;
@@ -1479,24 +1621,51 @@ export function PetOverlay() {
   useEffect(() => {
     const api = window.forgepadPet;
     if (!api?.onAgentStatusUpdate) return;
-    return api.onAgentStatusUpdate((status) => {
-      agentStatusRef.current = status;
-      setIsPermissionStatus(status === 'permission');
-      if (status !== 'permission') {
-        pendingPermissionRef.current = null;
-        setPendingPermission(null);
-      }
-
-      if (status === 'idle') {
-        restoreStatusAnimation();
-        scheduleNextRef.current(900);
-      } else {
-        cancelAutonomousMotion();
-        setAnimation(agentStatusToAnimation(status));
-        clearTimeout(idleTimer.current);
-      }
+    return api.onAgentStatusUpdate((update) => {
+      applyAgentStatusUpdate(update);
     });
-  }, [cancelAutonomousMotion, restoreStatusAnimation]);
+  }, [applyAgentStatusUpdate]);
+
+  useEffect(() => {
+    const api = window.forgepadPet;
+    if (!api?.onUserPrompt) return;
+    return api.onUserPrompt((data) => {
+      const nextMessages = {
+        ...agentMessagesRef.current,
+        [data.ptyId]: {
+          ...agentMessagesRef.current[data.ptyId],
+          userPrompt: data.prompt,
+        },
+      };
+      agentMessagesRef.current = nextMessages;
+      setAgentMessages(nextMessages);
+    });
+  }, []);
+
+  useEffect(() => {
+    const api = window.forgepadPet;
+    if (!api?.onCompletion) return;
+    return api.onCompletion((data) => {
+      const previous = agentMessagesRef.current[data.ptyId] ?? {};
+      const nextMessages = {
+        ...agentMessagesRef.current,
+        [data.ptyId]: {
+          ...previous,
+          aiResponse: data.aiMessage,
+        },
+      };
+      const card: CompletionCard = {
+        id: `${data.ptyId}:${Date.now()}`,
+        ptyId: data.ptyId,
+        userPrompt: previous.userPrompt ?? "",
+        aiResponse: data.aiMessage,
+        timestamp: Date.now(),
+      };
+      agentMessagesRef.current = nextMessages;
+      setAgentMessages(nextMessages);
+      setCompletionCards((cards) => [...cards, card]);
+    });
+  }, []);
 
   useEffect(() => {
     const api = window.forgepadPet;
@@ -1505,30 +1674,51 @@ export function PetOverlay() {
       if (!data.toolName) {
         pendingPermissionRef.current = null;
         setPendingPermission(null);
+        const nextStatuses = {
+          ...agentStatusesRef.current,
+          [data.ptyId]: "idle" as AgentStatus,
+        };
+        agentStatusesRef.current = nextStatuses;
+        setAgentStatuses(nextStatuses);
+        const primaryStatus = highestAgentStatus(nextStatuses);
+        agentStatusRef.current = primaryStatus;
+        setIsPermissionStatus(primaryStatus === "permission");
+        if (primaryStatus === "idle") {
+          restoreStatusAnimation();
+          scheduleNextRef.current(900);
+        }
         return;
       }
       pendingPermissionRef.current = data;
       setPendingPermission(data);
+      const nextStatuses = {
+        ...agentStatusesRef.current,
+        [data.ptyId]: "permission" as AgentStatus,
+      };
+      agentStatusesRef.current = nextStatuses;
+      setAgentStatuses(nextStatuses);
+      agentStatusRef.current = "permission";
+      setIsPermissionStatus(true);
       cancelAutonomousMotion();
     });
-  }, [cancelAutonomousMotion]);
+  }, [cancelAutonomousMotion, restoreStatusAnimation]);
 
   const handleApprove = useCallback(() => {
     if (!pendingPermission) return;
-    window.forgepadPet?.sendPermissionDecision(pendingPermission.ptyId, 'allow');
+    window.forgepadPet?.sendPermissionDecision(pendingPermission.ptyId, "allow");
     setPendingPermission(null);
   }, [pendingPermission]);
 
   const handleAllowAlways = useCallback(() => {
     if (!pendingPermission) return;
-    window.forgepadPet?.sendPermissionDecision(pendingPermission.ptyId, 'allowAlways');
+    window.forgepadPet?.sendPermissionDecision(pendingPermission.ptyId, "allowAlways");
     setPendingPermission(null);
   }, [pendingPermission]);
 
   const handleAnswer = useCallback(
     (answers: Record<string, string>) => {
       if (!pendingPermission) return;
-      window.forgepadPet?.sendPermissionDecision(pendingPermission.ptyId, 'answer', answers);
+      window.forgepadPet?.sendPermissionDecision(pendingPermission.ptyId, "answer", answers);
       setPendingPermission(null);
     },
     [pendingPermission],
@@ -1536,7 +1726,7 @@ export function PetOverlay() {
 
   const handleDeny = useCallback(() => {
     if (!pendingPermission) return;
-    window.forgepadPet?.sendPermissionDecision(pendingPermission.ptyId, 'deny');
+    window.forgepadPet?.sendPermissionDecision(pendingPermission.ptyId, "deny");
     setPendingPermission(null);
   }, [pendingPermission]);
 
@@ -1560,7 +1750,7 @@ export function PetOverlay() {
       draggingRef.current = true;
       cancelAutonomousMotion();
       setDragging(true);
-      setAnimation('idle');
+      setAnimation("idle");
       resetIdleTimer();
     },
     [cancelAutonomousMotion, resetIdleTimer],
@@ -1579,9 +1769,9 @@ export function PetOverlay() {
       const newY = e.screenY - dragOffset.current.y;
       moveWindowTo({ x: newX, y: newY });
 
-      if (e.movementX > 2) setAnimation('running-right');
-      else if (e.movementX < -2) setAnimation('running-left');
-      else if (e.movementY < -2) setAnimation('jumping');
+      if (e.movementX > 2) setAnimation("running-right");
+      else if (e.movementX < -2) setAnimation("running-left");
+      else if (e.movementY < -2) setAnimation("jumping");
     },
     [moveWindowTo],
   );
@@ -1598,14 +1788,14 @@ export function PetOverlay() {
         const dy = e.screenY - pointerDownPos.current.y;
         if (Math.abs(dx) < 5 && Math.abs(dy) < 5) {
           const shortcutAction: PetDebugAction | null = e.altKey
-            ? 'portal'
+            ? "portal"
             : e.shiftKey
-              ? 'random'
+              ? "random"
               : e.metaKey || e.ctrlKey
-                ? 'balloon'
+                ? "balloon"
                 : null;
+          window.forgepadPet?.requestControl?.();
           if (shortcutAction) void playInteractiveAction(shortcutAction);
-          else window.forgepadPet?.focusAgent();
         }
       }
       pointerDownPos.current = null;
@@ -1620,7 +1810,7 @@ export function PetOverlay() {
     (e: React.MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      void playInteractiveAction(Math.random() < 0.45 ? 'spring' : 'random');
+      void playInteractiveAction(Math.random() < 0.45 ? "spring" : "random");
     },
     [playInteractiveAction],
   );
@@ -1629,7 +1819,7 @@ export function PetOverlay() {
     (e: React.MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      void playInteractiveAction('portal');
+      void playInteractiveAction("portal");
     },
     [playInteractiveAction],
   );
@@ -1643,7 +1833,7 @@ export function PetOverlay() {
       if (now - wheelCooldownRef.current < 900) return;
       wheelCooldownRef.current = now;
 
-      void playInteractiveAction(e.deltaY < 0 ? 'balloon' : 'zigzag');
+      void playInteractiveAction(e.deltaY < 0 ? "balloon" : "zigzag");
     },
     [playInteractiveAction],
   );
@@ -1654,7 +1844,7 @@ export function PetOverlay() {
 
     hoverTimerRef.current = setTimeout(() => {
       if (!canPlayInteractiveAction() || isWanderingRef.current || draggingRef.current) return;
-      setAnimation('waving');
+      setAnimation("waving");
       resetIdleTimer();
     }, 260);
   }, [canPlayInteractiveAction, resetIdleTimer]);
@@ -1664,7 +1854,36 @@ export function PetOverlay() {
     if (!draggingRef.current && !isWanderingRef.current) restoreStatusAnimation();
   }, [restoreStatusAnimation]);
 
-  const showApproval = isPermissionStatus && pendingPermission !== null;
+  const showApproval = pendingPermission !== null;
+  const currentCompletionCard = showApproval ? null : (completionCards[0] ?? null);
+  const showCompletion = currentCompletionCard !== null;
+  const workingAgents: WorkingAgentSummary[] = Object.entries(agentStatuses)
+    .filter(([, status]) => status === "working")
+    .map(([ptyId]) => ({
+      ptyId,
+      title: agentMessages[ptyId]?.userPrompt || `Agent ${ptyId.slice(-4)}`,
+      userPrompt: agentMessages[ptyId]?.userPrompt,
+    }));
+
+  const dismissCompletionCard = useCallback((cardId: string) => {
+    setCompletionCards((cards) => cards.filter((card) => card.id !== cardId));
+  }, []);
+
+  const focusAgentByPtyId = useCallback((ptyId: string) => {
+    window.forgepadPet?.focusAgent?.(ptyId);
+  }, []);
+
+  const handleCompletionDismiss = useCallback(() => {
+    if (!currentCompletionCard) return;
+    dismissCompletionCard(currentCompletionCard.id);
+  }, [currentCompletionCard, dismissCompletionCard]);
+
+  const handleCompletionView = useCallback(() => {
+    if (!currentCompletionCard) return;
+    focusAgentByPtyId(currentCompletionCard.ptyId);
+    dismissCompletionCard(currentCompletionCard.id);
+  }, [currentCompletionCard, dismissCompletionCard, focusAgentByPtyId]);
+
   const prevShowApproval = useRef(false);
 
   useEffect(() => {
@@ -1676,20 +1895,32 @@ export function PetOverlay() {
     const spriteW = Math.round(BASE_SPRITE_WIDTH * scale);
     const spriteH = Math.round(BASE_SPRITE_HEIGHT * scale);
 
-    if (showApproval && !prevShowApproval.current) {
+    const hasFloatingPanel = showApproval || showCompletion;
+    if (hasFloatingPanel) {
       const isQuestion = pendingPermission?.questions && pendingPermission.questions.length > 0;
       const optionCount = isQuestion ? (pendingPermission.questions![0].options.length ?? 0) : 0;
-      const hasDescription = isQuestion && pendingPermission.questions![0].options.some((o) => o.description);
+      const hasDescription =
+        isQuestion && pendingPermission.questions![0].options.some((o) => o.description);
       const optionItemH = hasDescription ? 48 : 34;
-      const popupH = isQuestion ? 106 + optionCount * optionItemH : 120;
-      const totalW = Math.max(spriteW, isQuestion ? 320 : 280);
+      const approvalPopupH = isQuestion ? 106 + optionCount * optionItemH : 120;
+      const completionPopupH =
+        128 + (completionHovered ? Math.min(workingAgents.length, 6) * 24 + 28 : 0);
+      const popupH = showApproval ? approvalPopupH : completionPopupH;
+      const totalW = Math.max(spriteW, showApproval ? (isQuestion ? 320 : 280) : 340);
       const totalH = spriteH + popupH;
       api.resizeWindow(totalW, totalH);
-    } else if (!showApproval && prevShowApproval.current) {
+    } else if (prevShowApproval.current) {
       api.resizeWindow(spriteW, spriteH);
     }
-    prevShowApproval.current = showApproval;
-  }, [showApproval, petSettings, pendingPermission]);
+    prevShowApproval.current = hasFloatingPanel;
+  }, [
+    showApproval,
+    showCompletion,
+    completionHovered,
+    workingAgents.length,
+    petSettings,
+    pendingPermission,
+  ]);
 
   if (!petSettings?.enabled) return null;
 
@@ -1699,17 +1930,17 @@ export function PetOverlay() {
   return (
     <div
       style={{
-        position: 'relative',
-        width: '100vw',
-        height: '100vh',
-        overflow: 'visible',
+        position: "relative",
+        width: "100vw",
+        height: "100vh",
+        overflow: "visible",
       }}
     >
       {(portalEffect || propEffect) && <style>{`${PORTAL_DOOR_CSS}\n${PROP_EFFECT_CSS}`}</style>}
       {showApproval && pendingPermission && (
         <div
           style={{
-            position: 'absolute',
+            position: "absolute",
             right: 0,
             bottom: `${currentSpriteSize.height}px`,
             zIndex: 6,
@@ -1725,6 +1956,27 @@ export function PetOverlay() {
           />
         </div>
       )}
+      {currentCompletionCard && (
+        <div
+          style={{
+            position: "absolute",
+            right: 0,
+            bottom: `${currentSpriteSize.height}px`,
+            zIndex: 5,
+          }}
+        >
+          <PetCompletionCard
+            key={currentCompletionCard.id}
+            card={currentCompletionCard}
+            onDismiss={handleCompletionDismiss}
+            onView={handleCompletionView}
+            workingAgents={workingAgents}
+            onWorkingAgentView={focusAgentByPtyId}
+            onHoverChange={setCompletionHovered}
+            variant="overlay"
+          />
+        </div>
+      )}
       <div
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
@@ -1736,26 +1988,26 @@ export function PetOverlay() {
         onContextMenu={handleContextMenu}
         onWheel={handleWheel}
         style={{
-          position: 'absolute',
+          position: "absolute",
           left: `${motionLayout.spriteOffsetX}px`,
           top: `${motionLayout.spriteOffsetY}px`,
           width: `${currentSpriteSize.width}px`,
           height: `${currentSpriteSize.height}px`,
-          cursor: dragging ? 'grabbing' : 'grab',
-          touchAction: 'none',
-          userSelect: 'none',
-          WebkitUserSelect: 'none',
+          cursor: dragging ? "grabbing" : "grab",
+          touchAction: "none",
+          userSelect: "none",
+          WebkitUserSelect: "none",
         }}
       >
         {portalEffect && <PortalDoorEffect effect={portalEffect} scale={petSettings.petSize} />}
         {propEffect && <PropEffectView effect={propEffect} />}
         <div
           style={{
-            position: 'relative',
+            position: "relative",
             zIndex: 4,
             opacity: petHidden ? 0 : 1,
-            transform: petHidden ? 'translateY(6px) scale(0.86)' : 'translateY(0) scale(1)',
-            transition: 'opacity 140ms ease, transform 140ms ease',
+            transform: petHidden ? "translateY(6px) scale(0.86)" : "translateY(0) scale(1)",
+            transition: "opacity 140ms ease, transform 140ms ease",
           }}
         >
           <SpriteAnimator<ForgePetAnimationName>

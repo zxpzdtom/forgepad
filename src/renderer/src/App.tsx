@@ -30,7 +30,11 @@ import {
 import { registerPendingExtTabCreate } from "@renderer/lib/extension-tab-bridge";
 import { eventMatchesCombo } from "@renderer/lib/shortcut-utils";
 import { useAppStore } from "@renderer/store/app-store";
-import type { ShortcutActionId } from "@shared/types";
+import type {
+  PetNudgeDirection,
+  PetPlayAction,
+  ShortcutActionId,
+} from "@shared/types";
 import { DEFAULT_SHORTCUTS } from "@shared/types";
 import { Allotment } from "allotment";
 import {
@@ -44,6 +48,44 @@ import {
 export const ThemeContext = createContext<ResolvedTheme>("dark");
 export const useResolvedTheme = () => useContext(ThemeContext);
 
+const PET_CONTROL_WINDOW_MS = 12_000;
+const PET_DEBUG_ACTIONS: Array<PetPlayAction | "random"> = [
+  "random",
+  "stroll",
+  "hop",
+  "stairs",
+  "portal",
+  "windowTop",
+  "zigzag",
+  "spring",
+  "peek",
+  "balloon",
+  "rocket",
+];
+
+type ForgePadPetDebugApi = {
+  play: (action?: PetPlayAction | "random") => void;
+  stop: () => void;
+  nudge: (direction: PetNudgeDirection, amount?: number) => void;
+  list: () => Array<PetPlayAction | "random">;
+  help: () => string;
+};
+
+function isTextEntryTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return Boolean(
+    target.closest('input, textarea, select, [contenteditable="true"]'),
+  );
+}
+
+function arrowDirection(key: string): PetNudgeDirection | null {
+  if (key === "ArrowUp") return "up";
+  if (key === "ArrowDown") return "down";
+  if (key === "ArrowLeft") return "left";
+  if (key === "ArrowRight") return "right";
+  return null;
+}
+
 function AppInner() {
   const resolvedTheme = useTheme();
   useAgentLifecycle();
@@ -52,6 +94,7 @@ function AppInner() {
   const terminalHeightRef = useRef(240);
   const sidebarWidthRef = useRef(260);
   const rightPanelWidthRef = useRef(390);
+  const petControlUntilRef = useRef(0);
   const horizontalSplitRef = useRef<{
     reset: () => void;
     resize: (sizes: number[]) => void;
@@ -91,6 +134,7 @@ function AppInner() {
   const settingsOpen = useAppStore((state) => state.settingsOpen);
   const addToast = useAppStore((state) => state.addToast);
   const keyboardShortcuts = useAppStore((s) => s.settings.keyboardShortcuts);
+  const petSettings = useAppStore((s) => s.settings.pets);
   const shortcuts = useMemo(
     () => ({ ...DEFAULT_SHORTCUTS, ...(keyboardShortcuts ?? {}) }),
     [keyboardShortcuts],
@@ -160,6 +204,44 @@ function AppInner() {
       }
     });
   }, [createBrowserTab]);
+
+  useEffect(() => {
+    return window.forgepad.pet.onControlRequested(() => {
+      petControlUntilRef.current = Date.now() + PET_CONTROL_WINDOW_MS;
+      addToast("info", t("settings.pets.controlActivatedToast"));
+    });
+  }, [addToast, t]);
+
+  useEffect(() => {
+    const isDev = Boolean(
+      (import.meta as unknown as { env?: { DEV?: boolean } }).env?.DEV,
+    );
+    if (!isDev) return;
+
+    const debugWindow = window as Window & {
+      forgepadPetDebug?: ForgePadPetDebugApi;
+    };
+    const api: ForgePadPetDebugApi = {
+      play: (action = "random") => {
+        const normalized = PET_DEBUG_ACTIONS.includes(action)
+          ? action
+          : "random";
+        window.forgepad.pet.play(normalized);
+      },
+      stop: () => window.forgepad.pet.stop(),
+      nudge: (direction, amount) => window.forgepad.pet.nudge(direction, amount),
+      list: () => [...PET_DEBUG_ACTIONS],
+      help: () =>
+        'forgepadPetDebug.play("portal" | "spring" | "peek" | "balloon" | "rocket" | "random"); forgepadPetDebug.nudge("left" | "right" | "up" | "down"); forgepadPetDebug.stop();',
+    };
+
+    debugWindow.forgepadPetDebug = api;
+    return () => {
+      if (debugWindow.forgepadPetDebug === api) {
+        delete debugWindow.forgepadPetDebug;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     // Build action handler map for configurable keyboard shortcuts
@@ -324,6 +406,83 @@ function AppInner() {
     }
 
     const onKeyDown = (event: KeyboardEvent) => {
+      const isTextEntry = isTextEntryTarget(event.target);
+      const isDev = Boolean(
+        (import.meta as unknown as { env?: { DEV?: boolean } }).env?.DEV,
+      );
+      const devActionByKey: Record<string, PetPlayAction | "random"> = {
+        "1": "stroll",
+        "2": "hop",
+        "3": "stairs",
+        "4": "portal",
+        "5": "windowTop",
+        "6": "zigzag",
+        "7": "spring",
+        "8": "balloon",
+        "9": "rocket",
+      };
+
+      if (
+        isDev &&
+        petSettings.enabled &&
+        !isTextEntry &&
+        !event.metaKey &&
+        !event.ctrlKey &&
+        !event.altKey
+      ) {
+        const devAction = devActionByKey[event.key];
+        if (devAction) {
+          event.preventDefault();
+          event.stopPropagation();
+          petControlUntilRef.current = Date.now() + PET_CONTROL_WINDOW_MS;
+          window.forgepad.pet.play(devAction);
+          return;
+        }
+      }
+
+      const petControlActive =
+        petSettings.enabled &&
+        (petSettings.keyboardControlEnabled ?? true) &&
+        Date.now() <= petControlUntilRef.current &&
+        !isTextEntry;
+
+      if (petControlActive) {
+        const direction = arrowDirection(event.key);
+
+        if (direction) {
+          event.preventDefault();
+          event.stopPropagation();
+          petControlUntilRef.current = Date.now() + PET_CONTROL_WINDOW_MS;
+          window.forgepad.pet.nudge(direction, event.shiftKey ? 96 : 56);
+          return;
+        }
+
+        if (event.key === " " || event.code === "Space") {
+          event.preventDefault();
+          event.stopPropagation();
+          petControlUntilRef.current = Date.now() + PET_CONTROL_WINDOW_MS;
+          window.forgepad.pet.play("random");
+          return;
+        }
+
+        if (event.key === "Escape") {
+          event.preventDefault();
+          event.stopPropagation();
+          petControlUntilRef.current = 0;
+          window.forgepad.pet.stop();
+          return;
+        }
+
+        const devAction = isDev ? devActionByKey[event.key] : undefined;
+        if (devAction) {
+          event.preventDefault();
+          event.stopPropagation();
+          petControlUntilRef.current = Date.now() + PET_CONTROL_WINDOW_MS;
+          window.forgepad.pet.play(devAction);
+          return;
+        }
+      }
+
       // Data-driven dispatch: iterate all shortcuts, find match
       for (const [actionId, combo] of Object.entries(shortcuts)) {
         if (eventMatchesCombo(event, combo)) {
@@ -350,6 +509,8 @@ function AppInner() {
     toggleSidebar,
     toggleRightPanel,
     navigatePanel,
+    petSettings.enabled,
+    petSettings.keyboardControlEnabled,
     shortcuts,
   ]);
 
