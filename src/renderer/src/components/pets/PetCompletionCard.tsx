@@ -106,11 +106,13 @@ export function PetCompletionCard({
   return (
     <div
       style={{
-        position: isOverlay ? "relative" : "absolute",
+        position: isOverlay ? undefined : "absolute",
         bottom: isOverlay ? undefined : "100%",
-        left: "50%",
-        transform: `translateX(-50%) scale(${visible ? 1 : 0.9})`,
-        marginBottom: isOverlay ? 4 : 8,
+        left: isOverlay ? undefined : "50%",
+        transform: isOverlay
+          ? `scale(${visible ? 1 : 0.9})`
+          : `translateX(-50%) scale(${visible ? 1 : 0.9})`,
+        marginBottom: isOverlay ? 0 : 8,
         opacity: visible ? 1 : 0,
         transition: "opacity 0.2s ease, transform 0.2s ease",
         pointerEvents: "auto",
