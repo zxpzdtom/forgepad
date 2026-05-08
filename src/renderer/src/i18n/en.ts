@@ -39,6 +39,7 @@ const en = {
   "app.emptyState.newAgent": "New Agent",
   "app.emptyState.terminal": "Terminal",
   "app.emptyState.browser": "Browser",
+  "app.emptyState.canvas": "Canvas",
   "app.toast.failedLoadState": "Failed to load workspace state.",
   "app.toast.failedSaveState": "Failed to save workspace state.",
   "app.toast.failedWatchWorkspace": "Failed to watch workspace changes.",
@@ -467,6 +468,13 @@ const en = {
 
   // ── Tab Bar ──
   "tabBar.openBrowser": "Open Browser",
+  "tabBar.openCanvas": "Open Canvas",
+
+  // ── Canvas ──
+  "canvas.saving": "Saving…",
+  "canvas.saveFailed": "Failed to save canvas.",
+  "canvas.loadError": "Failed to load canvas file.",
+  "canvas.newCanvas": "New Canvas",
 
   // ── Tab Context Menu ──
   "tabMenu.rename": "Rename",
@@ -702,6 +710,7 @@ const en = {
   "store.changes": "Changes",
   "store.context": "Context",
   "store.browser": "Browser",
+  "store.canvas": "Canvas",
   "store.agent": "Agent",
   "store.terminal": "Terminal",
   "store.terminalN": "Terminal {n}",

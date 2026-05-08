@@ -38,6 +38,7 @@ import {
   FolderOpen,
   GitBranch,
   Globe,
+  PenLine,
   TerminalSquare,
 } from "lucide-react";
 
@@ -80,6 +81,7 @@ function AppInner() {
   const createTerminal = useAppStore((state) => state.createTerminal);
   const createAgentTerminal = useAppStore((state) => state.createAgentTerminal);
   const createBrowserTab = useAppStore((state) => state.createBrowserTab);
+  const createCanvasTab = useAppStore((state) => state.createCanvasTab);
   const closeTab = useAppStore((state) => state.closeTab);
   const setActiveTab = useAppStore((state) => state.setActiveTab);
   const setActiveWorkspace = useAppStore((state) => state.setActiveWorkspace);
@@ -556,6 +558,14 @@ function AppInner() {
             >
               <Globe size={16} />
               {t("app.emptyState.browser")}
+            </button>
+            <button
+              className="secondary-button"
+              type="button"
+              onClick={() => createCanvasTab()}
+            >
+              <PenLine size={16} />
+              {t("app.emptyState.canvas")}
             </button>
           </div>
         ) : null}

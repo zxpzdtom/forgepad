@@ -17,6 +17,7 @@ import { useAppStore } from "@renderer/store/app-store";
 import type { Workspace } from "@shared/types";
 
 import { BrowserTab } from "./BrowserTab";
+import { CanvasTab } from "./CanvasTab";
 import { ContextPreview } from "./ContextPreview";
 import { DiffViewer } from "./DiffViewer";
 import { FileEditor } from "./FileEditor";
@@ -248,6 +249,15 @@ export function FileColumn() {
             }
             if (tab.type === "context-preview") {
               return <ContextPreview key={tab.id} />;
+            }
+            if (tab.type === "canvas") {
+              return (
+                <CanvasTab
+                  key={tab.id}
+                  tab={tab}
+                  workspace={activeWorkspace}
+                />
+              );
             }
             return null;
           })}

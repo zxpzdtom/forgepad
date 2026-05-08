@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { readdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import type { FileNode, FileStatus } from '@shared/types';
@@ -200,6 +200,7 @@ export class FileService {
   static async writeFile(rootPath: string, relPathInput: string, content: string): Promise<void> {
     const relPath = normalizeRelPath(relPathInput);
     const abs = await resolveInsideRoot(rootPath, relPath);
+    await mkdir(path.dirname(abs), { recursive: true });
     await writeFile(abs, content, 'utf8');
   }
 

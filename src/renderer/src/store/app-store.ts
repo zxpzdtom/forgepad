@@ -246,6 +246,8 @@ type AppState = {
     trackRemote?: boolean,
   ) => Promise<void>;
   syncWorktreesFromDisk: () => Promise<void>;
+  // Canvas tab actions
+  createCanvasTab: (relPath?: string) => string | undefined;
   // Browser tab actions
   createBrowserTab: (url?: string) => string | undefined;
   addBrowserHistoryEntry: (
@@ -300,6 +302,7 @@ function tabTitle(tab: Tab): string {
   if (tab.type === "diff") return "Changes";
   if (tab.type === "context-preview") return "Context";
   if (tab.type === "browser") return tab.title || "Browser";
+  if (tab.type === "canvas") return tab.title || tab.relPath.split("/").pop() || "Canvas";
   if (tab.type === "file") return tab.relPath.split("/").pop() || tab.relPath;
   return "Tab";
 }
@@ -2615,6 +2618,36 @@ export const useAppStore = create<AppState>((set, get) => ({
       }),
     );
     set((s) => ({ branchStats: { ...s.branchStats, ...updates } }));
+  },
+
+  // ── Canvas tab actions ───────────────────────────────────────────────────
+
+  createCanvasTab: (relPath) => {
+    const state = get();
+    const workspaceId = state.activeWorkspaceId;
+    if (!workspaceId) return undefined;
+
+    // Default path: canvas/untitled-{timestamp}.tldr
+    const path = relPath ?? `canvas/untitled-${Date.now()}.tldr`;
+
+    // If a tab with this path already exists in the workspace, switch to it
+    const existing = state.tabs.find(
+      (t) => t.type === "canvas" && t.workspaceId === workspaceId && t.relPath === path,
+    );
+    if (existing) {
+      get().setActiveTab(existing.id);
+      return existing.id;
+    }
+
+    const tab: Tab = {
+      id: id(),
+      workspaceId,
+      type: "canvas",
+      title: "Canvas",
+      relPath: path,
+    };
+    get().addTab(tab);
+    return tab.id;
   },
 
   // ── Browser tab actions ──────────────────────────────────────────────────

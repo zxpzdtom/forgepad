@@ -52,6 +52,14 @@ export type Tab =
       isLoading: boolean;
       canGoBack: boolean;
       canGoForward: boolean;
+    }
+  | {
+      id: string;
+      workspaceId: string;
+      type: "canvas";
+      title: string;
+      /** Relative path within workspace, e.g. "canvas/diagram.tldr" */
+      relPath: string;
     };
 
 /** A URL visited in the browser tab, stored for history/autocomplete */

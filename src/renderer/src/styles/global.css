@@ -2850,3 +2850,26 @@ textarea {
         filter: none !important;
     }
 }
+
+/* ── Canvas (tldraw) integration ───────────────────────────────────────── */
+
+.canvas-tab-wrapper {
+    /* tldraw fills this container */
+    position: relative;
+}
+
+/* Ensure tldraw fills the entire canvas tab area */
+.canvas-tab-wrapper .tl-container {
+    width: 100%;
+    height: 100%;
+}
+
+/* Blend tldraw's top bar with ForgePad's look (subtle, not heavy) */
+.canvas-tab-wrapper .tlui-layout {
+    --color-background: var(--bg);
+}
+
+/* Make the tldraw background match our theme so there's no white flash */
+[data-theme="dark"] .canvas-tab-wrapper .tl-background {
+    background: var(--bg, #1c1917);
+}

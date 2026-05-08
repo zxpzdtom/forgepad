@@ -19,6 +19,7 @@ import {
   PanelLeftOpen,
   PanelRightClose,
   PanelRightOpen,
+  PenLine,
   Pencil,
   Play,
   Search,
@@ -195,6 +196,7 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
   const settings = useAppStore((state) => state.settings);
   const createTerminal = useAppStore((state) => state.createTerminal);
   const createBrowserTab = useAppStore((state) => state.createBrowserTab);
+  const createCanvasTab = useAppStore((state) => state.createCanvasTab);
   const projectActiveRunIndex = useAppStore(
     (state) => state.projectActiveRunIndex,
   );
@@ -663,6 +665,18 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
             onClick={() => createBrowserTab()}
           >
             <Globe size={17} />
+          </button>
+        </Tooltip>
+
+        {/* ── Canvas button ── */}
+        <Tooltip label={t("tabBar.openCanvas")} position="bottom">
+          <button
+            className="icon-button border-transparent"
+            type="button"
+            disabled={!activeWorkspaceId}
+            onClick={() => createCanvasTab()}
+          >
+            <PenLine size={17} />
           </button>
         </Tooltip>
 

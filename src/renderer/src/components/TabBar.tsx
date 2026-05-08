@@ -6,7 +6,7 @@ import { useHorizontalScroll } from '@renderer/hooks/useHorizontalScroll';
 import { getDroppedPaths, hasDraggableFiles, isInternalDrop } from '@renderer/lib/drag-utils';
 import { getTabTitle, useAppStore } from '@renderer/store/app-store';
 import type { Tab } from '@shared/types';
-import { Bot, ClipboardList, ExternalLink, GitCompare, Globe, TerminalSquare } from 'lucide-react';
+import { Bot, ClipboardList, ExternalLink, GitCompare, Globe, PenLine, TerminalSquare } from 'lucide-react';
 
 import { FileIcon } from './FileIcon';
 import { SortableTabItem } from './SortableTabItem';
@@ -17,6 +17,7 @@ function tabIcon(tab: Tab) {
   if (tab.type === 'diff') return <GitCompare size={14} />;
   if (tab.type === 'context-preview') return <ClipboardList size={14} />;
   if (tab.type === 'browser') return <Globe size={14} />;
+  if (tab.type === 'canvas') return <PenLine size={14} />;
   return <FileIcon filePath={tab.relPath} size={16} />;
 }
 

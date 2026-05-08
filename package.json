@@ -74,6 +74,7 @@
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "streamdown": "^2.5.0",
+    "tldraw": "2.4.6",
     "unicode-animations": "^1.0.3",
     "zustand": "^5.0.11"
   },

@@ -41,6 +41,7 @@ const zhCN: Record<TranslationKeys, string> = {
   "app.emptyState.newAgent": "新建代理",
   "app.emptyState.terminal": "终端",
   "app.emptyState.browser": "浏览器",
+  "app.emptyState.canvas": "画布",
   "app.toast.failedLoadState": "加载工作区状态失败。",
   "app.toast.failedSaveState": "保存工作区状态失败。",
   "app.toast.failedWatchWorkspace": "监听工作区变更失败。",
@@ -439,6 +440,13 @@ const zhCN: Record<TranslationKeys, string> = {
 
   // ── Tab Bar ──
   "tabBar.openBrowser": "打开浏览器",
+  "tabBar.openCanvas": "打开画布",
+
+  // ── Canvas ──
+  "canvas.saving": "保存中…",
+  "canvas.saveFailed": "画布保存失败。",
+  "canvas.loadError": "画布文件加载失败。",
+  "canvas.newCanvas": "新建画布",
 
   // ── Tab Context Menu ──
   "tabMenu.rename": "重命名",
@@ -663,6 +671,7 @@ const zhCN: Record<TranslationKeys, string> = {
   "store.changes": "变更",
   "store.context": "上下文",
   "store.browser": "浏览器",
+  "store.canvas": "画布",
   "store.agent": "代理",
   "store.terminal": "终端",
   "store.terminalN": "终端 {n}",
