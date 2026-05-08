@@ -559,6 +559,11 @@ const zhCN: Record<TranslationKeys, string> = {
   'simulator.noStyles': '无计算样式',
   'simulator.selectElement': '选择一个元素以查看样式',
   'simulator.sendFeedback': '发送反馈',
+  'simulator.devtools': 'DevTools',
+  'simulator.devtoolsHint': '选择要检查的页面',
+  'simulator.loadingDevtools': '正在加载 DevTools…',
+  'simulator.noDevtoolsTargets': '未找到可检查的页面',
+  'simulator.refreshDevtoolsTargets': '刷新页面列表',
 
   // ── Browser Feedback Modal ──
   'browserFeedback.title': '元素反馈',

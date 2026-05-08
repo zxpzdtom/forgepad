@@ -30,6 +30,14 @@ type SimulatorElementPanelProps = {
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
 };
 
+type DevtoolsTarget = {
+  id: string;
+  title: string;
+  url: string;
+  appName: string;
+  devtoolsFrontendUrl: string;
+};
+
 // ── Helpers ──────────────────────────────────────────────────────────────
 
 /** Parse DOM node attributes array [name, value, name, value, ...] into pairs. */
@@ -91,6 +99,17 @@ const BOX_COLORS = {
   content: 'rgba(111, 168, 220, 0.66)',
 } as const;
 
+// ── Spinner ──────────────────────────────────────────────────────────────
+
+function Spinner({ className = 'h-5 w-5' }: { className?: string }) {
+  return (
+    <svg className={`animate-spin text-accent ${className}`} viewBox="0 0 16 16" fill="none">
+      <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="2" opacity="0.25" />
+      <path d="M14 8a6 6 0 00-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 // ── Component ────────────────────────────────────────────────────────────
 
 export function SimulatorElementPanel({ udid, port, deviceName, deviceRuntime, tabId, canvasRef }: SimulatorElementPanelProps) {
@@ -108,11 +127,21 @@ export function SimulatorElementPanel({ udid, port, deviceName, deviceRuntime, t
   const [loading, setLoading] = useState(false);
   const [loadingInfo, setLoadingInfo] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeSection, setActiveSection] = useState<'elements' | 'styles'>('elements');
+  const [activeSection, setActiveSection] = useState<'elements' | 'styles' | 'devtools'>('elements');
+
+  // ── DevTools state ─────────────────────────────────────────────────────
+  const [devtoolsTargets, setDevtoolsTargets] = useState<DevtoolsTarget[]>([]);
+  const [selectedDevtoolsTargetId, setSelectedDevtoolsTargetId] = useState<string | null>(null);
+  const [devtoolsLoading, setDevtoolsLoading] = useState(false);
+  const [devtoolsError, setDevtoolsError] = useState<string | null>(null);
 
   const treeContainerRef = useRef<HTMLDivElement>(null);
 
   const selectedTarget = useMemo(() => targets.find((t) => t.id === selectedTargetId) ?? null, [targets, selectedTargetId]);
+  const selectedDevtoolsTarget = useMemo(
+    () => devtoolsTargets.find((t) => t.id === selectedDevtoolsTargetId) ?? null,
+    [devtoolsTargets, selectedDevtoolsTargetId],
+  );
 
   // ── Initialize: start bridge + list targets ───────────────────────────
   useEffect(() => {
@@ -235,6 +264,38 @@ export function SimulatorElementPanel({ udid, port, deviceName, deviceRuntime, t
     };
   }, [selectedTargetId, selectedNodeId]);
 
+  // ── Load DevTools targets when DevTools tab activated ──────────────────
+  useEffect(() => {
+    if (activeSection !== 'devtools' || port === 0) return;
+    let cancelled = false;
+
+    async function loadDevtoolsTargets() {
+      setDevtoolsLoading(true);
+      setDevtoolsError(null);
+      try {
+        const res = await fetch(`http://127.0.0.1:${port}/.sim/devtools`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = (await res.json()) as { targets: DevtoolsTarget[] };
+        if (cancelled) return;
+        setDevtoolsTargets(data.targets ?? []);
+        if (data.targets?.length > 0) {
+          setSelectedDevtoolsTargetId((prev) => prev ?? data.targets[0].id);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setDevtoolsError(err instanceof Error ? err.message : String(err));
+        }
+      } finally {
+        if (!cancelled) setDevtoolsLoading(false);
+      }
+    }
+
+    loadDevtoolsTargets();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeSection, port]);
+
   // ── Cleanup on unmount ─────────────────────────────────────────────────
   useEffect(() => {
     return () => {
@@ -305,6 +366,25 @@ export function SimulatorElementPanel({ udid, port, deviceName, deviceRuntime, t
     }
   }, [selectedTargetId]);
 
+  const handleRefreshDevtoolsTargets = useCallback(async () => {
+    if (port === 0) return;
+    setDevtoolsLoading(true);
+    setDevtoolsError(null);
+    try {
+      const res = await fetch(`http://127.0.0.1:${port}/.sim/devtools`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = (await res.json()) as { targets: DevtoolsTarget[] };
+      setDevtoolsTargets(data.targets ?? []);
+      if (data.targets?.length > 0 && !data.targets.some((t) => t.id === selectedDevtoolsTargetId)) {
+        setSelectedDevtoolsTargetId(data.targets[0].id);
+      }
+    } catch (err) {
+      setDevtoolsError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setDevtoolsLoading(false);
+    }
+  }, [port, selectedDevtoolsTargetId]);
+
   const handleSendFeedback = useCallback(() => {
     if (!selectedNodeInfo || !selectedTargetId) return;
 
@@ -337,77 +417,116 @@ export function SimulatorElementPanel({ udid, port, deviceName, deviceRuntime, t
         </svg>
         <span className="flex-1 truncate font-medium text-[11px] text-text">{t('simulator.elements')}</span>
 
-        {/* Refresh button */}
-        <button
-          type="button"
-          onClick={handleRefreshTree}
-          disabled={!selectedTargetId || loading}
-          title={t('simulator.refreshTree')}
-          className="rounded p-0.5 text-subtle transition-colors hover:bg-panel-2 hover:text-text disabled:opacity-30"
-        >
-          <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
-            <path
-              d="M12 7A5 5 0 1 1 7 2M7 2l2.5 2.5M7 2L4.5 4.5"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </button>
+        {/* Refresh button (only for Elements/Styles) */}
+        {activeSection !== 'devtools' && (
+          <button
+            type="button"
+            onClick={handleRefreshTree}
+            disabled={!selectedTargetId || loading}
+            title={t('simulator.refreshTree')}
+            className="rounded p-0.5 text-subtle transition-colors hover:bg-panel-2 hover:text-text disabled:opacity-30"
+          >
+            <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+              <path
+                d="M12 7A5 5 0 1 1 7 2M7 2l2.5 2.5M7 2L4.5 4.5"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
+        )}
       </div>
 
-      {/* ── Target picker ───────────────────────────────────────────────── */}
-      <div className="flex shrink-0 items-center gap-1.5 border-border border-b px-2 py-1.5">
-        <select
-          value={selectedTargetId ?? ''}
-          onChange={(e) => setSelectedTargetId(e.target.value || null)}
-          disabled={loading || targets.length === 0}
-          className="min-w-0 flex-1 rounded border border-border bg-panel-2 px-1.5 py-1 text-[11px] text-text outline-none transition-colors focus:border-accent disabled:opacity-50"
-        >
-          {targets.length === 0 && <option value="">{t('simulator.noWebTargets')}</option>}
-          {targets.map((target) => (
-            <option key={target.id} value={target.id}>
-              {target.title} — {target.appName}
-            </option>
-          ))}
-        </select>
-        <button
-          type="button"
-          onClick={handleRefreshTargets}
-          disabled={loading}
-          title={t('simulator.refreshTargets')}
-          className="shrink-0 rounded p-1 text-subtle transition-colors hover:bg-panel-2 hover:text-text disabled:opacity-30"
-        >
-          <svg width="11" height="11" viewBox="0 0 14 14" fill="none">
-            <path
-              d="M12 7A5 5 0 1 1 7 2M7 2l2.5 2.5M7 2L4.5 4.5"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </button>
-      </div>
+      {/* ── Global tab bar: Elements | Styles | DevTools ────────────────── */}
+      {(targets.length > 0 || activeSection === 'devtools') && (
+        <div className="flex shrink-0 border-border border-b">
+          <button
+            type="button"
+            onClick={() => setActiveSection('elements')}
+            className={[
+              'px-3 py-1 font-medium text-[11px] transition-colors',
+              activeSection === 'elements' ? 'border-accent border-b-2 text-accent' : 'text-muted hover:text-text',
+            ].join(' ')}
+          >
+            {t('simulator.elements')}
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveSection('styles')}
+            className={[
+              'px-3 py-1 font-medium text-[11px] transition-colors',
+              activeSection === 'styles' ? 'border-accent border-b-2 text-accent' : 'text-muted hover:text-text',
+            ].join(' ')}
+          >
+            {t('simulator.styles')}
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveSection('devtools')}
+            className={[
+              'px-3 py-1 font-medium text-[11px] transition-colors',
+              activeSection === 'devtools' ? 'border-accent border-b-2 text-accent' : 'text-muted hover:text-text',
+            ].join(' ')}
+          >
+            {t('simulator.devtools')}
+          </button>
+        </div>
+      )}
 
-      {/* ── Error / Loading ─────────────────────────────────────────────── */}
-      {error && <div className="shrink-0 border-border border-b bg-danger/5 px-2 py-1.5 text-[11px] text-danger">{error}</div>}
+      {/* ── Target picker (Elements/Styles only) ────────────────────────── */}
+      {activeSection !== 'devtools' && (
+        <div className="flex shrink-0 items-center gap-1.5 border-border border-b px-2 py-1.5">
+          <select
+            value={selectedTargetId ?? ''}
+            onChange={(e) => setSelectedTargetId(e.target.value || null)}
+            disabled={loading || targets.length === 0}
+            className="min-w-0 flex-1 rounded border border-border bg-panel-2 px-1.5 py-1 text-[11px] text-text outline-none transition-colors focus:border-accent disabled:opacity-50"
+          >
+            {targets.length === 0 && <option value="">{t('simulator.noWebTargets')}</option>}
+            {targets.map((target) => (
+              <option key={target.id} value={target.id}>
+                {target.title} — {target.appName}
+              </option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={handleRefreshTargets}
+            disabled={loading}
+            title={t('simulator.refreshTargets')}
+            className="shrink-0 rounded p-1 text-subtle transition-colors hover:bg-panel-2 hover:text-text disabled:opacity-30"
+          >
+            <svg width="11" height="11" viewBox="0 0 14 14" fill="none">
+              <path
+                d="M12 7A5 5 0 1 1 7 2M7 2l2.5 2.5M7 2L4.5 4.5"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
+        </div>
+      )}
 
-      {loading && !domTree && (
+      {/* ── Error / Loading (Elements/Styles) ───────────────────────────── */}
+      {activeSection !== 'devtools' && error && (
+        <div className="shrink-0 border-border border-b bg-danger/5 px-2 py-1.5 text-[11px] text-danger">{error}</div>
+      )}
+
+      {activeSection !== 'devtools' && loading && !domTree && (
         <div className="flex flex-1 items-center justify-center">
           <div className="flex flex-col items-center gap-2">
-            <svg className="h-5 w-5 animate-spin text-accent" viewBox="0 0 16 16" fill="none">
-              <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="2" opacity="0.25" />
-              <path d="M14 8a6 6 0 00-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-            </svg>
+            <Spinner />
             <span className="text-[11px] text-muted">{t('simulator.loadingTree')}</span>
           </div>
         </div>
       )}
 
       {/* ── No targets state ────────────────────────────────────────────── */}
-      {!loading && targets.length === 0 && !error && (
+      {activeSection !== 'devtools' && !loading && targets.length === 0 && !error && (
         <div className="flex flex-1 items-center justify-center px-4 text-center">
           <div className="flex flex-col items-center gap-2">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-muted">
@@ -429,33 +548,9 @@ export function SimulatorElementPanel({ udid, port, deviceName, deviceRuntime, t
         </div>
       )}
 
-      {/* ── DOM Tree + Info Split ────────────────────────────────────────── */}
-      {domTree && (
+      {/* ── DOM Tree + Info Split (Elements/Styles) ──────────────────────── */}
+      {activeSection !== 'devtools' && domTree && (
         <div className="flex min-h-0 flex-1 flex-col">
-          {/* Tab bar: Elements | Styles */}
-          <div className="flex shrink-0 border-border border-b">
-            <button
-              type="button"
-              onClick={() => setActiveSection('elements')}
-              className={[
-                'px-3 py-1 font-medium text-[11px] transition-colors',
-                activeSection === 'elements' ? 'border-accent border-b-2 text-accent' : 'text-muted hover:text-text',
-              ].join(' ')}
-            >
-              {t('simulator.elements')}
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveSection('styles')}
-              className={[
-                'px-3 py-1 font-medium text-[11px] transition-colors',
-                activeSection === 'styles' ? 'border-accent border-b-2 text-accent' : 'text-muted hover:text-text',
-              ].join(' ')}
-            >
-              {t('simulator.styles')}
-            </button>
-          </div>
-
           {activeSection === 'elements' ? (
             <>
               {/* DOM Tree */}
@@ -494,6 +589,92 @@ export function SimulatorElementPanel({ udid, port, deviceName, deviceRuntime, t
                 </div>
               )}
             </div>
+          )}
+        </div>
+      )}
+
+      {/* ── DevTools tab (full-panel, no domTree dependency) ────────────── */}
+      {activeSection === 'devtools' && (
+        <div className="flex min-h-0 flex-1 flex-col">
+          {/* DevTools target picker */}
+          <div className="flex shrink-0 items-center gap-1.5 border-border border-b px-2 py-1.5">
+            <select
+              value={selectedDevtoolsTargetId ?? ''}
+              onChange={(e) => setSelectedDevtoolsTargetId(e.target.value || null)}
+              disabled={devtoolsLoading || devtoolsTargets.length === 0}
+              className="min-w-0 flex-1 rounded border border-border bg-panel-2 px-1.5 py-1 text-[11px] text-text outline-none transition-colors focus:border-accent disabled:opacity-50"
+            >
+              {devtoolsTargets.length === 0 && <option value="">{t('simulator.noDevtoolsTargets')}</option>}
+              {devtoolsTargets.map((target) => (
+                <option key={target.id} value={target.id}>
+                  {target.title || target.url} — {target.appName}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={handleRefreshDevtoolsTargets}
+              disabled={devtoolsLoading}
+              title={t('simulator.refreshDevtoolsTargets')}
+              className="shrink-0 rounded p-1 text-subtle transition-colors hover:bg-panel-2 hover:text-text disabled:opacity-30"
+            >
+              <svg width="11" height="11" viewBox="0 0 14 14" fill="none">
+                <path
+                  d="M12 7A5 5 0 1 1 7 2M7 2l2.5 2.5M7 2L4.5 4.5"
+                  stroke="currentColor"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+          </div>
+
+          {/* DevTools error */}
+          {devtoolsError && (
+            <div className="shrink-0 border-border border-b bg-danger/5 px-2 py-1.5 text-[11px] text-danger">{devtoolsError}</div>
+          )}
+
+          {/* DevTools loading */}
+          {devtoolsLoading && (
+            <div className="flex flex-1 items-center justify-center">
+              <div className="flex flex-col items-center gap-2">
+                <Spinner />
+                <span className="text-[11px] text-muted">{t('simulator.loadingDevtools')}</span>
+              </div>
+            </div>
+          )}
+
+          {/* No targets */}
+          {!devtoolsLoading && devtoolsTargets.length === 0 && !devtoolsError && (
+            <div className="flex flex-1 items-center justify-center px-4 text-center">
+              <div className="flex flex-col items-center gap-2">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-muted">
+                  <rect x="3" y="3" width="18" height="14" rx="2" stroke="currentColor" strokeWidth="1.5" />
+                  <path d="M8 21h8M12 17v4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                  <path d="M7 9l3 3-3 3M13 15h4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                <p className="text-[11px] text-muted leading-relaxed">{t('simulator.noDevtoolsTargets')}</p>
+                <button
+                  type="button"
+                  onClick={handleRefreshDevtoolsTargets}
+                  className="mt-1 rounded border border-border px-2 py-0.5 text-[10px] text-muted transition-colors hover:bg-panel-2 hover:text-text"
+                >
+                  {t('simulator.refreshDevtoolsTargets')}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* DevTools iframe */}
+          {!devtoolsLoading && selectedDevtoolsTarget && (
+            <iframe
+              key={selectedDevtoolsTarget.devtoolsFrontendUrl}
+              src={selectedDevtoolsTarget.devtoolsFrontendUrl}
+              className="min-h-0 flex-1 border-0 bg-white"
+              sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-modals"
+              title="Chrome DevTools"
+            />
           )}
         </div>
       )}
@@ -635,10 +816,7 @@ function ElementInfoSection({
   if (loading) {
     return (
       <div className="flex items-center justify-center p-3">
-        <svg className="h-4 w-4 animate-spin text-accent" viewBox="0 0 16 16" fill="none">
-          <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="2" opacity="0.25" />
-          <path d="M14 8a6 6 0 00-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-        </svg>
+        <Spinner className="h-4 w-4" />
       </div>
     );
   }

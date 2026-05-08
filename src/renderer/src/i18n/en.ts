@@ -558,6 +558,11 @@ const en = {
   'simulator.noStyles': 'No computed styles',
   'simulator.selectElement': 'Select an element to view styles',
   'simulator.sendFeedback': 'Send Feedback',
+  'simulator.devtools': 'DevTools',
+  'simulator.devtoolsHint': 'Select a page to inspect',
+  'simulator.loadingDevtools': 'Loading DevTools…',
+  'simulator.noDevtoolsTargets': 'No inspectable pages found',
+  'simulator.refreshDevtoolsTargets': 'Refresh pages',
 
   // ── Browser Feedback Modal ──
   'browserFeedback.title': 'Element Feedback',
