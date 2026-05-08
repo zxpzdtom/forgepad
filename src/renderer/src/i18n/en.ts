@@ -182,6 +182,9 @@ const en = {
   "settings.agent.tabTitlePromptDesc":
     "Prompt template for generating tab titles. Use {prompt} as a placeholder for the user message.",
   "settings.agent.resetTabTitlePrompt": "Reset to default",
+  "settings.agent.renameOnFirstMessageOnly": "Rename on first message only",
+  "settings.agent.renameOnFirstMessageOnlyDesc":
+    "When enabled, tab titles are only set on the first message — subsequent messages won't trigger renaming, saving tokens and preventing title flickering.",
 
   // ── Settings > Terminal ──
   "settings.terminal.title": "Terminal",

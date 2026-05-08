@@ -1624,6 +1624,8 @@ export type AppSettings = {
   autoGenerateTabTitle: boolean;
   /** Prompt template for AI tab title generation. {prompt} is replaced with user's message. */
   tabTitlePromptTemplate: string;
+  /** Only rename the tab title on the first user message; ignore subsequent messages */
+  renameOnFirstMessageOnly: boolean;
   /** Apply hand-drawn sketchy visual effects on top of any theme */
   sketchyMode: boolean;
   /** Desktop pet settings */
@@ -1686,6 +1688,7 @@ scope 从变更的文件路径或模块中提取。
 - 只输出标题本身，不超过 10 个字
 
 用户消息：{prompt}`,
+  renameOnFirstMessageOnly: false,
   sketchyMode: false,
   pets: { ...DEFAULT_PET_SETTINGS },
   defaultBrowserHomepage: "https://www.google.com",
