@@ -1,5 +1,6 @@
 export const IPC = {
   APP_OPEN_PROJECT: "app:open-project",
+  APP_OPEN_PROJECT_FROM_PATH: "app:open-project-from-path",
   APP_PICK_DIRECTORY: "app:pick-directory",
   STATE_LOAD: "state:load",
   STATE_SAVE: "state:save",

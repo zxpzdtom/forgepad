@@ -279,6 +279,7 @@ app.whenReady().then(async () => {
       hookServer?.updateSettings({
         autoGenerateTabTitle: state.settings.autoGenerateTabTitle,
         tabTitlePromptTemplate: state.settings.tabTitlePromptTemplate,
+        renameOnFirstMessageOnly: state.settings.renameOnFirstMessageOnly,
       });
     }
   } catch {

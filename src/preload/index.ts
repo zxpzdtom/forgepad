@@ -31,6 +31,11 @@ const api = {
       ipcRenderer.invoke(
         IPC.APP_OPEN_PROJECT,
       ) as Promise<OpenProjectResult | null>,
+    openProjectFromPath: (selectedPath: string) =>
+      ipcRenderer.invoke(
+        IPC.APP_OPEN_PROJECT_FROM_PATH,
+        selectedPath,
+      ) as Promise<OpenProjectResult | null>,
     showEmojiPanel: () =>
       ipcRenderer.invoke(IPC.APP_SHOW_EMOJI_PANEL) as Promise<void>,
     pickDirectory: (title?: string) =>

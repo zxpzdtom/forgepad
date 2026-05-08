@@ -271,6 +271,20 @@ export function registerIpcHandlers(
     };
   });
 
+  ipcMain.handle(IPC.APP_OPEN_PROJECT_FROM_PATH, async (_event, selectedPath: string) => {
+    const isGitRepo = await GitService.isGitRepo(selectedPath);
+    const repoPath = isGitRepo
+      ? await GitService.getTopLevel(selectedPath).catch(() => selectedPath)
+      : selectedPath;
+    const branch = isGitRepo ? await GitService.getCurrentBranch(repoPath) : "";
+    return {
+      name: path.basename(repoPath),
+      repoPath,
+      branch,
+      isGitRepo,
+    };
+  });
+
   ipcMain.handle(IPC.APP_PICK_DIRECTORY, async (_event, title?: string) => {
     const result = await dialog.showOpenDialog({
       properties: ["openDirectory", "createDirectory"],
@@ -288,6 +302,7 @@ export function registerIpcHandlers(
       hookServer.updateSettings({
         autoGenerateTabTitle: state.settings.autoGenerateTabTitle,
         tabTitlePromptTemplate: state.settings.tabTitlePromptTemplate,
+        renameOnFirstMessageOnly: state.settings.renameOnFirstMessageOnly,
       });
     }
   });

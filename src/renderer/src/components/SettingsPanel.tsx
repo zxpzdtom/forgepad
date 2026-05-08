@@ -765,6 +765,17 @@ function AgentSection() {
         />
       </SettingRow>
 
+      <SettingRow
+        label={t("settings.agent.renameOnFirstMessageOnly")}
+        description={t("settings.agent.renameOnFirstMessageOnlyDesc")}
+      >
+        <Toggle
+          checked={settings.renameOnFirstMessageOnly}
+          onChange={(v) => updateSettings({ renameOnFirstMessageOnly: v })}
+          label="Rename tab on first message only"
+        />
+      </SettingRow>
+
       {settings.autoGenerateTabTitle && (
         <div className="py-2">
           <div className="font-[510] text-[13px] text-text">
