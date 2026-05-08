@@ -83,6 +83,12 @@ const en = {
   "settings.pets.randomMove": "Random Movement",
   "settings.pets.randomMoveDesc":
     "Allow pet to randomly wander and interact on its own",
+  "settings.pets.playMode": "Play Mode",
+  "settings.pets.playModeDesc":
+    "Controls how boldly the pet explores windows and the desktop",
+  "settings.pets.playMode.cozy": "Cozy",
+  "settings.pets.playMode.playful": "Playful",
+  "settings.pets.playMode.adventure": "Adventure",
   "settings.pets.choosePet": "Choose Your Pet",
   "settings.pets.choosePetDesc":
     "Select from built-in or custom pets. Click to select, drag in the workspace to interact.",

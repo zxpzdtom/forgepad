@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useAppStore } from "@renderer/store/app-store";
-import type { CompletionCard, Tab } from "@shared/types";
-
-type TerminalTab = Extract<Tab, { type: "terminal" }>;
+import type { CompletionCard } from "@shared/types";
+export type WorkingAgentSummary = {
+  ptyId: string;
+  title: string;
+  userPrompt?: string;
+};
 
 /** Auto-dismiss delay (ms) when the card first appears. */
 const AUTO_DISMISS_MS = 8_000;
@@ -21,11 +23,17 @@ export function PetCompletionCard({
   card,
   onDismiss,
   onView,
+  workingAgents,
+  onWorkingAgentView,
+  onHoverChange,
   variant = "widget",
 }: {
   card: CompletionCard;
   onDismiss: () => void;
   onView: () => void;
+  workingAgents?: WorkingAgentSummary[];
+  onWorkingAgentView?: (ptyId: string) => void;
+  onHoverChange?: (hovered: boolean) => void;
   /** 'widget' = inside main window, 'overlay' = desktop pet window */
   variant?: "widget" | "overlay";
 }) {
@@ -67,25 +75,23 @@ export function PetCompletionCard({
     setHovered(true);
     hasBeenHoveredRef.current = true;
     clearDismissTimer();
-  }, [clearDismissTimer]);
+    onHoverChange?.(true);
+  }, [clearDismissTimer, onHoverChange]);
 
   const handlePointerLeave = useCallback(() => {
     setHovered(false);
+    onHoverChange?.(false);
     // Use shorter timer after user has seen the card
     startDismissTimer(POST_HOVER_DISMISS_MS);
-  }, [startDismissTimer]);
+  }, [onHoverChange, startDismissTimer]);
 
-  // Get working agents for the hover expansion
-  const agentStatuses = useAppStore((s) => s.agentStatuses);
-  const tabs = useAppStore((s) => s.tabs);
-  const activeWorkspaceId = useAppStore((s) => s.activeWorkspaceId);
+  const visibleWorkingAgents = workingAgents ?? [];
 
-  const workingAgents = tabs.filter(
-    (t): t is TerminalTab =>
-      t.type === "terminal" &&
-      !!t.isAgent &&
-      t.workspaceId === activeWorkspaceId &&
-      agentStatuses[t.ptyId] === "working",
+  const viewWorkingAgent = useCallback(
+    (ptyId: string) => {
+      onWorkingAgentView?.(ptyId);
+    },
+    [onWorkingAgentView],
   );
 
   const isOverlay = variant === "overlay";
@@ -100,11 +106,13 @@ export function PetCompletionCard({
   return (
     <div
       style={{
-        position: isOverlay ? "relative" : "absolute",
+        position: isOverlay ? undefined : "absolute",
         bottom: isOverlay ? undefined : "100%",
-        left: "50%",
-        transform: `translateX(-50%) scale(${visible ? 1 : 0.9})`,
-        marginBottom: isOverlay ? 4 : 8,
+        left: isOverlay ? undefined : "50%",
+        transform: isOverlay
+          ? `scale(${visible ? 1 : 0.9})`
+          : `translateX(-50%) scale(${visible ? 1 : 0.9})`,
+        marginBottom: isOverlay ? 0 : 8,
         opacity: visible ? 1 : 0,
         transition: "opacity 0.2s ease, transform 0.2s ease",
         pointerEvents: "auto",
@@ -115,8 +123,9 @@ export function PetCompletionCard({
         border: "1px solid rgba(255, 255, 255, 0.12)",
         borderRadius: 12,
         padding: "8px 12px",
-        minWidth: 220,
-        maxWidth: 320,
+        width: isOverlay ? 320 : undefined,
+        minWidth: 240,
+        maxWidth: 340,
         boxShadow:
           "0 4px 20px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.05)",
         fontFamily:
@@ -129,98 +138,78 @@ export function PetCompletionCard({
       onPointerEnter={handlePointerEnter}
       onPointerLeave={handlePointerLeave}
     >
-      {/* Header */}
+      {/* User input line */}
       <div
         style={{
           display: "flex",
-          alignItems: "center",
-          gap: 6,
-          marginBottom: 6,
+          gap: 4,
+          marginBottom: 3,
+          minWidth: 0,
+          alignItems: "flex-start",
         }}
       >
         <span
           style={{
             fontSize: 11,
-            fontWeight: 700,
-            color: "rgba(80, 200, 120, 0.95)",
+            fontWeight: 600,
+            color: "rgba(80, 200, 120, 0.8)",
+            flexShrink: 0,
           }}
         >
-          Task Completed
+          &gt;
+        </span>
+        <span
+          style={{
+            minWidth: 0,
+            fontSize: 11,
+            color: "rgba(255, 255, 255, 0.75)",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+            lineHeight: 1.4,
+          }}
+        >
+          {truncate(card.userPrompt || "No prompt captured", 100)}
         </span>
       </div>
 
-      {/* User input line */}
-      {card.userPrompt && (
-        <div
-          style={{
-            display: "flex",
-            gap: 4,
-            marginBottom: 3,
-            alignItems: "flex-start",
-          }}
-        >
-          <span
-            style={{
-              fontSize: 11,
-              fontWeight: 600,
-              color: "rgba(80, 200, 120, 0.8)",
-              flexShrink: 0,
-            }}
-          >
-            &gt;
-          </span>
-          <span
-            style={{
-              fontSize: 11,
-              color: "rgba(255, 255, 255, 0.75)",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-              lineHeight: 1.4,
-            }}
-          >
-            {truncate(card.userPrompt, 80)}
-          </span>
-        </div>
-      )}
-
       {/* AI response line */}
-      {card.aiResponse && (
-        <div
+      <div
+        style={{
+          display: "flex",
+          gap: 4,
+          marginBottom: 6,
+          minWidth: 0,
+          alignItems: "flex-start",
+        }}
+      >
+        <span
           style={{
-            display: "flex",
-            gap: 4,
-            marginBottom: 6,
-            alignItems: "flex-start",
+            fontSize: 11,
+            fontWeight: 600,
+            color: "rgba(220, 160, 80, 0.8)",
+            flexShrink: 0,
           }}
         >
-          <span
-            style={{
-              fontSize: 11,
-              fontWeight: 600,
-              color: "rgba(220, 160, 80, 0.8)",
-              flexShrink: 0,
-            }}
-          >
-            $
-          </span>
-          <span
-            style={{
-              fontSize: 11,
-              color: "rgba(255, 255, 255, 0.75)",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-              lineHeight: 1.4,
-            }}
-          >
-            {truncate(card.aiResponse, 80)}
-          </span>
-        </div>
-      )}
+          AI
+        </span>
+        <span
+          style={{
+            minWidth: 0,
+            fontSize: 11,
+            color: "rgba(255, 255, 255, 0.75)",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+            lineHeight: 1.4,
+          }}
+        >
+          {truncate(card.aiResponse || "Finished.", 100)}
+        </span>
+      </div>
 
       {/* Hover expansion: working agents list */}
-      {hovered && workingAgents.length > 0 && (
+      {hovered && visibleWorkingAgents.length > 0 && (
         <div style={{ marginBottom: 6 }}>
           <div
             style={{
@@ -241,14 +230,26 @@ export function PetCompletionCard({
               Working Agents
             </span>
           </div>
-          {workingAgents.map((agent) => (
-            <div
-              key={agent.id}
+          {visibleWorkingAgents.slice(0, 6).map((agent) => (
+            <button
+              type="button"
+              key={agent.ptyId}
+              onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                viewWorkingAgent(agent.ptyId);
+              }}
               style={{
                 display: "flex",
                 alignItems: "center",
                 gap: 6,
+                width: "100%",
                 padding: "3px 0",
+                border: 0,
+                background: "transparent",
+                cursor: "pointer",
+                fontFamily: "inherit",
+                textAlign: "left",
               }}
             >
               <span
@@ -263,6 +264,7 @@ export function PetCompletionCard({
               />
               <span
                 style={{
+                  minWidth: 0,
                   fontSize: 10,
                   color: "rgba(255, 255, 255, 0.65)",
                   overflow: "hidden",
@@ -270,9 +272,9 @@ export function PetCompletionCard({
                   whiteSpace: "nowrap",
                 }}
               >
-                {agent.title}
+                {agent.userPrompt || agent.title}
               </span>
-            </div>
+            </button>
           ))}
         </div>
       )}

@@ -15,7 +15,7 @@ import {
   type ForgePetAnimationName,
 } from "./pet-registry";
 import { PetApprovalPopup } from "./PetApprovalPopup";
-import { PetCompletionCard } from "./PetCompletionCard";
+import { PetCompletionCard, type WorkingAgentSummary } from "./PetCompletionCard";
 
 /** Priority for each agent status — higher = more urgent. */
 const STATUS_PRIORITY: Record<AgentStatus, number> = {
@@ -55,6 +55,7 @@ export function PetWidget() {
   const activeAgentTabId = useAppStore((s) => s.activeAgentTabId);
   const tabs = useAppStore((s) => s.tabs);
   const agentStatuses = useAppStore((s) => s.agentStatuses);
+  const agentMessages = useAppStore((s) => s.agentMessages);
 
   const pendingPermission = useAppStore((s) => s.pendingPermission);
 
@@ -85,6 +86,16 @@ export function PetWidget() {
   // Track whether a random-walk step is in progress so agent-status
   // changes don't interrupt the walk animation mid-step.
   const isWanderingRef = useRef(false);
+  const petPositionRef = useRef(pet.position);
+  const petSizeRef = useRef(petSettings.petSize);
+
+  useEffect(() => {
+    petPositionRef.current = pet.position;
+  }, [pet.position]);
+
+  useEffect(() => {
+    petSizeRef.current = petSettings.petSize;
+  }, [petSettings.petSize]);
 
   // When agent status changes, update the pet animation (unless dragging/wandering).
   useEffect(() => {
@@ -171,16 +182,17 @@ export function PetWidget() {
         }
 
         // Clamp position to stay within viewport bounds
-        const spriteW = 192 * petSettings.petSize;
-        const spriteH = 208 * petSettings.petSize;
+        const spriteW = 192 * petSizeRef.current;
+        const spriteH = 208 * petSizeRef.current;
+        const petPosition = petPositionRef.current;
         const margin = 8;
         const newX = Math.max(
           margin,
-          Math.min(window.innerWidth - spriteW - margin, pet.position.x + dx),
+          Math.min(window.innerWidth - spriteW - margin, petPosition.x + dx),
         );
         const newY = Math.max(
           40,
-          Math.min(window.innerHeight - spriteH - margin, pet.position.y + dy),
+          Math.min(window.innerHeight - spriteH - margin, petPosition.y + dy),
         );
 
         // Start walk animation
@@ -221,8 +233,6 @@ export function PetWidget() {
       clearTimeout(wanderStepTimerRef.current);
       isWanderingRef.current = false;
     };
-    // pet.position is intentionally omitted to avoid re-scheduling on every position change
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     petSettings.allowRandomMove,
     petSettings.enabled,
@@ -329,6 +339,22 @@ export function PetWidget() {
   // Show completion card only when no approval/question popup is active
   const showCompletion = !showApproval && completionCards.length > 0;
   const currentCompletionCard = showCompletion ? completionCards[0] : null;
+  const workingAgents: WorkingAgentSummary[] = useMemo(
+    () =>
+      tabs
+        .filter(
+          (t) =>
+            t.type === "terminal" &&
+            !!t.isAgent &&
+            agentStatuses[t.ptyId] === "working",
+        )
+        .map((agent) => ({
+          ptyId: agent.ptyId,
+          title: agent.title,
+          userPrompt: agentMessages[agent.ptyId]?.userPrompt,
+        })),
+    [agentMessages, agentStatuses, tabs],
+  );
 
   const handleApprove = useCallback(() => {
     if (!pendingPermission) return;
@@ -393,6 +419,16 @@ export function PetWidget() {
     dismissCompletionCard(currentCompletionCard.id);
   }, [currentCompletionCard, dismissCompletionCard]);
 
+  const handleWorkingAgentView = useCallback((ptyId: string) => {
+    const state = useAppStore.getState();
+    const tab = state.tabs.find((t) => t.type === "terminal" && t.ptyId === ptyId);
+    if (!tab) return;
+    state.setActiveTab(tab.id);
+    if (tab.workspaceId !== state.activeWorkspaceId) {
+      state.setActiveWorkspace(tab.workspaceId);
+    }
+  }, []);
+
   if (!petSettings.enabled) return null;
 
   const src = getPetSpritesheetUrl(petSettings.selectedPetId);
@@ -434,6 +470,8 @@ export function PetWidget() {
           card={currentCompletionCard}
           onDismiss={handleCompletionDismiss}
           onView={handleCompletionView}
+          workingAgents={workingAgents}
+          onWorkingAgentView={handleWorkingAgentView}
           variant="widget"
         />
       )}

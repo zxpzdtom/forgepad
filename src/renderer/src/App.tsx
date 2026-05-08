@@ -1,5 +1,6 @@
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -30,7 +31,10 @@ import {
 import { registerPendingExtTabCreate } from "@renderer/lib/extension-tab-bridge";
 import { eventMatchesCombo } from "@renderer/lib/shortcut-utils";
 import { useAppStore } from "@renderer/store/app-store";
-import type { ShortcutActionId } from "@shared/types";
+import type {
+  PetPlayAction,
+  ShortcutActionId,
+} from "@shared/types";
 import { DEFAULT_SHORTCUTS } from "@shared/types";
 import { Allotment } from "allotment";
 import {
@@ -43,6 +47,13 @@ import {
 
 export const ThemeContext = createContext<ResolvedTheme>("dark");
 export const useResolvedTheme = () => useContext(ThemeContext);
+
+function isTextEntryTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return Boolean(
+    target.closest('input, textarea, select, [contenteditable="true"]'),
+  );
+}
 
 function AppInner() {
   const resolvedTheme = useTheme();
@@ -91,6 +102,7 @@ function AppInner() {
   const settingsOpen = useAppStore((state) => state.settingsOpen);
   const addToast = useAppStore((state) => state.addToast);
   const keyboardShortcuts = useAppStore((s) => s.settings.keyboardShortcuts);
+  const petSettings = useAppStore((s) => s.settings.pets);
   const shortcuts = useMemo(
     () => ({ ...DEFAULT_SHORTCUTS, ...(keyboardShortcuts ?? {}) }),
     [keyboardShortcuts],
@@ -324,6 +336,39 @@ function AppInner() {
     }
 
     const onKeyDown = (event: KeyboardEvent) => {
+      const isTextEntry = isTextEntryTarget(event.target);
+      const isDev = Boolean(
+        (import.meta as unknown as { env?: { DEV?: boolean } }).env?.DEV,
+      );
+      const devActionByKey: Record<string, PetPlayAction | "random"> = {
+        "1": "stroll",
+        "2": "hop",
+        "3": "stairs",
+        "4": "portal",
+        "5": "windowTop",
+        "6": "zigzag",
+        "7": "spring",
+        "8": "balloon",
+        "9": "rocket",
+      };
+
+      if (
+        isDev &&
+        petSettings.enabled &&
+        !isTextEntry &&
+        !event.metaKey &&
+        !event.ctrlKey &&
+        !event.altKey
+      ) {
+        const devAction = devActionByKey[event.key];
+        if (devAction) {
+          event.preventDefault();
+          event.stopPropagation();
+          window.forgepad.pet.play(devAction);
+          return;
+        }
+      }
+
       // Data-driven dispatch: iterate all shortcuts, find match
       for (const [actionId, combo] of Object.entries(shortcuts)) {
         if (eventMatchesCombo(event, combo)) {
@@ -336,7 +381,9 @@ function AppInner() {
     };
 
     window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+    };
   }, [
     activeTabId,
     activeWorkspaceId,
@@ -350,6 +397,7 @@ function AppInner() {
     toggleSidebar,
     toggleRightPanel,
     navigatePanel,
+    petSettings.enabled,
     shortcuts,
   ]);
 
