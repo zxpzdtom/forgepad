@@ -503,7 +503,7 @@ export class HookServer {
       }
     }
     // Forward to the pet overlay window so it can animate per agent status
-    sendPetAgentStatus(update.status);
+    sendPetAgentStatus(update);
     // Desktop notifications and sounds are now handled by the renderer
     // (useAgentLifecycle hook) based on user settings.
   }

@@ -16,6 +16,8 @@ import type {
   LspLocation,
   OpenProjectResult,
   PendingPermission,
+  PetCommand,
+  PetPlayAction,
   PersistedAppState,
   PetSettings,
   WorkspaceChangeEvent,
@@ -503,6 +505,15 @@ const api = {
     /** Send updated pet settings to the main process, which forwards them to the pet overlay window. */
     sendSettings: (settings: PetSettings) =>
       ipcRenderer.send(IPC.PET_SETTINGS_CHANGED, settings),
+    /** Forward a manual command from the focused main window to the transparent pet overlay. */
+    command: (command: PetCommand) => ipcRenderer.send(IPC.PET_COMMAND, command),
+    play: (action?: PetPlayAction | "random") =>
+      ipcRenderer.send(IPC.PET_COMMAND, {
+        type: "play",
+        action,
+      } satisfies PetCommand),
+    stop: () =>
+      ipcRenderer.send(IPC.PET_COMMAND, { type: "stop" } satisfies PetCommand),
     /** Open folder picker, validate, and import a custom pet. */
     importPet: () =>
       ipcRenderer.invoke(IPC.PET_IMPORT) as Promise<ImportPetResult>,
