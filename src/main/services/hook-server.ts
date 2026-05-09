@@ -1,5 +1,8 @@
-import { execFile } from "node:child_process";
+import { execFile, spawn } from "node:child_process";
+import fs from "node:fs/promises";
 import http from "node:http";
+import os from "node:os";
+import path from "node:path";
 import { URL } from "node:url";
 import { promisify } from "node:util";
 import type { AgentStatusUpdate } from "@shared/agent-lifecycle";
@@ -20,6 +23,7 @@ const execFileAsync = promisify(execFile);
 
 /** Timeout for held PermissionRequest connections (2 minutes). */
 const PERMISSION_TIMEOUT_MS = 120_000;
+type AgentHookSource = "claude" | "codex";
 
 export class HookServer {
   private server: http.Server | null = null;
@@ -183,6 +187,9 @@ export class HookServer {
       if (url.pathname === "/hook/notify") {
         const eventType = url.searchParams.get("eventType") ?? "";
         const ptyId = url.searchParams.get("ptyId") ?? "";
+        const rawSource = url.searchParams.get("source") ?? "";
+        const source: AgentHookSource =
+          rawSource === "codex" ? "codex" : "claude";
 
         if (!ptyId || !eventType) {
           res.writeHead(400);
@@ -310,7 +317,15 @@ export class HookServer {
           let prompt = "";
           try {
             const json = JSON.parse(body) as Record<string, unknown>;
-            if (typeof json.prompt === "string") prompt = json.prompt;
+            if (typeof json.prompt === "string") {
+              prompt = json.prompt;
+            } else if (typeof json.user_prompt === "string") {
+              prompt = json.user_prompt;
+            } else if (typeof json.input === "string") {
+              prompt = json.input;
+            } else if (typeof json.message === "string") {
+              prompt = json.message;
+            }
           } catch {
             // ignore parse errors
           }
@@ -325,13 +340,7 @@ export class HookServer {
               // Still broadcast the prompt for completion card display
               this.broadcastUserPrompt(ptyId, prompt);
               res.writeHead(200, { "Content-Type": "application/json" });
-              res.end(
-                JSON.stringify({
-                  hookSpecificOutput: {
-                    hookEventName: "UserPromptSubmit",
-                  },
-                }),
-              );
+              res.end(this.userPromptSubmitOutput(source));
               return;
             }
 
@@ -342,14 +351,7 @@ export class HookServer {
             this.broadcastUserPrompt(ptyId, prompt);
             // Respond to the hook right away (don't block Claude CLI)
             res.writeHead(200, { "Content-Type": "application/json" });
-            res.end(
-              JSON.stringify({
-                hookSpecificOutput: {
-                  hookEventName: "UserPromptSubmit",
-                  sessionTitle: quickTitle,
-                },
-              }),
-            );
+            res.end(this.userPromptSubmitOutput(source, quickTitle));
 
             // Mark this ptyId as renamed (for "first message only" mode)
             if (this._renameOnFirstMessageOnly) {
@@ -358,7 +360,7 @@ export class HookServer {
 
             // If AI title generation is enabled, generate asynchronously and update
             if (this._autoGenerateTabTitle && this._tabTitlePromptTemplate) {
-              this.generateTitle(prompt)
+              this.generateTitle(prompt, source)
                 .then((aiTitle) => {
                   if (aiTitle !== quickTitle) {
                     this.broadcastRenameTab(ptyId, aiTitle);
@@ -446,7 +448,25 @@ export class HookServer {
     return `${lastSpace > 4 ? truncated.slice(0, lastSpace) : truncated}…`;
   }
 
-  private async generateTitle(prompt: string): Promise<string> {
+  private userPromptSubmitOutput(
+    source: AgentHookSource,
+    sessionTitle?: string,
+  ): string {
+    const hookSpecificOutput: Record<string, string> = {
+      hookEventName: "UserPromptSubmit",
+    };
+
+    if (source === "claude" && sessionTitle) {
+      hookSpecificOutput.sessionTitle = sessionTitle;
+    }
+
+    return JSON.stringify({ hookSpecificOutput });
+  }
+
+  private async generateTitle(
+    prompt: string,
+    source: AgentHookSource,
+  ): Promise<string> {
     // Always produce a quick truncated title first (used as fallback)
     const fallback = this.truncateTitle(prompt);
 
@@ -460,18 +480,10 @@ export class HookServer {
         : `${this._tabTitlePromptTemplate}\n\n${prompt}`;
 
       const userPath = getUserPath();
-      const { stdout } = await execFileAsync(
-        "claude",
-        ["-p", "--no-session-persistence", fullPrompt],
-        {
-          encoding: "utf8",
-          maxBuffer: 5 * 1024 * 1024,
-          timeout: 30_000,
-          env: { ...process.env, PATH: userPath },
-        },
-      );
-
-      const result = stdout.trim();
+      const result =
+        source === "codex"
+          ? await this.generateTitleWithCodex(fullPrompt, userPath)
+          : await this.generateTitleWithClaude(fullPrompt, userPath);
       if (!result) return fallback;
 
       // Ensure the AI result isn't too long for a tab
@@ -481,11 +493,184 @@ export class HookServer {
       return result;
     } catch (error) {
       console.error(
-        "[HookServer] AI title generation failed, using fallback:",
+        `[HookServer] AI title generation via ${source} failed, using fallback:`,
         error,
       );
       return fallback;
     }
+  }
+
+  private async generateTitleWithClaude(
+    fullPrompt: string,
+    userPath: string,
+  ): Promise<string> {
+    const { stdout } = await execFileAsync(
+      "claude",
+      ["-p", "--no-session-persistence", fullPrompt],
+      {
+        encoding: "utf8",
+        maxBuffer: 5 * 1024 * 1024,
+        timeout: 30_000,
+        env: { ...process.env, PATH: userPath },
+      },
+    );
+    return stdout.trim();
+  }
+
+  private async generateTitleWithCodex(
+    fullPrompt: string,
+    userPath: string,
+  ): Promise<string> {
+    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), "forgepad-title-"));
+    const outputPath = path.join(tmpDir, "title.txt");
+    try {
+      const { stdout, stderr } = await this.execFileWithStdin(
+        "codex",
+        [
+          "exec",
+          "--ephemeral",
+          "--skip-git-repo-check",
+          "--sandbox",
+          "read-only",
+          "--disable",
+          "hooks",
+          "--output-last-message",
+          outputPath,
+          "-",
+        ],
+        {
+          timeout: 60_000,
+          env: { ...process.env, PATH: userPath },
+        },
+        fullPrompt,
+      );
+      const fileTitle = await fs
+        .readFile(outputPath, "utf8")
+        .then((value) => value.trim())
+        .catch(() => "");
+      const streamTitle = this.extractCodexTitleFromOutput(
+        `${stdout}\n${stderr}`,
+      );
+      if (!fileTitle && !streamTitle) {
+        console.warn(
+          "[HookServer] Codex title generation produced no title",
+          {
+            stdoutTail: this.tailForLog(stdout),
+            stderrTail: this.tailForLog(stderr),
+          },
+        );
+      }
+      return fileTitle || streamTitle;
+    } finally {
+      await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
+    }
+  }
+
+  private extractCodexTitleFromOutput(output: string): string {
+    const lines = output
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean);
+
+    for (let i = lines.length - 1; i >= 0; i -= 1) {
+      const line = lines[i];
+      if (
+        line.length > 40 ||
+        line === "codex" ||
+        line === "tokens used" ||
+        /^\d[\d,]*$/.test(line) ||
+        /^\d{4}-\d{2}-\d{2}T.*\b(WARN|INFO|ERROR)\b/.test(line) ||
+        line.startsWith("deprecated:") ||
+        line.startsWith("Enable it with") ||
+        line.startsWith("<") ||
+        line.includes("<html") ||
+        line.startsWith("OpenAI Codex") ||
+        line.startsWith("--------") ||
+        line.startsWith("workdir:") ||
+        line.startsWith("model:") ||
+        line.startsWith("provider:") ||
+        line.startsWith("approval:") ||
+        line.startsWith("sandbox:") ||
+        line.startsWith("reasoning ") ||
+        line.startsWith("session id:") ||
+        line === "user"
+      ) {
+        continue;
+      }
+      return line;
+    }
+
+    return "";
+  }
+
+  private tailForLog(value: string): string {
+    return value.split(/\r?\n/).slice(-20).join("\n");
+  }
+
+  private execFileWithStdin(
+    command: string,
+    args: string[],
+    options: {
+      timeout: number;
+      env: NodeJS.ProcessEnv;
+    },
+    input: string,
+  ): Promise<{ stdout: string; stderr: string }> {
+    return new Promise((resolve, reject) => {
+      const child = spawn(command, args, {
+        env: options.env,
+        stdio: ["pipe", "pipe", "pipe"],
+      });
+      let stdout = "";
+      let stderr = "";
+      let settled = false;
+
+      const timer = setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        child.kill("SIGTERM");
+        const error = new Error(
+          `${command} ${args.join(" ")} timed out after ${options.timeout}ms`,
+        ) as Error & { stdout?: string; stderr?: string };
+        error.stdout = stdout;
+        error.stderr = stderr;
+        reject(error);
+      }, options.timeout);
+
+      child.stdout.setEncoding("utf8");
+      child.stderr.setEncoding("utf8");
+      child.stdout.on("data", (chunk) => {
+        stdout += chunk;
+      });
+      child.stderr.on("data", (chunk) => {
+        stderr += chunk;
+      });
+      child.on("error", (error) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        reject(error);
+      });
+      child.on("close", (code, signal) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        if (code === 0) {
+          resolve({ stdout, stderr });
+          return;
+        }
+        const error = new Error(
+          `${command} ${args.join(" ")} exited with code ${code ?? "null"}${
+            signal ? ` signal ${signal}` : ""
+          }`,
+        ) as Error & { stdout?: string; stderr?: string };
+        error.stdout = stdout;
+        error.stderr = stderr;
+        reject(error);
+      });
+
+      child.stdin.end(input);
+    });
   }
 
   private broadcastRenameTab(ptyId: string, title: string): void {

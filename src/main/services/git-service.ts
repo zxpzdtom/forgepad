@@ -18,11 +18,15 @@ const execFileAsync = promisify(execFile);
 const MAX_BUFFER = 20 * 1024 * 1024;
 
 async function git(args: string[], cwd: string): Promise<string> {
-  const { stdout } = await execFileAsync("git", args, {
-    cwd,
-    encoding: "utf8",
-    maxBuffer: MAX_BUFFER,
-  });
+  const { stdout } = await execFileAsync(
+    "git",
+    ["-c", "core.quotePath=false", ...args],
+    {
+      cwd,
+      encoding: "utf8",
+      maxBuffer: MAX_BUFFER,
+    },
+  );
   return stdout.trimEnd();
 }
 
