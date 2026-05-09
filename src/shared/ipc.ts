@@ -98,4 +98,6 @@ export const IPC = {
   EXTENSION_TAB_CREATE: "extension:tab-create",
   /** Renderer → main: response with the new tab's webContentsId after dom-ready */
   EXTENSION_TAB_CREATED: "extension:tab-created",
+  /** Unified extension API message bus (session preload → main process) */
+  EXTENSION_MSG: "extension:msg",
 } as const;
