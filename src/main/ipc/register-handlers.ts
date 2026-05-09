@@ -896,98 +896,234 @@ export function registerIpcHandlers(
     session.defaultSession.removeExtension(id);
   });
 
+  type ExtensionScriptingExecuteArgs = {
+    tabId: number;
+    func?: string;
+    files?: string[];
+    extId?: string;
+  };
+
+  async function executeExtensionScripting(
+    args: ExtensionScriptingExecuteArgs,
+  ): Promise<Array<{ result?: unknown; error?: { message: string } }>> {
+    const wc = webContents.fromId(args.tabId);
+    if (!wc || wc.isDestroyed()) return [{ result: undefined }];
+
+    // Execute a serialized function call in the target tab.
+    if (args.func) {
+      try {
+        const result = await wc.executeJavaScript(args.func);
+        return [{ result }];
+      } catch (err) {
+        return [{ error: { message: String(err) } }];
+      }
+    }
+
+    // Execute extension JS files in the target tab.
+    if (args.files && args.extId) {
+      const ext = session.defaultSession
+        .getAllExtensions()
+        .find((e) => e.id === args.extId);
+      if (!ext) return [{ error: { message: "Extension not found" } }];
+
+      const results: Array<{
+        result?: unknown;
+        error?: { message: string };
+      }> = [];
+      for (const file of args.files) {
+        try {
+          const code = await readFile(path.join(ext.path, file), "utf-8");
+          const result = await wc.executeJavaScript(code);
+          results.push({ result });
+        } catch (err) {
+          results.push({ error: { message: String(err) } });
+        }
+      }
+      return results;
+    }
+
+    return [{ result: undefined }];
+  }
+
+  async function insertExtensionCss(args: {
+    tabId: number;
+    css: string;
+  }): Promise<void> {
+    const wc = webContents.fromId(args.tabId);
+    if (!wc || wc.isDestroyed()) return;
+    await wc.insertCSS(args.css);
+  }
+
   // ── chrome.scripting polyfill — relay executeScript / insertCSS to webview ──
   ipcMain.handle(
     IPC.EXTENSION_SCRIPTING_EXECUTE,
     async (
       _event,
-      args: { tabId: number; func?: string; files?: string[]; extId?: string },
-    ) => {
-      const wc = webContents.fromId(args.tabId);
-      if (!wc || wc.isDestroyed()) return [{ result: undefined }];
-
-      // Execute a function string
-      if (args.func) {
-        try {
-          const result = await wc.executeJavaScript(args.func);
-          return [{ result }];
-        } catch (err) {
-          return [{ error: { message: String(err) } }];
-        }
-      }
-
-      // Execute extension JS files
-      if (args.files && args.extId) {
-        const ext = session.defaultSession
-          .getAllExtensions()
-          .find((e) => e.id === args.extId);
-        if (!ext) return [{ error: { message: "Extension not found" } }];
-        const results: Array<{
-          result?: unknown;
-          error?: { message: string };
-        }> = [];
-        for (const file of args.files) {
-          try {
-            const code = await readFile(path.join(ext.path, file), "utf-8");
-            const result = await wc.executeJavaScript(code);
-            results.push({ result });
-          } catch (err) {
-            results.push({ error: { message: String(err) } });
-          }
-        }
-        return results;
-      }
-
-      return [{ result: undefined }];
-    },
+      args: ExtensionScriptingExecuteArgs,
+    ) => executeExtensionScripting(args),
   );
 
   ipcMain.handle(
     IPC.EXTENSION_SCRIPTING_INSERT_CSS,
     async (_event, args: { tabId: number; css: string }) => {
-      const wc = webContents.fromId(args.tabId);
-      if (!wc || wc.isDestroyed()) return;
-      await wc.insertCSS(args.css);
+      await insertExtensionCss(args);
     },
   );
 
   // Extension popup window — singleton, auto-closes on blur
   let extensionPopup: BrowserWindow | null = null;
-  /** The browser window that opened the current extension popup (for routing tab-create). */
-  let extensionPopupSenderWin: BrowserWindow | null = null;
+
+  // Track context for each extension popup (keyed by popup webContents.id).
+  // Populated when popup opens, used by the unified EXTENSION_MSG handler.
+  const popupContextMap = new Map<
+    number,
+    {
+      activeTabId: number;
+      activeTabUrl: string;
+      extId: string;
+      senderWin: BrowserWindow | null;
+    }
+  >();
+
+  function makeFakeTab(
+    id: number,
+    extra?: Record<string, unknown>,
+  ): Record<string, unknown> {
+    return {
+      id,
+      active: true,
+      windowId: 1,
+      status: "complete",
+      url: "",
+      title: "",
+      index: 0,
+      pinned: false,
+      highlighted: true,
+      incognito: false,
+      ...extra,
+    };
+  }
+
+  // ── Unified extension API IPC handler ────────────────────────────────
+  // Receives calls from the session preload's polyfill code and dispatches
+  // to the appropriate handler. Context (active tab info) is looked up from
+  // popupContextMap using the sender's webContents.id.
+  ipcMain.handle(
+    IPC.EXTENSION_MSG,
+    async (event, method: string, ...args: unknown[]) => {
+      const wcId = event.sender.id;
+      const ctx = popupContextMap.get(wcId);
+      if (!ctx) {
+        throw new Error(
+          `No extension popup context for webContents ${wcId}`,
+        );
+      }
+
+      switch (method) {
+        case "tabs.query": {
+          return [
+            makeFakeTab(ctx.activeTabId, { url: ctx.activeTabUrl }),
+          ];
+        }
+        case "tabs.get": {
+          const tabId = (args[0] as number) || ctx.activeTabId;
+          return makeFakeTab(tabId, { url: ctx.activeTabUrl });
+        }
+        case "tabs.create": {
+          const payload = args[0] as { url?: string; active?: boolean } | undefined;
+          return createExtensionTab({
+            url: payload?.url || "about:blank",
+            active: payload?.active !== false,
+          });
+        }
+        case "tabs.update": {
+          const tabId = args[0] as number | undefined;
+          const updateProps = args[1] as
+            | { url?: string; active?: boolean }
+            | undefined;
+          return makeFakeTab(tabId || ctx.activeTabId, {
+            url: updateProps?.url || ctx.activeTabUrl,
+          });
+        }
+        case "tabs.remove":
+          return undefined;
+        case "tabs.sendMessage":
+          return undefined;
+        case "scripting.executeScript": {
+          const payload = args[0] as {
+            tabId?: number;
+            func?: string;
+            files?: string[];
+            extId?: string;
+          } | undefined;
+          return executeExtensionScripting({
+            tabId: payload?.tabId ?? ctx.activeTabId,
+            func: payload?.func,
+            files: payload?.files,
+            extId: payload?.extId ?? ctx.extId,
+          });
+        }
+        case "scripting.insertCSS": {
+          const payload = args[0] as {
+            tabId?: number;
+            css?: string;
+          } | undefined;
+          await insertExtensionCss({
+            tabId: payload?.tabId ?? ctx.activeTabId,
+            css: payload?.css || "",
+          });
+          return undefined;
+        }
+        default:
+          throw new Error(`Unknown extension method: ${method}`);
+      }
+    },
+  );
 
   // ── chrome.tabs.create — extension asks to open a new tab ──
-  // The popup preload calls this; we relay to the originating browser window
+  // The popup polyfill calls this; we relay to the originating browser window
   // and wait for the renderer to report the new webContentsId.
   const pendingTabCreates = new Map<
     string,
     { resolve: (tabId: number) => void; timer: NodeJS.Timeout }
   >();
 
+  function createExtensionTab(args: {
+    url: string;
+    active?: boolean;
+  }): Promise<{ id: number }> {
+    // Find the sender window from the current popup context
+    const popupWcId = extensionPopup && !extensionPopup.isDestroyed()
+      ? extensionPopup.webContents.id
+      : null;
+    const ctx = popupWcId ? popupContextMap.get(popupWcId) : null;
+    const win = ctx?.senderWin;
+    if (!win || win.isDestroyed()) return Promise.resolve({ id: 0 });
+
+    const requestId = `tab-create-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+    return new Promise<{ id: number }>((resolve) => {
+      const timer = setTimeout(() => {
+        pendingTabCreates.delete(requestId);
+        resolve({ id: 0 });
+      }, 10000);
+
+      pendingTabCreates.set(requestId, {
+        resolve: (tabId) => resolve({ id: tabId }),
+        timer,
+      });
+      win.webContents.send(IPC.EXTENSION_TAB_CREATE, {
+        requestId,
+        url: args.url,
+        active: args.active !== false,
+      });
+    });
+  }
+
   ipcMain.handle(
     IPC.EXTENSION_TAB_CREATE,
     async (_event, args: { url: string; active?: boolean }) => {
-      const win = extensionPopupSenderWin;
-      if (!win || win.isDestroyed()) return { id: 0 };
-
-      const requestId = `tab-create-${Date.now()}-${Math.random().toString(36).slice(2)}`;
-
-      return new Promise<{ id: number }>((resolve) => {
-        const timer = setTimeout(() => {
-          pendingTabCreates.delete(requestId);
-          resolve({ id: 0 });
-        }, 10000);
-
-        pendingTabCreates.set(requestId, {
-          resolve: (tabId) => resolve({ id: tabId }),
-          timer,
-        });
-        win.webContents.send(IPC.EXTENSION_TAB_CREATE, {
-          requestId,
-          url: args.url,
-          active: args.active !== false,
-        });
-      });
+      return createExtensionTab(args);
     },
   );
 
@@ -1017,9 +1153,9 @@ export function registerIpcHandlers(
         activeTabUrl?: string;
       },
     ) => {
-      // Remember which window opened the popup (for routing chrome.tabs.create)
-      extensionPopupSenderWin =
+      const senderWin =
         BrowserWindow.fromWebContents(_event.sender) ?? null;
+
       // Close any existing popup first
       if (extensionPopup && !extensionPopup.isDestroyed()) {
         extensionPopup.close();
@@ -1035,21 +1171,35 @@ export function registerIpcHandlers(
       const display = screen.getDisplayNearestPoint({ x: anchorX, y: anchorY });
       const workArea = display.workArea;
 
-      // Position: try below-and-left-aligned to anchor, then adjust for screen edges
       let popX = anchorX;
       let popY = anchorY;
 
-      // If popup would extend beyond the right edge, align its right edge to anchor
       if (popX + initialW > workArea.x + workArea.width) {
         popX = workArea.x + workArea.width - initialW;
       }
-      // If popup would extend below the bottom, show above the anchor
       if (popY + initialH > workArea.y + workArea.height) {
         popY = anchorY - initialH;
       }
-      // Clamp to work area
       popX = Math.max(workArea.x, popX);
       popY = Math.max(workArea.y, popY);
+
+      // Resolve active tab info
+      const activeTabWc = webContents.fromId(args.activeTabId);
+      const activeTabId =
+        activeTabWc && !activeTabWc.isDestroyed()
+          ? activeTabWc.id
+          : args.activeTabId;
+      const activeTabUrl =
+        args.activeTabUrl ||
+        (() => {
+          try {
+            return activeTabWc && !activeTabWc.isDestroyed()
+              ? activeTabWc.getURL()
+              : "";
+          } catch {
+            return "";
+          }
+        })();
 
       extensionPopup = new BrowserWindow({
         width: initialW,
@@ -1061,96 +1211,26 @@ export function registerIpcHandlers(
         skipTaskbar: true,
         alwaysOnTop: true,
         webPreferences: {
-          contextIsolation: false,
+          contextIsolation: true,
           sandbox: false,
         },
       });
 
-      // ── Inject polyfills via CDP BEFORE any page JS executes ──
-      // The preload approach fails for chrome-extension:// pages because
-      // Electron's extension system overrides webPreferences. Instead, we
-      // use the Chrome DevTools Protocol's Page.addScriptToEvaluateOnNewDocument
-      // which runs our script before any <script> tags on the page.
-      //
-      // We only need to patch chrome.tabs.query to return a fake tab with
-      // the correct tabId (webContentsId) and URL so the extension can find
-      // the active tab. Electron's native chrome.scripting.executeScript
-      // should work once given a valid tabId.
-      try {
-        const wc = extensionPopup.webContents;
-        wc.debugger.attach("1.3");
+      // Store context for this popup — the unified EXTENSION_MSG handler
+      // will look it up by sender webContents.id when polyfill code calls IPC.
+      const popupWcId = extensionPopup.webContents.id;
+      popupContextMap.set(popupWcId, {
+        activeTabId,
+        activeTabUrl,
+        extId: args.extId,
+        senderWin,
+      });
 
-        const tabId = args.activeTabId;
-        const tabUrl = JSON.stringify(args.activeTabUrl || "");
-
-        const injectionScript = `(function() {
-  var TAB_ID = ${tabId};
-  var TAB_URL = ${tabUrl};
-  console.log('[forgepad-ext-polyfill] TAB_ID =', TAB_ID, '| TAB_URL =', TAB_URL);
-
-  function makeFakeTab(id, extra) {
-    var tab = {
-      id: id,
-      active: true,
-      windowId: 1,
-      status: 'complete',
-      url: TAB_URL,
-      title: '',
-      index: 0,
-      pinned: false,
-      highlighted: true,
-      incognito: false
-    };
-    if (extra) { for (var k in extra) tab[k] = extra[k]; }
-    return tab;
-  }
-
-  // ── Patch chrome.tabs.query ──
-  if (typeof chrome !== 'undefined' && chrome.tabs && chrome.tabs.query) {
-    var _origQuery = chrome.tabs.query.bind(chrome.tabs);
-    chrome.tabs.query = function(queryInfo, callback) {
-      if (queryInfo && (queryInfo.active || queryInfo.currentWindow)) {
-        var tab = makeFakeTab(TAB_ID);
-        if (typeof callback === 'function') { callback([tab]); return; }
-        return Promise.resolve([tab]);
-      }
-      return _origQuery(queryInfo, callback);
-    };
-  }
-
-  // ── Patch chrome.tabs.get ──
-  if (typeof chrome !== 'undefined' && chrome.tabs) {
-    chrome.tabs.get = function(tabId, callback) {
-      var tab = makeFakeTab(tabId || TAB_ID);
-      if (typeof callback === 'function') { callback(tab); return; }
-      return Promise.resolve(tab);
-    };
-  }
-
-  // ── Redirect chrome.storage.sync → chrome.storage.local ──
-  if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.local && !chrome.storage.sync) {
-    chrome.storage.sync = chrome.storage.local;
-  }
-})();`;
-
-        await wc.debugger.sendCommand("Page.addScriptToEvaluateOnNewDocument", {
-          source: injectionScript,
-        });
-
-        // Detach debugger after page load
-        wc.once("did-finish-load", () => {
-          try {
-            wc.debugger.detach();
-          } catch {
-            /* */
-          }
-        });
-      } catch (err) {
-        console.warn(
-          "[ForgePad] Failed to inject extension polyfills via CDP:",
-          err,
-        );
-      }
+      // Clean up context when popup closes
+      extensionPopup.on("closed", () => {
+        popupContextMap.delete(popupWcId);
+        extensionPopup = null;
+      });
 
       extensionPopup.loadURL(
         `chrome-extension://${args.extId}/${args.popupPath}`,
@@ -1171,7 +1251,6 @@ export function registerIpcHandlers(
               const { w, h } = JSON.parse(result) as { w: number; h: number };
               const bounds = extensionPopup.getBounds();
 
-              // Recalculate position after resize
               let newX = bounds.x;
               let newY = bounds.y;
               if (newX + w > workArea.x + workArea.width) {
@@ -1198,9 +1277,6 @@ export function registerIpcHandlers(
 
       extensionPopup.on("blur", () => {
         extensionPopup?.close();
-      });
-      extensionPopup.on("closed", () => {
-        extensionPopup = null;
       });
     },
   );
