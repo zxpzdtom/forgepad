@@ -58,12 +58,16 @@ function isEnvFile(name: string): boolean {
 }
 
 async function gitLsFiles(rootPath: string): Promise<string[]> {
-  const { stdout } = await execFileAsync('git', ['ls-files', '--others', '--cached', '--exclude-standard'], {
-    cwd: rootPath,
-    encoding: 'utf8',
-    maxBuffer: 20 * 1024 * 1024,
-  });
-  return stdout.split(/\r?\n/).filter(Boolean);
+  const { stdout } = await execFileAsync(
+    'git',
+    ['-c', 'core.quotePath=false', 'ls-files', '-z', '--others', '--cached', '--exclude-standard'],
+    {
+      cwd: rootPath,
+      encoding: 'utf8',
+      maxBuffer: 20 * 1024 * 1024,
+    },
+  );
+  return stdout.split('\0').filter(Boolean);
 }
 
 async function manualList(rootPath: string, currentPath = rootPath, depth = 0): Promise<string[]> {

@@ -9,22 +9,23 @@ const root = fileURLToPath(new URL(".", import.meta.url));
 const fromRoot = (path: string) => resolve(root, path);
 
 /**
- * Custom plugin that builds extension-popup.ts as a self-contained CJS file.
+ * Custom plugin that builds extension-api.ts as a standalone browser bundle.
  *
- * The extension popup window loads `chrome-extension://` URLs which force
- * sandbox mode in Electron, preventing ESM preloads. So we bundle it
- * separately as CJS with all dependencies inlined.
+ * This preload is registered at the session level via
+ * session.registerPreloadScript() so it runs in ALL frames including
+ * chrome-extension:// popup pages. Uses browser platform since the session
+ * preload runs in a renderer-like context.
  */
-function buildExtensionPopupPreload() {
+function buildExtensionApiPreload() {
   return {
-    name: "build-extension-popup-preload",
+    name: "build-extension-api-preload",
     closeBundle: async () => {
       await esbuild({
-        entryPoints: [fromRoot("src/preload/extension-popup.ts")],
+        entryPoints: [fromRoot("src/preload/extension-api.ts")],
         bundle: true,
-        platform: "node",
+        platform: "browser",
         format: "cjs",
-        outfile: fromRoot("out/preload/extension-popup.cjs"),
+        outfile: fromRoot("out/preload/extension-api.cjs"),
         external: ["electron"],
         tsconfig: fromRoot("tsconfig.node.json"),
       });
@@ -43,7 +44,7 @@ export default defineConfig({
     },
   },
   preload: {
-    plugins: [externalizeDepsPlugin(), buildExtensionPopupPreload()],
+    plugins: [externalizeDepsPlugin(), buildExtensionApiPreload()],
     build: {
       rollupOptions: {
         input: {

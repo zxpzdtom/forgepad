@@ -1,31 +1,59 @@
-import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { AgentColumn } from '@renderer/components/AgentColumn';
-import { AgentQuickBar } from '@renderer/components/AgentQuickBar';
-import { AgentTabBar } from '@renderer/components/AgentTabBar';
-import { FileColumn } from '@renderer/components/FileColumn';
-import { QuickSearch } from '@renderer/components/QuickSearch';
-import { RightPanel } from '@renderer/components/RightPanel';
-import { SettingsPanel } from '@renderer/components/SettingsPanel';
-import { Sidebar } from '@renderer/components/Sidebar';
-import { SketchyFilters } from '@renderer/components/SketchyFilters';
-import { TabBar } from '@renderer/components/TabBar';
-import { TerminalDock } from '@renderer/components/TerminalDock';
-import { ToastStack } from '@renderer/components/ToastStack';
-import { TopBar } from '@renderer/components/TopBar';
-import { useAgentLifecycle } from '@renderer/hooks/useAgentLifecycle';
-import { type ResolvedTheme, useTheme } from '@renderer/hooks/useTheme';
-import { I18nProvider, useTranslation } from '@renderer/i18n';
-import { getDroppedPaths, hasDraggableFiles, isInternalDrop } from '@renderer/lib/drag-utils';
-import { registerPendingExtTabCreate } from '@renderer/lib/extension-tab-bridge';
-import { eventMatchesCombo } from '@renderer/lib/shortcut-utils';
-import { useAppStore } from '@renderer/store/app-store';
-import type { ShortcutActionId } from '@shared/types';
-import { DEFAULT_SHORTCUTS } from '@shared/types';
-import { Allotment } from 'allotment';
-import { Bot, FolderOpen, GitBranch, Globe, TerminalSquare } from 'lucide-react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { AgentColumn } from "@renderer/components/AgentColumn";
+import { AgentQuickBar } from "@renderer/components/AgentQuickBar";
+import { AgentTabBar } from "@renderer/components/AgentTabBar";
+import { FileColumn } from "@renderer/components/FileColumn";
+import { QuickSearch } from "@renderer/components/QuickSearch";
+import { RightPanel } from "@renderer/components/RightPanel";
+import { SettingsPanel } from "@renderer/components/SettingsPanel";
+import { Sidebar } from "@renderer/components/Sidebar";
+import { SketchyFilters } from "@renderer/components/SketchyFilters";
+import { TabBar } from "@renderer/components/TabBar";
+import { TerminalDock } from "@renderer/components/TerminalDock";
+import { ToastStack } from "@renderer/components/ToastStack";
+import { TopBar } from "@renderer/components/TopBar";
+import { useAgentLifecycle } from "@renderer/hooks/useAgentLifecycle";
+import { type ResolvedTheme, useTheme } from "@renderer/hooks/useTheme";
+import { I18nProvider, useTranslation } from "@renderer/i18n";
+import {
+  getDroppedPaths,
+  hasDraggableFiles,
+  isInternalDrop,
+} from "@renderer/lib/drag-utils";
+import { registerPendingExtTabCreate } from "@renderer/lib/extension-tab-bridge";
+import { eventMatchesCombo } from "@renderer/lib/shortcut-utils";
+import { useAppStore } from "@renderer/store/app-store";
+import type {
+  PetPlayAction,
+  ShortcutActionId,
+} from "@shared/types";
+import { DEFAULT_SHORTCUTS } from "@shared/types";
+import { Allotment } from "allotment";
+import {
+  Bot,
+  FolderOpen,
+  GitBranch,
+  Globe,
+  TerminalSquare,
+} from "lucide-react";
 
-export const ThemeContext = createContext<ResolvedTheme>('dark');
+export const ThemeContext = createContext<ResolvedTheme>("dark");
 export const useResolvedTheme = () => useContext(ThemeContext);
+
+function isTextEntryTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return Boolean(
+    target.closest('input, textarea, select, [contenteditable="true"]'),
+  );
+}
 
 function AppInner() {
   const resolvedTheme = useTheme();
@@ -74,7 +102,11 @@ function AppInner() {
   const settingsOpen = useAppStore((state) => state.settingsOpen);
   const addToast = useAppStore((state) => state.addToast);
   const keyboardShortcuts = useAppStore((s) => s.settings.keyboardShortcuts);
-  const shortcuts = useMemo(() => ({ ...DEFAULT_SHORTCUTS, ...(keyboardShortcuts ?? {}) }), [keyboardShortcuts]);
+  const petSettings = useAppStore((s) => s.settings.pets);
+  const shortcuts = useMemo(
+    () => ({ ...DEFAULT_SHORTCUTS, ...(keyboardShortcuts ?? {}) }),
+    [keyboardShortcuts],
+  );
   const toggleSidebar = useAppStore((s) => s.toggleSidebar);
   const toggleRightPanel = useAppStore((s) => s.toggleRightPanel);
   const rightPanelMode = useAppStore((s) => s.rightPanelMode);
@@ -88,7 +120,14 @@ function AppInner() {
       })
       .catch((error) => {
         useAppStore.getState().hydrate(null);
-        useAppStore.getState().addToast('error', error instanceof Error ? error.message : t('app.toast.failedLoadState'));
+        useAppStore
+          .getState()
+          .addToast(
+            "error",
+            error instanceof Error
+              ? error.message
+              : t("app.toast.failedLoadState"),
+          );
       });
     return () => {
       disposed = true;
@@ -102,7 +141,12 @@ function AppInner() {
       if (saveTimer) window.clearTimeout(saveTimer);
       saveTimer = window.setTimeout(() => {
         window.forgepad.state.save(state.toPersistedState()).catch((error) => {
-          state.addToast('error', error instanceof Error ? error.message : t('app.toast.failedSaveState'));
+          state.addToast(
+            "error",
+            error instanceof Error
+              ? error.message
+              : t("app.toast.failedSaveState"),
+          );
         });
       }, 400);
     });
@@ -139,34 +183,43 @@ function AppInner() {
         })),
       cycleTabForward: () => {
         const state = useAppStore.getState();
-        const wsTabs = state.tabs.filter((t) => t.workspaceId === state.activeWorkspaceId);
+        const wsTabs = state.tabs.filter(
+          (t) => t.workspaceId === state.activeWorkspaceId,
+        );
         let columnTabs;
-        if (focusedColumn === 'agent') {
-          columnTabs = wsTabs.filter((t) => t.type === 'terminal');
-        } else if (focusedColumn === 'file') {
-          columnTabs = wsTabs.filter((t) => t.type !== 'terminal');
+        if (focusedColumn === "agent") {
+          columnTabs = wsTabs.filter((t) => t.type === "terminal");
+        } else if (focusedColumn === "file") {
+          columnTabs = wsTabs.filter((t) => t.type !== "terminal");
         } else {
           columnTabs = wsTabs;
         }
         if (columnTabs.length <= 1) return;
-        const currentIdx = columnTabs.findIndex((t) => t.id === state.activeTabId);
+        const currentIdx = columnTabs.findIndex(
+          (t) => t.id === state.activeTabId,
+        );
         const nextIdx = (currentIdx + 1) % columnTabs.length;
         setActiveTab(columnTabs[nextIdx].id);
       },
       cycleTabBackward: () => {
         const state = useAppStore.getState();
-        const wsTabs = state.tabs.filter((t) => t.workspaceId === state.activeWorkspaceId);
+        const wsTabs = state.tabs.filter(
+          (t) => t.workspaceId === state.activeWorkspaceId,
+        );
         let columnTabs;
-        if (focusedColumn === 'agent') {
-          columnTabs = wsTabs.filter((t) => t.type === 'terminal');
-        } else if (focusedColumn === 'file') {
-          columnTabs = wsTabs.filter((t) => t.type !== 'terminal');
+        if (focusedColumn === "agent") {
+          columnTabs = wsTabs.filter((t) => t.type === "terminal");
+        } else if (focusedColumn === "file") {
+          columnTabs = wsTabs.filter((t) => t.type !== "terminal");
         } else {
           columnTabs = wsTabs;
         }
         if (columnTabs.length <= 1) return;
-        const currentIdx = columnTabs.findIndex((t) => t.id === state.activeTabId);
-        const nextIdx = (currentIdx - 1 + columnTabs.length) % columnTabs.length;
+        const currentIdx = columnTabs.findIndex(
+          (t) => t.id === state.activeTabId,
+        );
+        const nextIdx =
+          (currentIdx - 1 + columnTabs.length) % columnTabs.length;
         setActiveTab(columnTabs[nextIdx].id);
       },
       switchTab1: () => switchTabByIndex(0),
@@ -188,32 +241,32 @@ function AppInner() {
       toggleRightPanel: () => toggleRightPanel(),
       openRightPanelFiles: () => {
         const state = useAppStore.getState();
-        if (state.rightPanelOpen && state.rightPanelMode === 'files') {
+        if (state.rightPanelOpen && state.rightPanelMode === "files") {
           useAppStore.setState({ rightPanelOpen: false });
         } else {
-          setRightPanelMode('files');
+          setRightPanelMode("files");
         }
       },
       openRightPanelChanges: () => {
         const state = useAppStore.getState();
-        if (state.rightPanelOpen && state.rightPanelMode === 'changes') {
+        if (state.rightPanelOpen && state.rightPanelMode === "changes") {
           useAppStore.setState({ rightPanelOpen: false });
         } else {
-          setRightPanelMode('changes');
+          setRightPanelMode("changes");
         }
       },
       openRightPanelContext: () => {
         const state = useAppStore.getState();
-        if (state.rightPanelOpen && state.rightPanelMode === 'context') {
+        if (state.rightPanelOpen && state.rightPanelMode === "context") {
           useAppStore.setState({ rightPanelOpen: false });
         } else {
-          setRightPanelMode('context');
+          setRightPanelMode("context");
         }
       },
       copyPath: () => {
         const state = useAppStore.getState();
         const tab = state.tabs.find((t) => t.id === state.activeFileTabId);
-        if (!tab || tab.type !== 'file') return;
+        if (!tab || tab.type !== "file") return;
         const path =
           tab.absPath ??
           (() => {
@@ -222,17 +275,17 @@ function AppInner() {
           })();
         if (!path) return;
         void navigator.clipboard.writeText(path);
-        state.addToast('info', t('app.toast.pathCopied'));
+        state.addToast("info", t("app.toast.pathCopied"));
       },
       copyRelativePath: () => {
         const state = useAppStore.getState();
         const tab = state.tabs.find((t) => t.id === state.activeFileTabId);
-        if (!tab || tab.type !== 'file' || tab.absPath) return;
+        if (!tab || tab.type !== "file" || tab.absPath) return;
         void navigator.clipboard.writeText(tab.relPath);
-        state.addToast('info', t('app.toast.relativePathCopied'));
+        state.addToast("info", t("app.toast.relativePathCopied"));
       },
-      prevPanel: () => navigatePanel('prev'),
-      nextPanel: () => navigatePanel('next'),
+      prevPanel: () => navigatePanel("prev"),
+      nextPanel: () => navigatePanel("next"),
       switchPanel1: () => switchPanelByIndex(0),
       switchPanel2: () => switchPanelByIndex(1),
       switchPanel3: () => switchPanelByIndex(2),
@@ -253,18 +306,26 @@ function AppInner() {
 
     function switchTabByIndex(idx: number) {
       const state = useAppStore.getState();
-      if (focusedColumn === 'agent') {
+      if (focusedColumn === "agent") {
         const agentTabs = state.tabs.filter(
-          (t) => t.workspaceId === state.activeWorkspaceId && t.type === 'terminal' && t.isAgent,
+          (t) =>
+            t.workspaceId === state.activeWorkspaceId &&
+            t.type === "terminal" &&
+            t.isAgent,
         );
         if (idx < agentTabs.length) setActiveTab(agentTabs[idx].id);
-      } else if (focusedColumn === 'file') {
-        const fileTabs = state.tabs.filter((t) => t.workspaceId === state.activeWorkspaceId && t.type !== 'terminal');
+      } else if (focusedColumn === "file") {
+        const fileTabs = state.tabs.filter(
+          (t) =>
+            t.workspaceId === state.activeWorkspaceId && t.type !== "terminal",
+        );
         if (idx < fileTabs.length) setActiveTab(fileTabs[idx].id);
       } else {
         const orderedIds: string[] = [];
         for (const project of state.projects) {
-          for (const ws of state.workspaces.filter((w) => w.projectId === project.id)) {
+          for (const ws of state.workspaces.filter(
+            (w) => w.projectId === project.id,
+          )) {
             orderedIds.push(ws.id);
           }
         }
@@ -275,6 +336,39 @@ function AppInner() {
     }
 
     const onKeyDown = (event: KeyboardEvent) => {
+      const isTextEntry = isTextEntryTarget(event.target);
+      const isDev = Boolean(
+        (import.meta as unknown as { env?: { DEV?: boolean } }).env?.DEV,
+      );
+      const devActionByKey: Record<string, PetPlayAction | "random"> = {
+        "1": "stroll",
+        "2": "hop",
+        "3": "stairs",
+        "4": "portal",
+        "5": "windowTop",
+        "6": "zigzag",
+        "7": "spring",
+        "8": "balloon",
+        "9": "rocket",
+      };
+
+      if (
+        isDev &&
+        petSettings.enabled &&
+        !isTextEntry &&
+        !event.metaKey &&
+        !event.ctrlKey &&
+        !event.altKey
+      ) {
+        const devAction = devActionByKey[event.key];
+        if (devAction) {
+          event.preventDefault();
+          event.stopPropagation();
+          window.forgepad.pet.play(devAction);
+          return;
+        }
+      }
+
       // Data-driven dispatch: iterate all shortcuts, find match
       for (const [actionId, combo] of Object.entries(shortcuts)) {
         if (eventMatchesCombo(event, combo)) {
@@ -286,8 +380,10 @@ function AppInner() {
       }
     };
 
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+    };
   }, [
     activeTabId,
     activeWorkspaceId,
@@ -301,6 +397,7 @@ function AppInner() {
     toggleSidebar,
     toggleRightPanel,
     navigatePanel,
+    petSettings.enabled,
     shortcuts,
   ]);
 
@@ -334,7 +431,12 @@ function AppInner() {
         });
       })
       .catch((error) => {
-        addToast('error', error instanceof Error ? error.message : t('app.toast.failedWatchWorkspace'));
+        addToast(
+          "error",
+          error instanceof Error
+            ? error.message
+            : t("app.toast.failedWatchWorkspace"),
+        );
       });
 
     return () => {
@@ -345,33 +447,46 @@ function AppInner() {
     };
   }, [activeWorkspace, addToast, triggerGitRefresh]);
 
-  const workspaceTabs = tabs.filter((tab) => tab.workspaceId === activeWorkspaceId);
-  const hasAgentTabs = workspaceTabs.some((tab) => tab.type === 'terminal' && tab.isAgent);
-  const hasShellTabs = workspaceTabs.some((tab) => tab.type === 'terminal' && !tab.isAgent);
+  const workspaceTabs = tabs.filter(
+    (tab) => tab.workspaceId === activeWorkspaceId,
+  );
+  const hasAgentTabs = workspaceTabs.some(
+    (tab) => tab.type === "terminal" && tab.isAgent,
+  );
+  const hasShellTabs = workspaceTabs.some(
+    (tab) => tab.type === "terminal" && !tab.isAgent,
+  );
   const hasTerminalTabs = hasAgentTabs || hasShellTabs;
-  const hasFileTabs = workspaceTabs.some((tab) => tab.type !== 'terminal');
+  const hasFileTabs = workspaceTabs.some((tab) => tab.type !== "terminal");
 
   // Animate sidebar & right panel toggle via transient CSS transition
   useEffect(() => {
-    const el = horizontalSplitRef.current ? (document.querySelector('.app-horizontal-split') as HTMLElement | null) : null;
+    const el = horizontalSplitRef.current
+      ? (document.querySelector(".app-horizontal-split") as HTMLElement | null)
+      : null;
     if (!el) return;
-    el.classList.add('panel-animating');
+    el.classList.add("panel-animating");
     if (sidebarOpen) {
       requestAnimationFrame(() => {
         horizontalSplitRef.current?.resize([sidebarWidthRef.current]);
       });
     }
-    const tid = window.setTimeout(() => el.classList.remove('panel-animating'), 220);
+    const tid = window.setTimeout(
+      () => el.classList.remove("panel-animating"),
+      220,
+    );
     return () => {
       window.clearTimeout(tid);
-      el?.classList.remove('panel-animating');
+      el?.classList.remove("panel-animating");
     };
   }, [sidebarOpen]);
 
   useEffect(() => {
-    const el = document.querySelector('.app-horizontal-split') as HTMLElement | null;
+    const el = document.querySelector(
+      ".app-horizontal-split",
+    ) as HTMLElement | null;
     if (!el) return;
-    el.classList.add('panel-animating');
+    el.classList.add("panel-animating");
     if (rightPanelOpen) {
       requestAnimationFrame(() => {
         const total = el.clientWidth;
@@ -380,10 +495,13 @@ function AppInner() {
         horizontalSplitRef.current?.resize([sw, total - sw - rw, rw]);
       });
     }
-    const tid = window.setTimeout(() => el.classList.remove('panel-animating'), 220);
+    const tid = window.setTimeout(
+      () => el.classList.remove("panel-animating"),
+      220,
+    );
     return () => {
       window.clearTimeout(tid);
-      el?.classList.remove('panel-animating');
+      el?.classList.remove("panel-animating");
     };
   }, [rightPanelOpen, sidebarOpen]);
 
@@ -394,7 +512,7 @@ function AppInner() {
     if (fw == null || !columnsSplitRef.current) return;
     // Wait for the outer allotment to finish its layout first.
     requestAnimationFrame(() => {
-      const container = document.querySelector<HTMLElement>('.columns-split');
+      const container = document.querySelector<HTMLElement>(".columns-split");
       if (!container || !columnsSplitRef.current) return;
       const total = container.clientWidth;
       columnsSplitRef.current.resize([total - fw, fw]);
@@ -408,7 +526,9 @@ function AppInner() {
       requestAnimationFrame(() => {
         const handle = verticalSplitRef.current;
         if (!handle) return;
-        const container = document.querySelector<HTMLElement>('.terminal-vertical-split');
+        const container = document.querySelector<HTMLElement>(
+          ".terminal-vertical-split",
+        );
         if (!container) return;
         const total = container.clientHeight;
         const termH = terminalHeightRef.current;
@@ -425,11 +545,19 @@ function AppInner() {
           <div className="grid size-14 place-items-center rounded-lg border border-border bg-panel-2 text-accent">
             <FolderOpen size={32} />
           </div>
-          <h1 className="m-0 font-semibold text-[22px]">{t('app.emptyState.title')}</h1>
-          <p className="m-0 max-w-[460px] text-muted leading-relaxed">{t('app.emptyState.description')}</p>
-          <button className="primary-button" type="button" onClick={openProject}>
+          <h1 className="m-0 font-semibold text-[22px]">
+            {t("app.emptyState.title")}
+          </h1>
+          <p className="m-0 max-w-[460px] text-muted leading-relaxed">
+            {t("app.emptyState.description")}
+          </p>
+          <button
+            className="primary-button"
+            type="button"
+            onClick={openProject}
+          >
             <FolderOpen size={16} />
-            {t('app.emptyState.openProject')}
+            {t("app.emptyState.openProject")}
           </button>
         </section>
       );
@@ -438,29 +566,44 @@ function AppInner() {
     return (
       <section className="flex size-full flex-col items-center justify-center gap-3.5 p-8 text-center">
         <TerminalSquare size={30} />
-        <h1 className="m-0 font-semibold text-[22px]">{activeWorkspace?.name ?? t('app.emptyState.noWorkspace')}</h1>
+        <h1 className="m-0 font-semibold text-[22px]">
+          {activeWorkspace?.name ?? t("app.emptyState.noWorkspace")}
+        </h1>
         <p className="m-0 flex max-w-[460px] items-center gap-[7px] text-muted leading-relaxed">
           {activeWorkspace ? (
             <>
-              <GitBranch size={14} /> {activeWorkspace.branch || t('app.emptyState.detached')}
+              <GitBranch size={14} />{" "}
+              {activeWorkspace.branch || t("app.emptyState.detached")}
             </>
           ) : (
-            t('app.emptyState.pickProject')
+            t("app.emptyState.pickProject")
           )}
         </p>
         {activeWorkspace ? (
           <div className="flex gap-2">
-            <button className="primary-button" type="button" onClick={() => createAgentTerminal(activeWorkspace.id)}>
+            <button
+              className="primary-button"
+              type="button"
+              onClick={() => createAgentTerminal(activeWorkspace.id)}
+            >
               <Bot size={16} />
-              {t('app.emptyState.newAgent')}
+              {t("app.emptyState.newAgent")}
             </button>
-            <button className="secondary-button" type="button" onClick={() => createTerminal(activeWorkspace.id)}>
+            <button
+              className="secondary-button"
+              type="button"
+              onClick={() => createTerminal(activeWorkspace.id)}
+            >
               <TerminalSquare size={16} />
-              {t('app.emptyState.terminal')}
+              {t("app.emptyState.terminal")}
             </button>
-            <button className="secondary-button" type="button" onClick={() => createBrowserTab()}>
+            <button
+              className="secondary-button"
+              type="button"
+              onClick={() => createBrowserTab()}
+            >
               <Globe size={16} />
-              {t('app.emptyState.browser')}
+              {t("app.emptyState.browser")}
             </button>
           </div>
         ) : null}
@@ -471,8 +614,8 @@ function AppInner() {
   if (!hydrated) {
     return (
       <div className="flex size-full flex-col items-center justify-center gap-3.5 p-8 text-center">
-        <div className="font-bold text-[22px]">{t('app.name')}</div>
-        <div className="text-muted">{t('app.loading')}</div>
+        <div className="font-bold text-[22px]">{t("app.name")}</div>
+        <div className="text-muted">{t("app.loading")}</div>
       </div>
     );
   }
@@ -483,7 +626,10 @@ function AppInner() {
   const renderWorkspaceArea = () => {
     if (!hasFileTabs) {
       return (
-        <main className="flex size-full min-h-0 flex-col bg-bg" onMouseDown={() => setFocusedColumn('agent')}>
+        <main
+          className="flex size-full min-h-0 flex-col bg-bg"
+          onMouseDown={() => setFocusedColumn("agent")}
+        >
           {renderEmptyState()}
         </main>
       );
@@ -494,7 +640,7 @@ function AppInner() {
 
   // Whether any browser tabs exist across all workspaces — when true we must
   // keep FileColumn mounted (even if hidden) so webviews are not destroyed.
-  const hasBrowserTabsAnywhere = tabs.some((tab) => tab.type === 'browser');
+  const hasBrowserTabsAnywhere = tabs.some((tab) => tab.type === "browser");
   const keepFileColumnMounted = hasFileTabs || hasBrowserTabsAnywhere;
 
   const renderMiddleContent = () => {
@@ -510,7 +656,9 @@ function AppInner() {
     const showEmptyOverlay = !hasAgentTabs && !hasFileTabs;
     return (
       <div className="relative size-full">
-        {showEmptyOverlay && <div className="absolute inset-0 z-10">{renderWorkspaceArea()}</div>}
+        {showEmptyOverlay && (
+          <div className="absolute inset-0 z-10">{renderWorkspaceArea()}</div>
+        )}
         <Allotment
           ref={columnsSplitRef}
           proportionalLayout={false}
@@ -523,10 +671,10 @@ function AppInner() {
         >
           {/* Agent pane — always present but hidden when no agent tabs */}
           <Allotment.Pane
-            preferredSize={hasAgentTabs && hasFileTabs ? '50%' : undefined}
+            preferredSize={hasAgentTabs && hasFileTabs ? "50%" : undefined}
             minSize={hasAgentTabs ? 280 : 0}
             visible={hasAgentTabs}
-            className={focusedColumn === 'agent' ? 'pane-focused' : ''}
+            className={focusedColumn === "agent" ? "pane-focused" : ""}
           >
             <div className="flex size-full min-h-0 flex-col">
               <AgentTabBar />
@@ -542,10 +690,10 @@ function AppInner() {
               have browser tabs, this pane is hidden (visible=false) yet remains
               in the React tree so webview elements are not destroyed. */}
           <Allotment.Pane
-            preferredSize={hasAgentTabs && hasFileTabs ? '50%' : undefined}
+            preferredSize={hasAgentTabs && hasFileTabs ? "50%" : undefined}
             minSize={hasFileTabs ? 280 : 0}
             visible={hasFileTabs}
-            className={focusedColumn === 'file' ? 'pane-focused' : ''}
+            className={focusedColumn === "file" ? "pane-focused" : ""}
           >
             <div className="flex size-full min-h-0 flex-col">
               {!hasAgentTabs && <AgentQuickBar />}
@@ -573,7 +721,7 @@ function AppInner() {
   const handleWorkspaceDragOver = (e: React.DragEvent) => {
     if (hasDraggableFiles(e)) {
       e.preventDefault();
-      e.dataTransfer.dropEffect = 'copy';
+      e.dataTransfer.dropEffect = "copy";
     }
   };
 
@@ -583,15 +731,22 @@ function AppInner() {
     e.preventDefault();
 
     const state = useAppStore.getState();
-    const activeWs = state.workspaces.find((w) => w.id === state.activeWorkspaceId);
+    const activeWs = state.workspaces.find(
+      (w) => w.id === state.activeWorkspaceId,
+    );
 
     // Internal drop (file-tree) → always write to agent pty
     if (isInternalDrop(e)) {
-      const agentTabs = state.tabs.filter((t) => t.workspaceId === state.activeWorkspaceId && t.type === 'terminal' && t.isAgent);
+      const agentTabs = state.tabs.filter(
+        (t) =>
+          t.workspaceId === state.activeWorkspaceId &&
+          t.type === "terminal" &&
+          t.isAgent,
+      );
       const agentTabId = state.activeAgentTabId ?? agentTabs[0]?.id;
       const agentTab = agentTabs.find((t) => t.id === agentTabId);
-      if (agentTab?.type === 'terminal') {
-        window.forgepad.pty.write(agentTab.ptyId, paths.join(' '));
+      if (agentTab?.type === "terminal") {
+        window.forgepad.pty.write(agentTab.ptyId, paths.join(" "));
       }
       return;
     }
@@ -599,7 +754,7 @@ function AppInner() {
     // External drop anywhere outside Agent/Terminal → open as file preview
     if (!activeWs) return;
     for (const absPath of paths) {
-      if (absPath.startsWith(activeWs.worktreePath + '/')) {
+      if (absPath.startsWith(activeWs.worktreePath + "/")) {
         const relPath = absPath.slice(activeWs.worktreePath.length + 1);
         state.openFileTab(activeWs.id, relPath);
       } else {
@@ -609,7 +764,11 @@ function AppInner() {
   };
 
   const renderWorkspaceFrame = () => (
-    <main className="flex size-full min-h-0 flex-col bg-bg" onDragOver={handleWorkspaceDragOver} onDrop={handleWorkspaceDrop}>
+    <main
+      className="flex size-full min-h-0 flex-col bg-bg"
+      onDragOver={handleWorkspaceDragOver}
+      onDrop={handleWorkspaceDrop}
+    >
       {!hasAgentTabs && !hasFileTabs && <AgentQuickBar />}
       <div className="min-h-0 flex-1 overflow-hidden">
         <Allotment
@@ -659,7 +818,11 @@ function AppInner() {
                 if (sidebarOpen && sizes[0] > 0) {
                   sidebarWidthRef.current = sizes[0];
                 }
-                if (rightPanelOpen && sizes.length >= 3 && sizes[sizes.length - 1] > 0) {
+                if (
+                  rightPanelOpen &&
+                  sizes.length >= 3 &&
+                  sizes[sizes.length - 1] > 0
+                ) {
                   rightPanelWidthRef.current = sizes[sizes.length - 1];
                 }
               }}
@@ -673,7 +836,9 @@ function AppInner() {
                 <Sidebar />
               </Allotment.Pane>
 
-              <Allotment.Pane minSize={hasAnyContent ? 460 : 420}>{renderWorkspaceFrame()}</Allotment.Pane>
+              <Allotment.Pane minSize={hasAnyContent ? 460 : 420}>
+                {renderWorkspaceFrame()}
+              </Allotment.Pane>
 
               <Allotment.Pane
                 preferredSize={rightPanelOpen ? rightPanelWidthRef.current : 0}
@@ -687,7 +852,10 @@ function AppInner() {
           </div>
         )}
 
-        <QuickSearch open={quickSearchOpen} onClose={() => setQuickSearchOpen(false)} />
+        <QuickSearch
+          open={quickSearchOpen}
+          onClose={() => setQuickSearchOpen(false)}
+        />
         <ToastStack />
       </div>
     </ThemeContext.Provider>
