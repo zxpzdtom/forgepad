@@ -1,16 +1,21 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import {
   PetWidget as CodexPetWidget,
   usePetController,
   usePetDragGestureAnimations,
   type PetAction,
   type PetDragGestureAnimationMap,
-} from 'codex-pets-react';
-import { useAppStore } from '@renderer/store/app-store';
-import type { AgentStatus } from '@shared/agent-lifecycle';
-import { agentStatusToAnimation, forgePetAtlas, getPetSpritesheetUrl, type ForgePetAnimationName } from './pet-registry';
-import { PetApprovalPopup } from './PetApprovalPopup';
-import { PetCompletionCard } from './PetCompletionCard';
+} from "codex-pets-react";
+import { useAppStore } from "@renderer/store/app-store";
+import type { AgentStatus } from "@shared/agent-lifecycle";
+import {
+  agentStatusToAnimation,
+  forgePetAtlas,
+  getPetSpritesheetUrl,
+  type ForgePetAnimationName,
+} from "./pet-registry";
+import { PetApprovalPopup } from "./PetApprovalPopup";
+import { PetCompletionCard, type WorkingAgentSummary } from "./PetCompletionCard";
 
 /** Priority for each agent status — higher = more urgent. */
 const STATUS_PRIORITY: Record<AgentStatus, number> = {
@@ -50,25 +55,26 @@ export function PetWidget() {
   const activeAgentTabId = useAppStore((s) => s.activeAgentTabId);
   const tabs = useAppStore((s) => s.tabs);
   const agentStatuses = useAppStore((s) => s.agentStatuses);
+  const agentMessages = useAppStore((s) => s.agentMessages);
 
   const pendingPermission = useAppStore((s) => s.pendingPermission);
 
   const activeAgentStatus = useMemo(() => {
     const tab = tabs.find((t) => t.id === activeAgentTabId);
-    if (tab?.type === 'terminal' && tab.ptyId) {
-      return agentStatuses[tab.ptyId] ?? 'idle';
+    if (tab?.type === "terminal" && tab.ptyId) {
+      return agentStatuses[tab.ptyId] ?? "idle";
     }
-    return 'idle';
+    return "idle";
   }, [tabs, activeAgentTabId, agentStatuses]);
 
   const { pet, petDispatch } = usePetController<ForgePetAnimationName>({
     initialState: {
-      animation: { name: 'idle', mode: 'loop' },
-      pin: 'bottom-right',
+      animation: { name: "idle", mode: "loop" },
+      pin: "bottom-right",
       position: { x: 200, y: 200 },
     },
-    defaultAnimation: 'idle',
-    waitingAnimation: 'waiting',
+    defaultAnimation: "idle",
+    waitingAnimation: "waiting",
     // Only auto-switch to waiting when agent is idle; agent-driven
     // animations (running/review/waving) are set via the effect below.
     waitingAfterMs: 8000,
@@ -80,14 +86,24 @@ export function PetWidget() {
   // Track whether a random-walk step is in progress so agent-status
   // changes don't interrupt the walk animation mid-step.
   const isWanderingRef = useRef(false);
+  const petPositionRef = useRef(pet.position);
+  const petSizeRef = useRef(petSettings.petSize);
+
+  useEffect(() => {
+    petPositionRef.current = pet.position;
+  }, [pet.position]);
+
+  useEffect(() => {
+    petSizeRef.current = petSettings.petSize;
+  }, [petSettings.petSize]);
 
   // When agent status changes, update the pet animation (unless dragging/wandering).
   useEffect(() => {
     if (isDraggingRef.current || isWanderingRef.current) return;
     const anim = agentStatusToAnimation(activeAgentStatus);
     petDispatch({
-      type: 'setAnimation',
-      animation: { name: anim, mode: 'loop' },
+      type: "setAnimation",
+      animation: { name: anim, mode: "loop" },
     });
   }, [activeAgentStatus, petDispatch]);
 
@@ -97,7 +113,7 @@ export function PetWidget() {
 
   useEffect(() => {
     const allowRandom = petSettings.allowRandomMove ?? true;
-    if (!allowRandom || !petSettings.enabled || activeAgentStatus !== 'idle') {
+    if (!allowRandom || !petSettings.enabled || activeAgentStatus !== "idle") {
       clearTimeout(wanderTimerRef.current);
       clearTimeout(wanderStepTimerRef.current);
       isWanderingRef.current = false;
@@ -105,7 +121,9 @@ export function PetWidget() {
     }
 
     const scheduleWander = () => {
-      const delay = WANDER_INTERVAL_MIN + Math.random() * (WANDER_INTERVAL_MAX - WANDER_INTERVAL_MIN);
+      const delay =
+        WANDER_INTERVAL_MIN +
+        Math.random() * (WANDER_INTERVAL_MAX - WANDER_INTERVAL_MIN);
       wanderTimerRef.current = setTimeout(() => {
         if (isDraggingRef.current) {
           scheduleWander();
@@ -113,7 +131,9 @@ export function PetWidget() {
         }
 
         // Pick a random direction: left, right, up, down, or diagonal
-        const distance = WANDER_DISTANCE_MIN + Math.random() * (WANDER_DISTANCE_MAX - WANDER_DISTANCE_MIN);
+        const distance =
+          WANDER_DISTANCE_MIN +
+          Math.random() * (WANDER_DISTANCE_MAX - WANDER_DISTANCE_MIN);
         const direction = Math.random();
         let dx = 0;
         let dy = 0;
@@ -123,61 +143,68 @@ export function PetWidget() {
           // Go left
           dx = -distance;
           dy = (Math.random() - 0.5) * 20;
-          walkAnim = 'running-left';
+          walkAnim = "running-left";
         } else if (direction < 0.4) {
           // Go right
           dx = distance;
           dy = (Math.random() - 0.5) * 20;
-          walkAnim = 'running-right';
+          walkAnim = "running-right";
         } else if (direction < 0.5) {
           // Jump up
           dy = -(distance * 0.5);
           dx = (Math.random() - 0.5) * 30;
-          walkAnim = 'jumping';
+          walkAnim = "jumping";
         } else if (direction < 0.6) {
           // Move down
           dy = distance * 0.5;
           dx = (Math.random() - 0.5) * 30;
-          walkAnim = 'waving';
+          walkAnim = "waving";
         } else if (direction < 0.7) {
           // Diagonal upper-left
           dx = -distance * 0.7;
           dy = -distance * 0.4;
-          walkAnim = 'running-left';
+          walkAnim = "running-left";
         } else if (direction < 0.8) {
           // Diagonal upper-right
           dx = distance * 0.7;
           dy = -distance * 0.4;
-          walkAnim = 'running-right';
+          walkAnim = "running-right";
         } else if (direction < 0.9) {
           // Diagonal lower-left
           dx = -distance * 0.7;
           dy = distance * 0.4;
-          walkAnim = 'running-left';
+          walkAnim = "running-left";
         } else {
           // Diagonal lower-right
           dx = distance * 0.7;
           dy = distance * 0.4;
-          walkAnim = 'running-right';
+          walkAnim = "running-right";
         }
 
         // Clamp position to stay within viewport bounds
-        const spriteW = 192 * petSettings.petSize;
-        const spriteH = 208 * petSettings.petSize;
+        const spriteW = 192 * petSizeRef.current;
+        const spriteH = 208 * petSizeRef.current;
+        const petPosition = petPositionRef.current;
         const margin = 8;
-        const newX = Math.max(margin, Math.min(window.innerWidth - spriteW - margin, pet.position.x + dx));
-        const newY = Math.max(40, Math.min(window.innerHeight - spriteH - margin, pet.position.y + dy));
+        const newX = Math.max(
+          margin,
+          Math.min(window.innerWidth - spriteW - margin, petPosition.x + dx),
+        );
+        const newY = Math.max(
+          40,
+          Math.min(window.innerHeight - spriteH - margin, petPosition.y + dy),
+        );
 
         // Start walk animation
         isWanderingRef.current = true;
         petDispatch({
-          type: 'setAnimation',
-          animation: { name: walkAnim, mode: 'loop' },
+          type: "setAnimation",
+          animation: { name: walkAnim, mode: "loop" },
         });
 
         // Move position
         petDispatch({
-          type: 'setPosition',
+          type: "setPosition",
           position: {
             x: newX,
             y: newY,
@@ -190,8 +217,8 @@ export function PetWidget() {
           if (!isDraggingRef.current) {
             const anim = agentStatusToAnimation(activeAgentStatus);
             petDispatch({
-              type: 'setAnimation',
-              animation: { name: anim, mode: 'loop' },
+              type: "setAnimation",
+              animation: { name: anim, mode: "loop" },
             });
           }
           scheduleWander();
@@ -206,17 +233,20 @@ export function PetWidget() {
       clearTimeout(wanderStepTimerRef.current);
       isWanderingRef.current = false;
     };
-    // pet.position is intentionally omitted to avoid re-scheduling on every position change
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [petSettings.allowRandomMove, petSettings.enabled, activeAgentStatus, petDispatch]);
+  }, [
+    petSettings.allowRandomMove,
+    petSettings.enabled,
+    activeAgentStatus,
+    petDispatch,
+  ]);
 
   const dragGestureAnimations = useMemo(
     () =>
       ({
-        left: 'running-left',
-        right: 'running-right',
-        up: 'jumping',
-        down: 'waving',
+        left: "running-left",
+        right: "running-right",
+        up: "jumping",
+        down: "waving",
       }) satisfies PetDragGestureAnimationMap<ForgePetAnimationName>,
     [],
   );
@@ -232,15 +262,17 @@ export function PetWidget() {
   // agent status instead of always falling back to 'idle'.
   const restAnimation = agentStatusToAnimation(activeAgentStatus);
 
-  const observeDragGesture = usePetDragGestureAnimations<ForgePetAnimationName>({
-    enabled: true,
-    animations: dragGestureAnimations,
-    restAnimation,
-    restDelayMs: 140,
-    minimumDistance: 16,
-    axisBias: 1.12,
-    onGestureAction: commitAction,
-  });
+  const observeDragGesture = usePetDragGestureAnimations<ForgePetAnimationName>(
+    {
+      enabled: true,
+      animations: dragGestureAnimations,
+      restAnimation,
+      restDelayMs: 140,
+      minimumDistance: 16,
+      axisBias: 1.12,
+      onGestureAction: commitAction,
+    },
+  );
 
   // ── Click → jump to most urgent agent tab ──
   // We distinguish click vs drag: record pointer-down position, and on
@@ -250,7 +282,12 @@ export function PetWidget() {
 
   const handlePetClick = useCallback(() => {
     const state = useAppStore.getState();
-    const agentTabs = state.tabs.filter((t) => t.type === 'terminal' && t.isAgent && t.workspaceId === state.activeWorkspaceId);
+    const agentTabs = state.tabs.filter(
+      (t) =>
+        t.type === "terminal" &&
+        t.isAgent &&
+        t.workspaceId === state.activeWorkspaceId,
+    );
     if (agentTabs.length === 0) return;
 
     // Find the agent tab with the most urgent status
@@ -258,8 +295,8 @@ export function PetWidget() {
     let bestTab = agentTabs[0];
     let bestPriority = -1;
     for (const t of agentTabs) {
-      if (t.type !== 'terminal') continue;
-      const status = state.agentStatuses[t.ptyId] ?? 'idle';
+      if (t.type !== "terminal") continue;
+      const status = state.agentStatuses[t.ptyId] ?? "idle";
       const pri = STATUS_PRIORITY[status] ?? 0;
       if (pri > bestPriority) {
         bestPriority = pri;
@@ -276,14 +313,15 @@ export function PetWidget() {
   const dispatchAction = useCallback(
     (action: PetAction<ForgePetAnimationName>) => {
       // Track drag state so agent-status & wander effects don't fight gestures.
-      if (action.type === 'dragStart') {
+      if (action.type === "dragStart") {
         isDraggingRef.current = true;
         didDragRef.current = true;
         // Cancel any in-progress wander step
         clearTimeout(wanderStepTimerRef.current);
         isWanderingRef.current = false;
       }
-      if (action.type === 'dragEnd' || action.type === 'drop') isDraggingRef.current = false;
+      if (action.type === "dragEnd" || action.type === "drop")
+        isDraggingRef.current = false;
 
       commitAction(action);
       observeDragGesture(action);
@@ -296,27 +334,54 @@ export function PetWidget() {
   const dismissCompletionCard = useAppStore((s) => s.dismissCompletionCard);
 
   // ── Permission approval handlers ──
-  const showApproval = activeAgentStatus === 'permission' && pendingPermission !== null;
+  const showApproval =
+    activeAgentStatus === "permission" && pendingPermission !== null;
   // Show completion card only when no approval/question popup is active
   const showCompletion = !showApproval && completionCards.length > 0;
   const currentCompletionCard = showCompletion ? completionCards[0] : null;
+  const workingAgents: WorkingAgentSummary[] = useMemo(
+    () =>
+      tabs
+        .filter(
+          (t) =>
+            t.type === "terminal" &&
+            !!t.isAgent &&
+            agentStatuses[t.ptyId] === "working",
+        )
+        .map((agent) => ({
+          ptyId: agent.ptyId,
+          title: agent.title,
+          userPrompt: agentMessages[agent.ptyId]?.userPrompt,
+        })),
+    [agentMessages, agentStatuses, tabs],
+  );
 
   const handleApprove = useCallback(() => {
     if (!pendingPermission) return;
-    window.forgepad.agent.sendPermissionDecision(pendingPermission.ptyId, 'allow');
+    window.forgepad.agent.sendPermissionDecision(
+      pendingPermission.ptyId,
+      "allow",
+    );
     useAppStore.getState().setPendingPermission(null);
   }, [pendingPermission]);
 
   const handleAllowAlways = useCallback(() => {
     if (!pendingPermission) return;
-    window.forgepad.agent.sendPermissionDecision(pendingPermission.ptyId, 'allowAlways');
+    window.forgepad.agent.sendPermissionDecision(
+      pendingPermission.ptyId,
+      "allowAlways",
+    );
     useAppStore.getState().setPendingPermission(null);
   }, [pendingPermission]);
 
   const handleAnswer = useCallback(
     (answers: Record<string, string>) => {
       if (!pendingPermission) return;
-      window.forgepad.agent.sendPermissionDecision(pendingPermission.ptyId, 'answer', answers);
+      window.forgepad.agent.sendPermissionDecision(
+        pendingPermission.ptyId,
+        "answer",
+        answers,
+      );
       useAppStore.getState().setPendingPermission(null);
     },
     [pendingPermission],
@@ -324,7 +389,10 @@ export function PetWidget() {
 
   const handleDeny = useCallback(() => {
     if (!pendingPermission) return;
-    window.forgepad.agent.sendPermissionDecision(pendingPermission.ptyId, 'deny');
+    window.forgepad.agent.sendPermissionDecision(
+      pendingPermission.ptyId,
+      "deny",
+    );
     useAppStore.getState().setPendingPermission(null);
   }, [pendingPermission]);
 
@@ -339,7 +407,9 @@ export function PetWidget() {
     if (!currentCompletionCard) return;
     // Find the agent tab and switch to it
     const state = useAppStore.getState();
-    const tab = state.tabs.find((t) => t.type === 'terminal' && t.ptyId === currentCompletionCard.ptyId);
+    const tab = state.tabs.find(
+      (t) => t.type === "terminal" && t.ptyId === currentCompletionCard.ptyId,
+    );
     if (tab) {
       state.setActiveTab(tab.id);
       if (tab.workspaceId !== state.activeWorkspaceId) {
@@ -348,6 +418,16 @@ export function PetWidget() {
     }
     dismissCompletionCard(currentCompletionCard.id);
   }, [currentCompletionCard, dismissCompletionCard]);
+
+  const handleWorkingAgentView = useCallback((ptyId: string) => {
+    const state = useAppStore.getState();
+    const tab = state.tabs.find((t) => t.type === "terminal" && t.ptyId === ptyId);
+    if (!tab) return;
+    state.setActiveTab(tab.id);
+    if (tab.workspaceId !== state.activeWorkspaceId) {
+      state.setActiveWorkspace(tab.workspaceId);
+    }
+  }, []);
 
   if (!petSettings.enabled) return null;
 
@@ -370,7 +450,7 @@ export function PetWidget() {
         }
         pointerDownPos.current = null;
       }}
-      style={{ position: 'relative' }}
+      style={{ position: "relative" }}
     >
       {/* Approval popup positioned above the pet (highest priority) */}
       {showApproval && pendingPermission && (
@@ -390,6 +470,8 @@ export function PetWidget() {
           card={currentCompletionCard}
           onDismiss={handleCompletionDismiss}
           onView={handleCompletionView}
+          workingAgents={workingAgents}
+          onWorkingAgentView={handleWorkingAgentView}
           variant="widget"
         />
       )}

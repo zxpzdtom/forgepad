@@ -1,5 +1,5 @@
-import type { AgentStatusUpdate } from '@shared/agent-lifecycle';
-import { IPC } from '@shared/ipc';
+import type { AgentStatusUpdate } from "@shared/agent-lifecycle";
+import { IPC } from "@shared/ipc";
 import type {
   AgentCompletionData,
   AgentUserPromptData,
@@ -16,26 +16,46 @@ import type {
   LspLocation,
   OpenProjectResult,
   PendingPermission,
+  PetCommand,
+  PetPlayAction,
   PersistedAppState,
   PetSettings,
   WorkspaceChangeEvent,
-} from '@shared/types';
-import { contextBridge, ipcRenderer, webUtils } from 'electron';
+} from "@shared/types";
+import { contextBridge, ipcRenderer, webUtils } from "electron";
 
 const api = {
   app: {
-    openProject: () => ipcRenderer.invoke(IPC.APP_OPEN_PROJECT) as Promise<OpenProjectResult | null>,
+    openProject: () =>
+      ipcRenderer.invoke(
+        IPC.APP_OPEN_PROJECT,
+      ) as Promise<OpenProjectResult | null>,
     openProjectFromPath: (selectedPath: string) =>
-      ipcRenderer.invoke(IPC.APP_OPEN_PROJECT_FROM_PATH, selectedPath) as Promise<OpenProjectResult | null>,
-    showEmojiPanel: () => ipcRenderer.invoke(IPC.APP_SHOW_EMOJI_PANEL) as Promise<void>,
-    pickDirectory: (title?: string) => ipcRenderer.invoke(IPC.APP_PICK_DIRECTORY, title) as Promise<string | null>,
+      ipcRenderer.invoke(
+        IPC.APP_OPEN_PROJECT_FROM_PATH,
+        selectedPath,
+      ) as Promise<OpenProjectResult | null>,
+    showEmojiPanel: () =>
+      ipcRenderer.invoke(IPC.APP_SHOW_EMOJI_PANEL) as Promise<void>,
+    pickDirectory: (title?: string) =>
+      ipcRenderer.invoke(IPC.APP_PICK_DIRECTORY, title) as Promise<
+        string | null
+      >,
   },
   state: {
-    load: () => ipcRenderer.invoke(IPC.STATE_LOAD) as Promise<Partial<PersistedAppState> | null>,
-    save: (state: PersistedAppState) => ipcRenderer.invoke(IPC.STATE_SAVE, state) as Promise<void>,
+    load: () =>
+      ipcRenderer.invoke(
+        IPC.STATE_LOAD,
+      ) as Promise<Partial<PersistedAppState> | null>,
+    save: (state: PersistedAppState) =>
+      ipcRenderer.invoke(IPC.STATE_SAVE, state) as Promise<void>,
   },
   git: {
-    getCurrentBranch: (worktreePath: string) => ipcRenderer.invoke(IPC.GIT_CURRENT_BRANCH, worktreePath) as Promise<string>,
+    getCurrentBranch: (worktreePath: string) =>
+      ipcRenderer.invoke(
+        IPC.GIT_CURRENT_BRANCH,
+        worktreePath,
+      ) as Promise<string>,
     getBranchStats: (worktreePath: string) =>
       ipcRenderer.invoke(IPC.GIT_BRANCH_STATS, worktreePath) as Promise<{
         ahead: number;
@@ -43,27 +63,81 @@ const api = {
         additions: number;
         deletions: number;
       }>,
-    getStatus: (worktreePath: string) => ipcRenderer.invoke(IPC.GIT_STATUS, worktreePath) as Promise<FileStatus[]>,
-    getFileDiff: (worktreePath: string, relPath: string, bucket: GitBucket, status: GitStatusKind, oldPath?: string) =>
-      ipcRenderer.invoke(IPC.GIT_FILE_DIFF, worktreePath, relPath, bucket, status, oldPath),
-    stage: (worktreePath: string, paths: string[]) => ipcRenderer.invoke(IPC.GIT_STAGE, worktreePath, paths) as Promise<void>,
-    unstage: (worktreePath: string, paths: string[]) => ipcRenderer.invoke(IPC.GIT_UNSTAGE, worktreePath, paths) as Promise<void>,
-    discard: (worktreePath: string, entries: Array<{ path: string; bucket: GitBucket }>) =>
-      ipcRenderer.invoke(IPC.GIT_DISCARD, worktreePath, entries) as Promise<void>,
-    commit: (worktreePath: string, message: string) => ipcRenderer.invoke(IPC.GIT_COMMIT, worktreePath, message) as Promise<void>,
-    push: (worktreePath: string) => ipcRenderer.invoke(IPC.GIT_PUSH, worktreePath) as Promise<void>,
-    pull: (worktreePath: string) => ipcRenderer.invoke(IPC.GIT_PULL, worktreePath) as Promise<void>,
+    getStatus: (worktreePath: string) =>
+      ipcRenderer.invoke(IPC.GIT_STATUS, worktreePath) as Promise<FileStatus[]>,
+    getFileDiff: (
+      worktreePath: string,
+      relPath: string,
+      bucket: GitBucket,
+      status: GitStatusKind,
+      oldPath?: string,
+    ) =>
+      ipcRenderer.invoke(
+        IPC.GIT_FILE_DIFF,
+        worktreePath,
+        relPath,
+        bucket,
+        status,
+        oldPath,
+      ),
+    stage: (worktreePath: string, paths: string[]) =>
+      ipcRenderer.invoke(IPC.GIT_STAGE, worktreePath, paths) as Promise<void>,
+    unstage: (worktreePath: string, paths: string[]) =>
+      ipcRenderer.invoke(IPC.GIT_UNSTAGE, worktreePath, paths) as Promise<void>,
+    discard: (
+      worktreePath: string,
+      entries: Array<{ path: string; bucket: GitBucket }>,
+    ) =>
+      ipcRenderer.invoke(
+        IPC.GIT_DISCARD,
+        worktreePath,
+        entries,
+      ) as Promise<void>,
+    commit: (worktreePath: string, message: string) =>
+      ipcRenderer.invoke(
+        IPC.GIT_COMMIT,
+        worktreePath,
+        message,
+      ) as Promise<void>,
+    push: (worktreePath: string) =>
+      ipcRenderer.invoke(IPC.GIT_PUSH, worktreePath) as Promise<void>,
+    pull: (worktreePath: string) =>
+      ipcRenderer.invoke(IPC.GIT_PULL, worktreePath) as Promise<void>,
     generateCommitMessage: (worktreePath: string, promptTemplate: string) =>
-      ipcRenderer.invoke(IPC.GIT_GENERATE_COMMIT_MSG, worktreePath, promptTemplate) as Promise<string>,
-    addWorktree: (repoPath: string, branch: string, trackRemote?: boolean, worktreeBaseDir?: string) =>
-      ipcRenderer.invoke(IPC.GIT_WORKTREE_ADD, repoPath, branch, trackRemote, worktreeBaseDir) as Promise<{
+      ipcRenderer.invoke(
+        IPC.GIT_GENERATE_COMMIT_MSG,
+        worktreePath,
+        promptTemplate,
+      ) as Promise<string>,
+    addWorktree: (
+      repoPath: string,
+      branch: string,
+      trackRemote?: boolean,
+      worktreeBaseDir?: string,
+    ) =>
+      ipcRenderer.invoke(
+        IPC.GIT_WORKTREE_ADD,
+        repoPath,
+        branch,
+        trackRemote,
+        worktreeBaseDir,
+      ) as Promise<{
         worktreePath: string;
         branch: string;
       }>,
     removeWorktree: (repoPath: string, worktreePath: string, branch: string) =>
-      ipcRenderer.invoke(IPC.GIT_WORKTREE_REMOVE, repoPath, worktreePath, branch) as Promise<void>,
-    fetch: (repoPath: string) => ipcRenderer.invoke(IPC.GIT_FETCH, repoPath) as Promise<void>,
-    listRemoteBranches: (repoPath: string) => ipcRenderer.invoke(IPC.GIT_REMOTE_BRANCHES, repoPath) as Promise<string[]>,
+      ipcRenderer.invoke(
+        IPC.GIT_WORKTREE_REMOVE,
+        repoPath,
+        worktreePath,
+        branch,
+      ) as Promise<void>,
+    fetch: (repoPath: string) =>
+      ipcRenderer.invoke(IPC.GIT_FETCH, repoPath) as Promise<void>,
+    listRemoteBranches: (repoPath: string) =>
+      ipcRenderer.invoke(IPC.GIT_REMOTE_BRANCHES, repoPath) as Promise<
+        string[]
+      >,
     getPrInfo: (worktreePath: string) =>
       ipcRenderer.invoke(IPC.GIT_PR_NUMBER, worktreePath) as Promise<{
         number: number;
@@ -81,30 +155,73 @@ const api = {
       >,
   },
   fs: {
-    getTreeWithStatus: (worktreePath: string) => ipcRenderer.invoke(IPC.FS_TREE_WITH_STATUS, worktreePath) as Promise<FileNode[]>,
-    listFiles: (worktreePath: string) => ipcRenderer.invoke(IPC.FS_LIST_FILES, worktreePath) as Promise<string[]>,
+    getTreeWithStatus: (worktreePath: string) =>
+      ipcRenderer.invoke(IPC.FS_TREE_WITH_STATUS, worktreePath) as Promise<
+        FileNode[]
+      >,
+    listFiles: (worktreePath: string) =>
+      ipcRenderer.invoke(IPC.FS_LIST_FILES, worktreePath) as Promise<string[]>,
     readFile: (worktreePath: string, relPath: string) =>
-      ipcRenderer.invoke(IPC.FS_READ_FILE, worktreePath, relPath) as Promise<string>,
+      ipcRenderer.invoke(
+        IPC.FS_READ_FILE,
+        worktreePath,
+        relPath,
+      ) as Promise<string>,
     readFileAsDataUrl: (worktreePath: string, relPath: string) =>
-      ipcRenderer.invoke(IPC.FS_READ_FILE_DATA_URL, worktreePath, relPath) as Promise<string>,
-    readAbsFile: (absPath: string) => ipcRenderer.invoke(IPC.FS_READ_ABS_FILE, absPath) as Promise<string>,
-    readAbsFileAsDataUrl: (absPath: string) => ipcRenderer.invoke(IPC.FS_READ_ABS_FILE_DATA_URL, absPath) as Promise<string>,
+      ipcRenderer.invoke(
+        IPC.FS_READ_FILE_DATA_URL,
+        worktreePath,
+        relPath,
+      ) as Promise<string>,
+    readAbsFile: (absPath: string) =>
+      ipcRenderer.invoke(IPC.FS_READ_ABS_FILE, absPath) as Promise<string>,
+    readAbsFileAsDataUrl: (absPath: string) =>
+      ipcRenderer.invoke(
+        IPC.FS_READ_ABS_FILE_DATA_URL,
+        absPath,
+      ) as Promise<string>,
     writeFile: (worktreePath: string, relPath: string, content: string) =>
-      ipcRenderer.invoke(IPC.FS_WRITE_FILE, worktreePath, relPath, content) as Promise<void>,
-    watchWorkspace: (worktreePath: string) => ipcRenderer.invoke(IPC.FS_WATCH, worktreePath) as Promise<string>,
-    unwatchWorkspace: (watchId: string) => ipcRenderer.send(IPC.FS_UNWATCH, watchId),
-    onChanged: (watchId: string, callback: (event: WorkspaceChangeEvent) => void) => {
+      ipcRenderer.invoke(
+        IPC.FS_WRITE_FILE,
+        worktreePath,
+        relPath,
+        content,
+      ) as Promise<void>,
+    watchWorkspace: (worktreePath: string) =>
+      ipcRenderer.invoke(IPC.FS_WATCH, worktreePath) as Promise<string>,
+    unwatchWorkspace: (watchId: string) =>
+      ipcRenderer.send(IPC.FS_UNWATCH, watchId),
+    onChanged: (
+      watchId: string,
+      callback: (event: WorkspaceChangeEvent) => void,
+    ) => {
       const channel = `${IPC.FS_CHANGED}:${watchId}`;
-      const listener = (_event: Electron.IpcRendererEvent, payload: WorkspaceChangeEvent) => callback(payload);
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        payload: WorkspaceChangeEvent,
+      ) => callback(payload);
       ipcRenderer.on(channel, listener);
       return () => ipcRenderer.removeListener(channel, listener);
     },
   },
   pty: {
-    create: (worktreePath: string, shell?: string, command?: string, extraEnv?: Record<string, string>) =>
-      ipcRenderer.invoke(IPC.PTY_CREATE, worktreePath, shell, command, extraEnv) as Promise<string>,
-    write: (id: string, data: string) => ipcRenderer.send(IPC.PTY_WRITE, id, data),
-    resize: (id: string, cols: number, rows: number) => ipcRenderer.send(IPC.PTY_RESIZE, id, cols, rows),
+    create: (
+      worktreePath: string,
+      shell?: string,
+      command?: string,
+      extraEnv?: Record<string, string>,
+    ) =>
+      ipcRenderer.invoke(
+        IPC.PTY_CREATE,
+        worktreePath,
+        shell,
+        command,
+        extraEnv,
+      ) as Promise<string>,
+    write: (id: string, data: string) =>
+      ipcRenderer.send(IPC.PTY_WRITE, id, data),
+    resize: (id: string, cols: number, rows: number) =>
+      ipcRenderer.send(IPC.PTY_RESIZE, id, cols, rows),
     destroy: (id: string) => ipcRenderer.send(IPC.PTY_DESTROY, id),
     reattach: (id: string) =>
       ipcRenderer.invoke(IPC.PTY_REATTACH, id) as Promise<{
@@ -113,38 +230,58 @@ const api = {
       }>,
     onData: (id: string, callback: (data: string) => void) => {
       const channel = `${IPC.PTY_DATA}:${id}`;
-      const listener = (_event: Electron.IpcRendererEvent, data: string) => callback(data);
+      const listener = (_event: Electron.IpcRendererEvent, data: string) =>
+        callback(data);
       ipcRenderer.on(channel, listener);
       return () => ipcRenderer.removeListener(channel, listener);
     },
-    onExit: (id: string, callback: (exitCode: number, signal?: number) => void) => {
+    onExit: (
+      id: string,
+      callback: (exitCode: number, signal?: number) => void,
+    ) => {
       const channel = `${IPC.PTY_EXIT}:${id}`;
-      const listener = (_event: Electron.IpcRendererEvent, exitCode: number, signal?: number) => callback(exitCode, signal);
+      const listener = (
+        _event: Electron.IpcRendererEvent,
+        exitCode: number,
+        signal?: number,
+      ) => callback(exitCode, signal);
       ipcRenderer.on(channel, listener);
       return () => ipcRenderer.removeListener(channel, listener);
     },
   },
   context: {
     createBundle: (input: CreateBundleInput) =>
-      ipcRenderer.invoke(IPC.CONTEXT_CREATE_BUNDLE, input) as Promise<ContextBundleResult>,
+      ipcRenderer.invoke(
+        IPC.CONTEXT_CREATE_BUNDLE,
+        input,
+      ) as Promise<ContextBundleResult>,
   },
   agent: {
     onStatusUpdate: (callback: (update: AgentStatusUpdate) => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, update: AgentStatusUpdate) => callback(update);
+      const handler = (
+        _event: Electron.IpcRendererEvent,
+        update: AgentStatusUpdate,
+      ) => callback(update);
       ipcRenderer.on(IPC.AGENT_STATUS_UPDATE, handler);
       return () => {
         ipcRenderer.removeListener(IPC.AGENT_STATUS_UPDATE, handler);
       };
     },
     onFocusTab: (callback: (ptyId: string) => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, ptyId: string) => callback(ptyId);
+      const handler = (_event: Electron.IpcRendererEvent, ptyId: string) =>
+        callback(ptyId);
       ipcRenderer.on(IPC.AGENT_FOCUS_TAB, handler);
       return () => {
         ipcRenderer.removeListener(IPC.AGENT_FOCUS_TAB, handler);
       };
     },
-    onRenameTab: (callback: (data: { ptyId: string; title: string }) => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, data: { ptyId: string; title: string }) => callback(data);
+    onRenameTab: (
+      callback: (data: { ptyId: string; title: string }) => void,
+    ) => {
+      const handler = (
+        _event: Electron.IpcRendererEvent,
+        data: { ptyId: string; title: string },
+      ) => callback(data);
       ipcRenderer.on(IPC.AGENT_RENAME_TAB, handler);
       return () => {
         ipcRenderer.removeListener(IPC.AGENT_RENAME_TAB, handler);
@@ -152,7 +289,10 @@ const api = {
     },
     /** Subscribe to PermissionRequest details (tool name, tool input). */
     onPermissionRequest: (callback: (data: PendingPermission) => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, data: PendingPermission) => callback(data);
+      const handler = (
+        _event: Electron.IpcRendererEvent,
+        data: PendingPermission,
+      ) => callback(data);
       ipcRenderer.on(IPC.AGENT_PERMISSION_REQUEST, handler);
       return () => {
         ipcRenderer.removeListener(IPC.AGENT_PERMISSION_REQUEST, handler);
@@ -161,14 +301,17 @@ const api = {
     /** Send a permission decision back to the main process. */
     sendPermissionDecision: (
       ptyId: string,
-      decision: 'allow' | 'deny' | 'allowAlways' | 'answer',
+      decision: "allow" | "deny" | "allowAlways" | "answer",
       answers?: Record<string, string>,
     ) => {
       ipcRenderer.send(IPC.AGENT_PERMISSION_DECISION, ptyId, decision, answers);
     },
     /** Subscribe to user prompt submissions (full prompt text for completion card). */
     onUserPrompt: (callback: (data: AgentUserPromptData) => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, data: AgentUserPromptData) => callback(data);
+      const handler = (
+        _event: Electron.IpcRendererEvent,
+        data: AgentUserPromptData,
+      ) => callback(data);
       ipcRenderer.on(IPC.AGENT_USER_PROMPT, handler);
       return () => {
         ipcRenderer.removeListener(IPC.AGENT_USER_PROMPT, handler);
@@ -176,7 +319,10 @@ const api = {
     },
     /** Subscribe to agent completion events (AI's last response). */
     onCompletion: (callback: (data: AgentCompletionData) => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, data: AgentCompletionData) => callback(data);
+      const handler = (
+        _event: Electron.IpcRendererEvent,
+        data: AgentCompletionData,
+      ) => callback(data);
       ipcRenderer.on(IPC.AGENT_COMPLETION, handler);
       return () => {
         ipcRenderer.removeListener(IPC.AGENT_COMPLETION, handler);
@@ -193,21 +339,39 @@ const api = {
     },
   },
   shell: {
-    openPath: (fullPath: string) => ipcRenderer.invoke(IPC.SHELL_OPEN_PATH, fullPath) as Promise<void>,
-    openExternal: (url: string) => ipcRenderer.invoke(IPC.SHELL_OPEN_EXTERNAL, url) as Promise<void>,
-    openInIde: (fullPath: string) => ipcRenderer.invoke(IPC.SHELL_OPEN_IN_IDE, fullPath) as Promise<void>,
-    openInTerminal: (fullPath: string) => ipcRenderer.invoke(IPC.SHELL_OPEN_IN_TERMINAL, fullPath) as Promise<void>,
-    showItemInFolder: (fullPath: string) => ipcRenderer.invoke(IPC.SHELL_SHOW_ITEM_IN_FOLDER, fullPath) as Promise<void>,
+    openPath: (fullPath: string) =>
+      ipcRenderer.invoke(IPC.SHELL_OPEN_PATH, fullPath) as Promise<void>,
+    openExternal: (url: string) =>
+      ipcRenderer.invoke(IPC.SHELL_OPEN_EXTERNAL, url) as Promise<void>,
+    openInIde: (fullPath: string) =>
+      ipcRenderer.invoke(IPC.SHELL_OPEN_IN_IDE, fullPath) as Promise<void>,
+    openInTerminal: (fullPath: string) =>
+      ipcRenderer.invoke(IPC.SHELL_OPEN_IN_TERMINAL, fullPath) as Promise<void>,
+    showItemInFolder: (fullPath: string) =>
+      ipcRenderer.invoke(
+        IPC.SHELL_SHOW_ITEM_IN_FOLDER,
+        fullPath,
+      ) as Promise<void>,
     detectIdes: () =>
       ipcRenderer.invoke(IPC.SHELL_DETECT_IDES) as Promise<
         Array<{ id: string; label: string; command: string; appName?: string }>
       >,
     openWithIde: (fullPath: string, ideId: string) =>
-      ipcRenderer.invoke(IPC.SHELL_OPEN_WITH_IDE, fullPath, ideId) as Promise<void>,
+      ipcRenderer.invoke(
+        IPC.SHELL_OPEN_WITH_IDE,
+        fullPath,
+        ideId,
+      ) as Promise<void>,
     detectTerminals: () =>
-      ipcRenderer.invoke(IPC.SHELL_DETECT_TERMINALS) as Promise<Array<{ id: string; label: string; appName: string }>>,
+      ipcRenderer.invoke(IPC.SHELL_DETECT_TERMINALS) as Promise<
+        Array<{ id: string; label: string; appName: string }>
+      >,
     openWithTerminal: (fullPath: string, terminalId: string) =>
-      ipcRenderer.invoke(IPC.SHELL_OPEN_WITH_TERMINAL, fullPath, terminalId) as Promise<void>,
+      ipcRenderer.invoke(
+        IPC.SHELL_OPEN_WITH_TERMINAL,
+        fullPath,
+        terminalId,
+      ) as Promise<void>,
   },
   notification: {
     pickAudio: () =>
@@ -216,7 +380,11 @@ const api = {
         assetPath: string;
         dataUrl: string;
       } | null>,
-    deleteAudio: (assetPath: string) => ipcRenderer.invoke(IPC.NOTIFICATION_DELETE_AUDIO, assetPath) as Promise<void>,
+    deleteAudio: (assetPath: string) =>
+      ipcRenderer.invoke(
+        IPC.NOTIFICATION_DELETE_AUDIO,
+        assetPath,
+      ) as Promise<void>,
   },
   app2: {
     isFocused: () => ipcRenderer.invoke(IPC.APP_IS_FOCUSED) as Promise<boolean>,
@@ -227,7 +395,10 @@ const api = {
     getPath: (file: File): string => webUtils.getPathForFile(file),
   },
   browser: {
-    captureScreenshot: (webContentsId: number, rect: { x: number; y: number; width: number; height: number }) =>
+    captureScreenshot: (
+      webContentsId: number,
+      rect: { x: number; y: number; width: number; height: number },
+    ) =>
       ipcRenderer.invoke(IPC.BROWSER_CAPTURE_SCREENSHOT, {
         webContentsId,
         rect,
@@ -250,7 +421,13 @@ const api = {
         webContentsId,
       }) as Promise<void>,
     /** Open the current URL in a standalone popout window. */
-    popout: (url: string, title?: string, locale?: string, theme?: string, defaultHomepage?: string) =>
+    popout: (
+      url: string,
+      title?: string,
+      locale?: string,
+      theme?: string,
+      defaultHomepage?: string,
+    ) =>
       ipcRenderer.invoke(IPC.BROWSER_POPOUT, {
         url,
         title,
@@ -259,24 +436,42 @@ const api = {
         defaultHomepage,
       }) as Promise<void>,
     onConsoleEvent: (callback: (raw: unknown) => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, raw: unknown) => callback(raw);
+      const handler = (_event: Electron.IpcRendererEvent, raw: unknown) =>
+        callback(raw);
       ipcRenderer.on(IPC.BROWSER_CONSOLE_EVENT, handler);
-      return () => ipcRenderer.removeListener(IPC.BROWSER_CONSOLE_EVENT, handler);
+      return () =>
+        ipcRenderer.removeListener(IPC.BROWSER_CONSOLE_EVENT, handler);
     },
   },
   lsp: {
     getDefinition: (worktreePath: string, token: string) =>
-      ipcRenderer.invoke(IPC.LSP_GET_DEFINITION, worktreePath, token) as Promise<LspLocation[]>,
+      ipcRenderer.invoke(
+        IPC.LSP_GET_DEFINITION,
+        worktreePath,
+        token,
+      ) as Promise<LspLocation[]>,
   },
   extension: {
     /** List all currently loaded browser extensions. */
-    list: () => ipcRenderer.invoke(IPC.EXTENSION_LIST) as Promise<ExtensionInfo[]>,
+    list: () =>
+      ipcRenderer.invoke(IPC.EXTENSION_LIST) as Promise<ExtensionInfo[]>,
     /** Open folder picker and load an unpacked Chrome extension. */
-    install: () => ipcRenderer.invoke(IPC.EXTENSION_INSTALL) as Promise<ExtensionInfo | null>,
+    install: () =>
+      ipcRenderer.invoke(
+        IPC.EXTENSION_INSTALL,
+      ) as Promise<ExtensionInfo | null>,
     /** Unload an extension by its id. */
-    uninstall: (id: string) => ipcRenderer.invoke(IPC.EXTENSION_UNINSTALL, id) as Promise<void>,
+    uninstall: (id: string) =>
+      ipcRenderer.invoke(IPC.EXTENSION_UNINSTALL, id) as Promise<void>,
     /** Open extension popup in a frameless window anchored at (x, y). activeTabId is the browser webview's webContentsId. */
-    openPopup: (extId: string, popupPath: string, x: number, y: number, activeTabId: number, activeTabUrl?: string) =>
+    openPopup: (
+      extId: string,
+      popupPath: string,
+      x: number,
+      y: number,
+      activeTabId: number,
+      activeTabUrl?: string,
+    ) =>
       ipcRenderer.invoke(IPC.EXTENSION_OPEN_POPUP, {
         extId,
         popupPath,
@@ -286,11 +481,20 @@ const api = {
         activeTabUrl,
       }) as Promise<void>,
     /** Extension asks to create a new browser tab — main process relays this here. */
-    onTabCreate: (callback: (data: { requestId: string; url: string; active: boolean }) => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, data: { requestId: string; url: string; active: boolean }) =>
-        callback(data);
+    onTabCreate: (
+      callback: (data: {
+        requestId: string;
+        url: string;
+        active: boolean;
+      }) => void,
+    ) => {
+      const handler = (
+        _event: Electron.IpcRendererEvent,
+        data: { requestId: string; url: string; active: boolean },
+      ) => callback(data);
       ipcRenderer.on(IPC.EXTENSION_TAB_CREATE, handler);
-      return () => ipcRenderer.removeListener(IPC.EXTENSION_TAB_CREATE, handler);
+      return () =>
+        ipcRenderer.removeListener(IPC.EXTENSION_TAB_CREATE, handler);
     },
     /** Reply to main process with the new tab's webContentsId after dom-ready. */
     sendTabCreated: (requestId: string, webContentsId: number) => {
@@ -299,16 +503,29 @@ const api = {
   },
   pet: {
     /** Send updated pet settings to the main process, which forwards them to the pet overlay window. */
-    sendSettings: (settings: PetSettings) => ipcRenderer.send(IPC.PET_SETTINGS_CHANGED, settings),
+    sendSettings: (settings: PetSettings) =>
+      ipcRenderer.send(IPC.PET_SETTINGS_CHANGED, settings),
+    /** Forward a manual command from the focused main window to the transparent pet overlay. */
+    command: (command: PetCommand) => ipcRenderer.send(IPC.PET_COMMAND, command),
+    play: (action?: PetPlayAction | "random") =>
+      ipcRenderer.send(IPC.PET_COMMAND, {
+        type: "play",
+        action,
+      } satisfies PetCommand),
+    stop: () =>
+      ipcRenderer.send(IPC.PET_COMMAND, { type: "stop" } satisfies PetCommand),
     /** Open folder picker, validate, and import a custom pet. */
-    importPet: () => ipcRenderer.invoke(IPC.PET_IMPORT) as Promise<ImportPetResult>,
+    importPet: () =>
+      ipcRenderer.invoke(IPC.PET_IMPORT) as Promise<ImportPetResult>,
     /** Delete a custom pet by ID (removes files from disk). */
-    deletePet: (petId: string) => ipcRenderer.invoke(IPC.PET_DELETE, petId) as Promise<DeletePetResult>,
+    deletePet: (petId: string) =>
+      ipcRenderer.invoke(IPC.PET_DELETE, petId) as Promise<DeletePetResult>,
     /** List all custom pets on disk (for hydration sync). */
-    listPets: () => ipcRenderer.invoke(IPC.PET_LIST) as Promise<CustomPetMeta[]>,
+    listPets: () =>
+      ipcRenderer.invoke(IPC.PET_LIST) as Promise<CustomPetMeta[]>,
   },
 };
 
-contextBridge.exposeInMainWorld('forgepad', api);
+contextBridge.exposeInMainWorld("forgepad", api);
 
 export type ForgePadApi = typeof api;

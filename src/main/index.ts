@@ -266,6 +266,23 @@ app.whenReady().then(async () => {
     // State loading failure should not block startup
   }
 
+  // Register session-level preload for extension API polyfills.
+  // This runs in ALL frames (including chrome-extension:// popup pages) before
+  // any extension JavaScript executes.
+  try {
+    const extensionApiPreloadPath = path.join(
+      __dirname,
+      "../preload/extension-api.cjs",
+    );
+    session.defaultSession.registerPreloadScript({
+      id: "forgepad-extension-api",
+      type: "frame",
+      filePath: extensionApiPreloadPath,
+    });
+  } catch (err) {
+    console.warn("[ForgePad] Failed to register extension API preload:", err);
+  }
+
   buildAppMenu();
   registerIpcHandlers(hookPort, hookServer ?? undefined);
   registerPetIpcHandlers();

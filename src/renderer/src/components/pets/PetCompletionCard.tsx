@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { useAppStore } from '@renderer/store/app-store';
-import type { CompletionCard, Tab } from '@shared/types';
-
-type TerminalTab = Extract<Tab, { type: 'terminal' }>;
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { CompletionCard } from "@shared/types";
+export type WorkingAgentSummary = {
+  ptyId: string;
+  title: string;
+  userPrompt?: string;
+};
 
 /** Auto-dismiss delay (ms) when the card first appears. */
 const AUTO_DISMISS_MS = 8_000;
@@ -21,13 +23,19 @@ export function PetCompletionCard({
   card,
   onDismiss,
   onView,
-  variant = 'widget',
+  workingAgents,
+  onWorkingAgentView,
+  onHoverChange,
+  variant = "widget",
 }: {
   card: CompletionCard;
   onDismiss: () => void;
   onView: () => void;
+  workingAgents?: WorkingAgentSummary[];
+  onWorkingAgentView?: (ptyId: string) => void;
+  onHoverChange?: (hovered: boolean) => void;
   /** 'widget' = inside main window, 'overlay' = desktop pet window */
-  variant?: 'widget' | 'overlay';
+  variant?: "widget" | "overlay";
 }) {
   const [visible, setVisible] = useState(false);
   const [hovered, setHovered] = useState(false);
@@ -67,29 +75,30 @@ export function PetCompletionCard({
     setHovered(true);
     hasBeenHoveredRef.current = true;
     clearDismissTimer();
-  }, [clearDismissTimer]);
+    onHoverChange?.(true);
+  }, [clearDismissTimer, onHoverChange]);
 
   const handlePointerLeave = useCallback(() => {
     setHovered(false);
+    onHoverChange?.(false);
     // Use shorter timer after user has seen the card
     startDismissTimer(POST_HOVER_DISMISS_MS);
-  }, [startDismissTimer]);
+  }, [onHoverChange, startDismissTimer]);
 
-  // Get working agents for the hover expansion
-  const agentStatuses = useAppStore((s) => s.agentStatuses);
-  const tabs = useAppStore((s) => s.tabs);
-  const activeWorkspaceId = useAppStore((s) => s.activeWorkspaceId);
+  const visibleWorkingAgents = workingAgents ?? [];
 
-  const workingAgents = tabs.filter(
-    (t): t is TerminalTab =>
-      t.type === 'terminal' && !!t.isAgent && t.workspaceId === activeWorkspaceId && agentStatuses[t.ptyId] === 'working',
+  const viewWorkingAgent = useCallback(
+    (ptyId: string) => {
+      onWorkingAgentView?.(ptyId);
+    },
+    [onWorkingAgentView],
   );
 
-  const isOverlay = variant === 'overlay';
+  const isOverlay = variant === "overlay";
 
   // Truncate text to a reasonable length for single-line display
   const truncate = (text: string, maxLen: number) => {
-    const cleaned = text.replace(/\s+/g, ' ').trim();
+    const cleaned = text.replace(/\s+/g, " ").trim();
     if (cleaned.length <= maxLen) return cleaned;
     return `${cleaned.slice(0, maxLen - 1)}…`;
   };
@@ -97,129 +106,114 @@ export function PetCompletionCard({
   return (
     <div
       style={{
-        position: isOverlay ? 'relative' : 'absolute',
-        bottom: isOverlay ? undefined : '100%',
-        left: '50%',
-        transform: `translateX(-50%) scale(${visible ? 1 : 0.9})`,
-        marginBottom: isOverlay ? 4 : 8,
+        position: isOverlay ? undefined : "absolute",
+        bottom: isOverlay ? undefined : "100%",
+        left: isOverlay ? undefined : "50%",
+        transform: isOverlay
+          ? `scale(${visible ? 1 : 0.9})`
+          : `translateX(-50%) scale(${visible ? 1 : 0.9})`,
+        marginBottom: isOverlay ? 0 : 8,
         opacity: visible ? 1 : 0,
-        transition: 'opacity 0.2s ease, transform 0.2s ease',
-        pointerEvents: 'auto',
+        transition: "opacity 0.2s ease, transform 0.2s ease",
+        pointerEvents: "auto",
         zIndex: 100,
-        background: 'rgba(20, 20, 28, 0.92)',
-        backdropFilter: 'blur(12px)',
-        WebkitBackdropFilter: 'blur(12px)',
-        border: '1px solid rgba(255, 255, 255, 0.12)',
+        background: "rgba(20, 20, 28, 0.92)",
+        backdropFilter: "blur(12px)",
+        WebkitBackdropFilter: "blur(12px)",
+        border: "1px solid rgba(255, 255, 255, 0.12)",
         borderRadius: 12,
-        padding: '8px 12px',
-        minWidth: 220,
-        maxWidth: 320,
-        boxShadow: '0 4px 20px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.05)',
-        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-        userSelect: 'none',
-        WebkitUserSelect: 'none',
-        cursor: 'default',
+        padding: "8px 12px",
+        width: isOverlay ? 320 : undefined,
+        minWidth: 240,
+        maxWidth: 340,
+        boxShadow:
+          "0 4px 20px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.05)",
+        fontFamily:
+          '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+        userSelect: "none",
+        WebkitUserSelect: "none",
+        cursor: "default",
       }}
       onPointerDown={(e) => e.stopPropagation()}
       onPointerEnter={handlePointerEnter}
       onPointerLeave={handlePointerLeave}
     >
-      {/* Header */}
+      {/* User input line */}
       <div
         style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 6,
-          marginBottom: 6,
+          display: "flex",
+          gap: 4,
+          marginBottom: 3,
+          minWidth: 0,
+          alignItems: "flex-start",
         }}
       >
         <span
           style={{
             fontSize: 11,
-            fontWeight: 700,
-            color: 'rgba(80, 200, 120, 0.95)',
+            fontWeight: 600,
+            color: "rgba(80, 200, 120, 0.8)",
+            flexShrink: 0,
           }}
         >
-          Task Completed
+          &gt;
+        </span>
+        <span
+          style={{
+            minWidth: 0,
+            fontSize: 11,
+            color: "rgba(255, 255, 255, 0.75)",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+            lineHeight: 1.4,
+          }}
+        >
+          {truncate(card.userPrompt || "No prompt captured", 100)}
         </span>
       </div>
 
-      {/* User input line */}
-      {card.userPrompt && (
-        <div
-          style={{
-            display: 'flex',
-            gap: 4,
-            marginBottom: 3,
-            alignItems: 'flex-start',
-          }}
-        >
-          <span
-            style={{
-              fontSize: 11,
-              fontWeight: 600,
-              color: 'rgba(80, 200, 120, 0.8)',
-              flexShrink: 0,
-            }}
-          >
-            &gt;
-          </span>
-          <span
-            style={{
-              fontSize: 11,
-              color: 'rgba(255, 255, 255, 0.75)',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-              lineHeight: 1.4,
-            }}
-          >
-            {truncate(card.userPrompt, 80)}
-          </span>
-        </div>
-      )}
-
       {/* AI response line */}
-      {card.aiResponse && (
-        <div
+      <div
+        style={{
+          display: "flex",
+          gap: 4,
+          marginBottom: 6,
+          minWidth: 0,
+          alignItems: "flex-start",
+        }}
+      >
+        <span
           style={{
-            display: 'flex',
-            gap: 4,
-            marginBottom: 6,
-            alignItems: 'flex-start',
+            fontSize: 11,
+            fontWeight: 600,
+            color: "rgba(220, 160, 80, 0.8)",
+            flexShrink: 0,
           }}
         >
-          <span
-            style={{
-              fontSize: 11,
-              fontWeight: 600,
-              color: 'rgba(220, 160, 80, 0.8)',
-              flexShrink: 0,
-            }}
-          >
-            $
-          </span>
-          <span
-            style={{
-              fontSize: 11,
-              color: 'rgba(255, 255, 255, 0.75)',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-              lineHeight: 1.4,
-            }}
-          >
-            {truncate(card.aiResponse, 80)}
-          </span>
-        </div>
-      )}
+          AI
+        </span>
+        <span
+          style={{
+            minWidth: 0,
+            fontSize: 11,
+            color: "rgba(255, 255, 255, 0.75)",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+            lineHeight: 1.4,
+          }}
+        >
+          {truncate(card.aiResponse || "Finished.", 100)}
+        </span>
+      </div>
 
       {/* Hover expansion: working agents list */}
-      {hovered && workingAgents.length > 0 && (
+      {hovered && visibleWorkingAgents.length > 0 && (
         <div style={{ marginBottom: 6 }}>
           <div
             style={{
-              borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+              borderTop: "1px solid rgba(255, 255, 255, 0.1)",
               marginBottom: 6,
               paddingTop: 6,
             }}
@@ -228,52 +222,65 @@ export function PetCompletionCard({
               style={{
                 fontSize: 10,
                 fontWeight: 600,
-                color: 'rgba(255, 255, 255, 0.4)',
-                textTransform: 'uppercase',
+                color: "rgba(255, 255, 255, 0.4)",
+                textTransform: "uppercase",
                 letterSpacing: 0.5,
               }}
             >
               Working Agents
             </span>
           </div>
-          {workingAgents.map((agent) => (
-            <div
-              key={agent.id}
+          {visibleWorkingAgents.slice(0, 6).map((agent) => (
+            <button
+              type="button"
+              key={agent.ptyId}
+              onClick={(e) => {
+                e.stopPropagation();
+                e.preventDefault();
+                viewWorkingAgent(agent.ptyId);
+              }}
               style={{
-                display: 'flex',
-                alignItems: 'center',
+                display: "flex",
+                alignItems: "center",
                 gap: 6,
-                padding: '3px 0',
+                width: "100%",
+                padding: "3px 0",
+                border: 0,
+                background: "transparent",
+                cursor: "pointer",
+                fontFamily: "inherit",
+                textAlign: "left",
               }}
             >
               <span
                 style={{
                   width: 6,
                   height: 6,
-                  borderRadius: '50%',
-                  background: 'rgba(100, 180, 255, 0.8)',
+                  borderRadius: "50%",
+                  background: "rgba(100, 180, 255, 0.8)",
                   flexShrink: 0,
-                  animation: 'pulse 2s ease-in-out infinite',
+                  animation: "pulse 2s ease-in-out infinite",
                 }}
               />
               <span
                 style={{
+                  minWidth: 0,
                   fontSize: 10,
-                  color: 'rgba(255, 255, 255, 0.65)',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
+                  color: "rgba(255, 255, 255, 0.65)",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
                 }}
               >
-                {agent.title}
+                {agent.userPrompt || agent.title}
               </span>
-            </div>
+            </button>
           ))}
         </div>
       )}
 
       {/* Action buttons */}
-      <div style={{ display: 'flex', gap: 6 }}>
+      <div style={{ display: "flex", gap: 6 }}>
         <CompletionButton
           label="Dismiss"
           bgColor="rgba(80, 80, 80, 0.5)"
@@ -327,17 +334,17 @@ function CompletionButton({
       onMouseLeave={() => setHovered(false)}
       style={{
         flex: primary ? 1.5 : 1,
-        padding: '5px 10px',
+        padding: "5px 10px",
         fontSize: 11,
         fontWeight: 600,
-        color: 'rgba(255, 255, 255, 0.92)',
+        color: "rgba(255, 255, 255, 0.92)",
         background: hovered ? bgHover : bgColor,
         border: `1px solid ${borderColor}`,
         borderRadius: 6,
-        cursor: 'pointer',
-        transition: 'background 0.15s ease',
-        outline: 'none',
-        fontFamily: 'inherit',
+        cursor: "pointer",
+        transition: "background 0.15s ease",
+        outline: "none",
+        fontFamily: "inherit",
         lineHeight: 1.2,
       }}
     >

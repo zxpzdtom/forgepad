@@ -1,45 +1,54 @@
-import { execFile } from 'node:child_process';
-import { existsSync } from 'node:fs';
-import { mkdir, readFile, readdir, rm } from 'node:fs/promises';
-import path from 'node:path';
-import { promisify } from 'node:util';
-import type { DiffFileData, FileStatus, GitBucket, GitStatusKind } from '@shared/types';
+import { execFile } from "node:child_process";
+import { existsSync } from "node:fs";
+import { mkdir, readFile, readdir, rm } from "node:fs/promises";
+import path from "node:path";
+import { promisify } from "node:util";
+import type {
+  DiffFileData,
+  FileStatus,
+  GitBucket,
+  GitStatusKind,
+} from "@shared/types";
 
-import { normalizeRelPath, resolveInsideRoot } from './path-guard';
-import { getDotFolderPath } from './paths';
-import { getUserPath } from './user-env';
+import { normalizeRelPath, resolveInsideRoot } from "./path-guard";
+import { getDotFolderPath } from "./paths";
+import { getUserPath } from "./user-env";
 
 const execFileAsync = promisify(execFile);
 const MAX_BUFFER = 20 * 1024 * 1024;
 
 async function git(args: string[], cwd: string): Promise<string> {
-  const { stdout } = await execFileAsync('git', args, {
-    cwd,
-    encoding: 'utf8',
-    maxBuffer: MAX_BUFFER,
-  });
+  const { stdout } = await execFileAsync(
+    "git",
+    ["-c", "core.quotePath=false", ...args],
+    {
+      cwd,
+      encoding: "utf8",
+      maxBuffer: MAX_BUFFER,
+    },
+  );
   return stdout.trimEnd();
 }
 
 function statusFromChar(char: string): GitStatusKind {
-  if (char === 'A') return 'added';
-  if (char === 'D') return 'deleted';
-  if (char === 'R' || char === 'C') return 'renamed';
-  if (char === 'U') return 'conflicted';
-  return 'modified';
+  if (char === "A") return "added";
+  if (char === "D") return "deleted";
+  if (char === "R" || char === "C") return "renamed";
+  if (char === "U") return "conflicted";
+  return "modified";
 }
 
 function conflictKindFromXY(xy: string): string {
   const map: Record<string, string> = {
-    DD: 'both_deleted',
-    AU: 'added_by_us',
-    UD: 'deleted_by_them',
-    UA: 'added_by_them',
-    DU: 'deleted_by_us',
-    AA: 'both_added',
-    UU: 'both_modified',
+    DD: "both_deleted",
+    AU: "added_by_us",
+    UD: "deleted_by_them",
+    UA: "added_by_them",
+    DU: "deleted_by_us",
+    AA: "both_added",
+    UU: "both_modified",
   };
-  return map[xy] ?? 'unmerged';
+  return map[xy] ?? "unmerged";
 }
 
 function parseStatusOutput(stdout: string): FileStatus[] {
@@ -47,25 +56,25 @@ function parseStatusOutput(stdout: string): FileStatus[] {
   for (const line of stdout.split(/\r?\n/)) {
     if (!line) continue;
 
-    if (line.startsWith('? ')) {
+    if (line.startsWith("? ")) {
       entries.push({
         path: line.slice(2),
-        status: 'untracked',
-        bucket: 'untracked',
+        status: "untracked",
+        bucket: "untracked",
         staged: false,
       });
       continue;
     }
 
-    if (line.startsWith('u ')) {
-      const parts = line.split(' ');
-      const xy = parts[1] ?? 'UU';
-      const filePath = parts.slice(10).join(' ');
+    if (line.startsWith("u ")) {
+      const parts = line.split(" ");
+      const xy = parts[1] ?? "UU";
+      const filePath = parts.slice(10).join(" ");
       if (filePath) {
         entries.push({
           path: filePath,
-          status: 'conflicted',
-          bucket: 'unstaged',
+          status: "conflicted",
+          bucket: "unstaged",
           staged: false,
           conflictKind: conflictKindFromXY(xy),
         });
@@ -73,35 +82,37 @@ function parseStatusOutput(stdout: string): FileStatus[] {
       continue;
     }
 
-    if (!line.startsWith('1 ') && !line.startsWith('2 ')) continue;
+    if (!line.startsWith("1 ") && !line.startsWith("2 ")) continue;
 
-    const isRename = line.startsWith('2 ');
-    const tabParts = line.split('\t');
-    const spaceParts = tabParts[0].split(' ');
-    const xy = spaceParts[1] ?? '..';
-    const indexStatus = xy[0] ?? '.';
-    const worktreeStatus = xy[1] ?? '.';
-    const filePath = isRename ? (spaceParts.at(-1) ?? '') : spaceParts.slice(8).join(' ');
+    const isRename = line.startsWith("2 ");
+    const tabParts = line.split("\t");
+    const spaceParts = tabParts[0].split(" ");
+    const xy = spaceParts[1] ?? "..";
+    const indexStatus = xy[0] ?? ".";
+    const worktreeStatus = xy[1] ?? ".";
+    const filePath = isRename
+      ? (spaceParts.at(-1) ?? "")
+      : spaceParts.slice(8).join(" ");
     const oldPath = isRename ? tabParts[1] : undefined;
 
     if (!filePath) continue;
 
-    if (indexStatus !== '.') {
+    if (indexStatus !== ".") {
       entries.push({
         path: filePath,
         oldPath,
         status: statusFromChar(indexStatus),
-        bucket: 'staged',
+        bucket: "staged",
         staged: true,
       });
     }
 
-    if (worktreeStatus !== '.') {
+    if (worktreeStatus !== ".") {
       entries.push({
         path: filePath,
         oldPath,
         status: statusFromChar(worktreeStatus),
-        bucket: 'unstaged',
+        bucket: "unstaged",
         staged: false,
       });
     }
@@ -109,24 +120,31 @@ function parseStatusOutput(stdout: string): FileStatus[] {
   return entries;
 }
 
-async function getNumstat(worktreePath: string, staged: boolean): Promise<Map<string, { additions: number; deletions: number }>> {
-  const args = ['diff', '--numstat'];
-  if (staged) args.push('--staged');
-  const output = await git(args, worktreePath).catch(() => '');
+async function getNumstat(
+  worktreePath: string,
+  staged: boolean,
+): Promise<Map<string, { additions: number; deletions: number }>> {
+  const args = ["diff", "--numstat"];
+  if (staged) args.push("--staged");
+  const output = await git(args, worktreePath).catch(() => "");
   const map = new Map<string, { additions: number; deletions: number }>();
   for (const line of output.split(/\r?\n/)) {
     if (!line) continue;
-    const [addStr, delStr, filePath] = line.split('\t');
+    const [addStr, delStr, filePath] = line.split("\t");
     if (!filePath) continue;
-    const additions = addStr === '-' ? 0 : Number.parseInt(addStr ?? '0', 10) || 0;
-    const deletions = delStr === '-' ? 0 : Number.parseInt(delStr ?? '0', 10) || 0;
+    const additions =
+      addStr === "-" ? 0 : Number.parseInt(addStr ?? "0", 10) || 0;
+    const deletions =
+      delStr === "-" ? 0 : Number.parseInt(delStr ?? "0", 10) || 0;
     map.set(filePath, { additions, deletions });
   }
   return map;
 }
 
 function patchIndicatesBinary(patch: string): boolean {
-  return /^\s*Binary files /m.test(patch) || /^\s*GIT binary patch\b/m.test(patch);
+  return (
+    /^\s*Binary files /m.test(patch) || /^\s*GIT binary patch\b/m.test(patch)
+  );
 }
 
 function bufferIsBinary(buffer: Buffer): boolean {
@@ -138,36 +156,36 @@ function bufferIsBinary(buffer: Buffer): boolean {
 }
 
 function syntheticAddedPatch(relPath: string, contents: string): string {
-  const lines = contents.split('\n');
+  const lines = contents.split("\n");
   return [
     `diff --git a/${relPath} b/${relPath}`,
-    'new file mode 100644',
-    '--- /dev/null',
+    "new file mode 100644",
+    "--- /dev/null",
     `+++ b/${relPath}`,
     `@@ -0,0 +1,${lines.length} @@`,
     ...lines.map((line) => `+${line}`),
-  ].join('\n');
+  ].join("\n");
 }
 
 export class GitService {
   static async isGitRepo(repoPath: string): Promise<boolean> {
     try {
-      const value = await git(['rev-parse', '--is-inside-work-tree'], repoPath);
-      return value === 'true';
+      const value = await git(["rev-parse", "--is-inside-work-tree"], repoPath);
+      return value === "true";
     } catch {
       return false;
     }
   }
 
   static async getTopLevel(repoPath: string): Promise<string> {
-    return git(['rev-parse', '--show-toplevel'], repoPath);
+    return git(["rev-parse", "--show-toplevel"], repoPath);
   }
 
   static async getCurrentBranch(worktreePath: string): Promise<string> {
     try {
-      return await git(['rev-parse', '--abbrev-ref', 'HEAD'], worktreePath);
+      return await git(["rev-parse", "--abbrev-ref", "HEAD"], worktreePath);
     } catch {
-      return '';
+      return "";
     }
   }
 
@@ -179,21 +197,26 @@ export class GitService {
   }> {
     try {
       const [abOutput, stagedOutput, unstagedOutput] = await Promise.all([
-        git(['rev-list', '--left-right', '--count', '@{upstream}...HEAD'], worktreePath).catch(() => '0\t0'),
-        git(['diff', '--numstat', '--staged'], worktreePath).catch(() => ''),
-        git(['diff', '--numstat'], worktreePath).catch(() => ''),
+        git(
+          ["rev-list", "--left-right", "--count", "@{upstream}...HEAD"],
+          worktreePath,
+        ).catch(() => "0\t0"),
+        git(["diff", "--numstat", "--staged"], worktreePath).catch(() => ""),
+        git(["diff", "--numstat"], worktreePath).catch(() => ""),
       ]);
-      const [behindStr, aheadStr] = abOutput.split('\t');
-      const ahead = Number.parseInt(aheadStr ?? '0', 10) || 0;
-      const behind = Number.parseInt(behindStr ?? '0', 10) || 0;
+      const [behindStr, aheadStr] = abOutput.split("\t");
+      const ahead = Number.parseInt(aheadStr ?? "0", 10) || 0;
+      const behind = Number.parseInt(behindStr ?? "0", 10) || 0;
       let additions = 0;
       let deletions = 0;
       for (const output of [stagedOutput, unstagedOutput]) {
         for (const line of output.split(/\r?\n/)) {
           if (!line) continue;
-          const [addStr, delStr] = line.split('\t');
-          additions += addStr === '-' ? 0 : Number.parseInt(addStr ?? '0', 10) || 0;
-          deletions += delStr === '-' ? 0 : Number.parseInt(delStr ?? '0', 10) || 0;
+          const [addStr, delStr] = line.split("\t");
+          additions +=
+            addStr === "-" ? 0 : Number.parseInt(addStr ?? "0", 10) || 0;
+          deletions +=
+            delStr === "-" ? 0 : Number.parseInt(delStr ?? "0", 10) || 0;
         }
       }
       return { ahead, behind, additions, deletions };
@@ -204,16 +227,24 @@ export class GitService {
 
   static async getStatus(worktreePath: string): Promise<FileStatus[]> {
     try {
-      const output = await git(['status', '--porcelain=v2', '--untracked-files=all'], worktreePath);
+      const output = await git(
+        ["status", "--porcelain=v2", "--untracked-files=all"],
+        worktreePath,
+      );
       if (!output) return [];
       const entries = parseStatusOutput(output);
-      const [stagedStats, unstagedStats] = await Promise.all([getNumstat(worktreePath, true), getNumstat(worktreePath, false)]);
+      const [stagedStats, unstagedStats] = await Promise.all([
+        getNumstat(worktreePath, true),
+        getNumstat(worktreePath, false),
+      ]);
       for (const entry of entries) {
         const stats =
-          entry.bucket === 'staged'
-            ? (stagedStats.get(entry.path) ?? stagedStats.get(entry.oldPath ?? ''))
-            : entry.bucket === 'unstaged'
-              ? (unstagedStats.get(entry.path) ?? unstagedStats.get(entry.oldPath ?? ''))
+          entry.bucket === "staged"
+            ? (stagedStats.get(entry.path) ??
+              stagedStats.get(entry.oldPath ?? ""))
+            : entry.bucket === "unstaged"
+              ? (unstagedStats.get(entry.path) ??
+                unstagedStats.get(entry.oldPath ?? ""))
               : undefined;
         if (stats) {
           entry.additions = stats.additions;
@@ -235,29 +266,29 @@ export class GitService {
   ): Promise<DiffFileData> {
     const relPath = normalizeRelPath(relPathInput);
     await resolveInsideRoot(worktreePath, relPath).catch(async (error) => {
-      if (status === 'deleted') return;
+      if (status === "deleted") return;
       throw error;
     });
 
-    if (bucket === 'untracked') {
+    if (bucket === "untracked") {
       const abs = await resolveInsideRoot(worktreePath, relPath);
       const buffer = await readFile(abs);
       if (bufferIsBinary(buffer)) {
         return {
           path: relPath,
           oldPath,
-          patch: '',
+          patch: "",
           status,
           bucket,
           isBinary: true,
         };
       }
-      const newContent = buffer.toString('utf8');
+      const newContent = buffer.toString("utf8");
       return {
         path: relPath,
         oldPath,
         patch: syntheticAddedPatch(relPath, newContent),
-        oldContent: '',
+        oldContent: "",
         newContent,
         status,
         bucket,
@@ -265,14 +296,14 @@ export class GitService {
       };
     }
 
-    const args = ['diff', '--find-renames', '--binary'];
-    if (bucket === 'staged') args.push('--staged');
-    args.push('--', relPath);
-    let patch = '';
+    const args = ["diff", "--find-renames", "--binary"];
+    if (bucket === "staged") args.push("--staged");
+    args.push("--", relPath);
+    let patch = "";
     try {
       patch = await git(args, worktreePath);
     } catch {
-      patch = '';
+      patch = "";
     }
 
     const isBinary = patchIndicatesBinary(patch);
@@ -286,23 +317,23 @@ export class GitService {
     let newContent: string | undefined;
     try {
       // Old content: HEAD version (staged) or index version (unstaged)
-      const showRef = bucket === 'staged' ? 'HEAD' : '';
+      const showRef = bucket === "staged" ? "HEAD" : "";
       const showPath = oldPath ?? relPath;
-      oldContent = await git(['show', `${showRef}:${showPath}`], worktreePath);
+      oldContent = await git(["show", `${showRef}:${showPath}`], worktreePath);
     } catch {
       // File may not exist in the old version (newly added)
-      oldContent = '';
+      oldContent = "";
     }
     try {
-      if (status === 'deleted') {
-        newContent = '';
-      } else if (bucket === 'staged') {
+      if (status === "deleted") {
+        newContent = "";
+      } else if (bucket === "staged") {
         // For staged changes, new content is the index version
-        newContent = await git(['show', `:${relPath}`], worktreePath);
+        newContent = await git(["show", `:${relPath}`], worktreePath);
       } else {
         // For unstaged changes, new content is the working tree version
         const abs = await resolveInsideRoot(worktreePath, relPath);
-        newContent = (await readFile(abs)).toString('utf8');
+        newContent = (await readFile(abs)).toString("utf8");
       }
     } catch {
       newContent = undefined;
@@ -323,61 +354,70 @@ export class GitService {
   static async stage(worktreePath: string, paths: string[]): Promise<void> {
     for (let i = 0; i < paths.length; i += 100) {
       const chunk = paths.slice(i, i + 100).map(normalizeRelPath);
-      if (chunk.length > 0) await git(['add', '--', ...chunk], worktreePath);
+      if (chunk.length > 0) await git(["add", "--", ...chunk], worktreePath);
     }
   }
 
   static async unstage(worktreePath: string, paths: string[]): Promise<void> {
     for (let i = 0; i < paths.length; i += 100) {
       const chunk = paths.slice(i, i + 100).map(normalizeRelPath);
-      if (chunk.length > 0) await git(['restore', '--staged', '--', ...chunk], worktreePath);
+      if (chunk.length > 0)
+        await git(["restore", "--staged", "--", ...chunk], worktreePath);
     }
   }
 
-  static async discard(worktreePath: string, entries: Array<{ path: string; bucket: GitBucket }>): Promise<void> {
+  static async discard(
+    worktreePath: string,
+    entries: Array<{ path: string; bucket: GitBucket }>,
+  ): Promise<void> {
     for (const entry of entries) {
       const relPath = normalizeRelPath(entry.path);
       const abs = path.resolve(worktreePath, relPath);
       const rel = path.relative(path.resolve(worktreePath), abs);
-      if (!rel || rel === '.' || rel.startsWith('..') || path.isAbsolute(rel)) {
+      if (!rel || rel === "." || rel.startsWith("..") || path.isAbsolute(rel)) {
         throw new Error(`Refusing to discard outside workspace: ${entry.path}`);
       }
 
-      if (entry.bucket === 'untracked') {
+      if (entry.bucket === "untracked") {
         const safePath = await resolveInsideRoot(worktreePath, relPath);
         await rm(safePath, { force: true, recursive: true });
       } else {
-        await git(['restore', '--worktree', '--', relPath], worktreePath);
-        if (entry.bucket === 'staged') {
-          await git(['restore', '--staged', '--', relPath], worktreePath).catch(() => '');
+        await git(["restore", "--worktree", "--", relPath], worktreePath);
+        if (entry.bucket === "staged") {
+          await git(["restore", "--staged", "--", relPath], worktreePath).catch(
+            () => "",
+          );
         }
       }
     }
   }
 
   static async commit(worktreePath: string, message: string): Promise<void> {
-    if (!message.trim()) throw new Error('Commit message is empty.');
-    await git(['commit', '-m', message.trim()], worktreePath);
+    if (!message.trim()) throw new Error("Commit message is empty.");
+    await git(["commit", "-m", message.trim()], worktreePath);
   }
 
   static async push(worktreePath: string): Promise<void> {
-    await git(['push'], worktreePath);
+    await git(["push"], worktreePath);
   }
 
   static async pull(worktreePath: string): Promise<void> {
-    await git(['pull', '--ff-only'], worktreePath);
+    await git(["pull", "--ff-only"], worktreePath);
   }
 
-  static async generateCommitMessage(worktreePath: string, promptTemplate: string): Promise<string> {
+  static async generateCommitMessage(
+    worktreePath: string,
+    promptTemplate: string,
+  ): Promise<string> {
     // If nothing is staged, auto-stage all changes first
-    let diff = await git(['diff', '--staged'], worktreePath).catch(() => '');
+    let diff = await git(["diff", "--staged"], worktreePath).catch(() => "");
     if (!diff.trim()) {
       // Nothing staged — stage everything and then get the staged diff
-      await git(['add', '-A'], worktreePath);
-      diff = await git(['diff', '--staged'], worktreePath).catch(() => '');
+      await git(["add", "-A"], worktreePath);
+      diff = await git(["diff", "--staged"], worktreePath).catch(() => "");
     }
     if (!diff.trim()) {
-      throw new Error('No changes to analyze.');
+      throw new Error("No changes to analyze.");
     }
 
     // Truncate very large diffs to avoid exceeding token limits
@@ -387,35 +427,44 @@ export class GitService {
     }
 
     // Build the full prompt
-    const prompt = promptTemplate.includes('{diff}') ? promptTemplate.replace('{diff}', diff) : `${promptTemplate}\n\n${diff}`;
+    const prompt = promptTemplate.includes("{diff}")
+      ? promptTemplate.replace("{diff}", diff)
+      : `${promptTemplate}\n\n${diff}`;
 
     // Run claude in headless mode
     const userPath = getUserPath();
-    const { stdout } = await execFileAsync('claude', ['-p', '--no-session-persistence', prompt], {
-      cwd: worktreePath,
-      encoding: 'utf8',
-      maxBuffer: MAX_BUFFER,
-      timeout: 60_000,
-      env: { ...process.env, PATH: userPath },
-    });
+    const { stdout } = await execFileAsync(
+      "claude",
+      ["-p", "--no-session-persistence", prompt],
+      {
+        cwd: worktreePath,
+        encoding: "utf8",
+        maxBuffer: MAX_BUFFER,
+        timeout: 60_000,
+        env: { ...process.env, PATH: userPath },
+      },
+    );
 
     const result = stdout.trim();
     if (!result) {
-      throw new Error('AI returned an empty response.');
+      throw new Error("AI returned an empty response.");
     }
     return result;
   }
 
   static async fetch(repoPath: string): Promise<void> {
-    await git(['fetch', '--prune'], repoPath).catch(() => '');
+    await git(["fetch", "--prune"], repoPath).catch(() => "");
   }
 
   static async listRemoteBranches(repoPath: string): Promise<string[]> {
-    const output = await git(['branch', '-r', '--format=%(refname:short)'], repoPath).catch(() => '');
+    const output = await git(
+      ["branch", "-r", "--format=%(refname:short)"],
+      repoPath,
+    ).catch(() => "");
     if (!output) return [];
     return output
       .split(/\r?\n/)
-      .filter((b) => b && !b.includes('HEAD'))
+      .filter((b) => b && !b.includes("HEAD"))
       .map((b) => b.trim());
   }
 
@@ -432,7 +481,7 @@ export class GitService {
     if (worktreeBaseDir && worktreeBaseDir.trim()) {
       baseDir = path.join(worktreeBaseDir.trim(), repoName);
     } else {
-      baseDir = path.join(getDotFolderPath(), 'worktrees', repoName);
+      baseDir = path.join(getDotFolderPath(), "worktrees", repoName);
     }
 
     const worktreePath = path.join(baseDir, branch);
@@ -441,30 +490,41 @@ export class GitService {
     if (trackRemote) {
       // Check if remote branch exists
       const remoteBranch = `origin/${branch}`;
-      const exists = await git(['rev-parse', '--verify', remoteBranch], repoPath)
+      const exists = await git(
+        ["rev-parse", "--verify", remoteBranch],
+        repoPath,
+      )
         .then(() => true)
         .catch(() => false);
       if (exists) {
-        await git(['worktree', 'add', '-b', branch, worktreePath, remoteBranch], repoPath);
+        await git(
+          ["worktree", "add", "-b", branch, worktreePath, remoteBranch],
+          repoPath,
+        );
       } else {
         // Remote doesn't exist — create local branch and push
-        await git(['worktree', 'add', '-b', branch, worktreePath], repoPath);
-        await git(['push', '-u', 'origin', branch], repoPath).catch(() => '');
+        await git(["worktree", "add", "-b", branch, worktreePath], repoPath);
+        await git(["push", "-u", "origin", branch], repoPath).catch(() => "");
       }
     } else {
-      await git(['worktree', 'add', '-b', branch, worktreePath], repoPath);
+      await git(["worktree", "add", "-b", branch, worktreePath], repoPath);
     }
 
     return { worktreePath, branch };
   }
 
-  static async removeWorktree(repoPath: string, worktreePath: string, branch: string, deleteBranch = true): Promise<void> {
-    await git(['worktree', 'remove', '--force', worktreePath], repoPath);
+  static async removeWorktree(
+    repoPath: string,
+    worktreePath: string,
+    branch: string,
+    deleteBranch = true,
+  ): Promise<void> {
+    await git(["worktree", "remove", "--force", worktreePath], repoPath);
     // Prune stale worktree refs so git no longer considers the branch checked-out
-    await git(['worktree', 'prune'], repoPath).catch(() => '');
+    await git(["worktree", "prune"], repoPath).catch(() => "");
     // Delete the branch (unless user opted to keep it)
     if (deleteBranch) {
-      await git(['branch', '-D', branch], repoPath).catch(() => '');
+      await git(["branch", "-D", branch], repoPath).catch(() => "");
     }
   }
 
@@ -473,7 +533,9 @@ export class GitService {
    * Directory structure: <baseDir>/<repoName>/<branch>/
    * Returns discovered entries grouped by repo, with repoPath resolved via `git rev-parse --show-toplevel`.
    */
-  static async scanWorktrees(baseDir: string): Promise<
+  static async scanWorktrees(
+    baseDir: string,
+  ): Promise<
     Array<{
       repoName: string;
       repoPath: string;
@@ -481,7 +543,8 @@ export class GitService {
       worktreePath: string;
     }>
   > {
-    const resolvedDir = baseDir.trim() || path.join(getDotFolderPath(), 'worktrees');
+    const resolvedDir =
+      baseDir.trim() || path.join(getDotFolderPath(), "worktrees");
     // biome-ignore lint: reassign baseDir to resolved value
     baseDir = resolvedDir;
     const results: Array<{
@@ -493,8 +556,11 @@ export class GitService {
 
     let repoDirs: string[];
     try {
-      repoDirs = await readdir(baseDir, { withFileTypes: true }).then((entries) =>
-        entries.filter((e) => e.isDirectory() && !e.name.startsWith('.')).map((e) => e.name),
+      repoDirs = await readdir(baseDir, { withFileTypes: true }).then(
+        (entries) =>
+          entries
+            .filter((e) => e.isDirectory() && !e.name.startsWith("."))
+            .map((e) => e.name),
       );
     } catch {
       return results;
@@ -504,8 +570,11 @@ export class GitService {
       const repoDir = path.join(baseDir, repoName);
       let branchDirs: string[];
       try {
-        branchDirs = await readdir(repoDir, { withFileTypes: true }).then((entries) =>
-          entries.filter((e) => e.isDirectory() && !e.name.startsWith('.')).map((e) => e.name),
+        branchDirs = await readdir(repoDir, { withFileTypes: true }).then(
+          (entries) =>
+            entries
+              .filter((e) => e.isDirectory() && !e.name.startsWith("."))
+              .map((e) => e.name),
         );
       } catch {
         continue;
@@ -514,24 +583,28 @@ export class GitService {
       for (const branch of branchDirs) {
         const worktreePath = path.join(repoDir, branch);
         // Verify it's actually a git worktree
-        const isRepo = await GitService.isGitRepo(worktreePath).catch(() => false);
+        const isRepo = await GitService.isGitRepo(worktreePath).catch(
+          () => false,
+        );
         if (!isRepo) continue;
 
         try {
           const topLevel = await GitService.getTopLevel(worktreePath);
           // For worktrees, the toplevel is the worktree path itself;
           // We need the main repo path — read the gitdir file to find the real repo.
-          const gitDir = await git(['rev-parse', '--git-dir'], worktreePath);
+          const gitDir = await git(["rev-parse", "--git-dir"], worktreePath);
           // A worktree's .git is a file pointing to <mainRepo>/.git/worktrees/<name>
           // So the main repo .git dir is two levels up from the worktree git dir
           let repoPath = topLevel;
-          if (gitDir.includes('.git/worktrees/')) {
+          if (gitDir.includes(".git/worktrees/")) {
             // gitDir is like /path/to/main-repo/.git/worktrees/<branch>
-            const mainGitDir = gitDir.replace(/\/worktrees\/[^/]+$/, '');
+            const mainGitDir = gitDir.replace(/\/worktrees\/[^/]+$/, "");
             repoPath = path.dirname(mainGitDir);
           }
 
-          const actualBranch = await GitService.getCurrentBranch(worktreePath).catch(() => branch);
+          const actualBranch = await GitService.getCurrentBranch(
+            worktreePath,
+          ).catch(() => branch);
           results.push({
             repoName,
             repoPath,
@@ -553,28 +626,30 @@ export class GitService {
    *   https://github.com/user/repo.git   → { host: 'github.com', owner: 'user', repo: 'repo' }
    *   git@gitlab.com:user/repo.git       → { host: 'gitlab.com', owner: 'user', repo: 'repo' }
    */
-  private static parseRemoteUrl(raw: string): { host: string; owner: string; repo: string } | null {
+  private static parseRemoteUrl(
+    raw: string,
+  ): { host: string; owner: string; repo: string } | null {
     const trimmed = raw.trim();
     // SSH: git@host:owner/repo.git
     const sshMatch = trimmed.match(/^[\w-]+@([^:]+):(.+?)(?:\.git)?$/);
     if (sshMatch) {
       const [, host, ownerRepo] = sshMatch;
-      const parts = ownerRepo.split('/');
+      const parts = ownerRepo.split("/");
       if (parts.length >= 2) {
         const repo = parts.pop()!;
-        return { host, owner: parts.join('/'), repo };
+        return { host, owner: parts.join("/"), repo };
       }
     }
     // HTTPS: https://host/owner/repo.git
     try {
       const url = new URL(trimmed);
       const segments = url.pathname
-        .replace(/\.git$/, '')
-        .split('/')
+        .replace(/\.git$/, "")
+        .split("/")
         .filter(Boolean);
       if (segments.length >= 2) {
         const repo = segments.pop()!;
-        return { host: url.host, owner: segments.join('/'), repo };
+        return { host: url.host, owner: segments.join("/"), repo };
       }
     } catch {
       // not a valid URL
@@ -600,12 +675,17 @@ export class GitService {
    *   (master or main). WAP deploy branches (e.g. wap_release_xxx) are not
    *   considered real merges.
    */
-  static async getPrInfo(worktreePath: string): Promise<{ number: number; url: string; merged: boolean } | null> {
+  static async getPrInfo(
+    worktreePath: string,
+  ): Promise<{ number: number; url: string; merged: boolean } | null> {
     try {
       const branch = await GitService.getCurrentBranch(worktreePath);
-      if (!branch || branch === 'HEAD') return null;
+      if (!branch || branch === "HEAD") return null;
 
-      const remoteUrl = await git(['remote', 'get-url', 'origin'], worktreePath).catch(() => '');
+      const remoteUrl = await git(
+        ["remote", "get-url", "origin"],
+        worktreePath,
+      ).catch(() => "");
       if (!remoteUrl) return null;
 
       const parsed = GitService.parseRemoteUrl(remoteUrl);
@@ -618,28 +698,34 @@ export class GitService {
       // Determine which ref pattern to look for
       let refPrefix: string;
       if (isGitHub) {
-        refPrefix = 'refs/pull/';
+        refPrefix = "refs/pull/";
       } else if (isGitLab || isAlibabaCode) {
         // Both GitLab and Alibaba Code use merge-requests refs
-        refPrefix = 'refs/merge-requests/';
+        refPrefix = "refs/merge-requests/";
       } else {
         // Gitea/Forgejo also use refs/pull/, Bitbucket does not expose PR refs
-        refPrefix = 'refs/pull/';
+        refPrefix = "refs/pull/";
       }
 
       // Get the SHA of the branch on the remote
-      const branchRefOutput = await git(['ls-remote', '--heads', 'origin', `refs/heads/${branch}`], worktreePath).catch(() => '');
+      const branchRefOutput = await git(
+        ["ls-remote", "--heads", "origin", `refs/heads/${branch}`],
+        worktreePath,
+      ).catch(() => "");
       const branchSha = branchRefOutput.split(/\s+/)[0];
       if (!branchSha) return null;
 
       // Fetch all PR/MR head refs from the remote
-      const prRefsOutput = await git(['ls-remote', 'origin', `${refPrefix}*/head`], worktreePath).catch(() => '');
+      const prRefsOutput = await git(
+        ["ls-remote", "origin", `${refPrefix}*/head`],
+        worktreePath,
+      ).catch(() => "");
       if (!prRefsOutput) return null;
 
       // Collect ALL MR/PR numbers whose head SHA matches our branch.
       // A branch may have multiple MRs (e.g. one to wap_release_*, one to master).
       const matchedPrNums: number[] = [];
-      for (const line of prRefsOutput.split('\n')) {
+      for (const line of prRefsOutput.split("\n")) {
         const [sha, ref] = line.split(/\s+/);
         if (sha !== branchSha || !ref) continue;
 
@@ -655,7 +741,7 @@ export class GitService {
       if (matchedPrNums.length === 0) return null;
 
       // Helper to build web URL for a given MR number
-      const webHost = isAlibabaCode ? 'code.alibaba-inc.com' : parsed.host;
+      const webHost = isAlibabaCode ? "code.alibaba-inc.com" : parsed.host;
       const baseUrl = `https://${webHost}/${parsed.owner}/${parsed.repo}`;
       const buildUrl = (prNum: number): string => {
         if (isAlibabaCode) return `${baseUrl}/codereview/${prNum}`;
@@ -666,7 +752,11 @@ export class GitService {
       // Check each matched MR: if any is merged to master/main, prefer that one.
       // Only master/main target branches count as real merges (not wap_release_* etc.)
       for (const prNum of matchedPrNums) {
-        const merged = await GitService.isPrMergedToMainBranch(worktreePath, refPrefix, prNum);
+        const merged = await GitService.isPrMergedToMainBranch(
+          worktreePath,
+          refPrefix,
+          prNum,
+        );
         if (merged) {
           return { number: prNum, url: buildUrl(prNum), merged: true };
         }
@@ -690,10 +780,17 @@ export class GitService {
    * 1. Check if refs/pull/<n>/merge or refs/merge-requests/<n>/merge exists (indicates merged)
    * 2. Use git merge-base --is-ancestor to verify the merge commit is in origin/master or origin/main
    */
-  private static async isPrMergedToMainBranch(worktreePath: string, refPrefix: string, prNum: number): Promise<boolean> {
+  private static async isPrMergedToMainBranch(
+    worktreePath: string,
+    refPrefix: string,
+    prNum: number,
+  ): Promise<boolean> {
     try {
       // Check if the merge ref exists (indicates the PR has been merged somewhere)
-      const mergeRefOutput = await git(['ls-remote', 'origin', `${refPrefix}${prNum}/merge`], worktreePath).catch(() => '');
+      const mergeRefOutput = await git(
+        ["ls-remote", "origin", `${refPrefix}${prNum}/merge`],
+        worktreePath,
+      ).catch(() => "");
 
       // If no merge ref, it hasn't been merged at all
       const mergeSha = mergeRefOutput.split(/\s+/)[0];
@@ -701,9 +798,12 @@ export class GitService {
 
       // The merge ref exists — now verify it landed in master or main.
       // Try both branches; git merge-base --is-ancestor exits 0 if true, 1 if false.
-      for (const mainBranch of ['origin/master', 'origin/main']) {
+      for (const mainBranch of ["origin/master", "origin/main"]) {
         try {
-          await git(['merge-base', '--is-ancestor', mergeSha, mainBranch], worktreePath);
+          await git(
+            ["merge-base", "--is-ancestor", mergeSha, mainBranch],
+            worktreePath,
+          );
           // If the command succeeds (exit 0), the merge commit is an ancestor of this main branch
           return true;
         } catch {
