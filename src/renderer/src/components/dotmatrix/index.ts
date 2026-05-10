@@ -24,7 +24,11 @@ export {
 } from './variants';
 
 /** Spinner style name → display label */
-export const DOTMATRIX_SPINNERS: { id: string; label: string; Component: React.ComponentType<{ size?: number; dotSize?: number; color?: string; speed?: number; animated?: boolean }> }[] = [];
+export const DOTMATRIX_SPINNERS: {
+  id: string;
+  label: string;
+  Component: React.ComponentType<{ size?: number; dotSize?: number; color?: string; speed?: number; animated?: boolean }>;
+}[] = [];
 
 // Populated lazily below to avoid circular import issues
 import {

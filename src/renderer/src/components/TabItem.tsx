@@ -1,6 +1,8 @@
 import { type CSSProperties, forwardRef, type HTMLAttributes, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react';
 import { X } from 'lucide-react';
 
+import clsx from 'clsx';
+
 export type TabItemProps = {
   /** Whether this tab is the currently active/selected tab. */
   active: boolean;
@@ -43,9 +45,11 @@ export const TabItem = forwardRef<HTMLDivElement, TabItemProps>(function TabItem
   return (
     <div
       ref={ref}
-      className={`group/tab relative flex h-9 shrink-0 cursor-pointer items-center gap-1.5 px-3 text-[13px] transition-colors select-none${
-        active ? 'text-text' : 'text-muted hover:text-text'
-      }${className ? ` ${className}` : ''}`}
+      className={clsx(
+        'group/tab relative flex h-9 shrink-0 cursor-pointer items-center gap-1.5 px-3 text-[13px] transition-colors select-none',
+        active ? 'text-text' : 'text-muted hover:text-text',
+        className,
+      )}
       role="tab"
       tabIndex={0}
       aria-selected={active}

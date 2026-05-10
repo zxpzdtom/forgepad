@@ -3,6 +3,8 @@ import { DEFAULT_SHORTCUTS } from '@shared/types';
 import { useAppStore } from '@renderer/store/app-store';
 import { comboToDisplay, eventMatchesCombo } from '@renderer/lib/shortcut-utils';
 
+import clsx from 'clsx';
+
 export type ContextMenuItem = {
   label: string;
   icon?: ReactNode;
@@ -132,21 +134,24 @@ export function ContextMenu({ sections, x, y, onClose }: ContextMenuProps) {
           <button
             key={item.label}
             type="button"
-            className={`flex h-7 w-full items-center gap-[7px] rounded-[5px] px-[9px] text-left${
+            className={clsx(
+              'flex h-7 w-full items-center gap-[7px] rounded-[5px] px-[9px] text-left',
               item.danger
                 ? isFocused
-                  ? ' bg-panel-3 text-danger'
-                  : ' bg-transparent text-danger hover:bg-panel-3'
+                  ? 'bg-panel-3 text-danger'
+                  : 'bg-transparent text-danger hover:bg-panel-3'
                 : isFocused
-                  ? ' bg-panel-3 text-text'
-                  : ' bg-transparent text-text hover:bg-panel-3'
-            }`}
+                  ? 'bg-panel-3 text-text'
+                  : 'bg-transparent text-text hover:bg-panel-3',
+            )}
             onClick={item.action}
             onMouseEnter={() => setFocusIndex(idx)}
             onMouseLeave={() => setFocusIndex(-1)}
           >
             {item.icon && (
-              <span className={`flex size-4 shrink-0 items-center justify-center${item.danger ? ' text-danger' : ' text-subtle'}`}>
+              <span
+                className={clsx('flex size-4 shrink-0 items-center justify-center', item.danger ? 'text-danger' : 'text-subtle')}
+              >
                 {item.icon}
               </span>
             )}

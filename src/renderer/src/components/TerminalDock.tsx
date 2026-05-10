@@ -13,6 +13,8 @@ import { SortableTabItem } from './SortableTabItem';
 import { TabContextMenu } from './TabContextMenu';
 import { TerminalPanel } from './TerminalPanel';
 
+import clsx from 'clsx';
+
 type TerminalTab = Extract<Tab, { type: 'terminal' }>;
 
 function terminalIcon(tab: TerminalTab) {
@@ -119,7 +121,10 @@ export function TerminalDock() {
 
   return (
     <section
-      className={`flex size-full min-h-0 flex-col border-border border-t bg-surface-terminal${dropHighlight ? 'drop-target-active' : ''}`}
+      className={clsx(
+        'flex size-full min-h-0 flex-col border-border border-t bg-surface-terminal',
+        dropHighlight && 'drop-target-active',
+      )}
       onMouseDown={() => setFocusedColumn('agent')}
       onDragOver={handleDragOver}
       onDragEnter={handleDragEnter}
@@ -164,7 +169,12 @@ export function TerminalDock() {
         >
           <Plus size={14} />
         </button>
-        <button className="icon-button small" type="button" title={t('terminalDock.hideTerminal')} onClick={() => setTerminalPanelOpen(false)}>
+        <button
+          className="icon-button small"
+          type="button"
+          title={t('terminalDock.hideTerminal')}
+          onClick={() => setTerminalPanelOpen(false)}
+        >
           <Minimize2 size={13} />
         </button>
       </div>

@@ -28,6 +28,8 @@ import { BUILTIN_THEMES } from '@shared/types';
 import { agentPresetIcon } from './AgentIcons';
 import { FileIcon } from './FileIcon';
 
+import clsx from 'clsx';
+
 type QuickSearchProps = {
   open: boolean;
   onClose: () => void;
@@ -63,7 +65,10 @@ function ProjectAvatar({ name }: { name: string }) {
   const colorClass = AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
   return (
     <span
-      className={`flex size-4 shrink-0 items-center justify-center rounded font-[590] text-[#f7f8f8] text-[10px] ${colorClass}`}
+      className={clsx(
+        'flex size-4 shrink-0 items-center justify-center rounded font-[590] text-[#f7f8f8] text-[10px]',
+        colorClass,
+      )}
     >
       {letter}
     </span>
@@ -449,9 +454,10 @@ export function QuickSearch({ open, onClose }: QuickSearchProps) {
           ) : (
             filteredItems.map((item, index) => (
               <button
-                className={`grid h-9 w-full grid-cols-[24px_minmax(120px,auto)_minmax(0,1fr)_18px] items-center gap-3 rounded-lg px-3 text-left transition-colors ${
-                  index === selectedIndex ? 'bg-panel-3 text-text' : 'text-muted hover:bg-panel-2 hover:text-text'
-                }`}
+                className={clsx(
+                  'grid h-9 w-full grid-cols-[24px_minmax(120px,auto)_minmax(0,1fr)_18px] items-center gap-3 rounded-lg px-3 text-left transition-colors',
+                  index === selectedIndex ? 'bg-panel-3 text-text' : 'text-muted hover:bg-panel-2 hover:text-text',
+                )}
                 key={item.id}
                 type="button"
                 onMouseEnter={() => setSelectedIndex(index)}

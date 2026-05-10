@@ -1,12 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { SpriteAnimator } from 'codex-pets-react';
 import type { PetSettings, PendingPermission } from '@shared/types';
-import {
-  agentStatusToAnimation,
-  forgePetAtlas,
-  getPetSpritesheetUrl,
-  type ForgePetAnimationName,
-} from './pet-registry';
+import { agentStatusToAnimation, forgePetAtlas, getPetSpritesheetUrl, type ForgePetAnimationName } from './pet-registry';
 import { PetApprovalPopup } from './PetApprovalPopup';
 
 // ── Random-walk constants (same as PetWidget) ──

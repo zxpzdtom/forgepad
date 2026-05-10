@@ -5,6 +5,8 @@ import { Bot } from 'lucide-react';
 
 import { agentPresetIcon } from './AgentIcons';
 
+import clsx from 'clsx';
+
 function shortPresetLabel(label: string): string {
   return label.replace(/\s+code$/i, '').trim();
 }
@@ -35,11 +37,12 @@ export function AgentQuickBar() {
       <div className="scrollbar-none scroll-mask-x flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto">
         {enabledPresets.map((preset) => (
           <button
-            className={`flex h-7 shrink-0 items-center gap-1.5 rounded-md border px-2.5 text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-45 ${
+            className={clsx(
+              'flex h-7 shrink-0 items-center gap-1.5 rounded-md border px-2.5 text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-45',
               preset.command === settings.defaultAgentCommand
                 ? 'border-accent/45 bg-accent-surface text-text'
-                : 'border-transparent bg-transparent text-muted hover:bg-panel-2 hover:text-text'
-            }`}
+                : 'border-transparent bg-transparent text-muted hover:bg-panel-2 hover:text-text',
+            )}
             key={preset.id}
             type="button"
             title={t('agent.newAgentPreset', { label: preset.label })}

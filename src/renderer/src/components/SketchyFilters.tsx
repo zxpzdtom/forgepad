@@ -15,63 +15,24 @@
  */
 export function SketchyFilters() {
   return (
-    <svg
-      aria-hidden="true"
-      style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden', pointerEvents: 'none' }}
-    >
+    <svg aria-hidden="true" style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden', pointerEvents: 'none' }}>
       <defs>
         {/* Subtle wobble — whole-element, keeps text readable */}
         <filter id="sketchy-subtle" x="-5%" y="-5%" width="110%" height="110%">
-          <feTurbulence
-            type="turbulence"
-            baseFrequency="0.03"
-            numOctaves={4}
-            seed={15}
-            result="noise"
-          />
-          <feDisplacementMap
-            in="SourceGraphic"
-            in2="noise"
-            scale={2}
-            xChannelSelector="R"
-            yChannelSelector="G"
-          />
+          <feTurbulence type="turbulence" baseFrequency="0.03" numOctaves={4} seed={15} result="noise" />
+          <feDisplacementMap in="SourceGraphic" in2="noise" scale={2} xChannelSelector="R" yChannelSelector="G" />
         </filter>
 
         {/* Medium wobble — border pseudo-elements on containers */}
         <filter id="sketchy-medium" x="-5%" y="-5%" width="110%" height="110%">
-          <feTurbulence
-            type="turbulence"
-            baseFrequency="0.025"
-            numOctaves={3}
-            seed={42}
-            result="noise"
-          />
-          <feDisplacementMap
-            in="SourceGraphic"
-            in2="noise"
-            scale={3}
-            xChannelSelector="R"
-            yChannelSelector="G"
-          />
+          <feTurbulence type="turbulence" baseFrequency="0.025" numOctaves={3} seed={42} result="noise" />
+          <feDisplacementMap in="SourceGraphic" in2="noise" scale={3} xChannelSelector="R" yChannelSelector="G" />
         </filter>
 
         {/* Strong wobble — standalone border decoration */}
         <filter id="sketchy-border" x="-5%" y="-5%" width="110%" height="110%">
-          <feTurbulence
-            type="turbulence"
-            baseFrequency="0.04"
-            numOctaves={4}
-            seed={7}
-            result="noise"
-          />
-          <feDisplacementMap
-            in="SourceGraphic"
-            in2="noise"
-            scale={4}
-            xChannelSelector="R"
-            yChannelSelector="G"
-          />
+          <feTurbulence type="turbulence" baseFrequency="0.04" numOctaves={4} seed={7} result="noise" />
+          <feDisplacementMap in="SourceGraphic" in2="noise" scale={4} xChannelSelector="R" yChannelSelector="G" />
         </filter>
       </defs>
     </svg>

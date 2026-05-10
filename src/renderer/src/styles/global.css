@@ -332,6 +332,68 @@ textarea {
     height: 100%;
 }
 
+.floating-search-bar {
+    position: absolute;
+    top: 10px;
+    right: 14px;
+    z-index: 5;
+    display: flex;
+    height: 32px;
+    min-width: 320px;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--panel) 94%, transparent);
+    padding: 0 7px 0 10px;
+    box-shadow: 0 14px 34px rgba(0, 0, 0, 0.22);
+    backdrop-filter: blur(12px);
+}
+
+.floating-search-bar input {
+    min-width: 0;
+    flex: 1;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: var(--text);
+    font-size: 12px;
+}
+
+.floating-search-bar input::placeholder {
+    color: var(--muted);
+}
+
+.floating-search-count {
+    width: 46px;
+    color: var(--muted);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+}
+
+.floating-search-bar button {
+    display: grid;
+    width: 22px;
+    height: 22px;
+    place-items: center;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--muted);
+    cursor: pointer;
+}
+
+.floating-search-bar button:hover:not(:disabled) {
+    background: var(--panel-3);
+    color: var(--text);
+}
+
+.floating-search-bar button:disabled {
+    cursor: default;
+    opacity: 0.35;
+}
+
 .editor-panel,
 .diff-panel,
 .context-preview {

@@ -1,19 +1,21 @@
+import clsx from 'clsx';
+
 /**
  * PopoutBrowser — Full-featured standalone browser window.
  *
  * Manages multiple tabs (show/hide, not mount/unmount) with local React state.
  * Does NOT depend on Zustand store or main-window i18n.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Allotment } from "allotment";
-import { arrayMove } from "@dnd-kit/sortable";
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Allotment } from 'allotment';
+import { arrayMove } from '@dnd-kit/sortable';
 
-import type { BrowserHistoryEntry, ExtensionInfo } from "@shared/types";
-import { BrowserConsolePanel } from "../BrowserConsolePanel";
-import type { ConsoleEntry } from "../console-utils";
-import { Tooltip } from "../Tooltip";
-import { UrlBar } from "../UrlBar";
-import { PopoutTabBar } from "./PopoutTabBar";
+import type { BrowserHistoryEntry, ExtensionInfo } from '@shared/types';
+import { BrowserConsolePanel } from '../BrowserConsolePanel';
+import type { ConsoleEntry } from '../console-utils';
+import { Tooltip } from '../Tooltip';
+import { UrlBar } from '../UrlBar';
+import { PopoutTabBar } from './PopoutTabBar';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -27,18 +29,15 @@ export type PopoutTab = {
   canGoForward: boolean;
 };
 
-type ViewportMode = "desktop" | "mobile";
+type ViewportMode = 'desktop' | 'mobile';
 
-const VIEWPORT_PRESETS: Record<
-  ViewportMode,
-  { width: number; height: number; userAgent?: string }
-> = {
+const VIEWPORT_PRESETS: Record<ViewportMode, { width: number; height: number; userAgent?: string }> = {
   desktop: { width: 0, height: 0 },
   mobile: {
     width: 375,
     height: 812,
     userAgent:
-      "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
+      'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
   },
 };
 
@@ -46,39 +45,36 @@ const VIEWPORT_PRESETS: Record<
 
 const translations: Record<string, Record<string, string>> = {
   en: {
-    back: "Back",
-    forward: "Forward",
-    reload: "Reload",
-    stop: "Stop",
-    switchDesktop: "Switch to desktop view",
-    switchMobile: "Switch to mobile view",
-    showConsole: "Show console",
-    hideConsole: "Hide console",
-    openDevTools: "Open DevTools",
-    newTab: "New Tab",
-    urlPlaceholder: "Enter URL or search",
+    back: 'Back',
+    forward: 'Forward',
+    reload: 'Reload',
+    stop: 'Stop',
+    switchDesktop: 'Switch to desktop view',
+    switchMobile: 'Switch to mobile view',
+    showConsole: 'Show console',
+    hideConsole: 'Hide console',
+    openDevTools: 'Open DevTools',
+    newTab: 'New Tab',
+    urlPlaceholder: 'Enter URL or search',
   },
-  "zh-CN": {
-    back: "后退",
-    forward: "前进",
-    reload: "刷新",
-    stop: "停止",
-    switchDesktop: "切换到桌面视图",
-    switchMobile: "切换到移动端视图",
-    showConsole: "显示控制台",
-    hideConsole: "隐藏控制台",
-    openDevTools: "打开开发者工具",
-    newTab: "新标签页",
-    urlPlaceholder: "输入网址或搜索",
+  'zh-CN': {
+    back: '后退',
+    forward: '前进',
+    reload: '刷新',
+    stop: '停止',
+    switchDesktop: '切换到桌面视图',
+    switchMobile: '切换到移动端视图',
+    showConsole: '显示控制台',
+    hideConsole: '隐藏控制台',
+    openDevTools: '打开开发者工具',
+    newTab: '新标签页',
+    urlPlaceholder: '输入网址或搜索',
   },
 };
 
 function usePopoutT() {
-  const locale = window.forgepadBrowser?.init?.locale || "en";
-  return useCallback(
-    (key: string) => translations[locale]?.[key] ?? translations.en[key] ?? key,
-    [locale],
-  );
+  const locale = window.forgepadBrowser?.init?.locale || 'en';
+  return useCallback((key: string) => translations[locale]?.[key] ?? translations.en[key] ?? key, [locale]);
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -89,7 +85,7 @@ function createTabId(): string {
 }
 
 function normalizeUrl(url: string): string {
-  if (url === "about:blank") return url;
+  if (url === 'about:blank') return url;
   if (/^https?:\/\//i.test(url)) return url;
   if (/^[a-zA-Z][a-zA-Z\d+\-.]*:\/\//.test(url)) return url;
   return `https://${url}`;
@@ -141,7 +137,7 @@ function WebviewPane({
     if (!wv) return;
 
     const injectMobileScrollbar = () => {
-      if (viewportModeRef.current !== "mobile") return;
+      if (viewportModeRef.current !== 'mobile') return;
       const css = `
         (function() {
           var id = '__forgepad_mobile_scrollbar__';
@@ -178,19 +174,17 @@ function WebviewPane({
     const handleDomReady = () => {
       domReadyRef.current = true;
       sendNavState();
-      const isMobile = viewportModeRef.current === "mobile";
+      const isMobile = viewportModeRef.current === 'mobile';
       try {
         const preset = VIEWPORT_PRESETS[viewportModeRef.current];
-        wv.setUserAgent(preset.userAgent || "");
+        wv.setUserAgent(preset.userAgent || '');
       } catch {
         /* */
       }
       try {
         const wcId = wv.getWebContentsId();
         webContentsIdRef.current = wcId;
-        window.forgepadBrowser.browser
-          .setTouchEmulation(wcId, isMobile)
-          .catch(() => {});
+        window.forgepadBrowser.browser.setTouchEmulation(wcId, isMobile).catch(() => {});
         // Enable console capture
         window.forgepadBrowser.browser.enableConsole(wcId).catch(() => {});
         // Notify parent that webContentsId is available (used for extension tab creation)
@@ -212,10 +206,10 @@ function WebviewPane({
         try {
           return wv.getURL();
         } catch {
-          return "";
+          return '';
         }
       })();
-      if (!url || url === "about:blank") return;
+      if (!url || url === 'about:blank') return;
       const faviconScript = `
         (() => {
           const links = [...document.querySelectorAll('link[rel~="icon"], link[rel~="shortcut"]')].sort((a, b) => {
@@ -249,17 +243,17 @@ function WebviewPane({
         try {
           return wv.getTitle();
         } catch {
-          return "";
+          return '';
         }
       })();
       wv.executeJavaScript(faviconScript)
         .then((dataUrl: unknown) => {
-          const favicon = typeof dataUrl === "string" ? dataUrl : "";
+          const favicon = typeof dataUrl === 'string' ? dataUrl : '';
           onNavStateChange(tab.id, { favicon });
           onHistoryEntry({ url, title, favicon, visitedAt: Date.now() });
         })
         .catch(() => {
-          onHistoryEntry({ url, title, favicon: "", visitedAt: Date.now() });
+          onHistoryEntry({ url, title, favicon: '', visitedAt: Date.now() });
         });
     };
 
@@ -268,8 +262,7 @@ function WebviewPane({
       // Re-enable console for new page
       try {
         const wcId = wv.getWebContentsId();
-        if (wcId)
-          window.forgepadBrowser.browser.enableConsole(wcId).catch(() => {});
+        if (wcId) window.forgepadBrowser.browser.enableConsole(wcId).catch(() => {});
       } catch {
         /* */
       }
@@ -287,140 +280,127 @@ function WebviewPane({
       onNewWindow(ev.url);
     };
 
-    wv.addEventListener("dom-ready", handleDomReady);
-    wv.addEventListener("did-start-loading", handleDidStartLoading);
-    wv.addEventListener("did-stop-loading", handleDidStopLoading);
-    wv.addEventListener("did-navigate", handleDidNavigate);
-    wv.addEventListener("did-navigate-in-page", sendNavState);
-    wv.addEventListener("page-title-updated", sendNavState);
-    wv.addEventListener("did-fail-load", handleDidFailLoad);
-    wv.addEventListener("new-window", handleNewWindow);
+    wv.addEventListener('dom-ready', handleDomReady);
+    wv.addEventListener('did-start-loading', handleDidStartLoading);
+    wv.addEventListener('did-stop-loading', handleDidStopLoading);
+    wv.addEventListener('did-navigate', handleDidNavigate);
+    wv.addEventListener('did-navigate-in-page', sendNavState);
+    wv.addEventListener('page-title-updated', sendNavState);
+    wv.addEventListener('did-fail-load', handleDidFailLoad);
+    wv.addEventListener('new-window', handleNewWindow);
 
     return () => {
       domReadyRef.current = false;
-      wv.removeEventListener("dom-ready", handleDomReady);
-      wv.removeEventListener("did-start-loading", handleDidStartLoading);
-      wv.removeEventListener("did-stop-loading", handleDidStopLoading);
-      wv.removeEventListener("did-navigate", handleDidNavigate);
-      wv.removeEventListener("did-navigate-in-page", sendNavState);
-      wv.removeEventListener("page-title-updated", sendNavState);
-      wv.removeEventListener("did-fail-load", handleDidFailLoad);
-      wv.removeEventListener("new-window", handleNewWindow);
+      wv.removeEventListener('dom-ready', handleDomReady);
+      wv.removeEventListener('did-start-loading', handleDidStartLoading);
+      wv.removeEventListener('did-stop-loading', handleDidStopLoading);
+      wv.removeEventListener('did-navigate', handleDidNavigate);
+      wv.removeEventListener('did-navigate-in-page', sendNavState);
+      wv.removeEventListener('page-title-updated', sendNavState);
+      wv.removeEventListener('did-fail-load', handleDidFailLoad);
+      wv.removeEventListener('new-window', handleNewWindow);
       // Disable console capture on unmount
       const wcId = webContentsIdRef.current;
       if (wcId != null) {
         window.forgepadBrowser.browser.disableConsole(wcId).catch(() => {});
       }
     };
-  }, [
-    tab.id,
-    onNavStateChange,
-    onNewWindow,
-    onHistoryEntry,
-    onWebContentsReady,
-  ]);
+  }, [tab.id, onNavStateChange, onNewWindow, onHistoryEntry, onWebContentsReady]);
 
   // ── Listen for CDP console events ──
   useEffect(() => {
-    const TYPE_MAP: Record<string, ConsoleEntry["level"]> = {
-      log: "log",
-      info: "log",
-      warning: "warn",
-      warn: "warn",
-      error: "error",
-      debug: "debug",
-      verbose: "debug",
-      dir: "log",
-      table: "log",
-      assert: "error",
+    const TYPE_MAP: Record<string, ConsoleEntry['level']> = {
+      log: 'log',
+      info: 'log',
+      warning: 'warn',
+      warn: 'warn',
+      error: 'error',
+      debug: 'debug',
+      verbose: 'debug',
+      dir: 'log',
+      table: 'log',
+      assert: 'error',
     };
 
-    const cleanup = window.forgepadBrowser.browser.onConsoleEvent(
-      (raw: unknown) => {
-        const evt = raw as {
-          webContentsId: number;
+    const cleanup = window.forgepadBrowser.browser.onConsoleEvent((raw: unknown) => {
+      const evt = raw as {
+        webContentsId: number;
+        type: string;
+        args: Array<{
           type: string;
-          args: Array<{
+          subtype?: string;
+          value?: unknown;
+          description?: string;
+          className?: string;
+          preview?: {
             type: string;
             subtype?: string;
-            value?: unknown;
             description?: string;
-            className?: string;
-            preview?: {
+            properties?: Array<{
+              name: string;
               type: string;
+              value?: string;
               subtype?: string;
-              description?: string;
-              properties?: Array<{
-                name: string;
-                type: string;
-                value?: string;
-                subtype?: string;
-              }>;
-            };
-          }>;
-          timestamp: number;
-        };
+            }>;
+          };
+        }>;
+        timestamp: number;
+      };
 
-        if (evt.webContentsId !== webContentsIdRef.current) return;
+      if (evt.webContentsId !== webContentsIdRef.current) return;
 
-        const entry: ConsoleEntry = {
-          id: ++consoleIdRef.current,
-          level: TYPE_MAP[evt.type] ?? "log",
-          args: evt.args.map((arg) => ({
-            type: arg.type,
-            subtype: arg.subtype,
-            value: arg.value,
-            description: arg.description,
-            className: arg.className,
-            preview: arg.preview,
-          })),
-          timestamp: evt.timestamp ? evt.timestamp * 1000 : Date.now(),
-        };
-        onConsoleEvent(tab.id, entry);
-      },
-    );
+      const entry: ConsoleEntry = {
+        id: ++consoleIdRef.current,
+        level: TYPE_MAP[evt.type] ?? 'log',
+        args: evt.args.map((arg) => ({
+          type: arg.type,
+          subtype: arg.subtype,
+          value: arg.value,
+          description: arg.description,
+          className: arg.className,
+          preview: arg.preview,
+        })),
+        timestamp: evt.timestamp ? evt.timestamp * 1000 : Date.now(),
+      };
+      onConsoleEvent(tab.id, entry);
+    });
 
     return cleanup;
   }, [tab.id, onConsoleEvent]);
 
-  const isMobile = viewportMode === "mobile";
+  const isMobile = viewportMode === 'mobile';
   const mobilePreset = VIEWPORT_PRESETS.mobile;
 
   return (
-    <div
-      style={{ display: isActive ? "flex" : "none" }}
-      className="size-full flex-col"
-    >
-      <div
-        className={`relative size-full ${isMobile ? "flex items-start justify-center bg-panel-2 pt-4" : "bg-white"}`}
-      >
+    <div style={{ display: isActive ? 'flex' : 'none' }} className="size-full flex-col">
+      <div className={clsx('relative size-full', isMobile ? 'flex items-start justify-center bg-panel-2 pt-4' : 'bg-white')}>
         {isMobile ? (
           <div
             className="relative shrink-0 overflow-hidden rounded-xl border border-border bg-white shadow-lg"
             style={{
               width: mobilePreset.width,
               height: mobilePreset.height,
-              maxHeight: "100%",
+              maxHeight: '100%',
             }}
           >
             <webview
               ref={webviewRef}
-              src={tab.url || "about:blank"}
-              useragent={VIEWPORT_PRESETS[viewportMode].userAgent || ""}
-              style={{ width: "100%", height: "100%", display: "inline-flex" }}
+              src={tab.url || 'about:blank'}
+              useragent={VIEWPORT_PRESETS[viewportMode].userAgent || ''}
+              style={{ width: '100%', height: '100%', display: 'inline-flex' }}
             />
           </div>
         ) : (
           <webview
             ref={webviewRef}
-            src={tab.url || "about:blank"}
-            useragent={VIEWPORT_PRESETS[viewportMode].userAgent || ""}
+            src={tab.url || 'about:blank'}
+            useragent={VIEWPORT_PRESETS[viewportMode].userAgent || ''}
             style={{
-              position: "absolute",
+              position: 'absolute',
               inset: 0,
-              width: "100%",
-              height: "100%",
-              display: "inline-flex",
+              width: '100%',
+              height: '100%',
+              display: 'inline-flex',
             }}
           />
         )}
@@ -434,7 +414,7 @@ function WebviewPane({
 export function PopoutBrowser() {
   const t = usePopoutT();
   const api = window.forgepadBrowser;
-  const defaultHomepage = api.init.defaultHomepage || "https://www.google.com";
+  const defaultHomepage = api.init.defaultHomepage || 'https://www.google.com';
   const initialUrl = api.init.initialUrl || defaultHomepage;
 
   // ── Tab state ──
@@ -442,26 +422,20 @@ export function PopoutBrowser() {
     {
       id: createTabId(),
       url: initialUrl,
-      title: "",
-      favicon: "",
+      title: '',
+      favicon: '',
       isLoading: true,
       canGoBack: false,
       canGoForward: false,
     },
   ]);
   const [activeTabId, setActiveTabId] = useState(tabs[0].id);
-  const [urlInput, setUrlInput] = useState(
-    initialUrl === "about:blank" ? "" : initialUrl,
-  );
-  const [viewportMode, setViewportMode] = useState<ViewportMode>("desktop");
+  const [urlInput, setUrlInput] = useState(initialUrl === 'about:blank' ? '' : initialUrl);
+  const [viewportMode, setViewportMode] = useState<ViewportMode>('desktop');
   const [consoleOpen, setConsoleOpen] = useState(false);
-  const [consoleEntries, setConsoleEntries] = useState<
-    Map<string, ConsoleEntry[]>
-  >(new Map());
+  const [consoleEntries, setConsoleEntries] = useState<Map<string, ConsoleEntry[]>>(new Map());
   const [extensionActions, setExtensionActions] = useState<ExtensionInfo[]>([]);
-  const [browsingHistory, setBrowsingHistory] = useState<BrowserHistoryEntry[]>(
-    [],
-  );
+  const [browsingHistory, setBrowsingHistory] = useState<BrowserHistoryEntry[]>([]);
 
   // Webview refs map
   const webviewRefs = useRef<Map<string, Electron.WebviewTag>>(new Map());
@@ -473,7 +447,7 @@ export function PopoutBrowser() {
 
   /** Focus the URL bar input element (finds it inside the UrlBar wrapper) */
   const focusUrlBar = useCallback(() => {
-    const input = urlBarWrapperRef.current?.querySelector("input");
+    const input = urlBarWrapperRef.current?.querySelector('input');
     if (input) {
       input.focus();
       input.select();
@@ -481,21 +455,12 @@ export function PopoutBrowser() {
   }, []);
 
   // Active tab
-  const activeTab = useMemo(
-    () => tabs.find((t) => t.id === activeTabId) ?? tabs[0],
-    [tabs, activeTabId],
-  );
+  const activeTab = useMemo(() => tabs.find((t) => t.id === activeTabId) ?? tabs[0], [tabs, activeTabId]);
 
   // Active tab's console entries
-  const activeConsoleEntries = useMemo(
-    () => consoleEntries.get(activeTabId) ?? [],
-    [consoleEntries, activeTabId],
-  );
+  const activeConsoleEntries = useMemo(() => consoleEntries.get(activeTabId) ?? [], [consoleEntries, activeTabId]);
 
-  const consoleErrorCount = useMemo(
-    () => activeConsoleEntries.filter((e) => e.level === "error").length,
-    [activeConsoleEntries],
-  );
+  const consoleErrorCount = useMemo(() => activeConsoleEntries.filter((e) => e.level === 'error').length, [activeConsoleEntries]);
 
   // Load extensions
   useEffect(() => {
@@ -509,10 +474,10 @@ export function PopoutBrowser() {
 
   // Sync URL bar when active tab changes or navigates
   useEffect(() => {
-    if (activeTab.url && activeTab.url !== "about:blank") {
+    if (activeTab.url && activeTab.url !== 'about:blank') {
       setUrlInput(activeTab.url);
     } else {
-      setUrlInput("");
+      setUrlInput('');
     }
   }, [activeTab.url, activeTab.id]);
 
@@ -525,16 +490,16 @@ export function PopoutBrowser() {
       const newTab: PopoutTab = {
         id,
         url: tabUrl,
-        title: "",
-        favicon: "",
-        isLoading: tabUrl !== "about:blank",
+        title: '',
+        favicon: '',
+        isLoading: tabUrl !== 'about:blank',
         canGoBack: false,
         canGoForward: false,
       };
       setTabs((prev) => [...prev, newTab]);
       setActiveTabId(id);
       // Focus URL bar for new empty tabs
-      if (!url && tabUrl === "about:blank") {
+      if (!url && tabUrl === 'about:blank') {
         setTimeout(() => focusUrlBar(), 50);
       }
     },
@@ -605,8 +570,7 @@ export function PopoutBrowser() {
   const selectTabByIndex = useCallback((index: number) => {
     setTabs((prev) => {
       // index 0 or 9 means last tab; 1~8 means tab at that position
-      const targetIdx =
-        index === 0 || index === 9 ? prev.length - 1 : index - 1;
+      const targetIdx = index === 0 || index === 9 ? prev.length - 1 : index - 1;
       if (targetIdx >= 0 && targetIdx < prev.length) {
         setActiveTabId(prev[targetIdx].id);
       }
@@ -625,16 +589,7 @@ export function PopoutBrowser() {
       api.onSelectTabByIndex((index: number) => selectTabByIndex(index)),
     ];
     return () => cleanups.forEach((fn) => fn());
-  }, [
-    api,
-    addTab,
-    closeTab,
-    activeTabId,
-    nextTab,
-    prevTab,
-    selectTabByIndex,
-    focusUrlBar,
-  ]);
+  }, [api, addTab, closeTab, activeTabId, nextTab, prevTab, selectTabByIndex, focusUrlBar]);
 
   // ── Extension tab creation listener ──
   // When the extension popup asks to create a tab (chrome.tabs.create),
@@ -650,9 +605,9 @@ export function PopoutBrowser() {
       const newTab: PopoutTab = {
         id,
         url: tabUrl,
-        title: "",
-        favicon: "",
-        isLoading: tabUrl !== "about:blank",
+        title: '',
+        favicon: '',
+        isLoading: tabUrl !== 'about:blank',
         canGoBack: false,
         canGoForward: false,
       };
@@ -679,14 +634,9 @@ export function PopoutBrowser() {
 
   // ── Webview callbacks ──
 
-  const handleNavStateChange = useCallback(
-    (tabId: string, update: Partial<PopoutTab>) => {
-      setTabs((prev) =>
-        prev.map((t) => (t.id === tabId ? { ...t, ...update } : t)),
-      );
-    },
-    [],
-  );
+  const handleNavStateChange = useCallback((tabId: string, update: Partial<PopoutTab>) => {
+    setTabs((prev) => prev.map((t) => (t.id === tabId ? { ...t, ...update } : t)));
+  }, []);
 
   const handleNewWindow = useCallback(
     (url: string) => {
@@ -695,17 +645,14 @@ export function PopoutBrowser() {
     [addTab],
   );
 
-  const handleConsoleEvent = useCallback(
-    (tabId: string, entry: ConsoleEntry) => {
-      setConsoleEntries((prev) => {
-        const next = new Map(prev);
-        const existing = next.get(tabId) ?? [];
-        next.set(tabId, [...existing, entry]);
-        return next;
-      });
-    },
-    [],
-  );
+  const handleConsoleEvent = useCallback((tabId: string, entry: ConsoleEntry) => {
+    setConsoleEntries((prev) => {
+      const next = new Map(prev);
+      const existing = next.get(tabId) ?? [];
+      next.set(tabId, [...existing, entry]);
+      return next;
+    });
+  }, []);
 
   const handleHistoryEntry = useCallback((entry: BrowserHistoryEntry) => {
     setBrowsingHistory((prev) => {
@@ -721,16 +668,13 @@ export function PopoutBrowser() {
     });
   }, []);
 
-  const handleWebviewRef = useCallback(
-    (tabId: string, wv: Electron.WebviewTag | null) => {
-      if (wv) {
-        webviewRefs.current.set(tabId, wv);
-      } else {
-        webviewRefs.current.delete(tabId);
-      }
-    },
-    [],
-  );
+  const handleWebviewRef = useCallback((tabId: string, wv: Electron.WebviewTag | null) => {
+    if (wv) {
+      webviewRefs.current.set(tabId, wv);
+    } else {
+      webviewRefs.current.delete(tabId);
+    }
+  }, []);
 
   // ── Navigation handlers ──
 
@@ -765,15 +709,15 @@ export function PopoutBrowser() {
 
   const handleToggleViewport = useCallback(() => {
     setViewportMode((prev) => {
-      const next = prev === "desktop" ? "mobile" : "desktop";
+      const next = prev === 'desktop' ? 'mobile' : 'desktop';
       // Apply UA change + reload to the active webview
       const wv = webviewRefs.current.get(activeTabId);
       if (wv) {
         try {
           const preset = VIEWPORT_PRESETS[next];
-          wv.setUserAgent(preset.userAgent || "");
+          wv.setUserAgent(preset.userAgent || '');
           const currentUrl = wv.getURL();
-          if (currentUrl && currentUrl !== "about:blank") {
+          if (currentUrl && currentUrl !== 'about:blank') {
             wv.reload();
           }
         } catch {
@@ -806,10 +750,10 @@ export function PopoutBrowser() {
       const inputId = Date.now();
       const inputEntry: ConsoleEntry = {
         id: inputId,
-        level: "log",
-        args: [{ type: "string", value: script }],
+        level: 'log',
+        args: [{ type: 'string', value: script }],
         timestamp: Date.now(),
-        source: "input",
+        source: 'input',
       };
       setConsoleEntries((prev) => {
         const next = new Map(prev);
@@ -846,55 +790,54 @@ export function PopoutBrowser() {
 
         let entry: ConsoleEntry;
         if (envelope?.__error) {
-          const desc = `${envelope.__name ?? "Error"}: ${envelope.__message ?? String(envelope)}`;
+          const desc = `${envelope.__name ?? 'Error'}: ${envelope.__message ?? String(envelope)}`;
           entry = {
             id: Date.now() + 1,
-            level: "error",
-            args: [{ type: "object", subtype: "error", description: desc }],
+            level: 'error',
+            args: [{ type: 'object', subtype: 'error', description: desc }],
             timestamp: Date.now(),
-            source: "error",
+            source: 'error',
           };
         } else {
-          let arg: import("../console-utils").ConsoleArg;
+          let arg: import('../console-utils').ConsoleArg;
           switch (envelope?.__type) {
-            case "null":
-              arg = { type: "object", subtype: "null" };
+            case 'null':
+              arg = { type: 'object', subtype: 'null' };
               break;
-            case "undefined":
-              arg = { type: "undefined" };
+            case 'undefined':
+              arg = { type: 'undefined' };
               break;
-            case "string":
-              arg = { type: "string", value: envelope.__value };
+            case 'string':
+              arg = { type: 'string', value: envelope.__value };
               break;
-            case "number":
-              arg = { type: "number", value: envelope.__value };
+            case 'number':
+              arg = { type: 'number', value: envelope.__value };
               break;
-            case "boolean":
-              arg = { type: "boolean", value: envelope.__value };
+            case 'boolean':
+              arg = { type: 'boolean', value: envelope.__value };
               break;
-            case "function":
+            case 'function':
               arg = {
-                type: "function",
-                description: envelope.__desc ?? "function()",
+                type: 'function',
+                description: envelope.__desc ?? 'function()',
               };
               break;
-            case "object":
+            case 'object':
               arg = {
-                type: "object",
-                description:
-                  envelope.__json ?? envelope.__desc ?? "[object Object]",
+                type: 'object',
+                description: envelope.__json ?? envelope.__desc ?? '[object Object]',
               };
               break;
             default:
-              arg = { type: "string", value: String(envelope) };
+              arg = { type: 'string', value: String(envelope) };
               break;
           }
           entry = {
             id: Date.now() + 1,
-            level: "log",
+            level: 'log',
             args: [arg],
             timestamp: Date.now(),
-            source: "result",
+            source: 'result',
           };
         }
 
@@ -907,12 +850,10 @@ export function PopoutBrowser() {
       } catch (err) {
         const errorEntry: ConsoleEntry = {
           id: Date.now() + 2,
-          level: "error",
-          args: [
-            { type: "object", subtype: "error", description: String(err) },
-          ],
+          level: 'error',
+          args: [{ type: 'object', subtype: 'error', description: String(err) }],
           timestamp: Date.now(),
-          source: "error",
+          source: 'error',
         };
         setConsoleEntries((prev) => {
           const next = new Map(prev);
@@ -925,7 +866,7 @@ export function PopoutBrowser() {
     [activeTabId],
   );
 
-  const isMobile = viewportMode === "mobile";
+  const isMobile = viewportMode === 'mobile';
 
   return (
     <div className="flex h-screen w-screen flex-col bg-bg text-text">
@@ -942,7 +883,7 @@ export function PopoutBrowser() {
       {/* ── Toolbar ─────────────────────────────────────── */}
       <div className="flex h-10 shrink-0 items-center gap-1 border-border border-b bg-panel px-2">
         {/* Back */}
-        <Tooltip label={t("back")} position="bottom">
+        <Tooltip label={t('back')} position="bottom">
           <button
             type="button"
             onClick={handleBack}
@@ -965,7 +906,7 @@ export function PopoutBrowser() {
         </Tooltip>
 
         {/* Forward */}
-        <Tooltip label={t("forward")} position="bottom">
+        <Tooltip label={t('forward')} position="bottom">
           <button
             type="button"
             onClick={handleForward}
@@ -988,10 +929,7 @@ export function PopoutBrowser() {
         </Tooltip>
 
         {/* Reload / Stop */}
-        <Tooltip
-          label={activeTab.isLoading ? t("stop") : t("reload")}
-          position="bottom"
-        >
+        <Tooltip label={activeTab.isLoading ? t('stop') : t('reload')} position="bottom">
           <button
             type="button"
             onClick={handleReloadOrStop}
@@ -1030,12 +968,7 @@ export function PopoutBrowser() {
 
         {/* URL bar */}
         <div ref={urlBarWrapperRef} className="min-w-0 flex-1">
-          <UrlBar
-            value={urlInput}
-            onChange={setUrlInput}
-            onNavigate={handleNavigate}
-            history={browsingHistory}
-          />
+          <UrlBar value={urlInput} onChange={setUrlInput} onNavigate={handleNavigate} history={browsingHistory} />
         </div>
 
         {/* Extension action buttons */}
@@ -1057,12 +990,10 @@ export function PopoutBrowser() {
                         try {
                           return wv.getURL();
                         } catch {
-                          return "";
+                          return '';
                         }
                       })();
-                      const rect = (
-                        e.currentTarget as HTMLElement
-                      ).getBoundingClientRect();
+                      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
                       api.extension.openPopup(
                         ext.id,
                         ext.popupPath,
@@ -1077,22 +1008,9 @@ export function PopoutBrowser() {
                   }}
                 >
                   {ext.iconUrl ? (
-                    <img
-                      src={ext.iconUrl}
-                      alt={ext.name}
-                      width={16}
-                      height={16}
-                      className="rounded-sm"
-                    />
+                    <img src={ext.iconUrl} alt={ext.name} width={16} height={16} className="rounded-sm" />
                   ) : (
-                    <svg
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                    >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
                     </svg>
                   )}
@@ -1104,100 +1022,42 @@ export function PopoutBrowser() {
         )}
 
         {/* Viewport mode toggle */}
-        <Tooltip
-          label={isMobile ? t("switchDesktop") : t("switchMobile")}
-          position="bottom"
-        >
+        <Tooltip label={isMobile ? t('switchDesktop') : t('switchMobile')} position="bottom">
           <button
             type="button"
             onClick={handleToggleViewport}
             className={[
-              "grid h-7 w-7 place-items-center rounded-md transition-[color,background-color,scale] duration-150 active:scale-[0.96]",
-              isMobile
-                ? "bg-accent text-white"
-                : "text-subtle hover:bg-panel-3 hover:text-text",
-            ].join(" ")}
+              'grid h-7 w-7 place-items-center rounded-md transition-[color,background-color,scale] duration-150 active:scale-[0.96]',
+              isMobile ? 'bg-accent text-white' : 'text-subtle hover:bg-panel-3 hover:text-text',
+            ].join(' ')}
           >
             {isMobile ? (
               <svg width="14" height="14" viewBox="0 0 13 13" fill="none">
-                <rect
-                  x="3"
-                  y="1"
-                  width="7"
-                  height="11"
-                  rx="1.5"
-                  stroke="currentColor"
-                  strokeWidth="1.2"
-                />
-                <line
-                  x1="5.5"
-                  y1="10"
-                  x2="7.5"
-                  y2="10"
-                  stroke="currentColor"
-                  strokeWidth="1.2"
-                  strokeLinecap="round"
-                />
+                <rect x="3" y="1" width="7" height="11" rx="1.5" stroke="currentColor" strokeWidth="1.2" />
+                <line x1="5.5" y1="10" x2="7.5" y2="10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
               </svg>
             ) : (
               <svg width="14" height="14" viewBox="0 0 14 13" fill="none">
-                <rect
-                  x="1"
-                  y="1"
-                  width="12"
-                  height="8"
-                  rx="1.2"
-                  stroke="currentColor"
-                  strokeWidth="1.2"
-                />
-                <line
-                  x1="5"
-                  y1="11"
-                  x2="9"
-                  y2="11"
-                  stroke="currentColor"
-                  strokeWidth="1.2"
-                  strokeLinecap="round"
-                />
-                <line
-                  x1="7"
-                  y1="9"
-                  x2="7"
-                  y2="11"
-                  stroke="currentColor"
-                  strokeWidth="1.2"
-                  strokeLinecap="round"
-                />
+                <rect x="1" y="1" width="12" height="8" rx="1.2" stroke="currentColor" strokeWidth="1.2" />
+                <line x1="5" y1="11" x2="9" y2="11" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+                <line x1="7" y1="9" x2="7" y2="11" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
               </svg>
             )}
           </button>
         </Tooltip>
 
         {/* Console toggle */}
-        <Tooltip
-          label={consoleOpen ? t("hideConsole") : t("showConsole")}
-          position="bottom"
-        >
+        <Tooltip label={consoleOpen ? t('hideConsole') : t('showConsole')} position="bottom">
           <button
             type="button"
             onClick={() => setConsoleOpen((v) => !v)}
             className={[
-              "relative grid h-7 w-7 place-items-center rounded-md transition-[color,background-color,scale] duration-150 active:scale-[0.96]",
-              consoleOpen
-                ? "bg-accent text-white"
-                : "text-subtle hover:bg-panel-3 hover:text-text",
-            ].join(" ")}
+              'relative grid h-7 w-7 place-items-center rounded-md transition-[color,background-color,scale] duration-150 active:scale-[0.96]',
+              consoleOpen ? 'bg-accent text-white' : 'text-subtle hover:bg-panel-3 hover:text-text',
+            ].join(' ')}
           >
             <svg width="14" height="14" viewBox="0 0 13 13" fill="none">
-              <rect
-                x="1"
-                y="2"
-                width="11"
-                height="9"
-                rx="1.5"
-                stroke="currentColor"
-                strokeWidth="1.2"
-              />
+              <rect x="1" y="2" width="11" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.2" />
               <path
                 d="M3.5 5.5l2 1.5-2 1.5"
                 stroke="currentColor"
@@ -1205,26 +1065,18 @@ export function PopoutBrowser() {
                 strokeLinecap="round"
                 strokeLinejoin="round"
               />
-              <line
-                x1="7"
-                y1="8.5"
-                x2="9.5"
-                y2="8.5"
-                stroke="currentColor"
-                strokeWidth="1.2"
-                strokeLinecap="round"
-              />
+              <line x1="7" y1="8.5" x2="9.5" y2="8.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
             </svg>
             {consoleErrorCount > 0 && !consoleOpen && (
               <span className="absolute -top-1 -right-1 inline-flex h-[14px] min-w-[14px] items-center justify-center rounded-full bg-danger px-0.5 font-mono text-[9px] text-white leading-none">
-                {consoleErrorCount > 99 ? "99+" : consoleErrorCount}
+                {consoleErrorCount > 99 ? '99+' : consoleErrorCount}
               </span>
             )}
           </button>
         </Tooltip>
 
         {/* DevTools */}
-        <Tooltip label={t("openDevTools")} position="bottom">
+        <Tooltip label={t('openDevTools')} position="bottom">
           <button
             type="button"
             onClick={() => {
@@ -1283,11 +1135,7 @@ export function PopoutBrowser() {
           </div>
         </Allotment.Pane>
 
-        <Allotment.Pane
-          preferredSize={200}
-          minSize={consoleOpen ? 80 : 0}
-          visible={consoleOpen}
-        >
+        <Allotment.Pane preferredSize={200} minSize={consoleOpen ? 80 : 0} visible={consoleOpen}>
           <BrowserConsolePanel
             entries={activeConsoleEntries}
             onClear={handleConsoleClear}
