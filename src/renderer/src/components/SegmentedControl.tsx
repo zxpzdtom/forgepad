@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react';
 
+import clsx from 'clsx';
+
 export function SegmentedControl<T extends string>({
   value,
   options,
@@ -19,7 +21,7 @@ export function SegmentedControl<T extends string>({
           type="button"
           role="radio"
           aria-checked={value === opt.value}
-          className={`flex items-center gap-1.5 ${value === opt.value ? 'active' : ''}`}
+          className={clsx('flex items-center gap-1.5', value === opt.value && 'active')}
           onClick={() => onChange(opt.value)}
         >
           {opt.icon}

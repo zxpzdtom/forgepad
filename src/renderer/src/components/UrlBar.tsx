@@ -3,6 +3,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from '@renderer/i18n';
 import type { BrowserHistoryEntry } from '@shared/types';
 
+import clsx from 'clsx';
+
 type UrlBarProps = {
   value: string;
   onChange: (url: string) => void;
@@ -25,16 +27,7 @@ function GlobeIcon() {
 function FaviconImg({ src, alt }: { src: string; alt: string }) {
   const [failed, setFailed] = useState(!src);
   if (failed || !src) return <GlobeIcon />;
-  return (
-    <img
-      src={src}
-      alt={alt}
-      width={14}
-      height={14}
-      className="shrink-0 rounded-sm"
-      onError={() => setFailed(true)}
-    />
-  );
+  return <img src={src} alt={alt} width={14} height={14} className="shrink-0 rounded-sm" onError={() => setFailed(true)} />;
 }
 
 export function UrlBar({ value, onChange, onNavigate, history }: UrlBarProps) {
@@ -48,9 +41,7 @@ export function UrlBar({ value, onChange, onNavigate, history }: UrlBarProps) {
   const suggestions = useMemo(() => {
     const q = value.trim().toLowerCase();
     if (!q) return history.slice(0, 10);
-    return history
-      .filter((h) => h.url.toLowerCase().includes(q) || h.title.toLowerCase().includes(q))
-      .slice(0, 10);
+    return history.filter((h) => h.url.toLowerCase().includes(q) || h.title.toLowerCase().includes(q)).slice(0, 10);
   }, [value, history]);
 
   // Close on outside click
@@ -172,7 +163,7 @@ export function UrlBar({ value, onChange, onNavigate, history }: UrlBarProps) {
             height="10"
             viewBox="0 0 10 10"
             fill="none"
-            className={`transition-transform ${open ? 'rotate-180' : ''}`}
+            className={clsx('transition-transform', open && 'rotate-180')}
           >
             <path d="M2 3.5l3 3 3-3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
           </svg>

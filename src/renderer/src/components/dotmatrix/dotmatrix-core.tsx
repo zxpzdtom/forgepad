@@ -142,11 +142,7 @@ export function harmonicPhase(row: number, col: number, a: number, b: number): n
   return Math.sin((row + 1) * a + (col + 1) * b);
 }
 
-export function lissajousOffset(
-  row: number,
-  col: number,
-  amplitude = 2.25,
-): { x: number; y: number; phase: number } {
+export function lissajousOffset(row: number, col: number, amplitude = 2.25): { x: number; y: number; phase: number } {
   const x = Math.sin((row + 1) * 1.15 + (col + 1) * 2.2) * amplitude;
   const y = Math.cos((row + 1) * 2.45 + (col + 1) * 0.95) * amplitude;
   const phase = Math.abs(Math.sin((row + 1) * 0.7 + (col + 1) * 1.1));
@@ -268,10 +264,22 @@ export function spiralInwardOrderValue(index: number): number {
 function buildOuterRingClockwiseOrderToIndexMap(): number[] {
   const order = new Array<number>(CELLS).fill(-1);
   const coords: Array<[number, number]> = [
-    [0, 0], [0, 1], [0, 2], [0, 3], [0, 4],
-    [1, 4], [2, 4], [3, 4], [4, 4],
-    [4, 3], [4, 2], [4, 1], [4, 0],
-    [3, 0], [2, 0], [1, 0],
+    [0, 0],
+    [0, 1],
+    [0, 2],
+    [0, 3],
+    [0, 4],
+    [1, 4],
+    [2, 4],
+    [3, 4],
+    [4, 4],
+    [4, 3],
+    [4, 2],
+    [4, 1],
+    [4, 0],
+    [3, 0],
+    [2, 0],
+    [1, 0],
   ];
   for (let t = 0; t < coords.length; t += 1) {
     const [row, col] = coords[t]!;
@@ -283,7 +291,14 @@ function buildOuterRingClockwiseOrderToIndexMap(): number[] {
 function buildMiddleRingAntiClockwiseOrderToIndexMap(): number[] {
   const order = new Array<number>(CELLS).fill(-1);
   const coords: Array<[number, number]> = [
-    [1, 1], [2, 1], [3, 1], [3, 2], [3, 3], [2, 3], [1, 3], [1, 2],
+    [1, 1],
+    [2, 1],
+    [3, 1],
+    [3, 2],
+    [3, 3],
+    [2, 3],
+    [1, 3],
+    [1, 2],
   ];
   for (let t = 0; t < coords.length; t += 1) {
     const [row, col] = coords[t]!;
@@ -349,8 +364,12 @@ export function diagonalSnakeNormFromIndex(index: number): number {
 function buildRowWaveSnakeOrderToIndexMap(): number[] {
   const order = new Array<number>(CELLS);
   const route: Array<{ col: number; dir: 'up' | 'down' }> = [
-    { col: 0, dir: 'up' }, { col: 2, dir: 'down' }, { col: 1, dir: 'up' },
-    { col: 3, dir: 'down' }, { col: 2, dir: 'up' }, { col: 4, dir: 'down' },
+    { col: 0, dir: 'up' },
+    { col: 2, dir: 'down' },
+    { col: 1, dir: 'up' },
+    { col: 3, dir: 'down' },
+    { col: 2, dir: 'up' },
+    { col: 4, dir: 'down' },
   ];
   let t = 0;
   for (const step of route) {
@@ -507,9 +526,10 @@ function getMatrix5Layout(size: number, dotSize: number, cellPadding?: number): 
   return { gap: g, matrixSpan: size };
 }
 
-function resolveDmxBoxOuterDim(
-  options: { boxSize?: number; minSize?: number } | null | undefined,
-): { outerDim: number; useWrapper: boolean } {
+function resolveDmxBoxOuterDim(options: { boxSize?: number; minSize?: number } | null | undefined): {
+  outerDim: number;
+  useWrapper: boolean;
+} {
   const b = options?.boxSize;
   const hasBox = b != null && b > 0 && Number.isFinite(b);
   if (!hasBox) return { outerDim: 0, useWrapper: false };
@@ -753,9 +773,19 @@ type PathWaveComponentProps = DotMatrixCommonProps;
 export function createPathWaveComponent(displayName: string, getPathNorm: NormFn) {
   const resolve = createPathWaveResolver(getPathNorm);
 
-  function PathWaveComponent({ pattern = 'full', animated = true, hoverAnimated = false, speed = 1, ...rest }: PathWaveComponentProps) {
+  function PathWaveComponent({
+    pattern = 'full',
+    animated = true,
+    hoverAnimated = false,
+    speed = 1,
+    ...rest
+  }: PathWaveComponentProps) {
     const reducedMotion = usePrefersReducedMotion();
-    const { phase: matrixPhase, onMouseEnter, onMouseLeave } = useDotMatrixPhases({
+    const {
+      phase: matrixPhase,
+      onMouseEnter,
+      onMouseLeave,
+    } = useDotMatrixPhases({
       animated: Boolean(animated && !reducedMotion),
       hoverAnimated: Boolean(hoverAnimated && !reducedMotion),
       speed,

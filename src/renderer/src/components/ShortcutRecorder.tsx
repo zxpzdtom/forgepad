@@ -6,6 +6,8 @@ import type { ShortcutActionId, ShortcutCombo } from '@shared/types';
 import { DEFAULT_SHORTCUTS, SHORTCUT_DEFINITIONS } from '@shared/types';
 import { RotateCcw } from 'lucide-react';
 
+import clsx from 'clsx';
+
 interface ShortcutRecorderProps {
   actionId: ShortcutActionId;
   currentCombo: ShortcutCombo;
@@ -136,13 +138,13 @@ export function ShortcutRecorder({ actionId, currentCombo }: ShortcutRecorderPro
           setPendingCombo(null);
           setConflict(null);
         }}
-        className={`inline-flex min-w-[60px] items-center justify-center rounded-md border px-2.5 py-1 font-mono text-[11px] transition-all ${
+        className={clsx(
+          'inline-flex min-w-[60px] items-center justify-center rounded-md border px-2.5 py-1 font-mono text-[11px] transition-all',
           recording
             ? 'border-accent bg-accent/10 text-accent'
-            : `border-border bg-panel-2 text-muted hover:border-zinc-500 hover:text-text ${
-                isModified ? 'ring-1 ring-accent/20' : ''
-              }`
-        }`}
+            : 'border-border bg-panel-2 text-muted hover:border-zinc-500 hover:text-text',
+          !recording && isModified && 'ring-1 ring-accent/20',
+        )}
       >
         {recording ? (pendingCombo ? comboToDisplay(pendingCombo) : 'Type shortcut\u2026') : comboToDisplay(currentCombo)}
       </button>

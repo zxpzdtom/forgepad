@@ -7,6 +7,8 @@ import { ChangesPanel } from './ChangesPanel';
 import { ContextPanel } from './ContextPanel';
 import { FilesPanel } from './FilesPanel';
 
+import clsx from 'clsx';
+
 const modes: Array<{
   mode: RightPanelMode;
   labelKey: string;
@@ -28,7 +30,10 @@ export function RightPanel() {
         <div className="flex min-w-0 flex-1" role="tablist">
           {modes.map(({ mode: nextMode, labelKey, icon: Icon }) => (
             <div
-              className={`relative flex h-9 cursor-pointer items-center gap-1.5 whitespace-nowrap px-3 text-[13px] transition-colors select-none${nextMode === mode ? 'text-text' : 'text-muted hover:text-text'}`}
+              className={clsx(
+                'relative flex h-9 cursor-pointer items-center gap-1.5 whitespace-nowrap px-3 text-[13px] transition-colors select-none',
+                nextMode === mode ? 'text-text' : 'text-muted hover:text-text',
+              )}
               key={nextMode}
               role="tab"
               tabIndex={0}

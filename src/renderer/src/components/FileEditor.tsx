@@ -9,11 +9,26 @@ import { useAppStore } from '@renderer/store/app-store';
 import type { CodeSelectionItem, Tab, Workspace } from '@shared/types';
 import { code as streamdownCode } from '@streamdown/code';
 import { createMermaidPlugin } from '@streamdown/mermaid';
-import { Check, ChevronDown, ChevronUp, Code, Copy, FileVideo, Image, List, MessageSquarePlus, Music, Search, X } from 'lucide-react';
+import {
+  Check,
+  ChevronDown,
+  ChevronUp,
+  Code,
+  Copy,
+  FileVideo,
+  Image,
+  List,
+  MessageSquarePlus,
+  Music,
+  Search,
+  X,
+} from 'lucide-react';
 import type { Components } from 'streamdown';
 import { Streamdown } from 'streamdown';
 import 'streamdown/styles.css';
 import { FileIcon } from './FileIcon';
+
+import clsx from 'clsx';
 
 type FileTab = Extract<Tab, { type: 'file' }>;
 
@@ -163,11 +178,7 @@ const RAIL_X_STEP = 12; // extra x per indentation level
  * The diagonal always consumes a fixed portion of the vertical gap so the
  * slope stays consistent regardless of the distance between items.
  */
-function buildRailPath(
-  itemYCenters: number[],
-  itemLevels: number[],
-  minLevel: number,
-): { d: string; segmentLengths: number[] } {
+function buildRailPath(itemYCenters: number[], itemLevels: number[], minLevel: number): { d: string; segmentLengths: number[] } {
   if (itemYCenters.length === 0) return { d: '', segmentLengths: [] };
 
   const xOf = (level: number) => RAIL_X_LEFT + (level - minLevel) * RAIL_X_STEP;
@@ -197,15 +208,15 @@ function buildRailPath(
       if (curX > prevX) {
         // Going deeper (e.g. H2 → H3): vertical first, then diagonal
         const midY = curY - diagonalDy;
-        d += ` L ${prevX} ${midY}`;                 // vertical down
-        d += ` L ${curX} ${curY}`;                   // diagonal to child
+        d += ` L ${prevX} ${midY}`; // vertical down
+        d += ` L ${curX} ${curY}`; // diagonal to child
         const vertLen = Math.abs(midY - prevY);
         segmentLengths.push(vertLen + diagLen(dx, diagonalDy));
       } else {
         // Going shallower (e.g. H3 → H2): diagonal first, then vertical
         const midY = prevY + diagonalDy;
-        d += ` L ${curX} ${midY}`;                   // diagonal back
-        d += ` L ${curX} ${curY}`;                   // vertical down
+        d += ` L ${curX} ${midY}`; // diagonal back
+        d += ` L ${curX} ${curY}`; // vertical down
         const vertLen = Math.abs(curY - midY);
         segmentLengths.push(diagLen(dx, diagonalDy) + vertLen);
       }
@@ -286,10 +297,7 @@ function MarkdownToc({
       const { d, segmentLengths } = buildRailPath(yCenters, levels, minLevel);
       const totalLength = segmentLengths.reduce((a, b) => a + b, 0);
       const svgHeight = navRect.height;
-      const points: [number, number][] = yCenters.map((y, idx) => [
-        RAIL_X_LEFT + (levels[idx] - minLevel) * RAIL_X_STEP,
-        y,
-      ]);
+      const points: [number, number][] = yCenters.map((y, idx) => [RAIL_X_LEFT + (levels[idx] - minLevel) * RAIL_X_STEP, y]);
 
       setRailData({ d, totalLength, segmentLengths, svgHeight, points });
     });
@@ -373,7 +381,7 @@ function MarkdownToc({
   if (items.length === 0) return null;
 
   return (
-    <nav className={`markdown-toc scrollbar-thin ${collapsed ? 'collapsed' : ''}`} ref={navRef}>
+    <nav className={clsx('markdown-toc scrollbar-thin', collapsed && 'collapsed')} ref={navRef}>
       <div className="markdown-toc-title">
         <List size={14} />
         目录
@@ -383,12 +391,7 @@ function MarkdownToc({
       {railData && railData.d && (
         <svg className="markdown-toc-rail" height={railData.svgHeight} aria-hidden="true">
           {/* Background track */}
-          <path
-            ref={trackPathRef}
-            d={railData.d}
-            className="markdown-toc-rail-track"
-            strokeDasharray="none"
-          />
+          <path ref={trackPathRef} d={railData.d} className="markdown-toc-rail-track" strokeDasharray="none" />
           {/* Active highlight */}
           <path
             d={railData.d}
@@ -410,7 +413,7 @@ function MarkdownToc({
             else itemRefs.current.delete(item.id);
           }}
           type="button"
-          className={`markdown-toc-item ${activeId === item.id ? 'active' : ''}`}
+          className={clsx('markdown-toc-item', activeId === item.id && 'active')}
           style={{ paddingLeft: `${(item.level - minLevel) * RAIL_X_STEP + RAIL_X_LEFT + 12}px` }}
           onClick={() => handleClick(item.id)}
           title={item.text}
@@ -650,6 +653,10 @@ function extractLines(text: string, startLine: number, endLine: number): string 
   return lines.slice(startLine - 1, endLine).join('\n');
 }
 
+function normalizeSearchSelection(selection: string): string {
+  return selection.replace(/\r?\n/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
 // --- Main component ---
 
 export function FileEditor({ tab, workspace }: FileEditorProps) {
@@ -828,8 +835,9 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
         if (!root || !scrollContainer) return;
         // data-line-index is 0-based
         const lineIndex = lineNumber - 1;
-        const lineEl = root.querySelector(`[data-content] [data-line-index="${lineIndex}"]`) as HTMLElement
-          ?? root.querySelector(`[data-gutter] [data-column-number="${lineNumber}"]`) as HTMLElement;
+        const lineEl =
+          (root.querySelector(`[data-content] [data-line-index="${lineIndex}"]`) as HTMLElement) ??
+          (root.querySelector(`[data-gutter] [data-column-number="${lineNumber}"]`) as HTMLElement);
         if (lineEl) {
           // Delay briefly so the browser finishes layout after render
           requestAnimationFrame(() => {
@@ -957,7 +965,9 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
         return;
       }
       // Also try gutter as fallback
-      const gutterItem = root.querySelector(`[data-gutter] [data-column-number="${pendingScrollLineRef.current}"]`) as HTMLElement | null;
+      const gutterItem = root.querySelector(
+        `[data-gutter] [data-column-number="${pendingScrollLineRef.current}"]`,
+      ) as HTMLElement | null;
       if (gutterItem) {
         scrollToLineElement(gutterItem, scrollContainer);
         pendingScrollLineRef.current = undefined;
@@ -1023,10 +1033,28 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
     });
   }, []);
 
+  const getSearchSeedFromSelection = useCallback(() => {
+    const domSelection = normalizeSearchSelection(window.getSelection()?.toString() ?? '');
+    if (domSelection) return domSelection;
+
+    const lineRange = pendingSelection
+      ? { start: pendingSelection.startLine, end: pendingSelection.endLine }
+      : selectedRange
+        ? { start: Math.min(selectedRange.start, selectedRange.end), end: Math.max(selectedRange.start, selectedRange.end) }
+        : null;
+    if (!lineRange) return '';
+    return normalizeSearchSelection(extractLines(fileText, lineRange.start, lineRange.end));
+  }, [fileText, pendingSelection, selectedRange]);
+
   const openSearch = useCallback(() => {
+    const selectedText = getSearchSeedFromSelection();
+    if (selectedText) {
+      setSearchQuery(selectedText);
+      setActiveMatchIndex(0);
+    }
     setSearchOpen(true);
     focusSearch();
-  }, [focusSearch]);
+  }, [focusSearch, getSearchSeedFromSelection]);
 
   const closeSearch = useCallback(() => {
     setSearchOpen(false);
@@ -1215,10 +1243,10 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
           {!isMediaFile && <span className="text-muted">{lineCount} lines</span>}
         </div>
         <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
-          {(isImage || isAudio || isVideo) ? (
+          {isImage || isAudio || isVideo ? (
             <div className="view-mode-toggle" role="radiogroup" aria-label="Media view">
               <button
-                className={`view-mode-btn ${mediaViewMode === 'preview' ? 'active' : ''}`}
+                className={clsx('view-mode-btn', mediaViewMode === 'preview' && 'active')}
                 type="button"
                 role="radio"
                 aria-checked={mediaViewMode === 'preview'}
@@ -1228,7 +1256,7 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
                 {isAudio ? <Music size={14} /> : isVideo ? <FileVideo size={14} /> : <Image size={14} />}
               </button>
               <button
-                className={`view-mode-btn ${mediaViewMode === 'raw' ? 'active' : ''}`}
+                className={clsx('view-mode-btn', mediaViewMode === 'raw' && 'active')}
                 type="button"
                 role="radio"
                 aria-checked={mediaViewMode === 'raw'}
@@ -1273,7 +1301,7 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
           ) : null}
           {showRenderedMarkdown && tocItems.length > 0 ? (
             <button
-              className={`icon-button ${tocOpen ? 'active' : ''}`}
+              className={clsx('icon-button', tocOpen && 'active')}
               type="button"
               title="Toggle table of contents"
               onClick={() => setTocOpen((v) => !v)}
@@ -1283,9 +1311,13 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
           ) : null}
           <button className="icon-button" type="button" title="Copy file" onClick={copyContent}>
             {copied ? (
-              <span key="check" className="icon-swap"><Check size={16} /></span>
+              <span key="check" className="icon-swap">
+                <Check size={16} />
+              </span>
             ) : (
-              <span key="copy" className="icon-swap"><Copy size={16} /></span>
+              <span key="copy" className="icon-swap">
+                <Copy size={16} />
+              </span>
             )}
           </button>
         </div>
@@ -1294,7 +1326,7 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
       {/* Search bar */}
       {searchOpen && searchable ? (
         <form
-          className="flex min-h-[38px] items-center gap-2 border-border border-b bg-surface-card px-2.5 py-1"
+          className="floating-search-bar"
           onSubmit={(event) => {
             event.preventDefault();
             goToMatch(1);
@@ -1310,27 +1342,15 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
               setActiveMatchIndex(0);
             }}
           />
-          <span className="w-[54px] text-center text-muted text-xs tabular-nums">{activeSearchLabel}</span>
-          <button
-            className="icon-button"
-            type="button"
-            title="Previous match"
-            disabled={searchRanges.length === 0}
-            onClick={() => goToMatch(-1)}
-          >
-            <ChevronUp size={15} />
+          <span className="floating-search-count">{activeSearchLabel}</span>
+          <button type="button" title="Previous match" disabled={searchRanges.length === 0} onClick={() => goToMatch(-1)}>
+            <ChevronUp size={14} />
           </button>
-          <button
-            className="icon-button"
-            type="button"
-            title="Next match"
-            disabled={searchRanges.length === 0}
-            onClick={() => goToMatch(1)}
-          >
-            <ChevronDown size={15} />
+          <button type="button" title="Next match" disabled={searchRanges.length === 0} onClick={() => goToMatch(1)}>
+            <ChevronDown size={14} />
           </button>
-          <button className="icon-button" type="button" title="Close search" onClick={closeSearch}>
-            <X size={15} />
+          <button type="button" title="Close search" onClick={closeSearch}>
+            <X size={14} />
           </button>
         </form>
       ) : null}
@@ -1359,7 +1379,10 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
         />
       ) : showRenderedMarkdown ? (
         <div className="flex min-h-0 min-w-0 flex-1 overflow-hidden">
-          <div className="markdown-viewer-scroll scrollbar-thin scroll-mask-y min-h-0 min-w-0 flex-1 overflow-auto" ref={scrollRef}>
+          <div
+            className="markdown-viewer-scroll scrollbar-thin scroll-mask-y min-h-0 min-w-0 flex-1 overflow-auto"
+            ref={scrollRef}
+          >
             <div ref={previewRef} className="markdown-preview">
               <Streamdown
                 components={mdHeadingComponents}

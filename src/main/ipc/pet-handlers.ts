@@ -45,8 +45,14 @@ export function registerPetHandlers(): void {
 
       // Check files exist
       const [petJsonExists, spritesheetExists] = await Promise.all([
-        fs.access(petJsonPath).then(() => true).catch(() => false),
-        fs.access(spritesheetPath).then(() => true).catch(() => false),
+        fs
+          .access(petJsonPath)
+          .then(() => true)
+          .catch(() => false),
+        fs
+          .access(spritesheetPath)
+          .then(() => true)
+          .catch(() => false),
       ]);
 
       if (!petJsonExists) {

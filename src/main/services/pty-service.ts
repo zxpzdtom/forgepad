@@ -1,11 +1,11 @@
-import { existsSync, mkdirSync, unlinkSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
-import { IPC } from "@shared/ipc";
-import type { WebContents } from "electron";
-import * as pty from "node-pty";
+import { existsSync, mkdirSync, unlinkSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { IPC } from '@shared/ipc';
+import type { WebContents } from 'electron';
+import * as pty from 'node-pty';
 
-import { getDotFolderPath } from "./paths";
-import { getUserPath } from "./user-env";
+import { getDotFolderPath } from './paths';
+import { getUserPath } from './user-env';
 
 type PtyInstance = {
   process: pty.IPty;
@@ -22,37 +22,33 @@ function appendReplay(instance: PtyInstance, data: string): void {
   if (!data) return;
   instance.replayChunks.push(data);
   instance.replayChars += data.length;
-  while (
-    instance.replayChars > MAX_REPLAY_CHARS &&
-    instance.replayChunks.length > 0
-  ) {
+  while (instance.replayChars > MAX_REPLAY_CHARS && instance.replayChunks.length > 0) {
     const removed = instance.replayChunks.shift();
     instance.replayChars -= removed?.length ?? 0;
   }
 }
 
 function splitCommand(input: string): string[] {
-  return (
-    input
-      .match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g)
-      ?.map((part) => part.replace(/^(['"])(.*)\1$/, "$2")) ?? []
-  );
+  return input.match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g)?.map((part) => part.replace(/^(['"])(.*)\1$/, '$2')) ?? [];
 }
 
 function defaultShellPath(): string {
-  const candidates = [
-    process.env.SHELL,
-    "/bin/zsh",
-    "/bin/bash",
-    "/bin/sh",
-  ].filter(Boolean) as string[];
-  return candidates.find((candidate) => existsSync(candidate)) ?? "/bin/sh";
+  const candidates = [process.env.SHELL, '/bin/zsh', '/bin/bash', '/bin/sh'].filter(Boolean) as string[];
+  return candidates.find((candidate) => existsSync(candidate)) ?? '/bin/sh';
 }
 
 function resolveShell(shell?: string): { file: string; args: string[] } {
   const parts = shell?.trim() ? splitCommand(shell.trim()) : [];
   const [file, ...args] = parts.length > 0 ? parts : [defaultShellPath()];
   return { file, args };
+}
+
+function isUtf8Locale(value: string | undefined): boolean {
+  return /utf-?8/i.test(value ?? '');
+}
+
+function utf8Locale(value: string | undefined): string {
+  return isUtf8Locale(value) ? value! : 'en_US.UTF-8';
 }
 
 export class PtyService {
@@ -81,11 +77,14 @@ export class PtyService {
     const env = {
       ...process.env,
       PATH: getUserPath(),
-      TERM: "xterm-256color",
-      COLORTERM: "truecolor",
+      LANG: utf8Locale(process.env.LANG),
+      LC_CTYPE: utf8Locale(process.env.LC_CTYPE ?? process.env.LANG),
+      ...(process.env.LC_ALL && !isUtf8Locale(process.env.LC_ALL) ? { LC_ALL: 'en_US.UTF-8' } : {}),
+      TERM: 'xterm-256color',
+      COLORTERM: 'truecolor',
       FORGEPAD_PTY_ID: id,
-      FORGEPAD_CONTEXT_DIR: ".forgepad/context",
-      FORGEPAD_AGENT_COMMAND: commandText ?? "",
+      FORGEPAD_CONTEXT_DIR: '.forgepad/context',
+      FORGEPAD_AGENT_COMMAND: commandText ?? '',
       ...(this.hookPort > 0 ? { FORGEPAD_PORT: String(this.hookPort) } : {}),
       ...extraEnv,
     } as Record<string, string>;
@@ -93,17 +92,15 @@ export class PtyService {
     let proc: pty.IPty;
     try {
       proc = pty.spawn(shellConfig.file, args, {
-        name: "xterm-256color",
+        name: 'xterm-256color',
         cols: 100,
         rows: 30,
         cwd: worktreePath,
         env,
       });
     } catch (error) {
-      const detail = error instanceof Error ? error.message : "unknown error";
-      throw new Error(
-        `Failed to start terminal with ${shellConfig.file}: ${detail}`,
-      );
+      const detail = error instanceof Error ? error.message : 'unknown error';
+      throw new Error(`Failed to start terminal with ${shellConfig.file}: ${detail}`);
     }
 
     const instance: PtyInstance = {
@@ -120,13 +117,10 @@ export class PtyService {
     let sessionFile: string | null = null;
     if (sessionId && this.hookPort > 0) {
       try {
-        const sessionsDir = join(getDotFolderPath(), "sessions");
+        const sessionsDir = join(getDotFolderPath(), 'sessions');
         mkdirSync(sessionsDir, { recursive: true });
         sessionFile = join(sessionsDir, `${sessionId}.json`);
-        writeFileSync(
-          sessionFile,
-          JSON.stringify({ port: this.hookPort, ptyId: id }),
-        );
+        writeFileSync(sessionFile, JSON.stringify({ port: this.hookPort, ptyId: id }));
       } catch {
         // Non-critical — hooks won't fire but PTY still works
       }
@@ -150,11 +144,7 @@ export class PtyService {
         }
       }
       if (!instance.webContents.isDestroyed()) {
-        instance.webContents.send(
-          `${IPC.PTY_EXIT}:${id}`,
-          event.exitCode,
-          event.signal,
-        );
+        instance.webContents.send(`${IPC.PTY_EXIT}:${id}`, event.exitCode, event.signal);
       }
     });
 
@@ -202,13 +192,10 @@ export class PtyService {
     }
   }
 
-  reattach(
-    id: string,
-    webContents: WebContents,
-  ): { replay: string; alive: boolean } {
+  reattach(id: string, webContents: WebContents): { replay: string; alive: boolean } {
     const instance = this.ptys.get(id);
-    if (!instance) return { replay: "", alive: false };
+    if (!instance) return { replay: '', alive: false };
     instance.webContents = webContents;
-    return { replay: instance.replayChunks.join(""), alive: true };
+    return { replay: instance.replayChunks.join(''), alive: true };
   }
 }
