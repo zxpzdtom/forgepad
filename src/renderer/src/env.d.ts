@@ -1,16 +1,17 @@
-import type { ForgePadApi } from '../../preload';
+import type { ForgePadApi } from './tauri-api';
 import type { ForgePadPetApi } from '../../preload/pet';
 
 declare global {
   interface Window {
     forgepad: ForgePadApi;
     forgepadPet?: ForgePadPetApi;
+    __TAURI_INTERNALS__?: unknown;
   }
 
   namespace JSX {
     interface IntrinsicElements {
       webview: React.DetailedHTMLProps<
-        React.HTMLAttributes<Electron.WebviewTag> & {
+        React.HTMLAttributes<HTMLElement> & {
           src?: string;
           preload?: string;
           partition?: string;
@@ -21,7 +22,7 @@ declare global {
           useragent?: string;
           disablewebsecurity?: string;
         },
-        Electron.WebviewTag
+        HTMLElement
       >;
     }
   }

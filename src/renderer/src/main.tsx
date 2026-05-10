@@ -4,6 +4,7 @@ import '@fontsource-variable/inter';
 import '@xterm/xterm/css/xterm.css';
 import 'allotment/dist/style.css';
 import './styles/global.css';
+import './tauri-api';
 
 import { App } from './App';
 

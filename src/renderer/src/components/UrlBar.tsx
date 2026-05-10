@@ -30,7 +30,7 @@ function FaviconImg({ src, alt }: { src: string; alt: string }) {
   return <img src={src} alt={alt} width={14} height={14} className="shrink-0 rounded-sm" onError={() => setFailed(true)} />;
 }
 
-export function UrlBar({ value, onChange, onNavigate, history }: UrlBarProps) {
+export function UrlBar({ value, onChange, onNavigate, history = [] }: UrlBarProps) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [activeIdx, setActiveIdx] = useState(-1);

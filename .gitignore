@@ -5,3 +5,5 @@ dist
 .DS_Store
 .forgepad/context
 
+src-tauri/target
+src-tauri/gen

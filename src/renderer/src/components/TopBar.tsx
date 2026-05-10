@@ -108,7 +108,7 @@ function Submenu({
   const isChildSelected = selectedId !== null && items.some((i) => i.id === selectedId);
 
   return (
-    <div onMouseEnter={handleEnter} onMouseLeave={handleLeave}>
+    <div className="relative" onMouseEnter={handleEnter} onMouseLeave={handleLeave}>
       {/* Parent row */}
       <div
         className={clsx(
@@ -415,7 +415,10 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
   };
 
   return (
-    <header className="app-topbar relative flex h-12 shrink-0 items-center border-border border-b bg-surface-toolbar px-3">
+    <header
+      className="app-topbar relative flex h-12 shrink-0 items-center border-border border-b bg-surface-toolbar px-3"
+      data-tauri-drag-region
+    >
       <div className="flex items-center pl-[80px]">
         <Tooltip label={sidebarOpen ? t('topbar.collapseSidebar') : t('topbar.expandSidebar')} position="bottom">
           <button

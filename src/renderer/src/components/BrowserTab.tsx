@@ -181,7 +181,103 @@ function normalizeUrl(url: string): string {
   return `https://${url}`;
 }
 
-export function BrowserTab({ tab }: BrowserTabProps) {
+export function BrowserTab(props: BrowserTabProps) {
+  const isTauri = '__TAURI_INTERNALS__' in window;
+  return isTauri ? <TauriBrowserTab {...props} /> : <ElectronBrowserTab {...props} />;
+}
+
+function TauriBrowserTab({ tab }: BrowserTabProps) {
+  const { t } = useTranslation();
+  const [urlInput, setUrlInput] = useState(tab.url === 'about:blank' ? '' : tab.url);
+  const updateBrowserNavState = useAppStore((s) => s.updateBrowserNavState);
+  const browserHistory = useAppStore((s) => s.browserHistory);
+  const addToast = useAppStore((s) => s.addToast);
+
+  useEffect(() => {
+    if (tab.url !== 'about:blank') setUrlInput(tab.url);
+  }, [tab.url]);
+
+  const currentUrl = tab.url && tab.url !== 'about:blank' ? tab.url : urlInput;
+
+  const navigate = useCallback(
+    (rawUrl: string) => {
+      const nextUrl = normalizeUrl(rawUrl);
+      setUrlInput(nextUrl === 'about:blank' ? '' : nextUrl);
+      updateBrowserNavState({
+        tabId: tab.id,
+        url: nextUrl,
+        title: nextUrl,
+        isLoading: false,
+        canGoBack: false,
+        canGoForward: false,
+      });
+      if (nextUrl && nextUrl !== 'about:blank') {
+        window.forgepad.browser
+          .openWindow(nextUrl, nextUrl)
+          .catch((error) => addToast('error', error instanceof Error ? error.message : String(error)));
+      }
+    },
+    [tab.id, updateBrowserNavState, addToast],
+  );
+
+  const openForgePadWindow = useCallback(() => {
+    const target = normalizeUrl(currentUrl || 'about:blank');
+    if (!target || target === 'about:blank') return;
+    window.forgepad.browser
+      .openWindow(target, target)
+      .catch((error) => addToast('error', error instanceof Error ? error.message : String(error)));
+  }, [currentUrl, addToast]);
+
+  const openExternal = useCallback(() => {
+    const target = normalizeUrl(currentUrl || 'about:blank');
+    if (!target || target === 'about:blank') return;
+    void window.forgepad.shell.openExternal(target);
+  }, [currentUrl]);
+
+  return (
+    <div className="flex h-full w-full flex-col">
+      <div className="flex h-10 shrink-0 items-center gap-1 border-border border-b bg-panel px-2">
+        <UrlBar value={urlInput} onChange={setUrlInput} onNavigate={navigate} history={browserHistory} />
+
+        <Tooltip label="Open in ForgePad window" position="bottom">
+          <button
+            type="button"
+            onClick={openForgePadWindow}
+            className="grid h-7 w-7 place-items-center rounded-md text-subtle transition-[color,background-color,scale] duration-150 hover:bg-panel-3 hover:text-text active:scale-[0.96]"
+          >
+            <ExternalLink size={14} />
+          </button>
+        </Tooltip>
+      </div>
+
+      <div className="flex min-h-0 flex-1 items-center justify-center bg-panel p-8">
+        <div className="w-full max-w-[640px] rounded-2xl border border-border bg-panel-2 p-6 text-center shadow-xl">
+          <div className="mx-auto mb-4 grid size-12 place-items-center rounded-2xl border border-border bg-panel-3 text-accent">
+            <ExternalLink size={22} />
+          </div>
+          <h2 className="mb-2 font-semibold text-lg text-text">Browser opens in a separate Tauri window</h2>
+          <p className="mx-auto mb-5 max-w-[500px] text-sm text-subtle leading-6">
+            Tauri does not support Electron-style embedded webviews in the React layout. Open the URL in a native ForgePad browser window instead.
+          </p>
+          <div className="mb-5 truncate rounded-lg border border-border bg-panel px-3 py-2 text-left font-mono text-xs text-muted">
+            {currentUrl || 'about:blank'}
+          </div>
+          <div className="flex flex-wrap justify-center gap-2">
+            <button type="button" className="rounded-lg bg-accent px-4 py-2 font-medium text-accent-contrast text-sm" onClick={openForgePadWindow}>
+              Open ForgePad Window
+            </button>
+            <button type="button" className="rounded-lg border border-border bg-panel px-4 py-2 font-medium text-sm text-text" onClick={openExternal}>
+              Open External Browser
+            </button>
+          </div>
+          <p className="mt-4 text-[11px] text-subtle">{t('tabBar.openBrowser')}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ElectronBrowserTab({ tab }: BrowserTabProps) {
   const { t } = useTranslation();
   const webviewRef = useRef<Electron.WebviewTag>(null);
   const [urlInput, setUrlInput] = useState(tab.url === 'about:blank' ? '' : tab.url);

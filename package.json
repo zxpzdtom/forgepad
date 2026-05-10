@@ -17,7 +17,12 @@
     "lint": "biome lint src/",
     "format": "biome format --write src/",
     "check": "biome check src/",
-    "check:write": "biome check --write src/"
+    "check:write": "biome check --write src/",
+    "vite:dev": "vite --host 127.0.0.1",
+    "vite:build": "vite build",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build"
   },
   "build": {
     "appId": "com.forgepad.app",
@@ -78,7 +83,8 @@
     "react-dom": "^19.2.4",
     "streamdown": "^2.5.0",
     "unicode-animations": "^1.0.3",
-    "zustand": "^5.0.11"
+    "zustand": "^5.0.11",
+    "@tauri-apps/api": "^2"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.13",
@@ -94,7 +100,8 @@
     "esbuild": "^0.28.0",
     "tailwindcss": "^4.2.4",
     "typescript": "^5.9.3",
-    "vite": "^7.2.7"
+    "vite": "^7.2.7",
+    "@tauri-apps/cli": "^2"
   },
   "repository": "git@github.com:zxpzdtom/forgepad.git"
 }

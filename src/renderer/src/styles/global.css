@@ -1257,9 +1257,15 @@ textarea {
     background: var(--accent);
 }
 
-/* Anchor-positioned dropdown menus */
+/* Dropdown menus.
+   Avoid CSS Anchor Positioning here: macOS WKWebView/Tauri support is inconsistent,
+   so menus are positioned relative to their nearest .relative wrapper. */
 .anchor-menu {
-    position: fixed;
+    position: absolute !important;
+    top: 100% !important;
+    right: 0 !important;
+    left: auto !important;
+    margin-top: 7px;
     z-index: 50;
     min-width: 180px;
     border-radius: 8px;
@@ -1270,7 +1276,11 @@ textarea {
         0 0 0 1px rgba(0, 0, 0, 0.15),
         0 4px 12px rgba(0, 0, 0, 0.3);
     animation: menu-in 120ms ease-out;
+    max-height: calc(100vh - 72px);
+    overflow-y: auto;
+    overflow-x: visible;
 }
+
 
 @keyframes menu-in {
     from {
@@ -1289,16 +1299,15 @@ textarea {
 }
 
 .anchor-submenu {
-    position: fixed;
+    position: static !important;
     z-index: 60;
-    min-width: 180px;
-    border-radius: 10px;
-    border: 1px solid var(--border);
-    background: var(--panel-2);
-    padding: 6px;
-    box-shadow:
-        rgba(0, 0, 0, 0.2) 0px 0px 0px 1px,
-        rgba(0, 0, 0, 0.4) 0px 2px 4px;
+    min-width: 0;
+    margin: 2px 0 4px 22px !important;
+    border-radius: 8px;
+    border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+    background: color-mix(in srgb, var(--panel-3) 55%, transparent);
+    padding: 4px;
+    box-shadow: none;
     transition:
         opacity 120ms ease,
         display 120ms ease allow-discrete;
@@ -1306,7 +1315,6 @@ textarea {
         opacity: 0;
     }
 }
-
 .anchor-submenu[hidden] {
     display: none;
     opacity: 0;
