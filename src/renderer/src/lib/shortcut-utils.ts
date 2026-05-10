@@ -78,9 +78,17 @@ function logicalKey(e: KeyboardEvent): string {
     if (e.code.startsWith('Digit')) return e.code[5];
     if (e.code.startsWith('Key')) return e.code.slice(3).toLowerCase();
     const codeMap: Record<string, string> = {
-      BracketLeft: '[', BracketRight: ']', Backslash: '\\',
-      Semicolon: ';', Quote: "'", Comma: ',', Period: '.',
-      Slash: '/', Minus: '-', Equal: '=', Backquote: '`',
+      BracketLeft: '[',
+      BracketRight: ']',
+      Backslash: '\\',
+      Semicolon: ';',
+      Quote: "'",
+      Comma: ',',
+      Period: '.',
+      Slash: '/',
+      Minus: '-',
+      Equal: '=',
+      Backquote: '`',
     };
     if (codeMap[e.code]) return codeMap[e.code];
   }

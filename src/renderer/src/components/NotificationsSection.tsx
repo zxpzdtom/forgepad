@@ -6,6 +6,8 @@ import { useAppStore } from '@renderer/store/app-store';
 import type { NotificationSound } from '@shared/types';
 import { Check, Music, Pause, Pencil, Play, Plus, Trash2, Upload, Volume2 } from 'lucide-react';
 
+import clsx from 'clsx';
+
 /* ─── Re-usable UI primitives (local copies matching SettingsPanel style) ─── */
 
 function SectionHeader({ title }: { title: string }) {
@@ -41,9 +43,11 @@ function Toggle({
 }) {
   return (
     <button
-      className={`relative inline-flex h-5 w-8 items-center rounded-full transition-colors ${
-        disabled ? 'cursor-not-allowed opacity-40' : ''
-      } ${checked ? 'bg-accent' : 'bg-panel-3'}`}
+      className={clsx(
+        'relative inline-flex h-5 w-8 items-center rounded-full transition-colors',
+        disabled && 'cursor-not-allowed opacity-40',
+        checked ? 'bg-accent' : 'bg-panel-3',
+      )}
       type="button"
       role="switch"
       aria-checked={checked}
@@ -52,9 +56,10 @@ function Toggle({
       onClick={() => !disabled && onChange(!checked)}
     >
       <span
-        className={`inline-block size-3.5 translate-x-0.5 rounded-full bg-white shadow transition-transform ${
-          checked ? 'translate-x-[14px]' : ''
-        }`}
+        className={clsx(
+          'inline-block size-3.5 translate-x-0.5 rounded-full bg-white shadow transition-transform',
+          checked && 'translate-x-[14px]',
+        )}
       />
     </button>
   );
@@ -157,9 +162,10 @@ function SoundCard({
       role="option"
       aria-selected={isSelected}
       tabIndex={0}
-      className={`group relative flex cursor-pointer select-none flex-col rounded-xl border p-3 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-accent/60 ${
-        isSelected ? 'border-accent/50 bg-accent-surface' : 'border-border bg-surface-card hover:border-border hover:bg-panel-2'
-      }`}
+      className={clsx(
+        'group relative flex cursor-pointer select-none flex-col rounded-xl border p-3 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-accent/60',
+        isSelected ? 'border-accent/50 bg-accent-surface' : 'border-border bg-surface-card hover:border-border hover:bg-panel-2',
+      )}
       onClick={onSelect}
       onKeyDown={(e) => {
         if (e.key === 'Enter' || e.key === ' ') {
@@ -175,9 +181,10 @@ function SoundCard({
       {/* Top row: icon + duration badge */}
       <div className="mb-2.5 flex items-start justify-between gap-1">
         <div
-          className={`grid size-9 shrink-0 place-items-center rounded-lg ${
-            isSelected ? 'bg-accent/20 text-accent' : 'bg-panel-3 text-muted'
-          }`}
+          className={clsx(
+            'grid size-9 shrink-0 place-items-center rounded-lg',
+            isSelected ? 'bg-accent/20 text-accent' : 'bg-panel-3 text-muted',
+          )}
         >
           <Music size={16} />
         </div>
@@ -193,11 +200,12 @@ function SoundCard({
       {/* Bottom row: play button + selected check */}
       <div className="flex items-center justify-between">
         <button
-          className={`flex h-6 w-6 items-center justify-center rounded-full border transition-colors ${
+          className={clsx(
+            'flex h-6 w-6 items-center justify-center rounded-full border transition-colors',
             isPlaying
               ? 'border-accent bg-accent text-white'
-              : 'border-border bg-panel-2 text-muted hover:border-accent/40 hover:text-accent'
-          }`}
+              : 'border-border bg-panel-2 text-muted hover:border-accent/40 hover:text-accent',
+          )}
           type="button"
           title={isPlaying ? t('settings.notifications.stopPreview') : t('settings.notifications.previewSound')}
           aria-label={isPlaying ? t('settings.notifications.stopPreview') : t('settings.notifications.previewSound')}
@@ -400,14 +408,21 @@ export function NotificationsSection() {
 
       {/* ─── Sound master toggle ─── */}
       <SettingRow label={t('settings.notifications.sounds')} description={t('settings.notifications.soundsDesc')}>
-        <Toggle checked={ns.enabled} onChange={(v) => updateNotifications({ enabled: v })} label={t('settings.notifications.sounds')} />
+        <Toggle
+          checked={ns.enabled}
+          onChange={(v) => updateNotifications({ enabled: v })}
+          label={t('settings.notifications.sounds')}
+        />
       </SettingRow>
 
       <SettingRow label={t('settings.notifications.volume')} description={t('settings.notifications.volumeDesc')}>
         <VolumeSlider value={ns.volume} onChange={(v) => updateNotifications({ volume: v })} />
       </SettingRow>
 
-      <SettingRow label={t('settings.notifications.playWhenFocused')} description={t('settings.notifications.playWhenFocusedDesc')}>
+      <SettingRow
+        label={t('settings.notifications.playWhenFocused')}
+        description={t('settings.notifications.playWhenFocusedDesc')}
+      >
         <Toggle
           checked={ns.playWhenAppFocused}
           onChange={(v) => updateNotifications({ playWhenAppFocused: v })}
@@ -437,7 +452,10 @@ export function NotificationsSection() {
         />
       </SettingRow>
 
-      <SettingRow label={t('settings.notifications.agentNeedsApproval')} description={t('settings.notifications.agentNeedsApprovalDesc')}>
+      <SettingRow
+        label={t('settings.notifications.agentNeedsApproval')}
+        description={t('settings.notifications.agentNeedsApprovalDesc')}
+      >
         <Toggle
           checked={ns.notifyOnAgentNeedsApproval}
           onChange={(v) => updateNotifications({ notifyOnAgentNeedsApproval: v })}
@@ -510,8 +528,9 @@ export function NotificationsSection() {
       </div>
 
       <p className="mt-3 text-[11px] text-subtle">
-        {t('settings.notifications.supportedFormats')} <code className="text-text-code-inline">.mp3</code>, <code className="text-text-code-inline">.wav</code>,{' '}
-        <code className="text-text-code-inline">.ogg</code> {t('settings.notifications.audioFiles')}
+        {t('settings.notifications.supportedFormats')} <code className="text-text-code-inline">.mp3</code>,{' '}
+        <code className="text-text-code-inline">.wav</code>, <code className="text-text-code-inline">.ogg</code>{' '}
+        {t('settings.notifications.audioFiles')}
       </p>
 
       {/* Rename dialog */}

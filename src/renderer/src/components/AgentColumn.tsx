@@ -5,6 +5,8 @@ import type { Workspace } from '@shared/types';
 
 import { TerminalPanel } from './TerminalPanel';
 
+import clsx from 'clsx';
+
 export function AgentColumn() {
   const tabs = useAppStore((state) => state.tabs);
   const activeWorkspaceId = useAppStore((state) => state.activeWorkspaceId);
@@ -68,7 +70,7 @@ export function AgentColumn() {
 
   return (
     <div
-      className={`flex size-full min-h-0 min-w-0 flex-col bg-bg relative ${dropHighlight ? 'drop-target-active' : ''}`}
+      className={clsx('relative flex size-full min-h-0 min-w-0 flex-col bg-bg', dropHighlight && 'drop-target-active')}
       onMouseDown={handleMouseDown}
       onDragOver={handleDragOver}
       onDragEnter={handleDragEnter}

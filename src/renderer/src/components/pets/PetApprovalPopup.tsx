@@ -115,20 +115,17 @@ export function PetApprovalPopup({
   );
 
   /** Multi-select: toggle an option's selected state. */
-  const handleMultiToggle = useCallback(
-    (label: string) => {
-      setMultiSelected((prev) => {
-        const next = new Set(prev);
-        if (next.has(label)) {
-          next.delete(label);
-        } else {
-          next.add(label);
-        }
-        return next;
-      });
-    },
-    [],
-  );
+  const handleMultiToggle = useCallback((label: string) => {
+    setMultiSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(label)) {
+        next.delete(label);
+      } else {
+        next.add(label);
+      }
+      return next;
+    });
+  }, []);
 
   /** Multi-select: confirm and submit all selected options (comma-joined). */
   const handleMultiConfirm = useCallback(() => {
@@ -136,9 +133,7 @@ export function PetApprovalPopup({
     // Join selected labels with commas, maintaining the original option order
     const currentQ = permission.questions?.[currentQuestionIndex];
     if (!currentQ) return;
-    const ordered = currentQ.options
-      .map((opt) => opt.label)
-      .filter((label) => multiSelected.has(label));
+    const ordered = currentQ.options.map((opt) => opt.label).filter((label) => multiSelected.has(label));
     submitAnswer(ordered.join(','));
   }, [multiSelected, permission.questions, currentQuestionIndex, submitAnswer]);
 
@@ -162,8 +157,7 @@ export function PetApprovalPopup({
   })();
 
   const isOverlay = variant === 'overlay';
-  const hasAlwaysAllow =
-    onAllowAlways && permission.permissionSuggestions && permission.permissionSuggestions.length > 0;
+  const hasAlwaysAllow = onAllowAlways && permission.permissionSuggestions && permission.permissionSuggestions.length > 0;
 
   // ── Question mode rendering ──
   if (isQuestionMode && permission.questions) {
@@ -222,11 +216,7 @@ export function PetApprovalPopup({
               {currentQuestionIndex + 1}/{totalQuestions}
             </span>
           )}
-          {isMulti && (
-            <span style={{ fontSize: 9, color: 'rgba(180, 160, 255, 0.6)' }}>
-              (multi)
-            </span>
-          )}
+          {isMulti && <span style={{ fontSize: 9, color: 'rgba(180, 160, 255, 0.6)' }}>(multi)</span>}
         </div>
 
         {/* Question text */}
@@ -250,9 +240,7 @@ export function PetApprovalPopup({
               label={opt.label}
               description={opt.description}
               selected={isMulti ? multiSelected.has(opt.label) : false}
-              onClick={() =>
-                isMulti ? handleMultiToggle(opt.label) : handleSingleSelect(opt.label)
-              }
+              onClick={() => (isMulti ? handleMultiToggle(opt.label) : handleSingleSelect(opt.label))}
             />
           ))}
         </div>
@@ -288,9 +276,7 @@ export function PetApprovalPopup({
         position: isOverlay ? 'relative' : 'absolute',
         bottom: isOverlay ? undefined : '100%',
         left: isOverlay ? '50%' : '50%',
-        transform: isOverlay
-          ? `translateX(-50%) scale(${visible ? 1 : 0.9})`
-          : `translateX(-50%) scale(${visible ? 1 : 0.9})`,
+        transform: isOverlay ? `translateX(-50%) scale(${visible ? 1 : 0.9})` : `translateX(-50%) scale(${visible ? 1 : 0.9})`,
         marginBottom: isOverlay ? 4 : 8,
         opacity: visible ? 1 : 0,
         transition: 'opacity 0.2s ease, transform 0.2s ease',
@@ -452,7 +438,8 @@ function OptionButton({
       }}
     >
       <div>
-        {selected ? '✓ ' : ''}{label}
+        {selected ? '✓ ' : ''}
+        {label}
       </div>
       {description && (
         <div

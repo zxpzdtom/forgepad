@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { Check, FileJson2, Plus, Save, Trash2, X } from 'lucide-react';
 import { useTranslation } from '@renderer/i18n';
 
+import clsx from 'clsx';
+
 interface RunCommandEntry {
   name: string;
   command: string;
@@ -150,11 +152,12 @@ export function RunSetupDialog({
                     return (
                       <button
                         key={s.name}
-                        className={`flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[12px] transition-colors ${
+                        className={clsx(
+                          'flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[12px] transition-colors',
                           isAdded
                             ? 'border-accent/40 bg-accent-surface text-accent'
-                            : 'border-border bg-panel-2 text-muted hover:border-accent/40 hover:text-text'
-                        }`}
+                            : 'border-border bg-panel-2 text-muted hover:border-accent/40 hover:text-text',
+                        )}
                         type="button"
                         title={s.command}
                         onClick={() => {

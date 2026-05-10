@@ -12,6 +12,8 @@ import { FileIcon } from './FileIcon';
 import { SortableTabItem } from './SortableTabItem';
 import { TabContextMenu } from './TabContextMenu';
 
+import clsx from 'clsx';
+
 function tabIcon(tab: Tab) {
   if (tab.type === 'terminal') return tab.isAgent ? <Bot size={14} /> : <TerminalSquare size={14} />;
   if (tab.type === 'diff') return <GitCompare size={14} />;
@@ -117,7 +119,10 @@ export function TabBar() {
 
   return (
     <div
-      className={`workspace-tabbar tabbar relative flex h-9 shrink-0 items-center border-b border-border bg-bg ${dropHighlight ? 'drop-target-active' : ''}`}
+      className={clsx(
+        'workspace-tabbar tabbar relative flex h-9 shrink-0 items-center border-b border-border bg-bg',
+        dropHighlight && 'drop-target-active',
+      )}
       onDragOver={handleFileDragOver}
       onDragEnter={handleFileDragEnter}
       onDragLeave={handleFileDragLeave}
@@ -151,11 +156,7 @@ export function TabBar() {
                   onContextMenu={(event) => handleContextMenu(event, tab)}
                   className="min-w-[80px] max-w-[240px]"
                   data-tab-id={tab.id}
-                  suffix={
-                    isExternal ? (
-                      <ExternalLink size={10} className="shrink-0 text-subtle" />
-                    ) : undefined
-                  }
+                  suffix={isExternal ? <ExternalLink size={10} className="shrink-0 text-subtle" /> : undefined}
                 />
               );
             })}

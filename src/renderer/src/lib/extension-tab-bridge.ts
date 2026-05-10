@@ -15,10 +15,7 @@
 const pendingRequests = new Map<string, string>();
 
 /** Register a pending extension tab create request */
-export function registerPendingExtTabCreate(
-  reactTabId: string,
-  requestId: string,
-): void {
+export function registerPendingExtTabCreate(reactTabId: string, requestId: string): void {
   pendingRequests.set(reactTabId, requestId);
 }
 
@@ -27,10 +24,7 @@ export function registerPendingExtTabCreate(
  * If this tab was created by an extension, replies to main process and cleans up.
  * Returns true if it was a pending extension tab.
  */
-export function resolvePendingExtTabCreate(
-  reactTabId: string,
-  webContentsId: number,
-): boolean {
+export function resolvePendingExtTabCreate(reactTabId: string, webContentsId: number): boolean {
   const requestId = pendingRequests.get(reactTabId);
   if (!requestId) return false;
   pendingRequests.delete(reactTabId);

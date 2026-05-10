@@ -6,6 +6,8 @@ import { ChevronDown, MessageSquare, Send, X } from 'lucide-react';
 
 import { useAppStore } from '../store/app-store';
 
+import clsx from 'clsx';
+
 export function BrowserFeedbackModal() {
   const { t } = useTranslation();
   const open = useAppStore((s) => s.feedbackModalOpen);
@@ -98,7 +100,7 @@ export function BrowserFeedbackModal() {
                   className="flex items-center gap-1 text-[11px] text-subtle transition-colors hover:text-muted"
                   onClick={() => setSnippetOpen((v) => !v)}
                 >
-                  <ChevronDown size={12} className={`transition-transform ${snippetOpen ? '' : '-rotate-90'}`} />
+                  <ChevronDown size={12} className={clsx('transition-transform', !snippetOpen && '-rotate-90')} />
                   {t('browserFeedback.htmlSnippet')}
                 </button>
                 {snippetOpen && (

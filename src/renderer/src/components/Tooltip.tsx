@@ -77,12 +77,7 @@ export function Tooltip({
   const translateY = position === 'top' ? '-100%' : '0';
 
   return (
-    <span
-      ref={wrapperRef}
-      className="tooltip-wrapper"
-      onPointerEnter={show}
-      onPointerLeave={hide}
-    >
+    <span ref={wrapperRef} className="tooltip-wrapper" onPointerEnter={show} onPointerLeave={hide}>
       {children}
       {visible &&
         coords &&

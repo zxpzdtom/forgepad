@@ -2,7 +2,10 @@ import { useState } from 'react';
 import { useTranslation } from '@renderer/i18n';
 import { useAppStore } from '@renderer/store/app-store';
 import { SpriteAnimator } from 'codex-pets-react';
-import { getAllPets, forgePetAtlas, getPetSpritesheetUrl, type ForgePetAnimationName } from './pets/pet-registry';
+
+import { type ForgePetAnimationName, forgePetAtlas, getAllPets, getPetSpritesheetUrl } from './pets/pet-registry';
+
+import clsx from 'clsx';
 
 /* ─── Reusable primitives (same style as SettingsPanel) ─── */
 
@@ -33,15 +36,17 @@ function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: 
       role="switch"
       aria-checked={checked}
       aria-label={label}
-      className={`relative inline-flex h-[22px] w-[40px] shrink-0 cursor-pointer items-center rounded-full transition-colors ${
-        checked ? 'bg-accent' : 'bg-border'
-      }`}
+      className={clsx(
+        'relative inline-flex h-[22px] w-[40px] shrink-0 cursor-pointer items-center rounded-full transition-colors',
+        checked ? 'bg-accent' : 'bg-border',
+      )}
       onClick={() => onChange(!checked)}
     >
       <span
-        className={`pointer-events-none inline-block size-[18px] rounded-full bg-white shadow-sm transition-transform ${
-          checked ? 'translate-x-[20px]' : 'translate-x-[2px]'
-        }`}
+        className={clsx(
+          'pointer-events-none inline-block size-[18px] rounded-full bg-white shadow-sm transition-transform',
+          checked ? 'translate-x-[20px]' : 'translate-x-[2px]',
+        )}
       />
     </button>
   );
@@ -49,7 +54,15 @@ function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: 
 
 /* ─── Pet preview card (uses SpriteAnimator for animated preview) ─── */
 
-function PetCard({ petId, displayName, selected, isCustom, cacheBust, onClick, onDelete }: {
+function PetCard({
+  petId,
+  displayName,
+  selected,
+  isCustom,
+  cacheBust,
+  onClick,
+  onDelete,
+}: {
   petId: string;
   displayName: string;
   selected: boolean;
@@ -64,13 +77,15 @@ function PetCard({ petId, displayName, selected, isCustom, cacheBust, onClick, o
     <button
       type="button"
       onClick={onClick}
-      className={`group relative flex flex-col items-center gap-2 rounded-xl border-2 p-3 transition-all hover:bg-panel-2 ${
-        selected ? 'border-accent bg-panel-2' : 'border-transparent'
-      } ${isCustom ? 'border-dashed' : ''}`}
+      className={clsx(
+        'group relative flex flex-col items-center gap-2 rounded-xl border-2 p-3 transition-all hover:bg-panel-2',
+        selected ? 'border-accent bg-panel-2' : 'border-transparent',
+        isCustom && 'border-dashed',
+      )}
     >
       {/* Custom badge */}
       {isCustom && (
-        <span className="absolute top-1.5 left-1.5 rounded bg-accent/10 px-1 py-0.5 text-[9px] font-[590] text-accent">
+        <span className="absolute top-1.5 left-1.5 rounded bg-accent/10 px-1 py-0.5 font-[590] text-[9px] text-accent">
           Custom
         </span>
       )}
@@ -80,8 +95,16 @@ function PetCard({ petId, displayName, selected, isCustom, cacheBust, onClick, o
         <span
           role="button"
           tabIndex={0}
-          onClick={(e) => { e.stopPropagation(); onDelete(); }}
-          onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); onDelete(); } }}
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete();
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.stopPropagation();
+              onDelete();
+            }
+          }}
           className="absolute top-1.5 right-1.5 flex size-5 items-center justify-center rounded-full opacity-0 transition-opacity hover:bg-danger/15 group-hover:opacity-100"
           title="Delete"
         >
@@ -101,7 +124,7 @@ function PetCard({ petId, displayName, selected, isCustom, cacheBust, onClick, o
           ariaLabel={displayName}
         />
       </div>
-      <span className={`text-[12px] font-[510] ${selected ? 'text-accent' : 'text-muted group-hover:text-text'}`}>
+      <span className={clsx('font-[510] text-[12px]', selected ? 'text-accent' : 'text-muted group-hover:text-text')}>
         {displayName}
       </span>
     </button>
@@ -110,7 +133,14 @@ function PetCard({ petId, displayName, selected, isCustom, cacheBust, onClick, o
 
 /* ─── Slider ─── */
 
-function Slider({ value, min, max, step, onChange, label }: {
+function Slider({
+  value,
+  min,
+  max,
+  step,
+  onChange,
+  label,
+}: {
   value: number;
   min: number;
   max: number;
@@ -201,11 +231,25 @@ export function PetsSection() {
 
       {/* Size & Speed sliders */}
       <SettingRow label={t('settings.pets.size')} description={t('settings.pets.sizeDesc')}>
-        <Slider value={petSettings.petSize} min={0.4} max={1.5} step={0.1} onChange={(v) => updatePets({ petSize: v })} label="Pet size" />
+        <Slider
+          value={petSettings.petSize}
+          min={0.4}
+          max={1.5}
+          step={0.1}
+          onChange={(v) => updatePets({ petSize: v })}
+          label="Pet size"
+        />
       </SettingRow>
 
       <SettingRow label={t('settings.pets.speed')} description={t('settings.pets.speedDesc')}>
-        <Slider value={petSettings.petSpeed} min={0.5} max={5} step={0.5} onChange={(v) => updatePets({ petSpeed: v })} label="Pet speed" />
+        <Slider
+          value={petSettings.petSpeed}
+          min={0.5}
+          max={5}
+          step={0.5}
+          onChange={(v) => updatePets({ petSpeed: v })}
+          label="Pet speed"
+        />
       </SettingRow>
 
       <SettingRow label={t('settings.pets.randomMove')} description={t('settings.pets.randomMoveDesc')}>
@@ -228,7 +272,7 @@ export function PetsSection() {
           type="button"
           onClick={handleImport}
           disabled={importing}
-          className="shrink-0 rounded-lg border border-dashed border-border px-3 py-1.5 text-[12px] font-[510] text-muted transition-colors hover:border-accent hover:text-accent disabled:opacity-50"
+          className="shrink-0 rounded-lg border border-border border-dashed px-3 py-1.5 font-[510] text-[12px] text-muted transition-colors hover:border-accent hover:text-accent disabled:opacity-50"
         >
           {importing ? t('settings.pets.importing') : t('settings.pets.importCustomPet')}
         </button>

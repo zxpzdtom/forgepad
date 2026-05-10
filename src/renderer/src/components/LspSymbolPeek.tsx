@@ -6,6 +6,8 @@ import { useTranslation } from '@renderer/i18n';
 import type { LspLocation, Workspace } from '@shared/types';
 import { ArrowLeft, FileCode, X } from 'lucide-react';
 
+import clsx from 'clsx';
+
 type LspSymbolPeekProps = {
   workspace: Workspace;
 };
@@ -132,26 +134,19 @@ export function LspSymbolPeek({ workspace }: LspSymbolPeekProps) {
       <div className="flex min-h-9 items-center justify-between gap-2 border-border border-b bg-panel-2 px-2.5">
         <div className="flex min-w-0 items-center gap-2">
           {symbolPeek.originFile && (
-            <button
-              type="button"
-              className="icon-button"
-              title="Return to origin"
-              onClick={handleReturnToOrigin}
-            >
+            <button type="button" className="icon-button" title="Return to origin" onClick={handleReturnToOrigin}>
               <ArrowLeft size={14} />
             </button>
           )}
           <span className="truncate font-medium text-[13px]">
             <span className="text-accent">"{token}"</span>
-            <span className="text-muted"> — {locations.length} definition{locations.length !== 1 ? 's' : ''}</span>
+            <span className="text-muted">
+              {' '}
+              — {locations.length} definition{locations.length !== 1 ? 's' : ''}
+            </span>
           </span>
         </div>
-        <button
-          type="button"
-          className="icon-button"
-          title="Close (Esc)"
-          onClick={closeSymbolPeek}
-        >
+        <button type="button" className="icon-button" title="Close (Esc)" onClick={closeSymbolPeek}>
           <X size={14} />
         </button>
       </div>
@@ -165,9 +160,7 @@ export function LspSymbolPeek({ workspace }: LspSymbolPeekProps) {
           ) : fileData ? (
             <PierreFile file={fileData} options={fileOptions} disableWorkerPool />
           ) : (
-            <div className="flex h-full items-center justify-center text-muted text-xs">
-              Select a location to preview
-            </div>
+            <div className="flex h-full items-center justify-center text-muted text-xs">Select a location to preview</div>
           )}
         </div>
 
@@ -183,13 +176,15 @@ export function LspSymbolPeek({ workspace }: LspSymbolPeekProps) {
                 <span className="ml-auto shrink-0 text-[10px] text-subtle">{locs.length}</span>
               </div>
               {locs.map((loc, idx) => {
-                const isActive =
-                  selectedLocation?.filePath === loc.filePath && selectedLocation?.lineNumber === loc.lineNumber;
+                const isActive = selectedLocation?.filePath === loc.filePath && selectedLocation?.lineNumber === loc.lineNumber;
                 return (
                   <button
                     key={`${loc.filePath}:${loc.lineNumber}:${idx}`}
                     type="button"
-                    className={`flex w-full items-baseline gap-2 px-2.5 py-1 text-left text-[12px] transition-colors hover:bg-accent-surface ${isActive ? 'bg-accent-surface' : ''}`}
+                    className={clsx(
+                      'flex w-full items-baseline gap-2 px-2.5 py-1 text-left text-[12px] transition-colors hover:bg-accent-surface',
+                      isActive && 'bg-accent-surface',
+                    )}
                     onClick={() => handleLocationClick(loc)}
                     onDoubleClick={() => handleLocationDoubleClick(loc)}
                   >

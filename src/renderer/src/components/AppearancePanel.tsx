@@ -4,6 +4,8 @@ import { useTranslation } from '@renderer/i18n';
 import { BUILTIN_THEMES, THEME_SCHEMA_VERSION, type ThemeDefinition, type ThemeTokens } from '@shared/types';
 import { Check, Download, ExternalLink, Pencil, Upload, X } from 'lucide-react';
 
+import clsx from 'clsx';
+
 /* ─── Theme validation ─── */
 
 const REQUIRED_TOKEN_KEYS: (keyof ThemeTokens)[] = ['bg', 'panel', 'text', 'accent', 'border'];
@@ -118,7 +120,17 @@ function TerminalPreview({ theme }: { theme: ThemeDefinition }) {
 
 /* ─── Theme card ─── */
 
-function ThemeCard({ theme, isSelected, onSelect, t }: { theme: ThemeDefinition; isSelected: boolean; onSelect: () => void; t: (key: string, params?: Record<string, unknown>) => string }) {
+function ThemeCard({
+  theme,
+  isSelected,
+  onSelect,
+  t,
+}: {
+  theme: ThemeDefinition;
+  isSelected: boolean;
+  onSelect: () => void;
+  t: (key: string, params?: Record<string, unknown>) => string;
+}) {
   const swatches = resolveSwatches(theme);
   const isSystem = theme.id === 'system';
 
@@ -128,9 +140,10 @@ function ThemeCard({ theme, isSelected, onSelect, t }: { theme: ThemeDefinition;
       aria-pressed={isSelected}
       aria-label={t('appearance.selectTheme', { name: theme.name })}
       onClick={onSelect}
-      className={`group relative flex w-full flex-col overflow-hidden rounded-xl border text-left transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-border focus-visible:ring-offset-2 focus-visible:ring-offset-bg ${
-        isSelected ? 'border-accent shadow-[0_0_0_2px_var(--accent)]' : 'border-border hover:border-border-soft hover:shadow-sm'
-      }`}
+      className={clsx(
+        'group relative flex w-full flex-col overflow-hidden rounded-xl border text-left transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-border focus-visible:ring-offset-2 focus-visible:ring-offset-bg',
+        isSelected ? 'border-accent shadow-[0_0_0_2px_var(--accent)]' : 'border-border hover:border-border-soft hover:shadow-sm',
+      )}
       style={{
         background: isSystem ? undefined : (theme.tokens.panel ?? 'var(--panel)'),
       }}
@@ -186,7 +199,15 @@ function ThemeCard({ theme, isSelected, onSelect, t }: { theme: ThemeDefinition;
 
 /* ─── Import error banner ─── */
 
-function ImportErrorBanner({ errors, onDismiss, t }: { errors: string[]; onDismiss: () => void; t: (key: string, params?: Record<string, unknown>) => string }) {
+function ImportErrorBanner({
+  errors,
+  onDismiss,
+  t,
+}: {
+  errors: string[];
+  onDismiss: () => void;
+  t: (key: string, params?: Record<string, unknown>) => string;
+}) {
   return (
     <div className="flex items-start gap-2 rounded-lg border border-danger/30 bg-danger/8 px-3 py-2.5">
       <div className="min-w-0 flex-1">
@@ -216,9 +237,10 @@ function ImportErrorBanner({ errors, onDismiss, t }: { errors: string[]; onDismi
 function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
   return (
     <button
-      className={`relative inline-flex h-5 w-8 items-center rounded-full transition-colors ${
-        checked ? 'bg-accent' : 'bg-panel-3'
-      }`}
+      className={clsx(
+        'relative inline-flex h-5 w-8 items-center rounded-full transition-colors',
+        checked ? 'bg-accent' : 'bg-panel-3',
+      )}
       type="button"
       role="switch"
       aria-checked={checked}
@@ -226,9 +248,10 @@ function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: 
       onClick={() => onChange(!checked)}
     >
       <span
-        className={`inline-block size-3.5 translate-x-0.5 rounded-full bg-white shadow transition-transform ${
-          checked ? 'translate-x-[14px]' : ''
-        }`}
+        className={clsx(
+          'inline-block size-3.5 translate-x-0.5 rounded-full bg-white shadow transition-transform',
+          checked && 'translate-x-[14px]',
+        )}
       />
     </button>
   );
@@ -279,9 +302,7 @@ export function AppearancePanel() {
         }
         const incoming = raw as ThemeDefinition;
         if (BUILTIN_THEMES.some((bt) => bt.id === incoming.id)) {
-          setImportErrors([
-            t('appearance.conflictBuiltIn', { id: incoming.id }),
-          ]);
+          setImportErrors([t('appearance.conflictBuiltIn', { id: incoming.id })]);
           return;
         }
         addCustomTheme({ ...incoming, schemaVersion: THEME_SCHEMA_VERSION });
@@ -404,9 +425,7 @@ export function AppearancePanel() {
       {importSuccess && (
         <div className="flex items-center gap-2 rounded-lg border border-ok/30 bg-ok/8 px-3 py-2 text-[12px] text-ok">
           <Check size={13} />
-          <span>
-            {t('appearance.importSuccess', { name: importSuccess })}
-          </span>
+          <span>{t('appearance.importSuccess', { name: importSuccess })}</span>
           <button
             type="button"
             aria-label={t('common.dismiss')}
@@ -430,7 +449,13 @@ export function AppearancePanel() {
           aria-label={t('appearance.selectBuiltIn')}
         >
           {BUILTIN_THEMES.map((theme) => (
-            <ThemeCard key={theme.id} theme={theme} isSelected={themeId === theme.id} onSelect={() => handleSelect(theme.id)} t={t} />
+            <ThemeCard
+              key={theme.id}
+              theme={theme}
+              isSelected={themeId === theme.id}
+              onSelect={() => handleSelect(theme.id)}
+              t={t}
+            />
           ))}
         </div>
       </section>
@@ -466,7 +491,6 @@ export function AppearancePanel() {
           </div>
         </section>
       )}
-
     </div>
   );
 }

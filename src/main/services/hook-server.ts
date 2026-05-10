@@ -1,20 +1,20 @@
-import { execFile } from "node:child_process";
-import http from "node:http";
-import { URL } from "node:url";
-import { promisify } from "node:util";
-import type { AgentStatusUpdate } from "@shared/agent-lifecycle";
-import { mapEventToStatus } from "@shared/agent-lifecycle";
-import { IPC } from "@shared/ipc";
+import { execFile } from 'node:child_process';
+import http from 'node:http';
+import { URL } from 'node:url';
+import { promisify } from 'node:util';
+import type { AgentStatusUpdate } from '@shared/agent-lifecycle';
+import { mapEventToStatus } from '@shared/agent-lifecycle';
+import { IPC } from '@shared/ipc';
 import type {
   AgentCompletionData,
   AgentUserPromptData,
   AskUserQuestionItem,
   PendingPermission,
   PermissionSuggestion,
-} from "@shared/types";
-import { BrowserWindow } from "electron";
-import { sendPetAgentStatus, sendPetPermissionRequest } from "../pet-window";
-import { getUserPath } from "./user-env";
+} from '@shared/types';
+import { BrowserWindow } from 'electron';
+import { sendPetAgentStatus, sendPetPermissionRequest } from '../pet-window';
+import { getUserPath } from './user-env';
 
 const execFileAsync = promisify(execFile);
 
@@ -27,7 +27,7 @@ export class HookServer {
 
   /** Cached settings for AI tab title generation. */
   private _autoGenerateTabTitle = false;
-  private _tabTitlePromptTemplate = "";
+  private _tabTitlePromptTemplate = '';
   /** Only rename on the first user message per tab. */
   private _renameOnFirstMessageOnly = false;
   /** Set of ptyIds that have already been renamed once. */
@@ -78,21 +78,21 @@ export class HookServer {
         void this.handleRequest(req, res);
       });
 
-      this.server.listen(0, "127.0.0.1", () => {
+      this.server.listen(0, '127.0.0.1', () => {
         const addr = this.server!.address();
-        this._port = typeof addr === "object" && addr ? addr.port : 0;
+        this._port = typeof addr === 'object' && addr ? addr.port : 0;
         console.log(`[HookServer] listening on 127.0.0.1:${this._port}`);
         resolve(this._port);
       });
 
-      this.server.on("error", reject);
+      this.server.on('error', reject);
     });
   }
 
   async stop(): Promise<void> {
     // Resolve all pending permissions before shutting down
     for (const ptyId of this.pendingPermissions.keys()) {
-      this.resolvePermission(ptyId, "allow");
+      this.resolvePermission(ptyId, 'allow');
     }
 
     return new Promise((resolve) => {
@@ -111,7 +111,7 @@ export class HookServer {
    */
   resolvePermission(
     ptyId: string,
-    decision: "allow" | "deny" | "allowAlways" | "answer",
+    decision: 'allow' | 'deny' | 'allowAlways' | 'answer',
     answers?: Record<string, string>,
   ): void {
     const pending = this.pendingPermissions.get(ptyId);
@@ -121,18 +121,17 @@ export class HookServer {
     this.pendingPermissions.delete(ptyId);
 
     let body: string;
-    if (decision === "deny") {
-      body =
-        '{"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"deny"}}}';
-    } else if (decision === "answer" && answers) {
+    if (decision === 'deny') {
+      body = '{"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"deny"}}}';
+    } else if (decision === 'answer' && answers) {
       // AskUserQuestion: return selected answers via updatedInput.
       // updatedInput replaces the ENTIRE tool input, so we must echo back
       // the original fields (especially `questions`) alongside `answers`.
       body = JSON.stringify({
         hookSpecificOutput: {
-          hookEventName: "PermissionRequest",
+          hookEventName: 'PermissionRequest',
           decision: {
-            behavior: "allow",
+            behavior: 'allow',
             updatedInput: {
               ...(pending.toolInput ?? {}),
               answers,
@@ -140,29 +139,25 @@ export class HookServer {
           },
         },
       });
-    } else if (
-      decision === "allowAlways" &&
-      pending.permissionSuggestions?.length
-    ) {
+    } else if (decision === 'allowAlways' && pending.permissionSuggestions?.length) {
       // Echo back the permission suggestions as updatedPermissions so Claude Code
       // persists them as "always allow" rules.
       body = JSON.stringify({
         hookSpecificOutput: {
-          hookEventName: "PermissionRequest",
+          hookEventName: 'PermissionRequest',
           decision: {
-            behavior: "allow",
+            behavior: 'allow',
             updatedPermissions: pending.permissionSuggestions,
           },
         },
       });
     } else {
-      body =
-        '{"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"allow"}}}';
+      body = '{"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"allow"}}}';
     }
 
     try {
       if (!pending.res.writableEnded) {
-        pending.res.writeHead(200, { "Content-Type": "application/json" });
+        pending.res.writeHead(200, { 'Content-Type': 'application/json' });
         pending.res.end(body);
       }
     } catch {
@@ -173,20 +168,17 @@ export class HookServer {
     this.broadcastPermissionClear(ptyId);
   }
 
-  private async handleRequest(
-    req: http.IncomingMessage,
-    res: http.ServerResponse,
-  ): Promise<void> {
+  private async handleRequest(req: http.IncomingMessage, res: http.ServerResponse): Promise<void> {
     try {
-      const url = new URL(req.url ?? "/", "http://127.0.0.1");
+      const url = new URL(req.url ?? '/', 'http://127.0.0.1');
 
-      if (url.pathname === "/hook/notify") {
-        const eventType = url.searchParams.get("eventType") ?? "";
-        const ptyId = url.searchParams.get("ptyId") ?? "";
+      if (url.pathname === '/hook/notify') {
+        const eventType = url.searchParams.get('eventType') ?? '';
+        const ptyId = url.searchParams.get('ptyId') ?? '';
 
         if (!ptyId || !eventType) {
           res.writeHead(400);
-          res.end("missing params");
+          res.end('missing params');
           return;
         }
 
@@ -196,38 +188,23 @@ export class HookServer {
         }
 
         // ── PermissionRequest: hold the connection open ──
-        if (eventType === "PermissionRequest" && req.method === "POST") {
+        if (eventType === 'PermissionRequest' && req.method === 'POST') {
           const body = await this.readBody(req);
-          let toolName = "";
+          let toolName = '';
           let toolInput: Record<string, unknown> | undefined;
           let permissionSuggestions: PermissionSuggestion[] | undefined;
           try {
             const json = JSON.parse(body) as Record<string, unknown>;
             // Claude Code sends tool_name / tool_input at top level
             toolName =
-              (json.tool_name as string) ??
-              (json.toolName as string) ??
-              (json.tool as string) ??
-              (json.name as string) ??
-              "";
-            const rawInput =
-              json.tool_input ??
-              json.toolInput ??
-              json.input ??
-              json.arguments ??
-              json.args ??
-              json.params;
-            if (
-              rawInput &&
-              typeof rawInput === "object" &&
-              !Array.isArray(rawInput)
-            ) {
+              (json.tool_name as string) ?? (json.toolName as string) ?? (json.tool as string) ?? (json.name as string) ?? '';
+            const rawInput = json.tool_input ?? json.toolInput ?? json.input ?? json.arguments ?? json.args ?? json.params;
+            if (rawInput && typeof rawInput === 'object' && !Array.isArray(rawInput)) {
               toolInput = rawInput as Record<string, unknown>;
             }
             // Extract permission suggestions (e.g. "always allow this tool" options)
             if (Array.isArray(json.permission_suggestions)) {
-              permissionSuggestions =
-                json.permission_suggestions as PermissionSuggestion[];
+              permissionSuggestions = json.permission_suggestions as PermissionSuggestion[];
             }
           } catch {
             // ignore parse errors
@@ -235,43 +212,35 @@ export class HookServer {
 
           // Parse AskUserQuestion questions from tool_input
           let questions: AskUserQuestionItem[] | undefined;
-          if (toolName === "AskUserQuestion" && toolInput) {
+          if (toolName === 'AskUserQuestion' && toolInput) {
             const rawQuestions = toolInput.questions;
             if (Array.isArray(rawQuestions)) {
-              questions = (rawQuestions as Array<Record<string, unknown>>).map(
-                (q) => ({
-                  question: (q.question as string) ?? "Question",
-                  header: q.header as string | undefined,
-                  multiSelect: q.multiSelect as boolean | undefined,
-                  options: Array.isArray(q.options)
-                    ? (
-                        q.options as Array<Record<string, unknown> | string>
-                      ).map((opt) =>
-                        typeof opt === "string"
-                          ? { label: opt }
-                          : {
-                              label: (opt.label as string) ?? "",
-                              description: opt.description as
-                                | string
-                                | undefined,
-                            },
-                      )
-                    : [],
-                }),
-              );
+              questions = (rawQuestions as Array<Record<string, unknown>>).map((q) => ({
+                question: (q.question as string) ?? 'Question',
+                header: q.header as string | undefined,
+                multiSelect: q.multiSelect as boolean | undefined,
+                options: Array.isArray(q.options)
+                  ? (q.options as Array<Record<string, unknown> | string>).map((opt) =>
+                      typeof opt === 'string'
+                        ? { label: opt }
+                        : {
+                            label: (opt.label as string) ?? '',
+                            description: opt.description as string | undefined,
+                          },
+                    )
+                  : [],
+              }));
             }
           }
 
           // If there's already a pending permission for this ptyId, deny the old one
           // (same dedup pattern as CodeIsland's mergeDuplicatePermissionRequest)
-          this.resolvePermission(ptyId, "deny");
+          this.resolvePermission(ptyId, 'deny');
 
           // Hold the response open — will be resolved when user clicks Allow/Deny
           const timeout = setTimeout(() => {
-            console.log(
-              `[HookServer] PermissionRequest for ${ptyId} timed out, auto-allowing`,
-            );
-            this.resolvePermission(ptyId, "allow");
+            console.log(`[HookServer] PermissionRequest for ${ptyId} timed out, auto-allowing`);
+            this.resolvePermission(ptyId, 'allow');
           }, PERMISSION_TIMEOUT_MS);
 
           this.pendingPermissions.set(ptyId, {
@@ -283,7 +252,7 @@ export class HookServer {
           });
 
           // Handle client disconnect (e.g. Ctrl+C in terminal kills curl)
-          res.on("close", () => {
+          res.on('close', () => {
             if (this.pendingPermissions.has(ptyId)) {
               clearTimeout(this.pendingPermissions.get(ptyId)!.timeout);
               this.pendingPermissions.delete(ptyId);
@@ -292,25 +261,19 @@ export class HookServer {
           });
 
           // Broadcast the permission request details to all windows + pet overlay
-          this.broadcastPermissionRequest(
-            ptyId,
-            toolName,
-            toolInput,
-            permissionSuggestions,
-            questions,
-          );
+          this.broadcastPermissionRequest(ptyId, toolName, toolInput, permissionSuggestions, questions);
 
           // Do NOT respond — the response is held until resolvePermission is called
           return;
         }
 
         // For UserPromptSubmit: read prompt from POST body, generate tab title
-        if (eventType === "UserPromptSubmit" && req.method === "POST") {
+        if (eventType === 'UserPromptSubmit' && req.method === 'POST') {
           const body = await this.readBody(req);
-          let prompt = "";
+          let prompt = '';
           try {
             const json = JSON.parse(body) as Record<string, unknown>;
-            if (typeof json.prompt === "string") prompt = json.prompt;
+            if (typeof json.prompt === 'string') prompt = json.prompt;
           } catch {
             // ignore parse errors
           }
@@ -318,17 +281,14 @@ export class HookServer {
           if (prompt) {
             // If "rename on first message only" is enabled and this tab was
             // already renamed, skip renaming and respond immediately.
-            if (
-              this._renameOnFirstMessageOnly &&
-              this._renamedPtyIds.has(ptyId)
-            ) {
+            if (this._renameOnFirstMessageOnly && this._renamedPtyIds.has(ptyId)) {
               // Still broadcast the prompt for completion card display
               this.broadcastUserPrompt(ptyId, prompt);
-              res.writeHead(200, { "Content-Type": "application/json" });
+              res.writeHead(200, { 'Content-Type': 'application/json' });
               res.end(
                 JSON.stringify({
                   hookSpecificOutput: {
-                    hookEventName: "UserPromptSubmit",
+                    hookEventName: 'UserPromptSubmit',
                   },
                 }),
               );
@@ -341,11 +301,11 @@ export class HookServer {
             // Broadcast full prompt for completion card display
             this.broadcastUserPrompt(ptyId, prompt);
             // Respond to the hook right away (don't block Claude CLI)
-            res.writeHead(200, { "Content-Type": "application/json" });
+            res.writeHead(200, { 'Content-Type': 'application/json' });
             res.end(
               JSON.stringify({
                 hookSpecificOutput: {
-                  hookEventName: "UserPromptSubmit",
+                  hookEventName: 'UserPromptSubmit',
                   sessionTitle: quickTitle,
                 },
               }),
@@ -373,24 +333,21 @@ export class HookServer {
         }
 
         // For Stop/StopFailure: read POST body to extract AI's last message
-        if (
-          (eventType === "Stop" || eventType === "StopFailure") &&
-          req.method === "POST"
-        ) {
+        if ((eventType === 'Stop' || eventType === 'StopFailure') && req.method === 'POST') {
           const body = await this.readBody(req);
-          let aiMessage = "";
+          let aiMessage = '';
           try {
             const json = JSON.parse(body) as Record<string, unknown>;
             // Claude Code may send the message in various fields
-            if (typeof json.last_assistant_message === "string") {
+            if (typeof json.last_assistant_message === 'string') {
               aiMessage = json.last_assistant_message;
-            } else if (typeof json.message === "string") {
+            } else if (typeof json.message === 'string') {
               aiMessage = json.message;
-            } else if (typeof json.text === "string") {
+            } else if (typeof json.text === 'string') {
               aiMessage = json.text;
-            } else if (typeof json.summary === "string") {
+            } else if (typeof json.summary === 'string') {
               aiMessage = json.summary;
-            } else if (typeof json.transcript_summary === "string") {
+            } else if (typeof json.transcript_summary === 'string') {
               aiMessage = json.transcript_summary;
             }
           } catch {
@@ -405,44 +362,44 @@ export class HookServer {
           this._renamedPtyIds.delete(ptyId);
 
           res.writeHead(200);
-          res.end("ok");
+          res.end('ok');
           return;
         }
 
         res.writeHead(200);
-        res.end("ok");
+        res.end('ok');
         return;
       }
 
-      if (url.pathname === "/health") {
+      if (url.pathname === '/health') {
         res.writeHead(200);
-        res.end("ok");
+        res.end('ok');
         return;
       }
 
       res.writeHead(404);
-      res.end("not found");
+      res.end('not found');
     } catch (error) {
-      console.error("[HookServer] error:", error);
+      console.error('[HookServer] error:', error);
       res.writeHead(500);
-      res.end("error");
+      res.end('error');
     }
   }
 
   private readBody(req: http.IncomingMessage): Promise<string> {
     return new Promise((resolve) => {
       const chunks: Buffer[] = [];
-      req.on("data", (chunk: Buffer) => chunks.push(chunk));
-      req.on("end", () => resolve(Buffer.concat(chunks).toString("utf-8")));
-      req.on("error", () => resolve(""));
+      req.on('data', (chunk: Buffer) => chunks.push(chunk));
+      req.on('end', () => resolve(Buffer.concat(chunks).toString('utf-8')));
+      req.on('error', () => resolve(''));
     });
   }
 
   private truncateTitle(prompt: string): string {
-    const cleaned = prompt.trim().replace(/\s+/g, " ");
+    const cleaned = prompt.trim().replace(/\s+/g, ' ');
     if (cleaned.length <= 10) return cleaned;
     const truncated = cleaned.slice(0, 10);
-    const lastSpace = truncated.lastIndexOf(" ");
+    const lastSpace = truncated.lastIndexOf(' ');
     return `${lastSpace > 4 ? truncated.slice(0, lastSpace) : truncated}…`;
   }
 
@@ -455,21 +412,17 @@ export class HookServer {
     }
 
     try {
-      const fullPrompt = this._tabTitlePromptTemplate.includes("{prompt}")
-        ? this._tabTitlePromptTemplate.replace("{prompt}", prompt)
+      const fullPrompt = this._tabTitlePromptTemplate.includes('{prompt}')
+        ? this._tabTitlePromptTemplate.replace('{prompt}', prompt)
         : `${this._tabTitlePromptTemplate}\n\n${prompt}`;
 
       const userPath = getUserPath();
-      const { stdout } = await execFileAsync(
-        "claude",
-        ["-p", "--no-session-persistence", fullPrompt],
-        {
-          encoding: "utf8",
-          maxBuffer: 5 * 1024 * 1024,
-          timeout: 30_000,
-          env: { ...process.env, PATH: userPath },
-        },
-      );
+      const { stdout } = await execFileAsync('claude', ['-p', '--no-session-persistence', fullPrompt], {
+        encoding: 'utf8',
+        maxBuffer: 5 * 1024 * 1024,
+        timeout: 30_000,
+        env: { ...process.env, PATH: userPath },
+      });
 
       const result = stdout.trim();
       if (!result) return fallback;
@@ -480,10 +433,7 @@ export class HookServer {
       }
       return result;
     } catch (error) {
-      console.error(
-        "[HookServer] AI title generation failed, using fallback:",
-        error,
-      );
+      console.error('[HookServer] AI title generation failed, using fallback:', error);
       return fallback;
     }
   }
@@ -528,13 +478,7 @@ export class HookServer {
         win.webContents.send(IPC.AGENT_PERMISSION_REQUEST, payload);
       }
     }
-    sendPetPermissionRequest(
-      ptyId,
-      toolName,
-      toolInput,
-      permissionSuggestions,
-      questions,
-    );
+    sendPetPermissionRequest(ptyId, toolName, toolInput, permissionSuggestions, questions);
   }
 
   /** Broadcast that a permission request was resolved (clear approval UI). */
@@ -543,13 +487,13 @@ export class HookServer {
       if (!win.webContents.isDestroyed()) {
         win.webContents.send(IPC.AGENT_PERMISSION_REQUEST, {
           ptyId,
-          toolName: "",
+          toolName: '',
           resolved: true,
         });
       }
     }
     // Also clear the pet overlay window
-    sendPetPermissionRequest(ptyId, "");
+    sendPetPermissionRequest(ptyId, '');
   }
 
   /** Broadcast user prompt to all windows (for completion card display). */

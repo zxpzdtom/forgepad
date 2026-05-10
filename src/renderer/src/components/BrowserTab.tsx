@@ -1,42 +1,34 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Allotment } from "allotment";
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Allotment } from 'allotment';
 
-import { useTranslation } from "@renderer/i18n";
-import { resolvePendingExtTabCreate } from "@renderer/lib/extension-tab-bridge";
-import type { ExtensionInfo } from "@shared/types";
-import {
-  ChevronLeft,
-  ChevronRight,
-  ExternalLink,
-  Puzzle,
-  RefreshCw,
-  X as XIcon,
-} from "lucide-react";
-import { getElementSelectionScript } from "../lib/element-selection-script";
-import { useAppStore } from "../store/app-store";
-import { BrowserConsolePanel } from "./BrowserConsolePanel";
-import { BrowserFeedbackModal } from "./BrowserFeedbackModal";
-import type { ConsoleEntry } from "./console-utils";
-import { stringifyConsoleArgs } from "./console-utils";
-import { Tooltip } from "./Tooltip";
-import { UrlBar } from "./UrlBar";
+import { useTranslation } from '@renderer/i18n';
+import { resolvePendingExtTabCreate } from '@renderer/lib/extension-tab-bridge';
+import type { ExtensionInfo } from '@shared/types';
+import { ChevronLeft, ChevronRight, ExternalLink, Puzzle, RefreshCw, X as XIcon } from 'lucide-react';
+import { getElementSelectionScript } from '../lib/element-selection-script';
+import { useAppStore } from '../store/app-store';
+import { BrowserConsolePanel } from './BrowserConsolePanel';
+import { BrowserFeedbackModal } from './BrowserFeedbackModal';
+import type { ConsoleEntry } from './console-utils';
+import { stringifyConsoleArgs } from './console-utils';
+import { Tooltip } from './Tooltip';
+import { UrlBar } from './UrlBar';
+
+import clsx from 'clsx';
 
 type BrowserTabProps = {
-  tab: Extract<import("@shared/types").Tab, { type: "browser" }>;
+  tab: Extract<import('@shared/types').Tab, { type: 'browser' }>;
 };
 
-type ViewportMode = "desktop" | "mobile";
+type ViewportMode = 'desktop' | 'mobile';
 
-const VIEWPORT_PRESETS: Record<
-  ViewportMode,
-  { width: number; height: number; userAgent?: string }
-> = {
+const VIEWPORT_PRESETS: Record<ViewportMode, { width: number; height: number; userAgent?: string }> = {
   desktop: { width: 0, height: 0 }, // 0 means fill container
   mobile: {
     width: 375,
     height: 812,
     userAgent:
-      "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
+      'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
   },
 };
 
@@ -65,99 +57,99 @@ function friendlyErrorMessage(
   switch (code) {
     case -2: // ERR_FAILED
       return {
-        title: t("browser.failedToLoad"),
-        detail: t("browser.couldNotLoad", { host }),
+        title: t('browser.failedToLoad'),
+        detail: t('browser.couldNotLoad', { host }),
         canRetry: true,
       };
     case -6: // ERR_FILE_NOT_FOUND
       return {
-        title: t("browser.pageNotFound"),
-        detail: t("browser.pageNotFoundDetail", { host }),
+        title: t('browser.pageNotFound'),
+        detail: t('browser.pageNotFoundDetail', { host }),
         canRetry: false,
       };
     case -7: // ERR_TIMED_OUT
       return {
-        title: t("browser.connectionTimeout"),
-        detail: t("browser.connectionTimeoutDetail", { host }),
+        title: t('browser.connectionTimeout'),
+        detail: t('browser.connectionTimeoutDetail', { host }),
         canRetry: true,
       };
     case -21: // ERR_NETWORK_CHANGED
       return {
-        title: t("browser.networkChanged"),
-        detail: t("browser.networkChangedDetail"),
+        title: t('browser.networkChanged'),
+        detail: t('browser.networkChangedDetail'),
         canRetry: true,
       };
     case -100: // ERR_CONNECTION_CLOSED
       return {
-        title: t("browser.connectionClosed"),
-        detail: t("browser.connectionClosedDetail", { host }),
+        title: t('browser.connectionClosed'),
+        detail: t('browser.connectionClosedDetail', { host }),
         canRetry: true,
       };
     case -101: // ERR_CONNECTION_RESET
       return {
-        title: t("browser.connectionReset"),
-        detail: t("browser.connectionResetDetail", { host }),
+        title: t('browser.connectionReset'),
+        detail: t('browser.connectionResetDetail', { host }),
         canRetry: true,
       };
     case -102: // ERR_CONNECTION_REFUSED
       return {
-        title: t("browser.connectionRefused"),
-        detail: t("browser.connectionRefusedDetail", { host }),
+        title: t('browser.connectionRefused'),
+        detail: t('browser.connectionRefusedDetail', { host }),
         canRetry: true,
       };
     case -103: // ERR_CONNECTION_ABORTED
       return {
-        title: t("browser.connectionAborted"),
-        detail: t("browser.connectionAbortedDetail", { host }),
+        title: t('browser.connectionAborted'),
+        detail: t('browser.connectionAbortedDetail', { host }),
         canRetry: true,
       };
     case -104: // ERR_CONNECTION_FAILED
       return {
-        title: t("browser.connectionFailed"),
-        detail: t("browser.connectionFailedDetail", { host }),
+        title: t('browser.connectionFailed'),
+        detail: t('browser.connectionFailedDetail', { host }),
         canRetry: true,
       };
     case -105: // ERR_NAME_NOT_RESOLVED
       return {
-        title: t("browser.addressNotFound"),
-        detail: t("browser.addressNotFoundDetail", { host }),
+        title: t('browser.addressNotFound'),
+        detail: t('browser.addressNotFoundDetail', { host }),
         canRetry: true,
       };
     case -106: // ERR_INTERNET_DISCONNECTED
       return {
-        title: t("browser.noInternet"),
-        detail: t("browser.noInternetDetail"),
+        title: t('browser.noInternet'),
+        detail: t('browser.noInternetDetail'),
         canRetry: true,
       };
     case -109: // ERR_ADDRESS_UNREACHABLE
       return {
-        title: t("browser.addressUnreachable"),
-        detail: t("browser.addressUnreachableDetail", { host }),
+        title: t('browser.addressUnreachable'),
+        detail: t('browser.addressUnreachableDetail', { host }),
         canRetry: true,
       };
     case -118: // ERR_CONNECTION_TIMED_OUT
       return {
-        title: t("browser.connectionTimeout"),
-        detail: t("browser.connectionTimeoutDetail", { host }),
+        title: t('browser.connectionTimeout'),
+        detail: t('browser.connectionTimeoutDetail', { host }),
         canRetry: true,
       };
     case -200: // ERR_CERT_COMMON_NAME_INVALID
     case -201: // ERR_CERT_DATE_INVALID
     case -202: // ERR_CERT_AUTHORITY_INVALID
       return {
-        title: t("browser.certificateError"),
-        detail: t("browser.certificateErrorDetail", { host }),
+        title: t('browser.certificateError'),
+        detail: t('browser.certificateErrorDetail', { host }),
         canRetry: true,
       };
     case -501: // ERR_INSECURE_RESPONSE
       return {
-        title: t("browser.insecureConnection"),
-        detail: t("browser.insecureConnectionDetail", { host }),
+        title: t('browser.insecureConnection'),
+        detail: t('browser.insecureConnectionDetail', { host }),
         canRetry: true,
       };
     default:
       return {
-        title: t("browser.failedToLoad"),
+        title: t('browser.failedToLoad'),
         detail: desc || `Error ${Math.abs(code)}`,
         canRetry: true,
       };
@@ -165,25 +157,25 @@ function friendlyErrorMessage(
 }
 
 /** Serialize a JS execution result into a ConsoleArg for display */
-function serializeResult(value: unknown): import("./console-utils").ConsoleArg {
-  if (value === null) return { type: "object", subtype: "null" };
-  if (value === undefined) return { type: "undefined" };
+function serializeResult(value: unknown): import('./console-utils').ConsoleArg {
+  if (value === null) return { type: 'object', subtype: 'null' };
+  if (value === undefined) return { type: 'undefined' };
   const t = typeof value;
-  if (t === "string") return { type: "string", value };
-  if (t === "number") return { type: "number", value };
-  if (t === "boolean") return { type: "boolean", value };
-  if (t === "object") {
+  if (t === 'string') return { type: 'string', value };
+  if (t === 'number') return { type: 'number', value };
+  if (t === 'boolean') return { type: 'boolean', value };
+  if (t === 'object') {
     try {
-      return { type: "object", description: JSON.stringify(value, null, 2) };
+      return { type: 'object', description: JSON.stringify(value, null, 2) };
     } catch {
-      return { type: "object", description: "[object Object]" };
+      return { type: 'object', description: '[object Object]' };
     }
   }
-  return { type: "string", value: String(value) };
+  return { type: 'string', value: String(value) };
 }
 
 function normalizeUrl(url: string): string {
-  if (url === "about:blank") return url;
+  if (url === 'about:blank') return url;
   if (/^https?:\/\//i.test(url)) return url;
   if (/^[a-zA-Z][a-zA-Z\d+\-.]*:\/\//.test(url)) return url;
   return `https://${url}`;
@@ -192,11 +184,9 @@ function normalizeUrl(url: string): string {
 export function BrowserTab({ tab }: BrowserTabProps) {
   const { t } = useTranslation();
   const webviewRef = useRef<Electron.WebviewTag>(null);
-  const [urlInput, setUrlInput] = useState(
-    tab.url === "about:blank" ? "" : tab.url,
-  );
+  const [urlInput, setUrlInput] = useState(tab.url === 'about:blank' ? '' : tab.url);
   const [loadError, setLoadError] = useState<LoadError | null>(null);
-  const [viewportMode, setViewportMode] = useState<ViewportMode>("desktop");
+  const [viewportMode, setViewportMode] = useState<ViewportMode>('desktop');
   const selectMode = useAppStore((s) => s.browserSelectMode[tab.id] ?? false);
   const setBrowserSelectMode = useAppStore((s) => s.setBrowserSelectMode);
   const updateBrowserNavState = useAppStore((s) => s.updateBrowserNavState);
@@ -210,10 +200,7 @@ export function BrowserTab({ tab }: BrowserTabProps) {
   const [consoleOpen, setConsoleOpen] = useState(false);
   const consoleIdRef = useRef(0);
 
-  const consoleErrorCount = useMemo(
-    () => consoleEntries.filter((e) => e.level === "error").length,
-    [consoleEntries],
-  );
+  const consoleErrorCount = useMemo(() => consoleEntries.filter((e) => e.level === 'error').length, [consoleEntries]);
 
   // Extensions with browser-action/popup
   const [extensionActions, setExtensionActions] = useState<ExtensionInfo[]>([]);
@@ -228,7 +215,7 @@ export function BrowserTab({ tab }: BrowserTabProps) {
 
   // Sync URL bar when navigation state changes externally
   useEffect(() => {
-    if (tab.url !== "about:blank") {
+    if (tab.url !== 'about:blank') {
       setUrlInput(tab.url);
     }
   }, [tab.url]);
@@ -246,7 +233,7 @@ export function BrowserTab({ tab }: BrowserTabProps) {
 
     /** Inject mobile-style thin overlay scrollbar CSS into the webview page */
     const injectMobileScrollbar = () => {
-      if (viewportModeRef.current !== "mobile") return;
+      if (viewportModeRef.current !== 'mobile') return;
       const css = `
         (function() {
           var id = '__forgepad_mobile_scrollbar__';
@@ -285,19 +272,17 @@ export function BrowserTab({ tab }: BrowserTabProps) {
       domReadyRef.current = true;
       sendNavState();
       // Apply or remove touch emulation + mobile scrollbar based on current mode
-      const isMobile = viewportModeRef.current === "mobile";
+      const isMobile = viewportModeRef.current === 'mobile';
       // Ensure UA is in sync (covers cases where setUserAgent was called before dom-ready)
       try {
         const preset = VIEWPORT_PRESETS[viewportModeRef.current];
-        wv.setUserAgent(preset.userAgent || "");
+        wv.setUserAgent(preset.userAgent || '');
       } catch {
         // webview may not be ready
       }
       try {
         const wcId = wv.getWebContentsId();
-        window.forgepad.browser
-          .setTouchEmulation(wcId, isMobile)
-          .catch(() => {});
+        window.forgepad.browser.setTouchEmulation(wcId, isMobile).catch(() => {});
         // If this tab was created by an extension (chrome.tabs.create),
         // reply with the webContentsId so main process can resolve the extension's promise
         resolvePendingExtTabCreate(tab.id, wcId);
@@ -349,17 +334,17 @@ export function BrowserTab({ tab }: BrowserTabProps) {
         try {
           return wv.getURL();
         } catch {
-          return "";
+          return '';
         }
       })();
       const title = (() => {
         try {
           return wv.getTitle();
         } catch {
-          return "";
+          return '';
         }
       })();
-      if (!url || url === "about:blank") return;
+      if (!url || url === 'about:blank') return;
 
       // Run inside the webview to grab the best favicon <link> and convert to data URL
       const faviconScript = `
@@ -396,36 +381,32 @@ export function BrowserTab({ tab }: BrowserTabProps) {
       `;
       wv.executeJavaScript(faviconScript)
         .then((dataUrl: unknown) => {
-          addBrowserHistoryEntry(
-            url,
-            title,
-            typeof dataUrl === "string" ? dataUrl : "",
-          );
+          addBrowserHistoryEntry(url, title, typeof dataUrl === 'string' ? dataUrl : '');
         })
         .catch(() => {
-          addBrowserHistoryEntry(url, title, "");
+          addBrowserHistoryEntry(url, title, '');
         });
     };
 
-    wv.addEventListener("dom-ready", handleDomReady);
-    wv.addEventListener("did-start-loading", handleDidStartLoading);
-    wv.addEventListener("did-stop-loading", handleDidStopLoading);
-    wv.addEventListener("did-navigate", sendNavState);
-    wv.addEventListener("did-navigate-in-page", sendNavState);
-    wv.addEventListener("page-title-updated", sendNavState);
-    wv.addEventListener("did-fail-load", handleDidFailLoad);
-    wv.addEventListener("new-window", handleNewWindow);
+    wv.addEventListener('dom-ready', handleDomReady);
+    wv.addEventListener('did-start-loading', handleDidStartLoading);
+    wv.addEventListener('did-stop-loading', handleDidStopLoading);
+    wv.addEventListener('did-navigate', sendNavState);
+    wv.addEventListener('did-navigate-in-page', sendNavState);
+    wv.addEventListener('page-title-updated', sendNavState);
+    wv.addEventListener('did-fail-load', handleDidFailLoad);
+    wv.addEventListener('new-window', handleNewWindow);
 
     return () => {
       domReadyRef.current = false;
-      wv.removeEventListener("dom-ready", handleDomReady);
-      wv.removeEventListener("did-start-loading", handleDidStartLoading);
-      wv.removeEventListener("did-stop-loading", handleDidStopLoading);
-      wv.removeEventListener("did-navigate", sendNavState);
-      wv.removeEventListener("did-navigate-in-page", sendNavState);
-      wv.removeEventListener("page-title-updated", sendNavState);
-      wv.removeEventListener("did-fail-load", handleDidFailLoad);
-      wv.removeEventListener("new-window", handleNewWindow);
+      wv.removeEventListener('dom-ready', handleDomReady);
+      wv.removeEventListener('did-start-loading', handleDidStartLoading);
+      wv.removeEventListener('did-stop-loading', handleDidStopLoading);
+      wv.removeEventListener('did-navigate', sendNavState);
+      wv.removeEventListener('did-navigate-in-page', sendNavState);
+      wv.removeEventListener('page-title-updated', sendNavState);
+      wv.removeEventListener('did-fail-load', handleDidFailLoad);
+      wv.removeEventListener('new-window', handleNewWindow);
     };
   }, [tab.id, updateBrowserNavState, addBrowserHistoryEntry]);
 
@@ -439,7 +420,7 @@ export function BrowserTab({ tab }: BrowserTabProps) {
       wv.executeJavaScript(script).catch(() => {});
     }
 
-    const PREFIX = "__FORGEPAD_SELECT__:";
+    const PREFIX = '__FORGEPAD_SELECT__:';
 
     // webview console-message events expose { message, level, ... } directly on Event
     const handleConsoleMessage = async (e: Event) => {
@@ -461,13 +442,10 @@ export function BrowserTab({ tab }: BrowserTabProps) {
       }
 
       // Capture screenshot via IPC to main process
-      let screenshotBase64 = "";
+      let screenshotBase64 = '';
       try {
         const webContentsId = wv.getWebContentsId();
-        screenshotBase64 = await window.forgepad.browser.captureScreenshot(
-          webContentsId,
-          data.boundingRect,
-        );
+        screenshotBase64 = await window.forgepad.browser.captureScreenshot(webContentsId, data.boundingRect);
       } catch {
         // Screenshot capture may fail
       }
@@ -476,9 +454,9 @@ export function BrowserTab({ tab }: BrowserTabProps) {
       setBrowserSelectMode(tab.id, false);
     };
 
-    wv.addEventListener("console-message", handleConsoleMessage);
+    wv.addEventListener('console-message', handleConsoleMessage);
     return () => {
-      wv.removeEventListener("console-message", handleConsoleMessage);
+      wv.removeEventListener('console-message', handleConsoleMessage);
     };
   }, [selectMode, tab.id, openFeedbackModal, setBrowserSelectMode]);
 
@@ -517,12 +495,12 @@ export function BrowserTab({ tab }: BrowserTabProps) {
     };
 
     if (domReadyRef.current) enableConsole();
-    wv.addEventListener("dom-ready", handleReady);
-    wv.addEventListener("did-navigate", handleNavigate);
+    wv.addEventListener('dom-ready', handleReady);
+    wv.addEventListener('did-navigate', handleNavigate);
 
     return () => {
-      wv.removeEventListener("dom-ready", handleReady);
-      wv.removeEventListener("did-navigate", handleNavigate);
+      wv.removeEventListener('dom-ready', handleReady);
+      wv.removeEventListener('did-navigate', handleNavigate);
       const wcId = webContentsIdRef.current;
       if (wcId != null) {
         window.forgepad.browser.disableConsole(wcId).catch(() => {});
@@ -533,17 +511,17 @@ export function BrowserTab({ tab }: BrowserTabProps) {
 
   // Listen for structured CDP console events
   useEffect(() => {
-    const TYPE_MAP: Record<string, ConsoleEntry["level"]> = {
-      log: "log",
-      info: "log",
-      warning: "warn",
-      warn: "warn",
-      error: "error",
-      debug: "debug",
-      verbose: "debug",
-      dir: "log",
-      table: "log",
-      assert: "error",
+    const TYPE_MAP: Record<string, ConsoleEntry['level']> = {
+      log: 'log',
+      info: 'log',
+      warning: 'warn',
+      warn: 'warn',
+      error: 'error',
+      debug: 'debug',
+      verbose: 'debug',
+      dir: 'log',
+      table: 'log',
+      assert: 'error',
     };
 
     const cleanup = window.forgepad.browser.onConsoleEvent((raw: unknown) => {
@@ -584,16 +562,16 @@ export function BrowserTab({ tab }: BrowserTabProps) {
       // Skip our internal element-selection messages
       if (
         evt.args.length > 0 &&
-        evt.args[0].type === "string" &&
-        typeof evt.args[0].value === "string" &&
-        (evt.args[0].value as string).startsWith("__FORGEPAD_SELECT__:")
+        evt.args[0].type === 'string' &&
+        typeof evt.args[0].value === 'string' &&
+        (evt.args[0].value as string).startsWith('__FORGEPAD_SELECT__:')
       ) {
         return;
       }
 
       const entry: ConsoleEntry = {
         id: ++consoleIdRef.current,
-        level: TYPE_MAP[evt.type] ?? "log",
+        level: TYPE_MAP[evt.type] ?? 'log',
         args: evt.args.map((arg) => ({
           type: arg.type,
           subtype: arg.subtype,
@@ -616,32 +594,20 @@ export function BrowserTab({ tab }: BrowserTabProps) {
       const state = useAppStore.getState();
       const agentTab =
         state.tabs.find(
-          (t) =>
-            t.id === state.activeAgentTabId &&
-            t.type === "terminal" &&
-            t.isAgent &&
-            t.workspaceId === tab.workspaceId,
-        ) ??
-        state.tabs.find(
-          (t) =>
-            t.workspaceId === tab.workspaceId &&
-            t.type === "terminal" &&
-            t.isAgent,
-        );
+          (t) => t.id === state.activeAgentTabId && t.type === 'terminal' && t.isAgent && t.workspaceId === tab.workspaceId,
+        ) ?? state.tabs.find((t) => t.workspaceId === tab.workspaceId && t.type === 'terminal' && t.isAgent);
 
-      if (!agentTab || agentTab.type !== "terminal") {
-        addToast("error", t("browser.noActiveAgent"));
+      if (!agentTab || agentTab.type !== 'terminal') {
+        addToast('error', t('browser.noActiveAgent'));
         return;
       }
 
       const prompt = [
-        `[Browser Console — ${entries.length} log${entries.length > 1 ? "s" : ""}]`,
-        "",
-        ...entries.map(
-          (e) => `[${e.level.toUpperCase()}] ${stringifyConsoleArgs(e.args)}`,
-        ),
-        "",
-      ].join("\n");
+        `[Browser Console — ${entries.length} log${entries.length > 1 ? 's' : ''}]`,
+        '',
+        ...entries.map((e) => `[${e.level.toUpperCase()}] ${stringifyConsoleArgs(e.args)}`),
+        '',
+      ].join('\n');
 
       window.forgepad.pty.write(agentTab.ptyId, prompt);
     },
@@ -659,10 +625,10 @@ export function BrowserTab({ tab }: BrowserTabProps) {
     // Show input line immediately
     const inputEntry: ConsoleEntry = {
       id: ++consoleIdRef.current,
-      level: "log",
-      args: [{ type: "string", value: script }],
+      level: 'log',
+      args: [{ type: 'string', value: script }],
       timestamp: Date.now(),
-      source: "input",
+      source: 'input',
     };
     setConsoleEntries((prev) => [...prev, inputEntry]);
 
@@ -700,47 +666,46 @@ export function BrowserTab({ tab }: BrowserTabProps) {
 
       if (envelope?.__error) {
         // JS runtime error inside the page
-        const desc = `${envelope.__name ?? "Error"}: ${envelope.__message ?? String(envelope)}`;
+        const desc = `${envelope.__name ?? 'Error'}: ${envelope.__message ?? String(envelope)}`;
         const errorEntry: ConsoleEntry = {
           id: ++consoleIdRef.current,
-          level: "error",
-          args: [{ type: "object", subtype: "error", description: desc }],
+          level: 'error',
+          args: [{ type: 'object', subtype: 'error', description: desc }],
           timestamp: Date.now(),
-          source: "error",
+          source: 'error',
         };
         setConsoleEntries((prev) => [...prev, errorEntry]);
         return;
       }
 
       // Deserialize the envelope back into a ConsoleArg
-      let arg: import("./console-utils").ConsoleArg;
+      let arg: import('./console-utils').ConsoleArg;
       switch (envelope?.__type) {
-        case "null":
-          arg = { type: "object", subtype: "null" };
+        case 'null':
+          arg = { type: 'object', subtype: 'null' };
           break;
-        case "undefined":
-          arg = { type: "undefined" };
+        case 'undefined':
+          arg = { type: 'undefined' };
           break;
-        case "string":
-          arg = { type: "string", value: envelope.__value };
+        case 'string':
+          arg = { type: 'string', value: envelope.__value };
           break;
-        case "number":
-          arg = { type: "number", value: envelope.__value };
+        case 'number':
+          arg = { type: 'number', value: envelope.__value };
           break;
-        case "boolean":
-          arg = { type: "boolean", value: envelope.__value };
+        case 'boolean':
+          arg = { type: 'boolean', value: envelope.__value };
           break;
-        case "function":
+        case 'function':
           arg = {
-            type: "function",
-            description: envelope.__desc ?? "function()",
+            type: 'function',
+            description: envelope.__desc ?? 'function()',
           };
           break;
-        case "object":
+        case 'object':
           arg = {
-            type: "object",
-            description:
-              envelope.__json ?? envelope.__desc ?? "[object Object]",
+            type: 'object',
+            description: envelope.__json ?? envelope.__desc ?? '[object Object]',
           };
           break;
         default:
@@ -750,20 +715,20 @@ export function BrowserTab({ tab }: BrowserTabProps) {
 
       const resultEntry: ConsoleEntry = {
         id: ++consoleIdRef.current,
-        level: "log",
+        level: 'log',
         args: [arg],
         timestamp: Date.now(),
-        source: "result",
+        source: 'result',
       };
       setConsoleEntries((prev) => [...prev, resultEntry]);
     } catch (err) {
       // Unexpected Electron/IPC-level error (should be rare after wrapping)
       const errorEntry: ConsoleEntry = {
         id: ++consoleIdRef.current,
-        level: "error",
-        args: [{ type: "object", subtype: "error", description: String(err) }],
+        level: 'error',
+        args: [{ type: 'object', subtype: 'error', description: String(err) }],
         timestamp: Date.now(),
-        source: "error",
+        source: 'error',
       };
       setConsoleEntries((prev) => [...prev, errorEntry]);
     }
@@ -783,9 +748,9 @@ export function BrowserTab({ tab }: BrowserTabProps) {
 
     const preset = VIEWPORT_PRESETS[viewportMode];
     try {
-      wv.setUserAgent(preset.userAgent || "");
+      wv.setUserAgent(preset.userAgent || '');
       const currentUrl = wv.getURL();
-      if (currentUrl && currentUrl !== "about:blank") {
+      if (currentUrl && currentUrl !== 'about:blank') {
         wv.reload();
       }
     } catch {
@@ -826,20 +791,15 @@ export function BrowserTab({ tab }: BrowserTabProps) {
   }, [selectMode, tab.id, setBrowserSelectMode]);
 
   const handleToggleViewport = useCallback(() => {
-    setViewportMode((prev) => (prev === "desktop" ? "mobile" : "desktop"));
+    setViewportMode((prev) => (prev === 'desktop' ? 'mobile' : 'desktop'));
   }, []);
 
   // ── Webview sizing ────────────────────────────────────────────────────
-  const isMobile = viewportMode === "mobile";
+  const isMobile = viewportMode === 'mobile';
   const mobilePreset = VIEWPORT_PRESETS.mobile;
 
   const errorInfo = loadError
-    ? friendlyErrorMessage(
-        loadError.errorCode,
-        loadError.errorDescription,
-        loadError.validatedURL,
-        t,
-      )
+    ? friendlyErrorMessage(loadError.errorCode, loadError.errorDescription, loadError.validatedURL, t)
     : null;
 
   return (
@@ -847,7 +807,7 @@ export function BrowserTab({ tab }: BrowserTabProps) {
       {/* ── Toolbar ─────────────────────────────────────────────────────── */}
       <div className="flex h-10 shrink-0 items-center gap-1 border-border border-b bg-panel px-2">
         {/* Back */}
-        <Tooltip label={t("browser.back")} position="bottom">
+        <Tooltip label={t('browser.back')} position="bottom">
           <button
             type="button"
             onClick={handleBack}
@@ -859,7 +819,7 @@ export function BrowserTab({ tab }: BrowserTabProps) {
         </Tooltip>
 
         {/* Forward */}
-        <Tooltip label={t("browser.forward")} position="bottom">
+        <Tooltip label={t('browser.forward')} position="bottom">
           <button
             type="button"
             onClick={handleForward}
@@ -871,10 +831,7 @@ export function BrowserTab({ tab }: BrowserTabProps) {
         </Tooltip>
 
         {/* Reload / Stop */}
-        <Tooltip
-          label={tab.isLoading ? t("browser.stop") : t("common.reload")}
-          position="bottom"
-        >
+        <Tooltip label={tab.isLoading ? t('browser.stop') : t('common.reload')} position="bottom">
           <button
             type="button"
             onClick={handleReloadOrStop}
@@ -914,12 +871,10 @@ export function BrowserTab({ tab }: BrowserTabProps) {
                       try {
                         return wv.getURL();
                       } catch {
-                        return "";
+                        return '';
                       }
                     })();
-                    const rect = (
-                      e.currentTarget as HTMLElement
-                    ).getBoundingClientRect();
+                    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
                     window.forgepad.extension.openPopup(
                       ext.id,
                       ext.popupPath,
@@ -931,13 +886,7 @@ export function BrowserTab({ tab }: BrowserTabProps) {
                   }}
                 >
                   {ext.iconUrl ? (
-                    <img
-                      src={ext.iconUrl}
-                      alt={ext.name}
-                      width={16}
-                      height={16}
-                      className="rounded-sm"
-                    />
+                    <img src={ext.iconUrl} alt={ext.name} width={16} height={16} className="rounded-sm" />
                   ) : (
                     <Puzzle size={14} />
                   )}
@@ -950,142 +899,60 @@ export function BrowserTab({ tab }: BrowserTabProps) {
         )}
 
         {/* Viewport mode toggle */}
-        <Tooltip
-          label={
-            isMobile ? t("browser.switchDesktop") : t("browser.switchMobile")
-          }
-          position="bottom"
-        >
+        <Tooltip label={isMobile ? t('browser.switchDesktop') : t('browser.switchMobile')} position="bottom">
           <button
             type="button"
             onClick={handleToggleViewport}
             className={[
-              "grid h-7 w-7 place-items-center rounded-md transition-[color,background-color,scale] duration-150 active:scale-[0.96]",
-              isMobile
-                ? "bg-accent text-white"
-                : "text-subtle hover:bg-panel-3 hover:text-text",
-            ].join(" ")}
+              'grid h-7 w-7 place-items-center rounded-md transition-[color,background-color,scale] duration-150 active:scale-[0.96]',
+              isMobile ? 'bg-accent text-white' : 'text-subtle hover:bg-panel-3 hover:text-text',
+            ].join(' ')}
           >
             {isMobile ? (
               <svg width="14" height="14" viewBox="0 0 13 13" fill="none">
-                <rect
-                  x="3"
-                  y="1"
-                  width="7"
-                  height="11"
-                  rx="1.5"
-                  stroke="currentColor"
-                  strokeWidth="1.2"
-                />
-                <line
-                  x1="5.5"
-                  y1="10"
-                  x2="7.5"
-                  y2="10"
-                  stroke="currentColor"
-                  strokeWidth="1.2"
-                  strokeLinecap="round"
-                />
+                <rect x="3" y="1" width="7" height="11" rx="1.5" stroke="currentColor" strokeWidth="1.2" />
+                <line x1="5.5" y1="10" x2="7.5" y2="10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
               </svg>
             ) : (
               <svg width="14" height="14" viewBox="0 0 14 13" fill="none">
-                <rect
-                  x="1"
-                  y="1"
-                  width="12"
-                  height="8"
-                  rx="1.2"
-                  stroke="currentColor"
-                  strokeWidth="1.2"
-                />
-                <line
-                  x1="5"
-                  y1="11"
-                  x2="9"
-                  y2="11"
-                  stroke="currentColor"
-                  strokeWidth="1.2"
-                  strokeLinecap="round"
-                />
-                <line
-                  x1="7"
-                  y1="9"
-                  x2="7"
-                  y2="11"
-                  stroke="currentColor"
-                  strokeWidth="1.2"
-                  strokeLinecap="round"
-                />
+                <rect x="1" y="1" width="12" height="8" rx="1.2" stroke="currentColor" strokeWidth="1.2" />
+                <line x1="5" y1="11" x2="9" y2="11" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+                <line x1="7" y1="9" x2="7" y2="11" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
               </svg>
             )}
           </button>
         </Tooltip>
 
         {/* Select Element toggle */}
-        <Tooltip
-          label={
-            selectMode
-              ? t("browser.exitElementSelection")
-              : t("browser.selectElement")
-          }
-          position="bottom"
-        >
+        <Tooltip label={selectMode ? t('browser.exitElementSelection') : t('browser.selectElement')} position="bottom">
           <button
             type="button"
             onClick={handleToggleSelect}
             className={[
-              "grid h-7 w-7 place-items-center rounded-md transition-[color,background-color,scale] duration-150 active:scale-[0.96]",
-              selectMode
-                ? "bg-accent text-white"
-                : "text-subtle hover:bg-panel-3 hover:text-text",
-            ].join(" ")}
+              'grid h-7 w-7 place-items-center rounded-md transition-[color,background-color,scale] duration-150 active:scale-[0.96]',
+              selectMode ? 'bg-accent text-white' : 'text-subtle hover:bg-panel-3 hover:text-text',
+            ].join(' ')}
           >
             <svg width="14" height="14" viewBox="0 0 13 13" fill="none">
-              <circle
-                cx="6.5"
-                cy="6.5"
-                r="5"
-                stroke="currentColor"
-                strokeWidth="1.3"
-              />
+              <circle cx="6.5" cy="6.5" r="5" stroke="currentColor" strokeWidth="1.3" />
               <circle cx="6.5" cy="6.5" r="1.5" fill="currentColor" />
-              <path
-                d="M6.5 1v2M6.5 10v2M1 6.5h2M10 6.5h2"
-                stroke="currentColor"
-                strokeWidth="1.3"
-                strokeLinecap="round"
-              />
+              <path d="M6.5 1v2M6.5 10v2M1 6.5h2M10 6.5h2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
             </svg>
           </button>
         </Tooltip>
 
         {/* Console toggle */}
-        <Tooltip
-          label={
-            consoleOpen ? t("browser.hideConsole") : t("browser.showConsole")
-          }
-          position="bottom"
-        >
+        <Tooltip label={consoleOpen ? t('browser.hideConsole') : t('browser.showConsole')} position="bottom">
           <button
             type="button"
             onClick={() => setConsoleOpen((v) => !v)}
             className={[
-              "relative grid h-7 w-7 place-items-center rounded-md transition-[color,background-color,scale] duration-150 active:scale-[0.96]",
-              consoleOpen
-                ? "bg-accent text-white"
-                : "text-subtle hover:bg-panel-3 hover:text-text",
-            ].join(" ")}
+              'relative grid h-7 w-7 place-items-center rounded-md transition-[color,background-color,scale] duration-150 active:scale-[0.96]',
+              consoleOpen ? 'bg-accent text-white' : 'text-subtle hover:bg-panel-3 hover:text-text',
+            ].join(' ')}
           >
             <svg width="14" height="14" viewBox="0 0 13 13" fill="none">
-              <rect
-                x="1"
-                y="2"
-                width="11"
-                height="9"
-                rx="1.5"
-                stroke="currentColor"
-                strokeWidth="1.2"
-              />
+              <rect x="1" y="2" width="11" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.2" />
               <path
                 d="M3.5 5.5l2 1.5-2 1.5"
                 stroke="currentColor"
@@ -1093,29 +960,21 @@ export function BrowserTab({ tab }: BrowserTabProps) {
                 strokeLinecap="round"
                 strokeLinejoin="round"
               />
-              <line
-                x1="7"
-                y1="8.5"
-                x2="9.5"
-                y2="8.5"
-                stroke="currentColor"
-                strokeWidth="1.2"
-                strokeLinecap="round"
-              />
+              <line x1="7" y1="8.5" x2="9.5" y2="8.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
             </svg>
             {consoleErrorCount > 0 && !consoleOpen && (
               <span
                 key={consoleErrorCount}
                 className="console-badge console-badge-pulse absolute -top-1 -right-1 inline-flex h-[14px] min-w-[14px] items-center justify-center rounded-full bg-danger px-0.5 font-mono text-[9px] text-white leading-none"
               >
-                {consoleErrorCount > 99 ? "99+" : consoleErrorCount}
+                {consoleErrorCount > 99 ? '99+' : consoleErrorCount}
               </span>
             )}
           </button>
         </Tooltip>
 
         {/* DevTools (open in separate window) */}
-        <Tooltip label={t("browser.openDevTools")} position="bottom">
+        <Tooltip label={t('browser.openDevTools')} position="bottom">
           <button
             type="button"
             onClick={() => {
@@ -1146,22 +1005,14 @@ export function BrowserTab({ tab }: BrowserTabProps) {
         </Tooltip>
 
         {/* Popout — open in a standalone window */}
-        <Tooltip label={t("browser.popout")} position="bottom">
+        <Tooltip label={t('browser.popout')} position="bottom">
           <button
             type="button"
             onClick={() => {
-              const url =
-                tab.url && tab.url !== "about:blank" ? tab.url : urlInput;
+              const url = tab.url && tab.url !== 'about:blank' ? tab.url : urlInput;
               if (!url) return;
-              const { locale, defaultBrowserHomepage } =
-                useAppStore.getState().settings;
-              window.forgepad.browser.popout(
-                url,
-                tab.title,
-                locale,
-                undefined,
-                defaultBrowserHomepage,
-              );
+              const { locale, defaultBrowserHomepage } = useAppStore.getState().settings;
+              window.forgepad.browser.popout(url, tab.title, locale, undefined, defaultBrowserHomepage);
             }}
             className="grid h-7 w-7 place-items-center rounded-md text-subtle transition-[color,background-color,scale] duration-150 hover:bg-panel-3 hover:text-text active:scale-[0.96]"
           >
@@ -1180,9 +1031,7 @@ export function BrowserTab({ tab }: BrowserTabProps) {
       {/* ── Webview + Console split ──────────────────────────────────────── */}
       <Allotment vertical className="min-h-0 flex-1">
         <Allotment.Pane minSize={100}>
-          <div
-            className={`relative size-full ${isMobile ? "flex items-start justify-center bg-panel-2 pt-4" : "bg-white"}`}
-          >
+          <div className={clsx('relative size-full', isMobile ? 'flex items-start justify-center bg-panel-2 pt-4' : 'bg-white')}>
             {/* Mobile device frame */}
             {isMobile ? (
               <div
@@ -1190,48 +1039,36 @@ export function BrowserTab({ tab }: BrowserTabProps) {
                 style={{
                   width: mobilePreset.width,
                   height: mobilePreset.height,
-                  maxHeight: "100%",
+                  maxHeight: '100%',
                 }}
               >
                 <webview
                   ref={webviewRef}
-                  src={tab.url || "about:blank"}
-                  useragent={VIEWPORT_PRESETS[viewportMode].userAgent || ""}
+                  src={tab.url || 'about:blank'}
+                  useragent={VIEWPORT_PRESETS[viewportMode].userAgent || ''}
                   style={{
-                    width: "100%",
-                    height: "100%",
-                    display: "inline-flex",
+                    width: '100%',
+                    height: '100%',
+                    display: 'inline-flex',
                   }}
                 />
-                {errorInfo && (
-                  <ErrorOverlay
-                    error={errorInfo}
-                    errorCode={loadError!.errorCode}
-                    onRetry={handleRetry}
-                  />
-                )}
+                {errorInfo && <ErrorOverlay error={errorInfo} errorCode={loadError!.errorCode} onRetry={handleRetry} />}
               </div>
             ) : (
               <>
                 <webview
                   ref={webviewRef}
-                  src={tab.url || "about:blank"}
-                  useragent={VIEWPORT_PRESETS[viewportMode].userAgent || ""}
+                  src={tab.url || 'about:blank'}
+                  useragent={VIEWPORT_PRESETS[viewportMode].userAgent || ''}
                   style={{
-                    position: "absolute",
+                    position: 'absolute',
                     inset: 0,
-                    width: "100%",
-                    height: "100%",
-                    display: "inline-flex",
+                    width: '100%',
+                    height: '100%',
+                    display: 'inline-flex',
                   }}
                 />
-                {errorInfo && (
-                  <ErrorOverlay
-                    error={errorInfo}
-                    errorCode={loadError!.errorCode}
-                    onRetry={handleRetry}
-                  />
-                )}
+                {errorInfo && <ErrorOverlay error={errorInfo} errorCode={loadError!.errorCode} onRetry={handleRetry} />}
               </>
             )}
 
@@ -1239,18 +1076,14 @@ export function BrowserTab({ tab }: BrowserTabProps) {
             {selectMode && (
               <div className="pointer-events-none absolute inset-0 z-10 flex items-start justify-center pt-4">
                 <div className="rounded-full border border-accent/50 bg-panel/90 px-3 py-1.5 text-accent text-xs shadow backdrop-blur-sm">
-                  {t("browser.selectHint")}
+                  {t('browser.selectHint')}
                 </div>
               </div>
             )}
           </div>
         </Allotment.Pane>
 
-        <Allotment.Pane
-          preferredSize={200}
-          minSize={consoleOpen ? 80 : 0}
-          visible={consoleOpen}
-        >
+        <Allotment.Pane preferredSize={200} minSize={consoleOpen ? 80 : 0} visible={consoleOpen}>
           <BrowserConsolePanel
             entries={consoleEntries}
             onClear={handleConsoleClear}
@@ -1283,30 +1116,9 @@ function ErrorOverlay({
         {/* Error icon */}
         <div className="flex size-12 items-center justify-center rounded-full bg-panel-2">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-            <circle
-              cx="12"
-              cy="12"
-              r="10"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              className="text-subtle"
-            />
-            <path
-              d="M12 8v5"
-              stroke="currentColor"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              className="text-subtle"
-            />
-            <circle
-              cx="12"
-              cy="16"
-              r="0.5"
-              fill="currentColor"
-              stroke="currentColor"
-              strokeWidth="0.5"
-              className="text-subtle"
-            />
+            <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5" className="text-subtle" />
+            <path d="M12 8v5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" className="text-subtle" />
+            <circle cx="12" cy="16" r="0.5" fill="currentColor" stroke="currentColor" strokeWidth="0.5" className="text-subtle" />
           </svg>
         </div>
 
@@ -1317,9 +1129,7 @@ function ErrorOverlay({
         <p className="text-xs leading-relaxed text-muted">{error.detail}</p>
 
         {/* Error code badge */}
-        <span className="rounded bg-panel-2 px-2 py-0.5 font-mono text-[10px] text-subtle">
-          ERR_{Math.abs(errorCode)}
-        </span>
+        <span className="rounded bg-panel-2 px-2 py-0.5 font-mono text-[10px] text-subtle">ERR_{Math.abs(errorCode)}</span>
 
         {/* Retry button */}
         {error.canRetry && (
@@ -1329,7 +1139,7 @@ function ErrorOverlay({
             className="mt-1 flex h-8 items-center gap-1.5 rounded-md bg-accent px-4 font-medium text-white text-xs transition-[background-color,scale] duration-150 hover:bg-accent/90 active:scale-[0.96]"
           >
             <RefreshCw size={13} />
-            {t("common.retry")}
+            {t('common.retry')}
           </button>
         )}
       </div>

@@ -7,8 +7,8 @@
  *
  * Receives activeTabId and extId via --additional-arguments.
  */
-import { IPC } from "@shared/ipc";
-import { ipcRenderer } from "electron";
+import { IPC } from '@shared/ipc';
+import { ipcRenderer } from 'electron';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 declare const chrome: any;
@@ -17,22 +17,15 @@ declare const chrome: any;
 function getArg(name: string): string {
   const prefix = `--${name}=`;
   const arg = process.argv.find((a) => a.startsWith(prefix));
-  return arg ? decodeURIComponent(arg.slice(prefix.length)) : "";
+  return arg ? decodeURIComponent(arg.slice(prefix.length)) : '';
 }
 
-const TAB_ID = Number(getArg("active-tab-id")) || 0;
-const EXT_ID = getArg("ext-id") || "";
-const TAB_URL = getArg("active-tab-url") || "";
+const TAB_ID = Number(getArg('active-tab-id')) || 0;
+const EXT_ID = getArg('ext-id') || '';
+const TAB_URL = getArg('active-tab-url') || '';
 
 // Debug: log what we received so we can verify the preload is running
-console.log(
-  "[forgepad-ext-preload] TAB_ID =",
-  TAB_ID,
-  "| EXT_ID =",
-  EXT_ID,
-  "| TAB_URL =",
-  TAB_URL,
-);
+console.log('[forgepad-ext-preload] TAB_ID =', TAB_ID, '| EXT_ID =', EXT_ID, '| TAB_URL =', TAB_URL);
 
 // ── Helper: build a fake tab object ──────────────────────────────────
 function makeFakeTab(id: number, extra?: Record<string, unknown>) {
@@ -40,9 +33,9 @@ function makeFakeTab(id: number, extra?: Record<string, unknown>) {
     id,
     active: true,
     windowId: 1,
-    status: "complete",
+    status: 'complete',
     url: TAB_URL,
-    title: "",
+    title: '',
     index: 0,
     pinned: false,
     highlighted: true,
@@ -84,21 +77,16 @@ function stubEvent() {
 // Must happen here (preload) so it's in place before the extension's
 // bundle.js calls chrome.tabs.* during initial load.
 // Use forceSet() because Electron's native bindings may be non-writable.
-if (typeof chrome !== "undefined" && chrome.tabs) {
+if (typeof chrome !== 'undefined' && chrome.tabs) {
   // ── chrome.tabs.query ──
-  const _origQuery = chrome.tabs.query
-    ? chrome.tabs.query.bind(chrome.tabs)
-    : null;
+  const _origQuery = chrome.tabs.query ? chrome.tabs.query.bind(chrome.tabs) : null;
   forceSet(
     chrome.tabs,
-    "query",
-    function (
-      queryInfo: { active?: boolean; currentWindow?: boolean },
-      callback?: (tabs: unknown[]) => void,
-    ) {
+    'query',
+    function (queryInfo: { active?: boolean; currentWindow?: boolean }, callback?: (tabs: unknown[]) => void) {
       if (queryInfo && (queryInfo.active || queryInfo.currentWindow)) {
         const tab = makeFakeTab(TAB_ID);
-        if (typeof callback === "function") {
+        if (typeof callback === 'function') {
           callback([tab]);
           return;
         }
@@ -106,7 +94,7 @@ if (typeof chrome !== "undefined" && chrome.tabs) {
       }
       if (_origQuery) return _origQuery(queryInfo, callback);
       const tab = makeFakeTab(TAB_ID);
-      if (typeof callback === "function") {
+      if (typeof callback === 'function') {
         callback([tab]);
         return;
       }
@@ -115,51 +103,38 @@ if (typeof chrome !== "undefined" && chrome.tabs) {
   );
 
   // ── chrome.tabs.get ──
-  forceSet(
-    chrome.tabs,
-    "get",
-    function (tabId: number, callback?: (tab: unknown) => void) {
-      const tab = makeFakeTab(tabId || TAB_ID);
-      if (typeof callback === "function") {
-        callback(tab);
-        return;
-      }
-      return Promise.resolve(tab);
-    },
-  );
+  forceSet(chrome.tabs, 'get', function (tabId: number, callback?: (tab: unknown) => void) {
+    const tab = makeFakeTab(tabId || TAB_ID);
+    if (typeof callback === 'function') {
+      callback(tab);
+      return;
+    }
+    return Promise.resolve(tab);
+  });
 
   // ── chrome.tabs.create — opens a new tab in the browser window ──
-  forceSet(
-    chrome.tabs,
-    "create",
-    function (
-      opts: { url?: string; active?: boolean },
-      callback?: (tab: unknown) => void,
-    ) {
-      const p = ipcRenderer
-        .invoke(IPC.EXTENSION_TAB_CREATE, {
-          url: opts?.url || "about:blank",
-          active: opts?.active,
-        })
-        .then((result: { id: number }) => {
-          const tab = makeFakeTab(result.id, { url: opts?.url || "" });
-          return tab;
-        });
+  forceSet(chrome.tabs, 'create', function (opts: { url?: string; active?: boolean }, callback?: (tab: unknown) => void) {
+    const p = ipcRenderer
+      .invoke(IPC.EXTENSION_TAB_CREATE, {
+        url: opts?.url || 'about:blank',
+        active: opts?.active,
+      })
+      .then((result: { id: number }) => {
+        const tab = makeFakeTab(result.id, { url: opts?.url || '' });
+        return tab;
+      });
 
-      if (typeof callback === "function") {
-        p.then((tab: unknown) => callback(tab)).catch(() =>
-          callback(makeFakeTab(0)),
-        );
-        return;
-      }
-      return p;
-    },
-  );
+    if (typeof callback === 'function') {
+      p.then((tab: unknown) => callback(tab)).catch(() => callback(makeFakeTab(0)));
+      return;
+    }
+    return p;
+  });
 
   // ── chrome.tabs.update — navigate an existing tab ──
   forceSet(
     chrome.tabs,
-    "update",
+    'update',
     function (
       tabId: number | { url?: string; active?: boolean },
       opts?: { url?: string; active?: boolean },
@@ -168,14 +143,14 @@ if (typeof chrome !== "undefined" && chrome.tabs) {
       let _tabId = TAB_ID;
       let _opts = opts;
       let _callback = callback;
-      if (typeof tabId === "object") {
+      if (typeof tabId === 'object') {
         _opts = tabId;
         _callback = opts as unknown as ((tab: unknown) => void) | undefined;
       } else {
         _tabId = tabId;
       }
-      const tab = makeFakeTab(_tabId, { url: _opts?.url || "" });
-      if (typeof _callback === "function") {
+      const tab = makeFakeTab(_tabId, { url: _opts?.url || '' });
+      if (typeof _callback === 'function') {
         _callback(tab);
         return;
       }
@@ -184,33 +159,24 @@ if (typeof chrome !== "undefined" && chrome.tabs) {
   );
 
   // ── chrome.tabs.remove ── (no-op stub)
-  forceSet(
-    chrome.tabs,
-    "remove",
-    function (_tabId: number | number[], callback?: () => void) {
-      if (typeof callback === "function") {
-        callback();
-        return;
-      }
-      return Promise.resolve();
-    },
-  );
+  forceSet(chrome.tabs, 'remove', function (_tabId: number | number[], callback?: () => void) {
+    if (typeof callback === 'function') {
+      callback();
+      return;
+    }
+    return Promise.resolve();
+  });
 
   // ── chrome.tabs.sendMessage ── (stub — relay not needed for most extensions)
   forceSet(
     chrome.tabs,
-    "sendMessage",
-    function (
-      _tabId: number,
-      _message: unknown,
-      _opts?: unknown,
-      callback?: (response: unknown) => void,
-    ) {
-      if (typeof _opts === "function") {
+    'sendMessage',
+    function (_tabId: number, _message: unknown, _opts?: unknown, callback?: (response: unknown) => void) {
+      if (typeof _opts === 'function') {
         (_opts as (r: unknown) => void)(undefined);
         return;
       }
-      if (typeof callback === "function") {
+      if (typeof callback === 'function') {
         callback(undefined);
         return;
       }
@@ -219,11 +185,10 @@ if (typeof chrome !== "undefined" && chrome.tabs) {
   );
 
   // ── Stub event listeners ──
-  if (!chrome.tabs.onUpdated) forceSet(chrome.tabs, "onUpdated", stubEvent());
-  if (!chrome.tabs.onCreated) forceSet(chrome.tabs, "onCreated", stubEvent());
-  if (!chrome.tabs.onRemoved) forceSet(chrome.tabs, "onRemoved", stubEvent());
-  if (!chrome.tabs.onActivated)
-    forceSet(chrome.tabs, "onActivated", stubEvent());
+  if (!chrome.tabs.onUpdated) forceSet(chrome.tabs, 'onUpdated', stubEvent());
+  if (!chrome.tabs.onCreated) forceSet(chrome.tabs, 'onCreated', stubEvent());
+  if (!chrome.tabs.onRemoved) forceSet(chrome.tabs, 'onRemoved', stubEvent());
+  if (!chrome.tabs.onActivated) forceSet(chrome.tabs, 'onActivated', stubEvent());
 
   // ── Also apply deferred patching for chrome.tabs ──
   // Electron may re-inject native chrome.tabs after preload completes.
@@ -237,24 +202,19 @@ if (typeof chrome !== "undefined" && chrome.tabs) {
   function rePatchTabs() {
     if (!chrome.tabs) return;
     // Only re-patch if our functions were replaced by native ones
-    if (chrome.tabs.query !== _tabsQuery)
-      forceSet(chrome.tabs, "query", _tabsQuery);
-    if (chrome.tabs.get !== _tabsGet) forceSet(chrome.tabs, "get", _tabsGet);
-    if (chrome.tabs.create !== _tabsCreate)
-      forceSet(chrome.tabs, "create", _tabsCreate);
-    if (chrome.tabs.update !== _tabsUpdate)
-      forceSet(chrome.tabs, "update", _tabsUpdate);
-    if (chrome.tabs.remove !== _tabsRemove)
-      forceSet(chrome.tabs, "remove", _tabsRemove);
-    if (chrome.tabs.sendMessage !== _tabsSendMessage)
-      forceSet(chrome.tabs, "sendMessage", _tabsSendMessage);
+    if (chrome.tabs.query !== _tabsQuery) forceSet(chrome.tabs, 'query', _tabsQuery);
+    if (chrome.tabs.get !== _tabsGet) forceSet(chrome.tabs, 'get', _tabsGet);
+    if (chrome.tabs.create !== _tabsCreate) forceSet(chrome.tabs, 'create', _tabsCreate);
+    if (chrome.tabs.update !== _tabsUpdate) forceSet(chrome.tabs, 'update', _tabsUpdate);
+    if (chrome.tabs.remove !== _tabsRemove) forceSet(chrome.tabs, 'remove', _tabsRemove);
+    if (chrome.tabs.sendMessage !== _tabsSendMessage) forceSet(chrome.tabs, 'sendMessage', _tabsSendMessage);
   }
   Promise.resolve().then(rePatchTabs);
   setTimeout(rePatchTabs, 0);
 }
 
 // ── Polyfill chrome.windows ──────────────────────────────────────────
-if (typeof chrome !== "undefined") {
+if (typeof chrome !== 'undefined') {
   if (!chrome.windows) {
     try {
       chrome.windows = {};
@@ -263,24 +223,20 @@ if (typeof chrome !== "undefined") {
     }
   }
   if (chrome.windows) {
-    forceSet(
-      chrome.windows,
-      "getCurrent",
-      function (_opts?: unknown, callback?: (win: unknown) => void) {
-        const win = { id: 1, focused: true, type: "normal", state: "normal" };
-        if (typeof _opts === "function") {
-          (_opts as (w: unknown) => void)(win);
-          return;
-        }
-        if (typeof callback === "function") {
-          callback(win);
-          return;
-        }
-        return Promise.resolve(win);
-      },
-    );
+    forceSet(chrome.windows, 'getCurrent', function (_opts?: unknown, callback?: (win: unknown) => void) {
+      const win = { id: 1, focused: true, type: 'normal', state: 'normal' };
+      if (typeof _opts === 'function') {
+        (_opts as (w: unknown) => void)(win);
+        return;
+      }
+      if (typeof callback === 'function') {
+        callback(win);
+        return;
+      }
+      return Promise.resolve(win);
+    });
     if (!chrome.windows.WINDOW_ID_CURRENT) {
-      forceSet(chrome.windows, "WINDOW_ID_CURRENT", -2);
+      forceSet(chrome.windows, 'WINDOW_ID_CURRENT', -2);
     }
   }
 }
@@ -288,23 +244,17 @@ if (typeof chrome !== "undefined") {
 // ── Redirect chrome.storage.sync → chrome.storage.local ─────────────
 // Electron doesn't support chrome.storage.sync. Many extensions use sync
 // storage for settings — redirect to local storage transparently.
-if (typeof chrome !== "undefined" && chrome.storage) {
+if (typeof chrome !== 'undefined' && chrome.storage) {
   if (!chrome.storage.sync && chrome.storage.local) {
-    forceSet(chrome.storage, "sync", chrome.storage.local);
+    forceSet(chrome.storage, 'sync', chrome.storage.local);
   } else if (chrome.storage.sync) {
     // sync exists but may throw — wrap it to fall back to local
     const origSync = chrome.storage.sync;
     const localFallback = chrome.storage.local;
     if (localFallback) {
       const wrappedSync: Record<string, unknown> = {};
-      for (const method of [
-        "get",
-        "set",
-        "remove",
-        "clear",
-        "getBytesInUse",
-      ] as const) {
-        if (typeof localFallback[method] === "function") {
+      for (const method of ['get', 'set', 'remove', 'clear', 'getBytesInUse'] as const) {
+        if (typeof localFallback[method] === 'function') {
           wrappedSync[method] = function (...args: unknown[]) {
             try {
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -318,9 +268,8 @@ if (typeof chrome !== "undefined" && chrome.storage) {
       }
       // Copy event listeners
       if (origSync.onChanged) wrappedSync.onChanged = origSync.onChanged;
-      else if (localFallback.onChanged)
-        wrappedSync.onChanged = localFallback.onChanged;
-      forceSet(chrome.storage, "sync", wrappedSync);
+      else if (localFallback.onChanged) wrappedSync.onChanged = localFallback.onChanged;
+      forceSet(chrome.storage, 'sync', wrappedSync);
     }
   }
 }
@@ -337,7 +286,7 @@ if (typeof chrome !== "undefined" && chrome.storage) {
 // 1. Object.defineProperty on the existing chrome.scripting
 // 2. Replace chrome.scripting entirely with a Proxy
 // 3. Use a deferred approach that patches on the first tick
-if (typeof chrome !== "undefined") {
+if (typeof chrome !== 'undefined') {
   const _executeScript = function (
     injection: {
       target?: { tabId?: number };
@@ -349,11 +298,11 @@ if (typeof chrome !== "undefined") {
     callback?: (results: unknown[]) => void,
   ) {
     const tabId = injection?.target?.tabId ?? TAB_ID;
-    let funcStr = "";
+    let funcStr = '';
     const fn = injection.func || injection.function;
-    if (typeof fn === "function") {
-      const argsStr = injection.args ? JSON.stringify(injection.args) : "";
-      funcStr = `(${fn.toString()})(${argsStr ? argsStr.slice(1, -1) : ""})`;
+    if (typeof fn === 'function') {
+      const argsStr = injection.args ? JSON.stringify(injection.args) : '';
+      funcStr = `(${fn.toString()})(${argsStr ? argsStr.slice(1, -1) : ''})`;
     }
 
     const p = ipcRenderer.invoke(IPC.EXTENSION_SCRIPTING_EXECUTE, {
@@ -363,25 +312,20 @@ if (typeof chrome !== "undefined") {
       extId: EXT_ID,
     });
 
-    if (typeof callback === "function") {
-      p.then((r: unknown) => callback(r as unknown[])).catch((e: unknown) =>
-        callback([{ error: e }]),
-      );
+    if (typeof callback === 'function') {
+      p.then((r: unknown) => callback(r as unknown[])).catch((e: unknown) => callback([{ error: e }]));
       return;
     }
     return p;
   };
 
-  const _insertCSS = function (
-    injection: { target?: { tabId?: number }; css?: string },
-    callback?: () => void,
-  ) {
+  const _insertCSS = function (injection: { target?: { tabId?: number }; css?: string }, callback?: () => void) {
     const tabId = injection?.target?.tabId ?? TAB_ID;
     const p = ipcRenderer.invoke(IPC.EXTENSION_SCRIPTING_INSERT_CSS, {
       tabId,
-      css: injection.css || "",
+      css: injection.css || '',
     });
-    if (typeof callback === "function") {
+    if (typeof callback === 'function') {
       p.then(() => callback()).catch(() => callback());
       return;
     }
@@ -389,7 +333,7 @@ if (typeof chrome !== "undefined") {
   };
 
   const _removeCSS = function (_injection: unknown, callback?: () => void) {
-    if (typeof callback === "function") {
+    if (typeof callback === 'function') {
       callback();
       return;
     }
@@ -455,7 +399,7 @@ if (typeof chrome !== "undefined") {
     };
     const original = chrome.scripting || {};
     const proxy = new Proxy(original, proxyHandler);
-    Object.defineProperty(chrome, "scripting", {
+    Object.defineProperty(chrome, 'scripting', {
       get: () => proxy,
       configurable: true,
       enumerable: true,

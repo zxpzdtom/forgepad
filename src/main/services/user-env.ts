@@ -1,8 +1,7 @@
-import { execSync } from "node:child_process";
-import { homedir } from "node:os";
+import { execSync } from 'node:child_process';
+import { homedir } from 'node:os';
 
-const FALLBACK_PATH =
-  "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin";
+const FALLBACK_PATH = '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin';
 
 /**
  * Resolve the user's login shell PATH by spawning a login shell.
@@ -16,9 +15,9 @@ let _resolvedUserPath: string | null = null;
 export function getUserPath(): string {
   if (_resolvedUserPath !== null) return _resolvedUserPath;
   try {
-    const loginShell = process.env.SHELL || "/bin/zsh";
+    const loginShell = process.env.SHELL || '/bin/zsh';
     const result = execSync(`${loginShell} -ilc 'echo "___PATH___:$PATH"'`, {
-      encoding: "utf-8",
+      encoding: 'utf-8',
       timeout: 5000,
       env: { ...process.env, HOME: homedir() },
     });
@@ -30,8 +29,6 @@ export function getUserPath(): string {
   } catch {
     // Fall through to process.env.PATH
   }
-  _resolvedUserPath = process.env.PATH
-    ? `${process.env.PATH}:${FALLBACK_PATH}`
-    : FALLBACK_PATH;
+  _resolvedUserPath = process.env.PATH ? `${process.env.PATH}:${FALLBACK_PATH}` : FALLBACK_PATH;
   return _resolvedUserPath;
 }
