@@ -1,5 +1,8 @@
 import {
   createContext,
+  lazy,
+  type ReactNode,
+  Suspense,
   useCallback,
   useContext,
   useEffect,
@@ -13,7 +16,6 @@ import { AgentTabBar } from "@renderer/components/AgentTabBar";
 import { FileColumn } from "@renderer/components/FileColumn";
 import { QuickSearch } from "@renderer/components/QuickSearch";
 import { RightPanel } from "@renderer/components/RightPanel";
-import { SettingsPanel } from "@renderer/components/SettingsPanel";
 import { Sidebar } from "@renderer/components/Sidebar";
 import { SketchyFilters } from "@renderer/components/SketchyFilters";
 import { TabBar } from "@renderer/components/TabBar";
@@ -44,9 +46,16 @@ import {
   Globe,
   TerminalSquare,
 } from "lucide-react";
+import { animate, motion, useReducedMotion } from "motion/react";
 
 export const ThemeContext = createContext<ResolvedTheme>("dark");
 export const useResolvedTheme = () => useContext(ThemeContext);
+
+const SettingsPanel = lazy(() =>
+  import("@renderer/components/SettingsPanel").then((module) => ({
+    default: module.SettingsPanel,
+  })),
+);
 
 function isTextEntryTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
@@ -57,6 +66,7 @@ function isTextEntryTarget(target: EventTarget | null): boolean {
 
 function AppInner() {
   const resolvedTheme = useTheme();
+  const prefersReducedMotion = useReducedMotion();
   useAgentLifecycle();
   const { t } = useTranslation();
   const [quickSearchOpen, setQuickSearchOpen] = useState(false);
@@ -77,6 +87,11 @@ function AppInner() {
   } | null>(null);
   const fileColumnWidthRef = useRef<number | null>(null);
   const prevShellDockVisibleRef = useRef(false);
+  const horizontalAnimationRef = useRef<ReturnType<typeof animate> | null>(
+    null,
+  );
+  const horizontalLayoutReadyRef = useRef(false);
+  const horizontalLayoutRef = useRef({ sidebar: 0, rightPanel: 0 });
   const hydrated = useAppStore((state) => state.hydrated);
   const projects = useAppStore((state) => state.projects);
   const workspaces = useAppStore((state) => state.workspaces);
@@ -86,6 +101,11 @@ function AppInner() {
   const focusedColumn = useAppStore((state) => state.focusedColumn);
   const rightPanelOpen = useAppStore((state) => state.rightPanelOpen);
   const sidebarOpen = useAppStore((state) => state.sidebarOpen);
+  const [sidebarPaneVisible, setSidebarPaneVisible] = useState(sidebarOpen);
+  const [rightPanelPaneVisible, setRightPanelPaneVisible] =
+    useState(rightPanelOpen);
+  const [horizontalPanelsAnimating, setHorizontalPanelsAnimating] =
+    useState(false);
   const terminalPanelOpen = useAppStore((state) => state.terminalPanelOpen);
   const openProject = useAppStore((state) => state.openProject);
   const createTerminal = useAppStore((state) => state.createTerminal);
@@ -103,6 +123,7 @@ function AppInner() {
   const addToast = useAppStore((state) => state.addToast);
   const keyboardShortcuts = useAppStore((s) => s.settings.keyboardShortcuts);
   const petSettings = useAppStore((s) => s.settings.pets);
+  const appIconVariant = useAppStore((s) => s.settings.appIconVariant);
   const shortcuts = useMemo(
     () => ({ ...DEFAULT_SHORTCUTS, ...(keyboardShortcuts ?? {}) }),
     [keyboardShortcuts],
@@ -155,6 +176,16 @@ function AppInner() {
       unsubscribe();
     };
   }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    window.forgepad.app.setIcon(appIconVariant).catch((error) => {
+      addToast(
+        "error",
+        error instanceof Error ? error.message : "Failed to apply app icon.",
+      );
+    });
+  }, [addToast, appIconVariant, hydrated]);
 
   // Listen for native menu "Settings" click
   useEffect(() => {
@@ -459,51 +490,90 @@ function AppInner() {
   const hasTerminalTabs = hasAgentTabs || hasShellTabs;
   const hasFileTabs = workspaceTabs.some((tab) => tab.type !== "terminal");
 
-  // Animate sidebar & right panel toggle via transient CSS transition
+  // Animate sidebar & right panel sizes with Motion while keeping Allotment's
+  // resize model intact for manual dragging.
   useEffect(() => {
-    const el = horizontalSplitRef.current
-      ? (document.querySelector(".app-horizontal-split") as HTMLElement | null)
-      : null;
-    if (!el) return;
-    el.classList.add("panel-animating");
-    if (sidebarOpen) {
-      requestAnimationFrame(() => {
-        horizontalSplitRef.current?.resize([sidebarWidthRef.current]);
-      });
-    }
-    const tid = window.setTimeout(
-      () => el.classList.remove("panel-animating"),
-      220,
-    );
-    return () => {
-      window.clearTimeout(tid);
-      el?.classList.remove("panel-animating");
-    };
-  }, [sidebarOpen]);
-
-  useEffect(() => {
+    const split = horizontalSplitRef.current;
     const el = document.querySelector(
       ".app-horizontal-split",
     ) as HTMLElement | null;
-    if (!el) return;
-    el.classList.add("panel-animating");
-    if (rightPanelOpen) {
-      requestAnimationFrame(() => {
-        const total = el.clientWidth;
-        const sw = sidebarOpen ? sidebarWidthRef.current : 0;
-        const rw = rightPanelWidthRef.current;
-        horizontalSplitRef.current?.resize([sw, total - sw - rw, rw]);
-      });
+    if (!split || !el) {
+      setSidebarPaneVisible(sidebarOpen);
+      setRightPanelPaneVisible(rightPanelOpen);
+      return;
     }
-    const tid = window.setTimeout(
-      () => el.classList.remove("panel-animating"),
-      220,
-    );
-    return () => {
-      window.clearTimeout(tid);
-      el?.classList.remove("panel-animating");
+
+    const total = el.clientWidth;
+    if (total <= 0) return;
+
+    let disposed = false;
+    const from = { ...horizontalLayoutRef.current };
+    const to = {
+      sidebar: sidebarOpen ? sidebarWidthRef.current : 0,
+      rightPanel: rightPanelOpen ? rightPanelWidthRef.current : 0,
     };
-  }, [rightPanelOpen, sidebarOpen]);
+
+    const applySizes = (sidebar: number, rightPanel: number) => {
+      const middle = Math.max(0, total - sidebar - rightPanel);
+      split.resize([sidebar, middle, rightPanel]);
+      horizontalLayoutRef.current = { sidebar, rightPanel };
+    };
+
+    if (!horizontalLayoutReadyRef.current) {
+      horizontalLayoutReadyRef.current = true;
+      setSidebarPaneVisible(sidebarOpen);
+      setRightPanelPaneVisible(rightPanelOpen);
+      requestAnimationFrame(() => {
+        if (!disposed) applySizes(to.sidebar, to.rightPanel);
+      });
+      return () => {
+        disposed = true;
+      };
+    }
+
+    horizontalAnimationRef.current?.stop();
+    if (sidebarOpen) setSidebarPaneVisible(true);
+    if (rightPanelOpen) setRightPanelPaneVisible(true);
+    setHorizontalPanelsAnimating(true);
+    el.classList.add("panel-animating");
+
+    requestAnimationFrame(() => {
+      if (disposed) return;
+
+      if (prefersReducedMotion) {
+        applySizes(to.sidebar, to.rightPanel);
+        setSidebarPaneVisible(sidebarOpen);
+        setRightPanelPaneVisible(rightPanelOpen);
+        setHorizontalPanelsAnimating(false);
+        el.classList.remove("panel-animating");
+        return;
+      }
+
+      horizontalAnimationRef.current = animate(0, 1, {
+        type: "spring",
+        duration: 0.3,
+        bounce: 0,
+        onUpdate: (progress) => {
+          applySizes(
+            from.sidebar + (to.sidebar - from.sidebar) * progress,
+            from.rightPanel + (to.rightPanel - from.rightPanel) * progress,
+          );
+        },
+        onComplete: () => {
+          setSidebarPaneVisible(sidebarOpen);
+          setRightPanelPaneVisible(rightPanelOpen);
+          setHorizontalPanelsAnimating(false);
+          el.classList.remove("panel-animating");
+        },
+      });
+    });
+
+    return () => {
+      disposed = true;
+      horizontalAnimationRef.current?.stop();
+      el.classList.remove("panel-animating");
+    };
+  }, [prefersReducedMotion, rightPanelOpen, sidebarOpen]);
 
   // When sidebar or right-panel toggles, keep the File column at its previous
   // width so the freed space goes entirely to the Agent column.
@@ -622,6 +692,31 @@ function AppInner() {
 
   const hasAnyContent = hasFileTabs || hasTerminalTabs;
   const shellDockVisible = terminalPanelOpen && hasShellTabs;
+  const sidebarPaneMounted = sidebarOpen || sidebarPaneVisible;
+  const rightPanelPaneMounted = rightPanelOpen || rightPanelPaneVisible;
+
+  const renderAnimatedSidePanel = (
+    side: "left" | "right",
+    open: boolean,
+    children: ReactNode,
+  ) => {
+    const offset = side === "left" ? -12 : 12;
+    const motionEnabled = !prefersReducedMotion;
+    return (
+      <motion.div
+        className="size-full overflow-hidden"
+        initial={false}
+        animate={{
+          opacity: open || !motionEnabled ? 1 : 0,
+          x: open || !motionEnabled ? 0 : offset,
+          filter: open || !motionEnabled ? "blur(0px)" : "blur(2px)",
+        }}
+        transition={{ type: "spring", duration: 0.3, bounce: 0 }}
+      >
+        {children}
+      </motion.div>
+    );
+  };
 
   const renderWorkspaceArea = () => {
     if (!hasFileTabs) {
@@ -805,7 +900,9 @@ function AppInner() {
         {settingsOpen ? (
           /* ── Settings full-page view ── */
           <div className="min-h-0 flex-1 overflow-hidden">
-            <SettingsPanel />
+            <Suspense fallback={null}>
+              <SettingsPanel />
+            </Suspense>
           </div>
         ) : (
           /* ── Normal workspace layout ── */
@@ -825,15 +922,23 @@ function AppInner() {
                 ) {
                   rightPanelWidthRef.current = sizes[sizes.length - 1];
                 }
+                horizontalLayoutRef.current = {
+                  sidebar: sidebarPaneMounted ? (sizes[0] ?? 0) : 0,
+                  rightPanel: rightPanelPaneMounted
+                    ? (sizes[sizes.length - 1] ?? 0)
+                    : 0,
+                };
               }}
             >
               <Allotment.Pane
-                preferredSize={sidebarOpen ? sidebarWidthRef.current : 0}
-                minSize={sidebarOpen ? 220 : 0}
-                maxSize={sidebarOpen ? 360 : 0}
-                visible={sidebarOpen}
+                preferredSize={sidebarPaneMounted ? sidebarWidthRef.current : 0}
+                minSize={
+                  sidebarOpen && !horizontalPanelsAnimating ? 220 : 0
+                }
+                maxSize={sidebarPaneMounted ? 360 : 0}
+                visible={sidebarPaneMounted}
               >
-                <Sidebar />
+                {renderAnimatedSidePanel("left", sidebarOpen, <Sidebar />)}
               </Allotment.Pane>
 
               <Allotment.Pane minSize={hasAnyContent ? 460 : 420}>
@@ -841,12 +946,16 @@ function AppInner() {
               </Allotment.Pane>
 
               <Allotment.Pane
-                preferredSize={rightPanelOpen ? rightPanelWidthRef.current : 0}
-                minSize={rightPanelOpen ? 320 : 0}
-                maxSize={rightPanelOpen ? 560 : 0}
-                visible={rightPanelOpen}
+                preferredSize={
+                  rightPanelPaneMounted ? rightPanelWidthRef.current : 0
+                }
+                minSize={
+                  rightPanelOpen && !horizontalPanelsAnimating ? 320 : 0
+                }
+                maxSize={rightPanelPaneMounted ? 560 : 0}
+                visible={rightPanelPaneMounted}
               >
-                <RightPanel />
+                {renderAnimatedSidePanel("right", rightPanelOpen, <RightPanel />)}
               </Allotment.Pane>
             </Allotment>
           </div>

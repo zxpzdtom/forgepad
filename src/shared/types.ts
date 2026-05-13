@@ -245,6 +245,12 @@ export type PersistedAppState = {
 
 export type ThemePreference = 'dark' | 'light' | 'system';
 export type TerminalThemeMode = 'follow' | 'dark' | 'light';
+export type AppIconVariant =
+  | 'graphite'
+  | 'aurora'
+  | 'ember'
+  | 'frost'
+  | 'violet';
 
 /* ─── Theme System ─── */
 
@@ -1463,7 +1469,7 @@ export type PetCommand =
 
 export const DEFAULT_PET_SETTINGS: PetSettings = {
   enabled: false,
-  selectedPetId: 'clawd',
+  selectedPetId: 'kiki',
   petSize: 0.8,
   petSpeed: 2,
   petPlayMode: "playful",
@@ -1558,6 +1564,8 @@ export type AppSettings = {
   theme: ThemePreference;
   /** Active theme id — one of the built-in ids or a custom theme id */
   themeId: string;
+  /** Active Dock icon material variant */
+  appIconVariant: AppIconVariant;
   /** User-imported custom themes */
   customThemes: ThemeDefinition[];
   defaultShell: string;
@@ -1617,6 +1625,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   locale: 'en',
   theme: 'dark',
   themeId: 'dark',
+  appIconVariant: 'graphite',
   customThemes: [],
   defaultShell: '',
   defaultAgentCommand: DEFAULT_AGENT_PRESETS[0].command,

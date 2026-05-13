@@ -1,13 +1,14 @@
+import { lazy, Suspense } from 'react';
 import { useTranslation } from '@renderer/i18n';
 import { useAppStore } from '@renderer/store/app-store';
 import type { RightPanelMode } from '@shared/types';
 import { Files, GitCompare, SendHorizontal } from 'lucide-react';
 
-import { ChangesPanel } from './ChangesPanel';
-import { ContextPanel } from './ContextPanel';
-import { FilesPanel } from './FilesPanel';
-
 import clsx from 'clsx';
+
+const ChangesPanel = lazy(() => import('./ChangesPanel').then((module) => ({ default: module.ChangesPanel })));
+const ContextPanel = lazy(() => import('./ContextPanel').then((module) => ({ default: module.ContextPanel })));
+const FilesPanel = lazy(() => import('./FilesPanel').then((module) => ({ default: module.FilesPanel })));
 
 const modes: Array<{
   mode: RightPanelMode;
@@ -55,9 +56,11 @@ export function RightPanel() {
         </div>
       </div>
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-        {mode === 'files' ? <FilesPanel /> : null}
-        {mode === 'changes' ? <ChangesPanel /> : null}
-        {mode === 'context' ? <ContextPanel /> : null}
+        <Suspense fallback={null}>
+          {mode === 'files' ? <FilesPanel /> : null}
+          {mode === 'changes' ? <ChangesPanel /> : null}
+          {mode === 'context' ? <ContextPanel /> : null}
+        </Suspense>
       </div>
     </aside>
   );

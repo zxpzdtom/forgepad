@@ -244,6 +244,52 @@ async fn app_show_emoji_panel() -> Result<(), String> {
     Ok(())
 }
 
+fn app_icon_variant_path(app: &AppHandle, variant: &str) -> PathBuf {
+    let safe_variant = match variant {
+        "graphite" | "aurora" | "ember" | "frost" | "violet" => variant,
+        _ => "graphite",
+    };
+    let file_name = format!("{safe_variant}.png");
+    if let Ok(resource_dir) = app.path().resource_dir() {
+        let bundled = resource_dir.join("app-icons").join(&file_name);
+        if bundled.exists() {
+            return bundled;
+        }
+    }
+    std::env::current_dir()
+        .unwrap_or_else(|_| PathBuf::from("."))
+        .join("build")
+        .join("app-icons")
+        .join(file_name)
+}
+
+#[cfg(target_os = "macos")]
+fn set_macos_application_icon(bytes: &[u8]) -> Result<(), String> {
+    use objc2::{AllocAnyThread, MainThreadMarker};
+    use objc2_app_kit::{NSApplication, NSImage};
+    use objc2_foundation::NSData;
+
+    let mtm = unsafe { MainThreadMarker::new_unchecked() };
+    let app = NSApplication::sharedApplication(mtm);
+    let data = NSData::with_bytes(bytes);
+    let app_icon = NSImage::initWithData(NSImage::alloc(), &data)
+        .ok_or_else(|| "Failed to decode app icon image.".to_string())?;
+    unsafe { app.setApplicationIconImage(Some(&app_icon)) };
+    Ok(())
+}
+
+#[cfg(not(target_os = "macos"))]
+fn set_macos_application_icon(_bytes: &[u8]) -> Result<(), String> {
+    Ok(())
+}
+
+#[tauri::command]
+async fn app_set_icon(app: AppHandle, variant: String) -> Result<(), String> {
+    let path = app_icon_variant_path(&app, &variant);
+    let bytes = fs::read(&path).map_err(|error| format!("Failed to read app icon {}: {error}", path.display()))?;
+    set_macos_application_icon(&bytes)
+}
+
 #[tauri::command]
 async fn state_load() -> Result<Option<Value>, String> {
     let path = state_path()?;
@@ -719,7 +765,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_shell::init())
         .invoke_handler(tauri::generate_handler![
-            app_open_project, app_open_project_from_path, app_pick_directory, app_show_emoji_panel, state_load, state_save,
+            app_open_project, app_open_project_from_path, app_pick_directory, app_show_emoji_panel, app_set_icon, state_load, state_save,
             git_current_branch, git_branch_stats, git_status, git_file_diff, git_stage, git_unstage, git_discard, git_commit, git_push, git_pull, git_generate_commit_msg, git_worktree_add, git_worktree_remove, git_scan_worktrees, git_fetch, git_remote_branches, git_pr_number,
             fs_tree_with_status, fs_list_files, fs_read_file, fs_read_file_data_url, fs_read_abs_file, fs_read_abs_file_data_url, fs_write_file, fs_watch, fs_unwatch,
             pty_create, pty_write, pty_resize, pty_destroy, pty_reattach, context_create_bundle,

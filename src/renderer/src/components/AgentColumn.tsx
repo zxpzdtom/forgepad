@@ -1,11 +1,11 @@
-import { useCallback, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useRef, useState } from 'react';
 import { useAppStore } from '@renderer/store/app-store';
 import { getDroppedPaths, hasDraggableFiles } from '@renderer/lib/drag-utils';
 import type { Workspace } from '@shared/types';
 
-import { TerminalPanel } from './TerminalPanel';
-
 import clsx from 'clsx';
+
+const TerminalPanel = lazy(() => import('./TerminalPanel').then((module) => ({ default: module.TerminalPanel })));
 
 export function AgentColumn() {
   const tabs = useAppStore((state) => state.tabs);
@@ -81,7 +81,11 @@ export function AgentColumn() {
         {terminalTabs.map((tab) => {
           const workspace = workspaces.find((w) => w.id === tab.workspaceId) as Workspace | undefined;
           if (!workspace) return null;
-          return <TerminalPanel key={tab.id} tab={tab} workspace={workspace} active={tab.id === columnActiveId} />;
+          return (
+            <Suspense key={tab.id} fallback={null}>
+              <TerminalPanel tab={tab} workspace={workspace} active={tab.id === columnActiveId} />
+            </Suspense>
+          );
         })}
       </div>
     </div>

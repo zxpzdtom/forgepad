@@ -48,6 +48,7 @@ export const tauriForgepadApi = {
     openProjectFromPath: (selectedPath: string) => invoke<OpenProjectResult | null>('app_open_project_from_path', { selectedPath }),
     showEmojiPanel: () => invoke<void>('app_show_emoji_panel'),
     pickDirectory: (title?: string) => invoke<string | null>('app_pick_directory', { title }),
+    setIcon: (variant: string) => invoke<void>('app_set_icon', { variant }),
   },
   state: {
     load: () => invoke<Partial<PersistedAppState> | null>('state_load'),

@@ -41,6 +41,8 @@ const api = {
       ipcRenderer.invoke(IPC.APP_PICK_DIRECTORY, title) as Promise<
         string | null
       >,
+    setIcon: (variant: string) =>
+      ipcRenderer.invoke(IPC.APP_SET_ICON, variant) as Promise<void>,
   },
   state: {
     load: () =>

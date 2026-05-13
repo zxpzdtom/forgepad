@@ -1233,12 +1233,7 @@ textarea {
     background: transparent;
 }
 
-/* Panel toggle animation — applied transiently during sidebar / right-panel open/close */
-.panel-animating
-    > .allotment-module_splitViewContainer__rQnVa
-    > .allotment-module_splitViewView__MGZ6O {
-    transition: width 250ms cubic-bezier(0.2, 0, 0, 1);
-}
+/* .panel-animating is toggled from React while Motion drives pane sizes. */
 
 /* Agent | File columns split – visible sash */
 .columns-split

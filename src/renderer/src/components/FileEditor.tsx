@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { SelectedLineRange } from '@pierre/diffs';
 import { getFiletypeFromFileName } from '@pierre/diffs';
 import type { FileOptions, LineAnnotation } from '@pierre/diffs/react';
@@ -7,8 +7,6 @@ import { useResolvedTheme } from '@renderer/App';
 import { useLspTokenNavigation } from '@renderer/hooks/useLspTokenNavigation';
 import { useAppStore } from '@renderer/store/app-store';
 import type { CodeSelectionItem, Tab, Workspace } from '@shared/types';
-import { code as streamdownCode } from '@streamdown/code';
-import { createMermaidPlugin } from '@streamdown/mermaid';
 import {
   Check,
   ChevronDown,
@@ -23,12 +21,13 @@ import {
   Search,
   X,
 } from 'lucide-react';
-import type { Components } from 'streamdown';
-import { Streamdown } from 'streamdown';
-import 'streamdown/styles.css';
 import { FileIcon } from './FileIcon';
 
 import clsx from 'clsx';
+
+const MarkdownPreview = lazy(() =>
+  import('./MarkdownPreview').then((module) => ({ default: module.MarkdownPreview })),
+);
 
 type FileTab = Extract<Tab, { type: 'file' }>;
 
@@ -112,7 +111,7 @@ function extractText(children: React.ReactNode): string {
 // --- Custom heading components that add id for anchor links ---
 
 /** Create a set of heading components (h1–h6) that add id attributes based on text content. */
-function createHeadingComponents(): Components {
+function createHeadingComponents(): Record<string, React.ComponentType<React.HTMLAttributes<HTMLHeadingElement> & { node?: unknown }>> {
   // Per-render slug counters for deduplication (reset each time Streamdown re-renders the tree)
   const counters = new Map<string, number>();
 
@@ -424,13 +423,6 @@ function MarkdownToc({
     </nav>
   );
 }
-
-// --- Streamdown plugins ---
-
-const mermaidDark = createMermaidPlugin({ config: { theme: 'dark' } });
-const mermaidLight = createMermaidPlugin({ config: { theme: 'default' } });
-const streamdownPluginsDark = { code: streamdownCode, mermaid: mermaidDark };
-const streamdownPluginsLight = { code: streamdownCode, mermaid: mermaidLight };
 
 // --- YAML frontmatter → Markdown table conversion ---
 
@@ -1384,12 +1376,9 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
             ref={scrollRef}
           >
             <div ref={previewRef} className="markdown-preview">
-              <Streamdown
-                components={mdHeadingComponents}
-                plugins={resolvedTheme === 'dark' ? streamdownPluginsDark : streamdownPluginsLight}
-              >
-                {markdownText}
-              </Streamdown>
+              <Suspense fallback={null}>
+                <MarkdownPreview components={mdHeadingComponents} markdownText={markdownText} theme={resolvedTheme} />
+              </Suspense>
             </div>
           </div>
           {tocItems.length > 0 ? (

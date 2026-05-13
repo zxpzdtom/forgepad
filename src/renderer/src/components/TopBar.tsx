@@ -15,6 +15,7 @@ import {
   Pencil,
   Play,
   Search,
+  Settings,
   TerminalSquare,
 } from 'lucide-react';
 
@@ -664,6 +665,18 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
             />
           </div>
         </div>
+
+        <div className="mx-0.5 h-5 w-px bg-border" aria-hidden="true" />
+
+        <Tooltip label={t('settings.title')} position="bottom">
+          <button
+            className="icon-button border-transparent"
+            type="button"
+            onClick={() => useAppStore.setState({ settingsOpen: true })}
+          >
+            <Settings size={17} />
+          </button>
+        </Tooltip>
       </div>
 
       {runSetupOpen && (

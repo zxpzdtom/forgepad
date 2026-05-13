@@ -1,17 +1,18 @@
-import { Component, type ErrorInfo, type ReactNode, useCallback, useRef, useState } from 'react';
+import { Component, type ErrorInfo, lazy, type ReactNode, Suspense, useCallback, useRef, useState } from 'react';
 import { useTranslation } from '@renderer/i18n';
 
 import { getDroppedPaths, hasDraggableFiles, isInternalDrop } from '@renderer/lib/drag-utils';
 import { useAppStore } from '@renderer/store/app-store';
 import type { Workspace } from '@shared/types';
 
-import { BrowserTab } from './BrowserTab';
 import { ContextPreview } from './ContextPreview';
-import { DiffViewer } from './DiffViewer';
-import { FileEditor } from './FileEditor';
-import { LspSymbolPeek } from './LspSymbolPeek';
 
 import clsx from 'clsx';
+
+const BrowserTab = lazy(() => import('./BrowserTab').then((module) => ({ default: module.BrowserTab })));
+const DiffViewer = lazy(() => import('./DiffViewer').then((module) => ({ default: module.DiffViewer })));
+const FileEditor = lazy(() => import('./FileEditor').then((module) => ({ default: module.FileEditor })));
+const LspSymbolPeek = lazy(() => import('./LspSymbolPeek').then((module) => ({ default: module.LspSymbolPeek })));
 
 /** Error boundary so a crashing BrowserTab doesn't take down the whole column */
 class BrowserErrorBoundary extends Component<
@@ -169,7 +170,9 @@ export function FileColumn() {
                 crashMessage={t('fileColumn.browserCrashed')}
                 reloadLabel={t('common.reload')}
               >
-                <BrowserTab tab={tab as Extract<import('@shared/types').Tab, { type: 'browser' }>} />
+                <Suspense fallback={null}>
+                  <BrowserTab tab={tab as Extract<import('@shared/types').Tab, { type: 'browser' }>} />
+                </Suspense>
               </BrowserErrorBoundary>
             </div>
           );
@@ -181,10 +184,18 @@ export function FileColumn() {
             const isActive = tab.id === activeFileTab?.id;
             if (!isActive) return null;
             if (tab.type === 'file') {
-              return <FileEditor key={tab.id} tab={tab} workspace={activeWorkspace} />;
+              return (
+                <Suspense key={tab.id} fallback={null}>
+                  <FileEditor tab={tab} workspace={activeWorkspace} />
+                </Suspense>
+              );
             }
             if (tab.type === 'diff') {
-              return <DiffViewer key={tab.id} tab={tab} workspace={activeWorkspace} />;
+              return (
+                <Suspense key={tab.id} fallback={null}>
+                  <DiffViewer tab={tab} workspace={activeWorkspace} />
+                </Suspense>
+              );
             }
             if (tab.type === 'context-preview') {
               return <ContextPreview key={tab.id} />;
@@ -192,7 +203,11 @@ export function FileColumn() {
             return null;
           })}
       </div>
-      {symbolPeek && activeWorkspace && <LspSymbolPeek workspace={activeWorkspace} />}
+      {symbolPeek && activeWorkspace && (
+        <Suspense fallback={null}>
+          <LspSymbolPeek workspace={activeWorkspace} />
+        </Suspense>
+      )}
     </div>
   );
 }

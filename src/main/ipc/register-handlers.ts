@@ -23,6 +23,7 @@ import {
   BrowserWindow,
   dialog,
   ipcMain,
+  nativeImage,
   screen,
   session,
   shell,
@@ -41,6 +42,13 @@ type FileWatch = {
 
 const fileWatches = new Map<string, FileWatch>();
 let nextFileWatchId = 0;
+const APP_ICON_VARIANTS = new Set([
+  "graphite",
+  "aurora",
+  "ember",
+  "frost",
+  "violet",
+]);
 
 function shouldIgnoreWatchPath(relPath: string): boolean {
   if (!relPath) return true;
@@ -60,6 +68,14 @@ function stopFileWatch(id: string): void {
   if (watch.timer) clearTimeout(watch.timer);
   watch.watcher.close();
   fileWatches.delete(id);
+}
+
+function resolveAppIconPath(variant: string): string {
+  const safeVariant = APP_ICON_VARIANTS.has(variant) ? variant : "graphite";
+  if (app.isPackaged) {
+    return path.join(process.resourcesPath, "app-icons", `${safeVariant}.png`);
+  }
+  return path.join(process.cwd(), "build", "app-icons", `${safeVariant}.png`);
 }
 
 function queueFileChange(id: string, relPath: string): void {
@@ -292,6 +308,15 @@ export function registerIpcHandlers(
     });
     if (result.canceled || !result.filePaths[0]) return null;
     return result.filePaths[0];
+  });
+
+  ipcMain.handle(IPC.APP_SET_ICON, async (_event, variant: string) => {
+    if (process.platform !== "darwin" || !app.dock) return;
+    const icon = nativeImage.createFromPath(resolveAppIconPath(variant));
+    if (icon.isEmpty()) {
+      throw new Error(`App icon asset not found for variant "${variant}".`);
+    }
+    app.dock.setIcon(icon);
   });
 
   ipcMain.handle(IPC.STATE_LOAD, async () => StateService.load());

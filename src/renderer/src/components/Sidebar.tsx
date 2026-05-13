@@ -9,7 +9,7 @@ import { getDroppedPaths, isInternalDrop } from '@renderer/lib/drag-utils';
 import { useAppStore } from '@renderer/store/app-store';
 import type { AgentStatus } from '@shared/agent-lifecycle';
 import type { Project, WorkspacePanel } from '@shared/types';
-import { FolderOpen, FolderPlus, Plus, Settings } from 'lucide-react';
+import { FolderOpen, FolderPlus, Plus } from 'lucide-react';
 
 import { ContextMenu, type ContextMenuSection } from './ContextMenu';
 import { NewWorktreeDialog } from './NewWorktreeDialog';
@@ -1349,16 +1349,8 @@ export function Sidebar() {
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      <div className="flex h-9 shrink-0 items-center justify-between border-border border-b px-3">
+      <div className="flex h-9 shrink-0 items-center border-border border-b px-3">
         <span className="font-semibold text-[11px] text-muted uppercase tracking-wider">{t('sidebar.workspaces')}</span>
-        <button
-          className="icon-button small border-transparent"
-          type="button"
-          title={t('settings.title')}
-          onClick={() => useAppStore.setState({ settingsOpen: true })}
-        >
-          <Settings size={15} />
-        </button>
       </div>
       <div
         key={activePanelId}

@@ -1,4 +1,4 @@
-import { type MouseEvent, useCallback, useMemo, useRef, useState } from 'react';
+import { lazy, type MouseEvent, Suspense, useCallback, useMemo, useRef, useState } from 'react';
 import { useHorizontalScroll } from '@renderer/hooks/useHorizontalScroll';
 import { useTranslation } from '@renderer/i18n';
 import { getDroppedPaths, hasDraggableFiles } from '@renderer/lib/drag-utils';
@@ -11,11 +11,12 @@ import { Bot, Minimize2, Plus, TerminalSquare } from 'lucide-react';
 import { RenameModal } from './RenameModal';
 import { SortableTabItem } from './SortableTabItem';
 import { TabContextMenu } from './TabContextMenu';
-import { TerminalPanel } from './TerminalPanel';
 
 import clsx from 'clsx';
 
 type TerminalTab = Extract<Tab, { type: 'terminal' }>;
+
+const TerminalPanel = lazy(() => import('./TerminalPanel').then((module) => ({ default: module.TerminalPanel })));
 
 function terminalIcon(tab: TerminalTab) {
   return tab.isAgent ? <Bot size={13} /> : <TerminalSquare size={13} />;
@@ -181,7 +182,9 @@ export function TerminalDock() {
 
       <div className="relative min-h-0 flex-1 overflow-hidden">
         {terminalTabs.map((tab) => (
-          <TerminalPanel key={tab.id} tab={tab} workspace={activeWorkspace} active={tab.id === activeId} />
+          <Suspense key={tab.id} fallback={null}>
+            <TerminalPanel tab={tab} workspace={activeWorkspace} active={tab.id === activeId} />
+          </Suspense>
         ))}
       </div>
 

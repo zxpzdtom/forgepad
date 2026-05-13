@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useAppStore } from '@renderer/store/app-store';
 import { useTranslation } from '@renderer/i18n';
-import { BUILTIN_THEMES, THEME_SCHEMA_VERSION, type ThemeDefinition, type ThemeTokens } from '@shared/types';
+import { BUILTIN_THEMES, THEME_SCHEMA_VERSION, type AppIconVariant, type ThemeDefinition, type ThemeTokens } from '@shared/types';
 import { Check, Download, ExternalLink, Pencil, Upload, X } from 'lucide-react';
 
 import clsx from 'clsx';
@@ -42,8 +42,36 @@ function validateTheme(raw: unknown, t: (key: string, params?: Record<string, un
 
 const SWATCH_KEYS: (keyof ThemeTokens)[] = ['bg', 'panel', 'accent', 'text', 'ok', 'danger', 'warn'];
 
+const DARK_PREVIEW_TOKENS: ThemeTokens = {
+  bg: '#08090a',
+  panel: '#0f1011',
+  'panel-2': '#191a1b',
+  'panel-3': '#28282c',
+  border: 'rgba(255,255,255,0.08)',
+  text: '#f7f8f8',
+  muted: '#8a8f98',
+  subtle: '#62666d',
+  accent: '#5e6ad2',
+  warn: '#e9bd61',
+  danger: '#ff7777',
+  ok: '#27a644',
+  'accent-surface': 'rgba(94,106,210,0.08)',
+};
+
+const APP_ICON_OPTIONS: Array<{
+  id: AppIconVariant;
+  nameKey: string;
+  descriptionKey: string;
+}> = [
+  { id: 'graphite', nameKey: 'appearance.appIcon.graphite', descriptionKey: 'appearance.appIcon.graphiteDesc' },
+  { id: 'aurora', nameKey: 'appearance.appIcon.aurora', descriptionKey: 'appearance.appIcon.auroraDesc' },
+  { id: 'ember', nameKey: 'appearance.appIcon.ember', descriptionKey: 'appearance.appIcon.emberDesc' },
+  { id: 'frost', nameKey: 'appearance.appIcon.frost', descriptionKey: 'appearance.appIcon.frostDesc' },
+  { id: 'violet', nameKey: 'appearance.appIcon.violet', descriptionKey: 'appearance.appIcon.violetDesc' },
+];
+
 function resolveSwatches(theme: ThemeDefinition): string[] {
-  const tokens = theme.tokens;
+  const tokens = resolvePreviewTokens(theme);
   return SWATCH_KEYS.map((k) => {
     const val = tokens[k];
     if (val) return val;
@@ -52,11 +80,87 @@ function resolveSwatches(theme: ThemeDefinition): string[] {
   });
 }
 
+function resolvePreviewTokens(theme: ThemeDefinition): ThemeTokens {
+  const base = theme.mode === 'light' ? BUILTIN_THEMES.find((t) => t.id === 'light')?.tokens : DARK_PREVIEW_TOKENS;
+  return { ...(base ?? {}), ...theme.tokens };
+}
+
+function resolveSystemSwatchGroups(): Array<{ colors: string[]; tokens: ThemeTokens }> {
+  const lightTokens = BUILTIN_THEMES.find((theme) => theme.id === 'light')?.tokens ?? {};
+  return [
+    { colors: SWATCH_KEYS.map((key) => DARK_PREVIEW_TOKENS[key] ?? '#888'), tokens: DARK_PREVIEW_TOKENS },
+    { colors: SWATCH_KEYS.map((key) => lightTokens[key] ?? DARK_PREVIEW_TOKENS[key] ?? '#888'), tokens: lightTokens },
+  ];
+}
+
+function PaletteSwatches({ colors, theme }: { colors: string[]; theme: ThemeDefinition }) {
+  const tokens = resolvePreviewTokens(theme);
+  const bg = tokens.bg ?? '#08090a';
+  const text = tokens.text ?? '#f7f8f8';
+
+  return (
+    <div
+      className="inline-flex w-fit items-center gap-1 rounded-md px-1.5 py-1"
+      style={{
+        background: `color-mix(in srgb, ${bg} 88%, ${text})`,
+        boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${text} 16%, transparent)`,
+      }}
+      aria-hidden="true"
+    >
+      {colors.map((color, i) => (
+        <span
+          key={i}
+          className="block h-3 w-1.5 shrink-0 rounded-full"
+          style={{
+            background: color,
+            boxShadow:
+              `inset 0 0 0 1px color-mix(in srgb, ${text} 18%, transparent), 0 0 0 1px color-mix(in srgb, ${bg} 45%, transparent)`,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+function SystemPaletteSwatches() {
+  return (
+    <div className="inline-flex w-fit items-center gap-1 rounded-md bg-panel-2 px-1.5 py-1 shadow-[inset_0_0_0_1px_var(--border)]" aria-hidden="true">
+      {resolveSystemSwatchGroups().map((group, groupIndex) => {
+        const bg = group.tokens.bg ?? '#08090a';
+        const text = group.tokens.text ?? '#f7f8f8';
+
+        return (
+          <div
+            key={groupIndex}
+            className="inline-flex items-center gap-1 rounded-[4px] px-1 py-0.5"
+            style={{
+              background: `color-mix(in srgb, ${bg} 88%, ${text})`,
+              boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${text} 16%, transparent)`,
+            }}
+          >
+            {group.colors.map((color, i) => (
+              <span
+                key={i}
+                className="block h-3 w-1.5 shrink-0 rounded-full"
+                style={{
+                  background: color,
+                  boxShadow:
+                    `inset 0 0 0 1px color-mix(in srgb, ${text} 18%, transparent), 0 0 0 1px color-mix(in srgb, ${bg} 45%, transparent)`,
+                }}
+              />
+            ))}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 /* ─── System card split preview ─── */
 
 function SystemSplitPreview() {
   return (
-    <div className="flex h-full overflow-hidden rounded-[6px]">
+    <div className="flex h-full w-full overflow-hidden rounded-[6px]">
       <div className="flex flex-1 flex-col gap-1 bg-[#08090a] p-2">
         <div className="flex gap-1">
           <div className="h-1.5 w-8 rounded-full bg-[#f7f8f8]/20" />
@@ -83,15 +187,16 @@ function SystemSplitPreview() {
 /* ─── Terminal preview inside card ─── */
 
 function TerminalPreview({ theme }: { theme: ThemeDefinition }) {
-  const bg = theme.terminal?.background ?? theme.tokens.bg ?? '#08090a';
-  const fg = theme.terminal?.foreground ?? theme.tokens.text ?? '#f7f8f8';
-  const green = theme.terminal?.green ?? theme.tokens.ok ?? '#27a644';
-  const blue = theme.terminal?.blue ?? theme.tokens.accent ?? '#5e6ad2';
-  const yellow = theme.terminal?.yellow ?? theme.tokens.warn ?? '#e9bd61';
+  const tokens = resolvePreviewTokens(theme);
+  const bg = theme.terminal?.background ?? tokens.bg ?? '#08090a';
+  const fg = theme.terminal?.foreground ?? tokens.text ?? '#f7f8f8';
+  const green = theme.terminal?.green ?? tokens.ok ?? '#27a644';
+  const blue = theme.terminal?.blue ?? tokens.accent ?? '#5e6ad2';
+  const yellow = theme.terminal?.yellow ?? tokens.warn ?? '#e9bd61';
 
   return (
     <div
-      className="h-full overflow-hidden rounded-[6px] p-2 font-mono text-[9px] leading-[1.4]"
+      className="h-full w-full overflow-hidden rounded-[6px] p-2 font-mono text-[9px] leading-[1.4]"
       style={{ background: bg, color: fg }}
       aria-hidden="true"
     >
@@ -133,6 +238,7 @@ function ThemeCard({
 }) {
   const swatches = resolveSwatches(theme);
   const isSystem = theme.id === 'system';
+  const previewTokens = resolvePreviewTokens(theme);
 
   return (
     <button
@@ -141,18 +247,18 @@ function ThemeCard({
       aria-label={t('appearance.selectTheme', { name: theme.name })}
       onClick={onSelect}
       className={clsx(
-        'group relative flex w-full flex-col overflow-hidden rounded-xl border text-left transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-border focus-visible:ring-offset-2 focus-visible:ring-offset-bg',
+        'group relative flex w-full min-w-0 flex-col items-stretch overflow-hidden rounded-xl border text-left transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-border focus-visible:ring-offset-2 focus-visible:ring-offset-bg',
         isSelected ? 'border-accent shadow-[0_0_0_2px_var(--accent)]' : 'border-border hover:border-border-soft hover:shadow-sm',
       )}
       style={{
-        background: isSystem ? undefined : (theme.tokens.panel ?? 'var(--panel)'),
+        background: isSystem ? undefined : (previewTokens.panel ?? 'var(--panel)'),
       }}
     >
       {/* Preview area */}
       <div
-        className="relative h-[90px] overflow-hidden"
+        className="relative h-[90px] w-full overflow-hidden"
         style={{
-          background: isSystem ? undefined : (theme.tokens.bg ?? 'var(--bg)'),
+          background: isSystem ? undefined : (previewTokens.bg ?? 'var(--bg)'),
         }}
       >
         {isSystem ? <SystemSplitPreview /> : <TerminalPreview theme={theme} />}
@@ -165,20 +271,18 @@ function ThemeCard({
       </div>
 
       {/* Palette swatches */}
-      <div className="flex gap-[3px] px-3 py-2" aria-hidden="true">
-        {swatches.map((color, i) => (
-          <div key={i} className="h-3 flex-1 rounded-full border border-white/10" style={{ background: color }} />
-        ))}
+      <div className="w-full px-3 py-2">
+        {isSystem ? <SystemPaletteSwatches /> : <PaletteSwatches colors={swatches} theme={theme} />}
       </div>
 
       {/* Card footer */}
-      <div className="flex items-center justify-between px-3 pt-0.5 pb-3">
+      <div className="flex w-full items-center justify-between px-3 pt-0.5 pb-3">
         <div className="min-w-0">
-          <div className="truncate font-[510] text-[12px]" style={{ color: theme.tokens.text ?? 'var(--text)' }}>
+          <div className="truncate font-[510] text-[12px]" style={{ color: previewTokens.text ?? 'var(--text)' }}>
             {theme.name}
           </div>
           {theme.author && (
-            <div className="truncate text-[10px]" style={{ color: theme.tokens.muted ?? 'var(--muted)' }}>
+            <div className="truncate text-[10px]" style={{ color: previewTokens.muted ?? 'var(--muted)' }}>
               {theme.author}
             </div>
           )}
@@ -186,13 +290,55 @@ function ThemeCard({
         <div
           className="ml-2 shrink-0 rounded-full px-1.5 py-0.5 text-[9px]"
           style={{
-            background: theme.tokens['accent-surface'] ?? 'var(--accent-surface)',
-            color: theme.tokens.accent ?? 'var(--accent)',
+            background: previewTokens['accent-surface'] ?? 'var(--accent-surface)',
+            color: previewTokens.accent ?? 'var(--accent)',
           }}
         >
           {theme.mode}
         </div>
       </div>
+    </button>
+  );
+}
+
+function AppIconCard({
+  id,
+  name,
+  description,
+  selected,
+  onSelect,
+}: {
+  id: AppIconVariant;
+  name: string;
+  description: string;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={selected}
+      className={clsx(
+        'group relative flex min-w-0 items-center gap-3 rounded-xl border bg-panel-2 p-3 text-left transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-focus-border',
+        selected ? 'border-accent shadow-[0_0_0_2px_var(--accent)]' : 'border-border hover:border-border-soft hover:bg-panel-3',
+      )}
+      onClick={onSelect}
+    >
+      <img
+        src={`app-icons/${id}.png`}
+        alt=""
+        className="size-13 shrink-0 rounded-[14px]"
+        draggable={false}
+      />
+      <span className="min-w-0 flex-1">
+        <span className="block truncate font-[510] text-[12px] text-text">{name}</span>
+        <span className="mt-0.5 block text-[10px] text-muted leading-tight">{description}</span>
+      </span>
+      {selected && (
+        <span className="grid size-5 shrink-0 place-items-center rounded-full bg-accent text-white">
+          <Check size={11} strokeWidth={3} />
+        </span>
+      )}
     </button>
   );
 }
@@ -262,6 +408,7 @@ function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: 
 export function AppearancePanel() {
   const { t } = useTranslation();
   const themeId = useAppStore((s) => s.settings.themeId);
+  const appIconVariant = useAppStore((s) => s.settings.appIconVariant);
   const sketchyMode = useAppStore((s) => s.settings.sketchyMode);
   const customThemes = useAppStore((s) => s.settings.customThemes ?? []);
   const addCustomTheme = useAppStore((s) => s.addCustomTheme);
@@ -378,6 +525,31 @@ export function AppearancePanel() {
         </div>
         <Toggle checked={sketchyMode} onChange={(v) => updateSettings({ sketchyMode: v })} label={t('appearance.sketchyMode')} />
       </div>
+
+      {/* ── App icon gallery ── */}
+      <section aria-label={t('appearance.appIcon')}>
+        <div className="mb-3">
+          <h3 className="font-[590] text-[13px] text-muted uppercase tracking-wider">{t('appearance.appIcon')}</h3>
+          <p className="mt-1 text-[11px] text-muted">{t('appearance.appIconDesc')}</p>
+        </div>
+        <div
+          className="grid gap-3"
+          style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))' }}
+          role="radiogroup"
+          aria-label={t('appearance.appIcon')}
+        >
+          {APP_ICON_OPTIONS.map((icon) => (
+            <AppIconCard
+              key={icon.id}
+              id={icon.id}
+              name={t(icon.nameKey)}
+              description={t(icon.descriptionKey)}
+              selected={appIconVariant === icon.id}
+              onSelect={() => updateSettings({ appIconVariant: icon.id })}
+            />
+          ))}
+        </div>
+      </section>
 
       {/* ── Header actions ── */}
       <div className="flex flex-wrap items-center gap-2">

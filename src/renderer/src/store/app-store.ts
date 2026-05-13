@@ -679,6 +679,9 @@ export const useAppStore = create<AppState>((set, get) => ({
       rawSettings.themeId = 'paper';
       rawSettings.sketchyMode = true;
     }
+    if (!['graphite', 'aurora', 'ember', 'frost', 'violet'].includes(rawSettings.appIconVariant)) {
+      rawSettings.appIconVariant = DEFAULT_SETTINGS.appIconVariant;
+    }
     if (!rawSettings.agentPresets || rawSettings.agentPresets.length === 0) {
       rawSettings.agentPresets = [...DEFAULT_SETTINGS.agentPresets];
     } else {
@@ -2451,7 +2454,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   removeCustomPet: (petId) =>
     set((state) => {
       const customPets = (state.settings.pets.customPets ?? []).filter((p) => p.id !== petId);
-      const selectedPetId = state.settings.pets.selectedPetId === petId ? 'clawd' : state.settings.pets.selectedPetId;
+      const selectedPetId = state.settings.pets.selectedPetId === petId ? 'kiki' : state.settings.pets.selectedPetId;
       return {
         settings: {
           ...state.settings,

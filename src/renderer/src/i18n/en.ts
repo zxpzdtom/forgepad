@@ -543,7 +543,10 @@ const en = {
   "runSetup.namePlaceholder": "Name, e.g. Dev Server",
   "runSetup.commandPlaceholder": "Command, e.g. bun run dev",
   "runSetup.helpText":
-    "Fill in name and command, then click Add or press Enter",
+    "Edit commands inline. The last empty row creates a new command, then Save once.",
+  "runSetup.incompleteRows": "Each command needs both a name and a command before saving.",
+  "runSetup.duplicateCommands": "Duplicate commands need to be removed before saving.",
+  "runSetup.newRow": "New command row",
   "runSetup.fromPackageJson": "From package.json",
   "runSetup.clearAll": "Clear All",
 
@@ -703,6 +706,18 @@ const en = {
     "Invalid JSON file. Please check the file and try again.",
   "appearance.sketchyMode": "Sketchy Mode",
   "appearance.sketchyModeDesc": "Apply hand-drawn styling to any theme",
+  "appearance.appIcon": "App Icon",
+  "appearance.appIconDesc": "Choose the Dock icon material for this workspace.",
+  "appearance.appIcon.graphite": "Graphite",
+  "appearance.appIcon.graphiteDesc": "The default dark developer-tool finish.",
+  "appearance.appIcon.aurora": "Aurora",
+  "appearance.appIcon.auroraDesc": "Teal and violet with a cooler glow.",
+  "appearance.appIcon.ember": "Ember",
+  "appearance.appIcon.emberDesc": "Warm forged metal with an orange cut.",
+  "appearance.appIcon.frost": "Frost",
+  "appearance.appIcon.frostDesc": "Bright glass for light desktops.",
+  "appearance.appIcon.violet": "Violet",
+  "appearance.appIcon.violetDesc": "A deeper purple graphite variant.",
 
   // ── Store (toast messages) ──
   "store.changes": "Changes",

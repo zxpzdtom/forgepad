@@ -50,6 +50,15 @@
     "files": [
       "out/**/*"
     ],
+    "extraResources": [
+      {
+        "from": "build/app-icons",
+        "to": "app-icons",
+        "filter": [
+          "*.png"
+        ]
+      }
+    ],
     "directories": {
       "output": "dist"
     },
@@ -78,6 +87,7 @@
     "codex-pets-react": "^0.2.0",
     "lucide-react": "^0.577.0",
     "mermaid": "^11.14.0",
+    "motion": "^12.38.0",
     "node-pty": "^1.1.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",

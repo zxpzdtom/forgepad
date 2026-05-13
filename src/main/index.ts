@@ -39,6 +39,16 @@ protocol.registerSchemesAsPrivileged([
 
 let hookServer: HookServer | null = null;
 let mainAppMenu: Electron.Menu | null = null;
+let didRunQuitCleanup = false;
+let shouldResumeQuitAfterCleanup = false;
+
+function cleanupBeforeQuit(): void {
+  if (didRunQuitCleanup) return;
+  didRunQuitCleanup = true;
+  ptyService.destroyAll();
+  destroyPetWindow();
+  hookServer?.stop().catch(() => {});
+}
 
 function buildAppMenu(): void {
   const isMac = process.platform === 'darwin';
@@ -341,8 +351,14 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
 
-app.on('will-quit', () => {
-  destroyPetWindow();
-  ptyService.destroyAll();
-  hookServer?.stop().catch(() => {});
+app.on('before-quit', (event) => {
+  if (didRunQuitCleanup) return;
+  const hadActivePtys = ptyService.activeCount() > 0;
+  cleanupBeforeQuit();
+  if (hadActivePtys && !shouldResumeQuitAfterCleanup) {
+    shouldResumeQuitAfterCleanup = true;
+    event.preventDefault();
+    setTimeout(() => app.quit(), 300);
+  }
 });
+app.on('will-quit', cleanupBeforeQuit);

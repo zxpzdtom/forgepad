@@ -14,6 +14,10 @@ type PtyInstance = {
   rows: number;
   replayChunks: string[];
   replayChars: number;
+  dataDisposable?: { dispose: () => void };
+  exitDisposable?: { dispose: () => void };
+  sessionFile?: string | null;
+  destroyed?: boolean;
 };
 
 const MAX_REPLAY_CHARS = 8_000_000;
@@ -58,6 +62,10 @@ export class PtyService {
 
   setHookPort(port: number): void {
     this.hookPort = port;
+  }
+
+  activeCount(): number {
+    return this.ptys.size;
   }
 
   create(
@@ -125,20 +133,23 @@ export class PtyService {
         // Non-critical — hooks won't fire but PTY still works
       }
     }
+    instance.sessionFile = sessionFile;
 
-    proc.onData((data) => {
+    instance.dataDisposable = proc.onData((data) => {
+      if (instance.destroyed) return;
       appendReplay(instance, data);
       if (!instance.webContents.isDestroyed()) {
         instance.webContents.send(`${IPC.PTY_DATA}:${id}`, data);
       }
     });
 
-    proc.onExit((event) => {
+    instance.exitDisposable = proc.onExit((event) => {
       this.ptys.delete(id);
+      instance.destroyed = true;
       // Clean up session mapping file
-      if (sessionFile) {
+      if (instance.sessionFile) {
         try {
-          unlinkSync(sessionFile);
+          unlinkSync(instance.sessionFile);
         } catch {
           /* ignore */
         }
@@ -176,13 +187,19 @@ export class PtyService {
   destroy(id: string): void {
     const instance = this.ptys.get(id);
     if (!instance) return;
-    instance.process.kill();
+    this.disposeInstance(instance);
+    try {
+      instance.process.kill();
+    } catch {
+      /* already dead */
+    }
     this.ptys.delete(id);
   }
 
   /** Kill all remaining PTY processes (called on app quit). */
   destroyAll(): void {
     for (const [id, instance] of this.ptys) {
+      this.disposeInstance(instance);
       try {
         instance.process.kill();
       } catch {
@@ -197,5 +214,27 @@ export class PtyService {
     if (!instance) return { replay: '', alive: false };
     instance.webContents = webContents;
     return { replay: instance.replayChunks.join(''), alive: true };
+  }
+
+  private disposeInstance(instance: PtyInstance): void {
+    if (instance.destroyed) return;
+    instance.destroyed = true;
+    try {
+      instance.dataDisposable?.dispose();
+    } catch {
+      /* ignore */
+    }
+    try {
+      instance.exitDisposable?.dispose();
+    } catch {
+      /* ignore */
+    }
+    if (instance.sessionFile) {
+      try {
+        unlinkSync(instance.sessionFile);
+      } catch {
+        /* ignore */
+      }
+    }
   }
 }
