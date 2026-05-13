@@ -130,6 +130,16 @@ function sameStringArray(a: readonly string[], b: readonly string[]) {
   return a.every((value, index) => value === b[index]);
 }
 
+function findTreeItemHit(event: Event): { row: HTMLElement; path: string } | null {
+  for (const node of event.composedPath()) {
+    if (node instanceof HTMLElement) {
+      const path = node.getAttribute('data-item-path');
+      if (path) return { row: node, path };
+    }
+  }
+  return null;
+}
+
 function useActiveWorkspace(): Workspace | undefined {
   const workspaces = useAppStore((state) => state.workspaces);
   const activeWorkspaceId = useAppStore((state) => state.activeWorkspaceId);
@@ -189,6 +199,11 @@ export function FilesPanel() {
     gitStatus: [],
   });
   const [selectedPaths, setSelectedPaths] = useState<string[]>([]);
+  const [manualContextMenu, setManualContextMenu] = useState<{
+    item: FileTreeContextMenuItem;
+    x: number;
+    y: number;
+  } | null>(null);
   const [loading, setLoading] = useState(false);
   const openFileTab = useAppStore((state) => state.openFileTab);
   const addContextFiles = useAppStore((state) => state.addContextFiles);
@@ -438,6 +453,54 @@ export function FilesPanel() {
     );
   };
 
+  const openManualContextMenu = useCallback(
+    (path: string, x: number, y: number) => {
+      const name = path.split('/').filter(Boolean).at(-1) ?? path;
+      setManualContextMenu({
+        item: {
+          kind: treeData.filePaths.has(path) ? 'file' : 'directory',
+          name,
+          path,
+        },
+        x,
+        y,
+      });
+    },
+    [treeData.filePaths],
+  );
+
+  const manualMenuRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!manualContextMenu) return;
+
+    const close = () => setManualContextMenu(null);
+    const onMouseDown = (event: MouseEvent) => {
+      const target = event.target;
+      if (target instanceof Node && manualMenuRef.current?.contains(target)) return;
+      close();
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      close();
+    };
+
+    document.addEventListener('mousedown', onMouseDown, true);
+    document.addEventListener('keydown', onKeyDown, true);
+    window.addEventListener('blur', close);
+    window.addEventListener('resize', close);
+    return () => {
+      document.removeEventListener('mousedown', onMouseDown, true);
+      document.removeEventListener('keydown', onKeyDown, true);
+      window.removeEventListener('blur', close);
+      window.removeEventListener('resize', close);
+    };
+  }, [manualContextMenu]);
+
+  useEffect(() => {
+    setManualContextMenu(null);
+  }, [workspace?.id, treeData.paths]);
+
   // ── Drag-to-terminal: drag file rows to paste relative path ──
   //
   // Strategy: We do NOT pre-set `draggable="true"` on Shadow DOM rows because
@@ -465,20 +528,19 @@ export function FilesPanel() {
 
     const THRESHOLD = 6;
 
-    const findItemRow = (composedPath: EventTarget[]): { row: HTMLElement; path: string } | null => {
-      for (const node of composedPath) {
-        if (node instanceof HTMLElement) {
-          const p = node.getAttribute('data-item-path');
-          if (p) return { row: node, path: p };
-        }
-      }
-      return null;
+    const onContextMenu = (e: MouseEvent) => {
+      const hit = findTreeItemHit(e);
+      if (!hit) return;
+      e.preventDefault();
+      e.stopPropagation();
+      cleanup();
+      openManualContextMenu(hit.path, e.clientX, e.clientY);
     };
 
     // (1) Capture mousedown — record which row and position
     const onMouseDown = (e: MouseEvent) => {
       if (e.button !== 0) return;
-      const hit = findItemRow(e.composedPath());
+      const hit = findTreeItemHit(e);
       if (hit) {
         pending = { row: hit.row, path: hit.path, x: e.clientX, y: e.clientY };
       }
@@ -521,12 +583,14 @@ export function FilesPanel() {
       }
     };
 
+    container.addEventListener('contextmenu', onContextMenu, true);
     container.addEventListener('mousedown', onMouseDown, true);
     container.addEventListener('mousemove', onMouseMove, true);
     container.addEventListener('dragstart', onDragStart);
     container.addEventListener('dragend', cleanup);
     container.addEventListener('mouseup', cleanup, true);
     return () => {
+      container.removeEventListener('contextmenu', onContextMenu, true);
       container.removeEventListener('mousedown', onMouseDown, true);
       container.removeEventListener('mousemove', onMouseMove, true);
       container.removeEventListener('dragstart', onDragStart);
@@ -534,7 +598,7 @@ export function FilesPanel() {
       container.removeEventListener('mouseup', cleanup, true);
       cleanup();
     };
-  }, []);
+  }, [openManualContextMenu]);
 
   if (!workspace) {
     return <div className="grid min-h-[90px] place-items-center text-muted">{t('files.openProjectFirst')}</div>;
@@ -551,6 +615,20 @@ export function FilesPanel() {
           </div>
         ) : null}
         <FileTree model={model} style={treeThemeStyle} renderContextMenu={renderContextMenu} />
+        {manualContextMenu ? (
+          <div
+            ref={manualMenuRef}
+            className="fixed z-[1000]"
+            style={{
+              left: Math.min(manualContextMenu.x, window.innerWidth - 180),
+              top: Math.min(manualContextMenu.y, window.innerHeight - 150),
+            }}
+            data-file-tree-context-menu-root="true"
+            onContextMenu={(event) => event.preventDefault()}
+          >
+            {renderContextMenu(manualContextMenu.item, { close: () => setManualContextMenu(null) })}
+          </div>
+        ) : null}
       </div>
     </section>
   );

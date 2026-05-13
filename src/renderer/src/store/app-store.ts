@@ -1697,26 +1697,16 @@ export const useAppStore = create<AppState>((set, get) => ({
   refreshBranch: async (workspaceId) => {
     const workspace = get().workspaces.find((item) => item.id === workspaceId);
     if (!workspace) return;
-    set((state) => ({
-      workspaceLoadingIds: new Set([...state.workspaceLoadingIds, workspaceId]),
-    }));
     try {
       const branch = await window.forgepad.git.getCurrentBranch(workspace.worktreePath);
       set((state) => {
-        const next = new Set(state.workspaceLoadingIds);
-        next.delete(workspaceId);
         return {
           workspaces: state.workspaces.map((item) => (item.id === workspaceId ? { ...item, branch } : item)),
-          workspaceLoadingIds: next,
         };
       });
     } catch {
-      // Clear loading state even if the branch lookup fails (e.g. worktree removed)
-      set((state) => {
-        const next = new Set(state.workspaceLoadingIds);
-        next.delete(workspaceId);
-        return { workspaceLoadingIds: next };
-      });
+      // Ignore branch lookup failures here. Worktree creation uses
+      // workspaceLoadingIds; routine branch refreshes should stay visually quiet.
     }
   },
 

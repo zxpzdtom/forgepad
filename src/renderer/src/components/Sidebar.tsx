@@ -271,7 +271,7 @@ function useWorkspaceAgentStatus(workspaceId: string): AgentStatus | undefined {
 
     for (const tab of agentTabs) {
       if (tab.type !== 'terminal') continue;
-      const isExited = exitedPtyIds.has(tab.ptyId);
+      if (exitedPtyIds.has(tab.ptyId)) continue;
       const status: AgentStatus = agentStatuses[tab.ptyId] ?? 'idle';
       if (!highest || priority[status] > priority[highest]) {
         highest = status;
