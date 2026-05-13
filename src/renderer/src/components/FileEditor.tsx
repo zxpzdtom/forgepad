@@ -1389,7 +1389,15 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
           >
             <div ref={previewRef} className="markdown-preview">
               <Suspense fallback={null}>
-                <MarkdownPreview components={mdHeadingComponents} markdownText={markdownText} theme={resolvedTheme} />
+                <MarkdownPreview
+                  absPath={tab.absPath}
+                  components={mdHeadingComponents}
+                  markdownPath={tab.relPath}
+                  markdownText={markdownText}
+                  theme={resolvedTheme}
+                  workspaceId={workspace.id}
+                  workspacePath={workspace.worktreePath}
+                />
               </Suspense>
             </div>
           </div>
