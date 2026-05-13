@@ -463,8 +463,20 @@ function renderFrontmatterAsTable(md: string): string {
 const SEARCH_HIGHLIGHT = 'forgepad-file-search';
 const ACTIVE_SEARCH_HIGHLIGHT = 'forgepad-file-search-active';
 
-/** CSS injected into the @pierre/diffs Shadow DOM so `::highlight()` works. */
-const SEARCH_HIGHLIGHT_CSS = `
+/** CSS injected into the @pierre/diffs Shadow DOM for file viewer layout/search. */
+const FILE_VIEWER_UNSAFE_CSS = `
+:host {
+  height: 100%;
+  min-height: 100%;
+}
+pre,
+[data-file],
+[data-code] {
+  min-height: 100%;
+}
+[data-code] {
+  align-self: stretch;
+}
 ::highlight(${SEARCH_HIGHLIGHT}) {
   color: inherit;
   background: rgba(233, 189, 97, 0.38);
@@ -804,7 +816,7 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
       disableFileHeader: true,
       enableLineSelection: true,
       lineHoverHighlight: 'both' as const,
-      unsafeCSS: SEARCH_HIGHLIGHT_CSS,
+      unsafeCSS: FILE_VIEWER_UNSAFE_CSS,
       onTokenClick,
       onTokenEnter,
       onTokenLeave,
@@ -1386,7 +1398,7 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
           ) : null}
         </div>
       ) : (
-        <div ref={codeViewerRef} className="scrollbar-thin scroll-mask flex min-h-0 flex-1 flex-col overflow-auto">
+        <div ref={codeViewerRef} className="scrollbar-thin scroll-mask flex min-h-0 flex-1 flex-col overflow-auto bg-bg">
           {/* Code viewer via @pierre/diffs File component */}
           {showCodeViewer ? (
             isPlainText ? (
@@ -1413,13 +1425,14 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
               </pre>
             ) : (
               <PierreFile
+                className="min-h-full flex-1"
                 file={pierreFileData}
                 options={fileOptions}
                 selectedLines={selectedRange}
                 lineAnnotations={lineAnnotations}
                 renderAnnotation={renderAnnotation}
                 disableWorkerPool
-                style={{ fontSize: `${editorFontSize}px` }}
+                style={{ fontSize: `${editorFontSize}px`, height: '100%', minHeight: '100%' }}
               />
             )
           ) : null}
