@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { type CSSProperties, useEffect, useMemo, useRef, useState } from 'react';
 import { useResolvedTheme } from '@renderer/App';
 import { eventMatchesCombo } from '@renderer/lib/shortcut-utils';
 import { useAppStore } from '@renderer/store/app-store';
@@ -861,10 +861,18 @@ export function TerminalPanel({ tab, workspace, active }: TerminalPanelProps) {
       ? `${searchResult.resultIndex + 1}/${searchResult.resultCount}`
       : '0/0'
     : '';
+  const terminalBackground = TERMINAL_THEMES[effectiveTerminalTheme].background;
 
   return (
-    <section className={clsx('terminal-panel', active && 'active')} aria-hidden={!active} data-tab-id={tab.id}>
-      <div ref={hostRef} className="terminal-host" />
+    <section
+      className={clsx('terminal-panel', active && 'active')}
+      aria-hidden={!active}
+      data-tab-id={tab.id}
+      style={{ '--terminal-background': terminalBackground } as CSSProperties}
+    >
+      <div className="terminal-host">
+        <div ref={hostRef} className="terminal-fit-host" />
+      </div>
       {searchOpen ? (
         <div className="floating-search-bar">
           <Search size={14} className="text-muted" />
