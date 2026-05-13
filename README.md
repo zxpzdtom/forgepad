@@ -1,48 +1,124 @@
-# ForgePad
+<p align="center">
+  <img src="./build/icon.png" alt="ForgePad icon" width="96" height="96">
+</p>
 
-Terminal-first AI coding workspace built with Electron, React, `@pierre/trees`, and `@pierre/diffs`.
+<h1 align="center">ForgePad</h1>
 
-## Run
+<p align="center">
+  A desktop workspace for AI-assisted coding, bringing terminals, files, diffs, context, and agent sessions into one focused app.
+</p>
+
+<p align="center">
+  <a href="./README.zh-CN.md">中文文档</a>
+</p>
+
+## Highlights
+
+- **AI coding workspace**: Manage projects, worktrees, regular terminals, and AI coding tool terminals in one interface.
+- **File and diff preview**: Browse the file tree, inspect code, review Git changes, and select context directly.
+- **Context basket**: Build context bundles from files, diffs, code selections, comments, and task notes, then send them to the active terminal workflow.
+- **Workspace settings**: Configure themes, pet overlay behavior, run commands, terminal behavior, and workspace preferences.
+- **Two desktop shells**: Electron is the primary desktop shell, with Tauri support maintained in the same codebase.
+
+## Main Areas
+
+ForgePad is organized around three main areas:
+
+- **Left workspace panel**: Projects, worktrees, tasks, terminals, and app settings.
+- **Center workspace**: Terminal tabs, agent sessions, file preview, Markdown preview, and diff views.
+- **Right resource panel**: File tree, Git changes, context basket, and related actions.
+
+## Requirements
+
+- Node.js 22 or newer.
+- pnpm.
+- Rust toolchain, only needed for Tauri development or builds.
+
+## Install
 
 ```bash
 pnpm install
-node node_modules/electron/install.js
-pnpm exec electron-rebuild -f -w node-pty
+```
+
+`node-pty` is rebuilt automatically during `postinstall`. If the native module needs a manual rebuild:
+
+```bash
+pnpm rebuild
+```
+
+## Development
+
+Run the Electron app:
+
+```bash
 pnpm dev
 ```
 
-The renderer dev server runs at `http://localhost:5173/`, and Electron opens the desktop app.
+Run the Vite renderer only:
 
-## MVP Scope
+```bash
+pnpm vite:dev
+```
 
-- Left sidebar for projects, root workspace, task creation, and terminal creation.
-- Center workspace with persistent shell/agent terminal tabs, Pierre-powered file viewing, Pierre diff viewing, and context bundle preview.
-- Right panel with Pierre file tree, git changes, and an AI context basket.
-- Multi-file and folder context selection from the tree.
-- File context can include full contents or reference the path only.
-- Diff context selection from git changes.
-- Diff line-range comments that are bundled with selected files and diffs.
-- Task context selection from the sidebar, including task title, status, description, and optional notes.
-- Workspace file watching refreshes file tree, git changes, and open diffs after external edits.
-- Agent terminals launch the Context panel's Agent command (`codex` by default) in the active workspace.
-- Context bundles written to `.forgepad/context/*.md` and pasted into the active terminal as an agent prompt.
+Run the Tauri app:
 
-## Task Workflow
+```bash
+pnpm tauri:dev
+```
 
-- Open a project, then use the sidebar Tasks section to create a task for the active project/workspace.
-- Use the task status selector to move tasks through `backlog`, `ready`, `running`, `review`, and `done`.
-- Click the send/context action on a task to add it to the AI context basket.
-- Send the context basket to the active terminal to generate a bundle containing the prompt, selected task details, files, diffs, and comments.
-- Use Preview Bundle from the Context panel after sending to inspect the generated markdown.
+## Build
 
-## Shortcuts
+Type-check the project:
 
-- `Cmd/Ctrl+T`: create a new terminal.
-- `Shift+Cmd/Ctrl+T`: create a new agent terminal.
-- `Cmd/Ctrl+W`: close the active tab.
-- `Cmd/Ctrl+J`: focus the terminal workflow by creating a terminal for the active workspace.
-- `Shift+Cmd/Ctrl+E`: switch the right panel to Files.
-- `Shift+Cmd/Ctrl+G`: switch the right panel to Changes.
-- `Shift+Cmd/Ctrl+C`: switch the right panel to Context.
+```bash
+pnpm typecheck
+```
 
-See `AI_CODING_TOOL_PRODUCT_MANUAL.md` and `AI_CODING_TOOL_TODO.md` for the fuller product design and roadmap.
+Build the Electron renderer and main process:
+
+```bash
+pnpm build
+```
+
+Create a macOS Electron DMG:
+
+```bash
+pnpm dist
+```
+
+Create an unpacked macOS Electron app directory:
+
+```bash
+pnpm dist:dir
+```
+
+Build the Tauri app:
+
+```bash
+pnpm tauri:build
+```
+
+## Useful Scripts
+
+| Command | Description |
+| --- | --- |
+| `pnpm lint` | Check source files with Biome |
+| `pnpm format` | Format source files with Biome |
+| `pnpm check` | Run Biome checks |
+| `pnpm check:write` | Apply Biome fixes where possible |
+| `pnpm vite:build` | Build the renderer |
+
+## Project Structure
+
+```text
+src/main/       Electron main process
+src/preload/    Electron preload bridges
+src/renderer/   React renderer app
+src-tauri/      Tauri shell and Rust commands
+build/          App icons and packaging resources
+dist/           Build output
+```
+
+## Notes
+
+ForgePad is private application code. Keep generated build output, local worktrees, machine-specific config, and temporary files out of commits unless they are intentionally part of a release artifact.
