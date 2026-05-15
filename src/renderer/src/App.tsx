@@ -51,11 +51,17 @@ import { animate, motion, useReducedMotion } from "motion/react";
 export const ThemeContext = createContext<ResolvedTheme>("dark");
 export const useResolvedTheme = () => useContext(ThemeContext);
 
-const SettingsPanel = lazy(() =>
-  import("@renderer/components/SettingsPanel").then((module) => ({
-    default: module.SettingsPanel,
-  })),
-);
+const SettingsPanel = __FORGEPAD_NATIVE_HOST__
+  ? lazy(() =>
+      import("@renderer/components/SettingsPanelNative").then((module) => ({
+        default: module.SettingsPanelNative,
+      })),
+    )
+  : lazy(() =>
+      import("@renderer/components/SettingsPanel").then((module) => ({
+        default: module.SettingsPanel,
+      })),
+    );
 
 function isTextEntryTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;

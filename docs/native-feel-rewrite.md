@@ -135,6 +135,7 @@ This branch has started the split without breaking the existing app:
 - The macOS host loads bundled renderer assets through a Swift-owned `forgepad://` URL scheme. This avoids WKWebView `file://` ES module failure while keeping the WebView as a rendering surface.
 - `pnpm native:mac:package` now builds a Swift-hosted, Rust-backend bundle. It excludes Node and the legacy JS backend.
 - The native macOS package now builds only the main renderer entry and routes browser launches to Swift-owned native `WKWebView` windows instead of bundling Electron `<webview>` browser/pet entries.
+- The native macOS package uses lightweight native-build viewer components for file, diff, Markdown, settings, and LSP peek surfaces. The richer Electron-era Pierre/Streamdown views remain in the non-native build but no longer pull Mermaid/Shiki/Katex language assets into the native bundle.
 
 ## Native Binding Strategy
 
@@ -152,7 +153,7 @@ Initial targets are intentionally practical:
 - Packaged app should remove bundled Chromium by removing Electron.
 - Current macOS bundle is about 39 MB and has no Node runtime.
 - Current renderer assets are about 34 MB. The biggest remaining frontend chunks are Mermaid, Shiki language/theme assets, terminal/browser UI, and syntax-heavy editor paths.
-- Native packaged renderer assets are still about 32 MB. The biggest remaining frontend chunks are Mermaid, Shiki language/theme assets, terminal UI, and syntax-heavy editor paths.
+- Native packaged renderer assets are now about 15 MB after excluding Electron browser/pet entries and rich Markdown/code preview assets. The biggest remaining frontend chunks are terminal UI and the file tree.
 - Idle memory should be measured in three buckets: native shell, WebView renderer, backend/Rust services.
 - Baseline target after Electron removal: under current Electron idle usage by at least 30%.
 - Sustained idle target after cleanup: below 500 MB for a typical workspace, excluding shared framework accounting.

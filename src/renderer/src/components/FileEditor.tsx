@@ -25,9 +25,9 @@ import { FileIcon } from './FileIcon';
 
 import clsx from 'clsx';
 
-const MarkdownPreview = lazy(() =>
-  import('./MarkdownPreview').then((module) => ({ default: module.MarkdownPreview })),
-);
+const MarkdownPreview = __FORGEPAD_NATIVE_HOST__
+  ? lazy(() => import('./MarkdownPreviewNative').then((module) => ({ default: module.MarkdownPreviewNative })))
+  : lazy(() => import('./MarkdownPreview').then((module) => ({ default: module.MarkdownPreview })));
 
 type FileTab = Extract<Tab, { type: 'file' }>;
 

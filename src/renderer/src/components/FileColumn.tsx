@@ -30,9 +30,15 @@ const NativeBrowserTab = ({ tab }: { tab: Extract<import('@shared/types').Tab, {
 const BrowserTab = __FORGEPAD_NATIVE_HOST__
   ? lazy(async () => ({ default: NativeBrowserTab }))
   : lazy(() => import('./BrowserTab').then((module) => ({ default: module.BrowserTab })));
-const DiffViewer = lazy(() => import('./DiffViewer').then((module) => ({ default: module.DiffViewer })));
-const FileEditor = lazy(() => import('./FileEditor').then((module) => ({ default: module.FileEditor })));
-const LspSymbolPeek = lazy(() => import('./LspSymbolPeek').then((module) => ({ default: module.LspSymbolPeek })));
+const DiffViewer = __FORGEPAD_NATIVE_HOST__
+  ? lazy(() => import('./DiffViewerNative').then((module) => ({ default: module.DiffViewerNative })))
+  : lazy(() => import('./DiffViewer').then((module) => ({ default: module.DiffViewer })));
+const FileEditor = __FORGEPAD_NATIVE_HOST__
+  ? lazy(() => import('./FileEditorNative').then((module) => ({ default: module.FileEditorNative })))
+  : lazy(() => import('./FileEditor').then((module) => ({ default: module.FileEditor })));
+const LspSymbolPeek = __FORGEPAD_NATIVE_HOST__
+  ? lazy(() => import('./LspSymbolPeekNative').then((module) => ({ default: module.LspSymbolPeekNative })))
+  : lazy(() => import('./LspSymbolPeek').then((module) => ({ default: module.LspSymbolPeek })));
 
 /** Error boundary so a crashing BrowserTab doesn't take down the whole column */
 class BrowserErrorBoundary extends Component<
