@@ -3,6 +3,7 @@ import { dirname, join, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
 
 const root = resolve(new URL("..", import.meta.url).pathname);
+const includeNode = process.argv.includes("--include-node");
 const appName = "ForgePad";
 const bundleRoot = join(root, "dist", "native-mac");
 const appRoot = join(bundleRoot, `${appName}.app`);
@@ -62,12 +63,16 @@ const coreBinary = join(
 
 copyFileOrDir(hostBinary, join(macOS, "ForgePadHost"));
 copyFileOrDir(coreBinary, join(resources, "forgepad-core-daemon"));
-copyFileOrDir(process.execPath, join(resources, "node"));
+if (includeNode) {
+  copyFileOrDir(process.execPath, join(resources, "node"));
+}
 copyFileOrDir(join(root, "dist", "renderer"), join(resources, "renderer"));
 copyFileOrDir(join(root, "out", "backend", "index.js"), join(resources, "backend", "index.js"));
 chmodSync(join(macOS, "ForgePadHost"), 0o755);
 chmodSync(join(resources, "forgepad-core-daemon"), 0o755);
-chmodSync(join(resources, "node"), 0o755);
+if (includeNode) {
+  chmodSync(join(resources, "node"), 0o755);
+}
 
 const iconPath = join(root, "build", "icon.icns");
 if (existsSync(iconPath)) {
@@ -110,4 +115,4 @@ writeFileSync(join(contents, "PkgInfo"), "APPL????");
 
 run("xattr", ["-cr", appRoot]);
 
-console.log(`\nCreated ${appRoot}`);
+console.log(`\nCreated ${appRoot}${includeNode ? " (portable, bundled Node)" : " (slim, system Node)"}`);

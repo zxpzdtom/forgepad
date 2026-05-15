@@ -30,4 +30,20 @@ Build the host:
 pnpm native:mac:build
 ```
 
-This host is intentionally incomplete. The next work is to replace bootstrap no-ops with calls into `forgepad-core` and a supervised backend process.
+Build a slim app bundle for local testing:
+
+```sh
+pnpm native:mac:package
+```
+
+The slim bundle does not include Node. It starts the bundled backend with a system Node found from the app environment, Homebrew, or common local Node paths.
+
+Build a portable app bundle that also includes the current Node runtime:
+
+```sh
+pnpm native:mac:package:portable
+```
+
+Use the portable bundle only when the test machine cannot provide Node. It is roughly 120-130 MB larger because the Node binary is copied into `Contents/Resources/node`.
+
+This host is intentionally incomplete, but the core path now runs through a supervised Rust daemon, a supervised backend process, and a Swift-owned `forgepad://` renderer scheme instead of Electron or Tauri shell loading.

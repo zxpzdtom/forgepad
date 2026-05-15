@@ -27,6 +27,7 @@
     "native:mac": "cd native/macos/ForgePadHost && FORGEPAD_WEB_URL=http://127.0.0.1:1420 FORGEPAD_CORE_COMMAND='cargo run --manifest-path ../../../crates/forgepad-core/Cargo.toml --bin forgepad-core-daemon' swift run",
     "native:mac:build": "cd native/macos/ForgePadHost && swift build",
     "native:mac:package": "node scripts/package-native-mac.mjs",
+    "native:mac:package:portable": "node scripts/package-native-mac.mjs --include-node",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build"

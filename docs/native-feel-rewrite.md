@@ -133,6 +133,9 @@ This branch has started the split without breaking the existing app:
 - `forgepad-core-daemon` is a JSON-lines Rust core coordinator. The Swift host supervises it with `CoreSupervisor`, sends host bridge commands over stdio, and forwards PTY events back to React.
 - Native browser popout now uses AppKit `NSWindow` + `WKWebView` through `BrowserWindowController`, replacing Electron popout for that path.
 - `crates/forgepad-core/src/lsp.rs` now owns text definition search parsing, further shrinking host responsibilities.
+- The macOS host loads bundled renderer assets through a Swift-owned `forgepad://` URL scheme. This avoids WKWebView `file://` ES module failure while keeping the WebView as a rendering surface.
+- `pnpm native:mac:package` now builds a slim local-test bundle. It excludes Node and relies on a system Node for the JS backend.
+- `pnpm native:mac:package:portable` builds a self-contained bundle with the current Node binary copied into `Contents/Resources/node`.
 
 ## Native Binding Strategy
 
@@ -148,6 +151,8 @@ The active implementation now uses the Rust subprocess route first. This keeps t
 Initial targets are intentionally practical:
 
 - Packaged app should remove bundled Chromium by removing Electron.
+- Current slim macOS bundle is about 39 MB. The portable bundle is about 120-130 MB larger because it includes Node.
+- Current renderer assets are about 34 MB. The biggest remaining frontend chunks are Mermaid, Shiki language/theme assets, terminal/browser UI, and syntax-heavy editor paths.
 - Idle memory should be measured in three buckets: native shell, WebView renderer, backend/Rust services.
 - Baseline target after Electron removal: under current Electron idle usage by at least 30%.
 - Sustained idle target after cleanup: below 500 MB for a typical workspace, excluding shared framework accounting.
@@ -160,3 +165,4 @@ Initial targets are intentionally practical:
 - IPC contract generation is not implemented yet.
 - A real native shell needs Xcode and Visual Studio project scaffolding, not just Rust/Tauri.
 - Some "lightness" gains may come from removing features or lazy-loading windows, not only changing frameworks.
+- Renderer slimming still needs feature-level migration: reduce always-packaged Mermaid/Shiki assets, split browser/editor-heavy paths more aggressively, and remove Electron-shaped browser compatibility once native browser tabs land.

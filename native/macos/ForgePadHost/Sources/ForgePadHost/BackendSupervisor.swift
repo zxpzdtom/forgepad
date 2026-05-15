@@ -22,6 +22,7 @@ final class BackendSupervisor {
             shell.executableURL = URL(fileURLWithPath: node ?? "/usr/bin/env")
             shell.arguments = node == nil ? ["node", backend] : [backend]
             var environment = ProcessInfo.processInfo.environment
+            environment["PATH"] = Self.backendPath(environment["PATH"])
             if let renderer = Bundle.main.resourceURL?.appendingPathComponent("renderer").path {
                 environment["FORGEPAD_RENDERER_DIR"] = renderer
             }
@@ -78,6 +79,39 @@ final class BackendSupervisor {
 
     private func bundledNodePath() -> String? {
         Bundle.main.path(forResource: "node", ofType: nil)
+    }
+
+    private static func backendPath(_ existing: String?) -> String {
+        let base = [
+            existing,
+            "/opt/homebrew/bin",
+            "/usr/local/bin",
+            "\(FileManager.default.homeDirectoryForCurrentUser.path)/.local/bin",
+            "/usr/bin",
+            "/bin",
+            "/usr/sbin",
+            "/sbin"
+        ]
+            .compactMap { $0 }
+            .filter { !$0.isEmpty }
+        return (base + nvmNodeBinPaths()).joined(separator: ":")
+    }
+
+    private static func nvmNodeBinPaths() -> [String] {
+        let root = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".nvm/versions/node")
+        guard let versions = try? FileManager.default.contentsOfDirectory(
+            at: root,
+            includingPropertiesForKeys: nil
+        ) else {
+            return []
+        }
+        return versions
+            .map { $0.appendingPathComponent("bin").path }
+            .filter { FileManager.default.fileExists(atPath: "\($0)/node") }
+            .sorted()
+            .reversed()
+            .filter { !$0.isEmpty }
     }
 
     func stop() {
