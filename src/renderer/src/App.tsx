@@ -111,6 +111,9 @@ function AppInner() {
   const createTerminal = useAppStore((state) => state.createTerminal);
   const createAgentTerminal = useAppStore((state) => state.createAgentTerminal);
   const createBrowserTab = useAppStore((state) => state.createBrowserTab);
+  const defaultBrowserHomepage = useAppStore(
+    (state) => state.settings.defaultBrowserHomepage,
+  );
   const closeTab = useAppStore((state) => state.closeTab);
   const setActiveTab = useAppStore((state) => state.setActiveTab);
   const setActiveWorkspace = useAppStore((state) => state.setActiveWorkspace);
@@ -197,12 +200,30 @@ function AppInner() {
   // Listen for extension tab creation requests (chrome.tabs.create polyfill)
   useEffect(() => {
     return window.forgepad.extension.onTabCreate((data) => {
+      if (__FORGEPAD_NATIVE_HOST__ && window.forgepad.browser.openWindow) {
+        void window.forgepad.browser.openWindow(data.url || "about:blank", "Browser");
+        return;
+      }
       const tabId = createBrowserTab(data.url);
       if (tabId) {
         registerPendingExtTabCreate(tabId, data.requestId);
       }
     });
   }, [createBrowserTab]);
+
+  const openBrowser = useCallback(
+    (url?: string) => {
+      if (__FORGEPAD_NATIVE_HOST__ && window.forgepad.browser.openWindow) {
+        void window.forgepad.browser.openWindow(
+          url || defaultBrowserHomepage || "about:blank",
+          "Browser",
+        );
+        return undefined;
+      }
+      return createBrowserTab(url);
+    },
+    [createBrowserTab, defaultBrowserHomepage],
+  );
 
   useEffect(() => {
     // Build action handler map for configurable keyboard shortcuts
@@ -670,7 +691,7 @@ function AppInner() {
             <button
               className="secondary-button"
               type="button"
-              onClick={() => createBrowserTab()}
+              onClick={() => openBrowser()}
             >
               <Globe size={16} />
               {t("app.emptyState.browser")}

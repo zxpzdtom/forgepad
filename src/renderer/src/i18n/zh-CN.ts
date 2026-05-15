@@ -41,6 +41,8 @@ const zhCN: Record<TranslationKeys, string> = {
   "app.emptyState.newAgent": "新建代理",
   "app.emptyState.terminal": "终端",
   "app.emptyState.browser": "浏览器",
+  "browser.nativeWindowOnly": "当前构建会使用原生窗口打开浏览器。",
+  "browser.openNativeWindow": "打开原生窗口",
   "app.toast.failedLoadState": "加载工作区状态失败。",
   "app.toast.failedSaveState": "保存工作区状态失败。",
   "app.toast.failedWatchWorkspace": "监听工作区变更失败。",

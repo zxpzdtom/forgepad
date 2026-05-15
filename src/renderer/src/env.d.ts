@@ -1,6 +1,8 @@
 import type { HostBridgeApi } from '@shared/host-bridge';
 import type { ForgePadPetApi } from '../../preload/pet';
 
+declare const __FORGEPAD_NATIVE_HOST__: boolean;
+
 declare global {
   interface Window {
     forgepad: HostBridgeApi;

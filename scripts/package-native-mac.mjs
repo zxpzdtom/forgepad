@@ -28,7 +28,12 @@ rmSync(bundleRoot, { recursive: true, force: true });
 mkdirSync(macOS, { recursive: true });
 mkdirSync(resources, { recursive: true });
 
-run("pnpm", ["vite:build"]);
+run("pnpm", ["vite:build"], {
+  env: {
+    ...process.env,
+    FORGEPAD_NATIVE_HOST: "1",
+  },
+});
 run("cargo", [
   "build",
   "--release",

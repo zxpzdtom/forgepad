@@ -39,6 +39,8 @@ const en = {
   "app.emptyState.newAgent": "New Agent",
   "app.emptyState.terminal": "Terminal",
   "app.emptyState.browser": "Browser",
+  "browser.nativeWindowOnly": "Browser tabs open in native windows in this build.",
+  "browser.openNativeWindow": "Open Native Window",
   "app.toast.failedLoadState": "Failed to load workspace state.",
   "app.toast.failedSaveState": "Failed to save workspace state.",
   "app.toast.failedWatchWorkspace": "Failed to watch workspace changes.",

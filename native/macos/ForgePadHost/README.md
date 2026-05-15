@@ -31,5 +31,6 @@ pnpm native:mac:package
 ```
 
 The bundle does not include Node or the legacy JS backend. Core backend behavior runs in the bundled Rust `forgepad-core-daemon`.
+The native package also builds only the main renderer entry. Browser actions open Swift-owned `WKWebView` windows instead of packaging the Electron browser/pet entries.
 
 This host is intentionally incomplete, but the core path now runs through a supervised Rust daemon and a Swift-owned `forgepad://` renderer scheme instead of Electron or Tauri shell loading.

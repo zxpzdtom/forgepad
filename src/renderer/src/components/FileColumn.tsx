@@ -9,7 +9,27 @@ import { ContextPreview } from './ContextPreview';
 
 import clsx from 'clsx';
 
-const BrowserTab = lazy(() => import('./BrowserTab').then((module) => ({ default: module.BrowserTab })));
+const NativeBrowserTab = ({ tab }: { tab: Extract<import('@shared/types').Tab, { type: 'browser' }> }) => {
+  const { t } = useTranslation();
+  const openNativeWindow = useCallback(() => {
+    window.forgepad.browser.openWindow?.(tab.url || 'about:blank', tab.title || 'Browser');
+  }, [tab.title, tab.url]);
+
+  return (
+    <div className="flex size-full items-center justify-center bg-bg p-6 text-center">
+      <div className="flex max-w-[360px] flex-col items-center gap-3">
+        <p className="m-0 text-muted text-sm">{t('browser.nativeWindowOnly')}</p>
+        <button type="button" className="secondary-button" onClick={openNativeWindow}>
+          {t('browser.openNativeWindow')}
+        </button>
+      </div>
+    </div>
+  );
+};
+
+const BrowserTab = __FORGEPAD_NATIVE_HOST__
+  ? lazy(async () => ({ default: NativeBrowserTab }))
+  : lazy(() => import('./BrowserTab').then((module) => ({ default: module.BrowserTab })));
 const DiffViewer = lazy(() => import('./DiffViewer').then((module) => ({ default: module.DiffViewer })));
 const FileEditor = lazy(() => import('./FileEditor').then((module) => ({ default: module.FileEditor })));
 const LspSymbolPeek = lazy(() => import('./LspSymbolPeek').then((module) => ({ default: module.LspSymbolPeek })));
