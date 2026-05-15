@@ -708,58 +708,6 @@ textarea {
     min-height: 280px;
 }
 
-.native-markdown-preview {
-    padding: 18px 20px 28px;
-    color: var(--text);
-    font-size: 14px;
-    line-height: 1.7;
-}
-
-.native-markdown-preview p {
-    margin: 0 0 12px;
-}
-
-.native-markdown-preview h1,
-.native-markdown-preview h2,
-.native-markdown-preview h3,
-.native-markdown-preview h4,
-.native-markdown-preview h5,
-.native-markdown-preview h6 {
-    margin: 20px 0 10px;
-    color: var(--text);
-    font-weight: 650;
-    line-height: 1.25;
-}
-
-.native-markdown-preview h1 {
-    font-size: 24px;
-}
-
-.native-markdown-preview h2 {
-    font-size: 20px;
-}
-
-.native-markdown-preview h3 {
-    font-size: 17px;
-}
-
-.native-markdown-preview pre {
-    overflow: auto;
-    margin: 12px 0;
-    padding: 12px;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    background: var(--panel);
-    color: var(--text);
-    font-size: 12px;
-    line-height: 1.55;
-}
-
-.native-markdown-preview img {
-    max-width: 100%;
-    border-radius: 6px;
-}
-
 /* Streamdown overrides — fullscreen table dialog: center + frosted glass */
 [data-streamdown="table-fullscreen"] {
     background-color: rgba(8, 9, 10, 0.38) !important;

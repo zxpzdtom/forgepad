@@ -32,6 +32,5 @@ pnpm native:mac:package
 
 The bundle does not include Node or the legacy JS backend. Core backend behavior runs in the bundled Rust `forgepad-core-daemon`.
 The native package also builds only the main renderer entry. Browser actions open Swift-owned `WKWebView` windows instead of packaging the Electron browser/pet entries.
-Native builds use lightweight file/diff/Markdown/settings/LSP viewer components so Mermaid, Shiki, and Katex assets are not carried in the macOS bundle.
 
 This host is intentionally incomplete, but the core path now runs through a supervised Rust daemon and a Swift-owned `forgepad://` renderer scheme instead of Electron or Tauri shell loading.
