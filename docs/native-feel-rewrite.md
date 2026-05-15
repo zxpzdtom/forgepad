@@ -22,7 +22,7 @@ The target is not Electron, and it is not Tauri as the final shell. The target i
 ```text
 Native shell        Swift/AppKit on macOS, C#/WPF or WinUI on Windows
 System WebView      WKWebView / WebView2 rendering React entry points
-Backend service     Node/Bun only where JS extension or agent orchestration pays for itself
+Backend service     Optional Node/Bun only where JS extension compatibility pays for itself
 Rust core           PTY, git, filesystem, indexing, context, shared schemas
 ```
 
@@ -43,7 +43,7 @@ Skill tenet: T1, "put the boundary at the WebView rendering surface." The OS own
 - `src/main/services/git-service.ts` and Tauri git commands -> Rust core git service.
 - `src/main/services/file-service.ts`, `path-guard.ts`, and Tauri FS commands -> Rust core filesystem service.
 - `src/main/services/context-service.ts` -> Rust core or backend service depending on template/agent coupling.
-- `HookServer` and `AgentHooksService` -> backend service if they remain JS-heavy.
+- `HookServer` and `AgentHooksService` -> Rust core by default; optional backend service only for JS extension compatibility.
 - Browser extension compatibility -> likely backend + native shell support, because WebView2/WKWebView will not behave like Electron `<webview>`.
 
 ### Retire
@@ -60,7 +60,7 @@ native/
   macos/                 Swift/AppKit host, WKWebView lifecycle, windows, menus
   windows/               C# host, WebView2 lifecycle, windows, tray/taskbar
 backend/
-  src/                   JS runtime for agents, extensions, hook server, state
+  src/                   Optional JS runtime for extension/browser compatibility
 crates/
   forgepad-core/         Rust PTY/git/fs/index/context core
 schema/
@@ -88,10 +88,10 @@ src/
    - Implement only app lifecycle, open project, state load/save, and shell open path.
    - Add WebView survival fixes before expanding scope: prewarm, no white flash, titlebar/native material ownership.
 
-4. Add the backend supervisor only where needed.
-   - Start JS backend from native shell.
-   - Move hook server, agent lifecycle events, and extension compatibility into it.
-   - Keep Rust core available to both shell and backend through one bridge.
+4. Add optional JS backend only where needed.
+   - Keep hook server, agent lifecycle events, PTY, Git, FS, context, and state in Rust core.
+   - Start JS backend from native shell only for legacy extension/browser compatibility.
+   - Keep Rust core as the default backend boundary for both shell and renderer.
 
 5. Replace Electron-only browser behavior.
    - Electron `<webview>` is the largest portability risk.
@@ -127,15 +127,15 @@ This branch has started the split without breaking the existing app:
 - `crates/forgepad-core` exists as the extraction target for host-independent Rust services.
 - The first extracted Rust modules cover command execution, path safety, file tree/list/read/write helpers, Git/worktree operations, PTY lifecycle/replay/event callbacks, context bundle generation, and persisted state load/save.
 - `native/macos/ForgePadHost` is a compiling Swift/AppKit + WKWebView host spike with native menu wiring, delayed WebView reveal, and a document-start `window.forgepad` compatibility bridge.
-- `backend/src/index.ts` is the first supervised backend process entry. The Swift host can start it with `FORGEPAD_BACKEND_COMMAND`, capture stdout/stderr, send JSON commands over stdin, and terminate it with the app.
-- `backend/src/hook-server.ts` is an Electron-free HookServer migration. It owns hook HTTP endpoints, permission hold/resolve, prompt/stop parsing, and emits agent lifecycle events as JSON lines.
-- `pnpm backend:smoke` verifies backend startup, hook server readiness, and graceful shutdown without Electron.
+- `backend/src/index.ts` remains as an optional supervised JS backend process entry. The Swift host can start it with `FORGEPAD_BACKEND_COMMAND` or `FORGEPAD_ENABLE_NODE_BACKEND=1`.
+- `crates/forgepad-core/src/hooks.rs` now owns the default hook HTTP server, permission hold/resolve, prompt/stop parsing, and agent lifecycle events.
+- `forgepad-core-daemon` emits `core.ready` with `hookPort`, and agent PTYs receive `FORGEPAD_PORT` plus `FORGEPAD_PTY_ID` so existing hook scripts can call Rust directly.
 - `forgepad-core-daemon` is a JSON-lines Rust core coordinator. The Swift host supervises it with `CoreSupervisor`, sends host bridge commands over stdio, and forwards PTY events back to React.
 - Native browser popout now uses AppKit `NSWindow` + `WKWebView` through `BrowserWindowController`, replacing Electron popout for that path.
 - `crates/forgepad-core/src/lsp.rs` now owns text definition search parsing, further shrinking host responsibilities.
 - The macOS host loads bundled renderer assets through a Swift-owned `forgepad://` URL scheme. This avoids WKWebView `file://` ES module failure while keeping the WebView as a rendering surface.
-- `pnpm native:mac:package` now builds a slim local-test bundle. It excludes Node and relies on a system Node for the JS backend.
-- `pnpm native:mac:package:portable` builds a self-contained bundle with the current Node binary copied into `Contents/Resources/node`.
+- `pnpm native:mac:package` now builds a slim Rust-backend bundle. It excludes Node and the Node backend.
+- `pnpm native:mac:package:portable` builds a self-contained legacy JS-backend bundle with the current Node binary copied into `Contents/Resources/node`.
 
 ## Native Binding Strategy
 
@@ -151,7 +151,7 @@ The active implementation now uses the Rust subprocess route first. This keeps t
 Initial targets are intentionally practical:
 
 - Packaged app should remove bundled Chromium by removing Electron.
-- Current slim macOS bundle is about 39 MB. The portable bundle is about 120-130 MB larger because it includes Node.
+- Current slim macOS bundle is about 39 MB and has no Node runtime. The portable bundle is about 120-130 MB larger because it includes Node.
 - Current renderer assets are about 34 MB. The biggest remaining frontend chunks are Mermaid, Shiki language/theme assets, terminal/browser UI, and syntax-heavy editor paths.
 - Idle memory should be measured in three buckets: native shell, WebView renderer, backend/Rust services.
 - Baseline target after Electron removal: under current Electron idle usage by at least 30%.

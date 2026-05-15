@@ -91,13 +91,7 @@ final class HostBridge: NSObject, WKScriptMessageHandler {
             }
             return NSNull()
         case "agent.permissionDecision":
-            backendSupervisor.send([
-                "type": "permission.resolve",
-                "ptyId": params["ptyId"] as? String ?? "",
-                "decision": params["decision"] as? String ?? "allow",
-                "answers": params["answers"] ?? NSNull()
-            ])
-            return NSNull()
+            return try await coreSupervisor.request(command: command, params: params)
         case "browser.openWindow":
             if let rawURL = params["url"] as? String, let url = URL(string: rawURL) {
                 openBrowserWindow(url, params["title"] as? String)
@@ -176,7 +170,8 @@ final class HostBridge: NSObject, WKScriptMessageHandler {
             command.hasPrefix("fs.") ||
             command.hasPrefix("pty.") ||
             command.hasPrefix("context.") ||
-            command.hasPrefix("lsp.")
+            command.hasPrefix("lsp.") ||
+            command.hasPrefix("agent.")
     }
 
     private func defaultValue(for command: String) -> Any {

@@ -76,6 +76,7 @@ impl PtyManager {
         cmd.cwd(worktree_path);
         cmd.env("TERM", "xterm-256color");
         cmd.env("COLORTERM", "truecolor");
+        cmd.env("FORGEPAD_PTY_ID", &id);
         if let Some(env) = extra_env {
             for (key, value) in env {
                 cmd.env(key, value);

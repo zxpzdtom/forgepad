@@ -161,7 +161,8 @@ pub fn branch_stats(path: &Path) -> BranchStats {
         .split_whitespace()
         .filter_map(|s| s.parse().ok())
         .collect();
-    let diff = command_output("git", &["diff", "--shortstat", "HEAD"], Some(path)).unwrap_or_default();
+    let diff =
+        command_output("git", &["diff", "--shortstat", "HEAD"], Some(path)).unwrap_or_default();
     let additions = diff
         .split(',')
         .find(|s| s.contains("insertion"))
@@ -225,7 +226,11 @@ pub fn fetch(repo_path: &Path) -> CoreResult<()> {
 }
 
 pub fn remote_branches(repo_path: &Path) -> CoreResult<Vec<String>> {
-    let out = command_output("git", &["branch", "-r", "--format=%(refname:short)"], Some(repo_path))?;
+    let out = command_output(
+        "git",
+        &["branch", "-r", "--format=%(refname:short)"],
+        Some(repo_path),
+    )?;
     Ok(out
         .lines()
         .map(|s| s.trim().to_string())
@@ -234,7 +239,8 @@ pub fn remote_branches(repo_path: &Path) -> CoreResult<Vec<String>> {
 }
 
 pub fn generate_commit_message(worktree_path: &Path) -> String {
-    let out = command_output("git", &["diff", "--cached", "--stat"], Some(worktree_path)).unwrap_or_default();
+    let out = command_output("git", &["diff", "--cached", "--stat"], Some(worktree_path))
+        .unwrap_or_default();
     if out.trim().is_empty() {
         "Update files".into()
     } else {
@@ -268,7 +274,11 @@ pub fn add_worktree(
             Some(repo_path),
         )?;
     } else {
-        command_status("git", &["worktree", "add", &worktree_path, branch], Some(repo_path))?;
+        command_status(
+            "git",
+            &["worktree", "add", &worktree_path, branch],
+            Some(repo_path),
+        )?;
     }
 
     Ok(WorktreeAddResult {
@@ -278,7 +288,11 @@ pub fn add_worktree(
 }
 
 pub fn remove_worktree(repo_path: &Path, worktree_path: &str) -> CoreResult<()> {
-    command_status("git", &["worktree", "remove", worktree_path], Some(repo_path))
+    command_status(
+        "git",
+        &["worktree", "remove", worktree_path],
+        Some(repo_path),
+    )
 }
 
 pub fn scan_worktrees(base_dir: impl AsRef<Path>) -> CoreResult<Vec<WorktreeSummary>> {

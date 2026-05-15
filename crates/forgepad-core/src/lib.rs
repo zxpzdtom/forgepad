@@ -2,6 +2,7 @@ pub mod command;
 pub mod context;
 pub mod files;
 pub mod git;
+pub mod hooks;
 pub mod lsp;
 pub mod pty;
 pub mod state;

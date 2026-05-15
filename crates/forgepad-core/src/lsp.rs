@@ -15,7 +15,8 @@ pub struct LspLocation {
 }
 
 pub fn get_definition(worktree_path: &Path, token: &str) -> CoreResult<Vec<LspLocation>> {
-    let out = command_output("git", &["grep", "-n", "--", token], Some(worktree_path)).unwrap_or_default();
+    let out = command_output("git", &["grep", "-n", "--", token], Some(worktree_path))
+        .unwrap_or_default();
     Ok(parse_git_grep(&out, 100))
 }
 

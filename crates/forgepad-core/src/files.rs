@@ -66,10 +66,18 @@ pub fn read_file(worktree_path: impl AsRef<Path>, rel_path: &str) -> CoreResult<
 pub fn read_file_data_url(worktree_path: impl AsRef<Path>, rel_path: &str) -> CoreResult<String> {
     let path = resolve_inside_root(worktree_path, rel_path)?;
     let data = fs::read(&path).map_err(err)?;
-    Ok(format!("data:{};base64,{}", mime_for(&path), BASE64.encode(data)))
+    Ok(format!(
+        "data:{};base64,{}",
+        mime_for(&path),
+        BASE64.encode(data)
+    ))
 }
 
-pub fn write_file(worktree_path: impl AsRef<Path>, rel_path: &str, content: &str) -> CoreResult<()> {
+pub fn write_file(
+    worktree_path: impl AsRef<Path>,
+    rel_path: &str,
+    content: &str,
+) -> CoreResult<()> {
     let path = resolve_inside_root(worktree_path, rel_path)?;
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(err)?;
@@ -84,7 +92,10 @@ pub fn list_files(worktree_path: impl AsRef<Path>) -> CoreResult<Vec<String>> {
         .hidden(false)
         .filter_entry(|entry| {
             let name = entry.file_name().to_string_lossy();
-            !matches!(name.as_ref(), ".git" | "node_modules" | "dist" | "out" | "target")
+            !matches!(
+                name.as_ref(),
+                ".git" | "node_modules" | "dist" | "out" | "target"
+            )
         })
         .build()
     {

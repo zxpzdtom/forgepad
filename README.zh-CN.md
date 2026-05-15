@@ -107,8 +107,8 @@ pnpm tauri:build
 | `pnpm check` | 运行 Biome check |
 | `pnpm check:write` | 自动应用可修复的 Biome 问题 |
 | `pnpm vite:build` | 构建 renderer |
-| `pnpm native:mac:package` | 构建 slim 版原生 macOS 包 |
-| `pnpm native:mac:package:portable` | 构建内置 Node 的原生 macOS 包 |
+| `pnpm native:mac:package` | 构建使用 Rust 后端的 slim 版原生 macOS 包 |
+| `pnpm native:mac:package:portable` | 构建内置 Node 后端的原生 macOS 包 |
 
 ## 项目结构
 

@@ -107,8 +107,8 @@ pnpm tauri:build
 | `pnpm check` | Run Biome checks |
 | `pnpm check:write` | Apply Biome fixes where possible |
 | `pnpm vite:build` | Build the renderer |
-| `pnpm native:mac:package` | Build the slim native macOS bundle |
-| `pnpm native:mac:package:portable` | Build the native macOS bundle with bundled Node |
+| `pnpm native:mac:package` | Build the slim native macOS bundle with Rust backend |
+| `pnpm native:mac:package:portable` | Build the native macOS bundle with bundled Node backend |
 
 ## Project Structure
 

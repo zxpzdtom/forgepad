@@ -78,7 +78,9 @@ fn render_bundle_markdown(input: &BundleInput) -> CoreResult<String> {
                 .and_then(Value::as_bool)
                 .unwrap_or(false)
             {
-                if let Ok(content) = fs::read_to_string(resolve_inside_root(&input.workspace_path, rel)?) {
+                if let Ok(content) =
+                    fs::read_to_string(resolve_inside_root(&input.workspace_path, rel)?)
+                {
                     md.push_str("```\n");
                     md.push_str(&content);
                     md.push_str("\n```\n");

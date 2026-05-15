@@ -3,7 +3,7 @@ use std::io::{self, BufRead, Write};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
-use forgepad_core::{context, files, git, lsp, pty, state};
+use forgepad_core::{context, files, git, hooks, lsp, pty, state};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
@@ -50,12 +50,24 @@ fn main() {
             );
         },
     );
+    let hook_output = Arc::clone(&output);
+    let hooks = match hooks::HookServer::start(move |event| emit(&hook_output, event)) {
+        Ok(server) => Some(server),
+        Err(error) => {
+            emit(
+                &output,
+                json!({"type": "core.log", "level": "error", "message": format!("hook server failed: {error}")}),
+            );
+            None
+        }
+    };
 
     emit(
         &output,
         json!({
             "type": "core.ready",
-            "pid": std::process::id()
+            "pid": std::process::id(),
+            "hookPort": hooks.as_ref().map(|server| server.port())
         }),
     );
 
@@ -64,7 +76,10 @@ fn main() {
         let line = match line {
             Ok(line) => line,
             Err(error) => {
-                emit(&output, json!({"type": "core.log", "level": "error", "message": error.to_string()}));
+                emit(
+                    &output,
+                    json!({"type": "core.log", "level": "error", "message": error.to_string()}),
+                );
                 continue;
             }
         };
@@ -74,7 +89,7 @@ fn main() {
         }
 
         let response = match serde_json::from_str::<Request>(&line) {
-            Ok(request) => handle_request(&ptys, request),
+            Ok(request) => handle_request(&ptys, hooks.as_ref(), request),
             Err(error) => Response {
                 id: "unknown".into(),
                 value: None,
@@ -86,8 +101,12 @@ fn main() {
     }
 }
 
-fn handle_request(ptys: &pty::PtyManager, request: Request) -> Response {
-    match dispatch(ptys, &request.command, request.params) {
+fn handle_request(
+    ptys: &pty::PtyManager,
+    hooks: Option<&hooks::HookServer>,
+    request: Request,
+) -> Response {
+    match dispatch(ptys, hooks, &request.command, request.params) {
         Ok(value) => Response {
             id: request.id,
             value: Some(value),
@@ -101,7 +120,12 @@ fn handle_request(ptys: &pty::PtyManager, request: Request) -> Response {
     }
 }
 
-fn dispatch(ptys: &pty::PtyManager, command: &str, params: Value) -> Result<Value, String> {
+fn dispatch(
+    ptys: &pty::PtyManager,
+    hooks: Option<&hooks::HookServer>,
+    command: &str,
+    params: Value,
+) -> Result<Value, String> {
     match command {
         "state.load" => serde_json::to_value(state::load_state()?).map_err(|e| e.to_string()),
         "state.save" => {
@@ -114,27 +138,38 @@ fn dispatch(ptys: &pty::PtyManager, command: &str, params: Value) -> Result<Valu
         }
         "git.status" => {
             let worktree_path = string_param(&params, "worktreePath")?;
-            serde_json::to_value(git::collect_status(Path::new(&worktree_path))?).map_err(|e| e.to_string())
+            serde_json::to_value(git::collect_status(Path::new(&worktree_path))?)
+                .map_err(|e| e.to_string())
         }
         "git.branchStats" => {
             let worktree_path = string_param(&params, "worktreePath")?;
-            serde_json::to_value(git::branch_stats(Path::new(&worktree_path))).map_err(|e| e.to_string())
+            serde_json::to_value(git::branch_stats(Path::new(&worktree_path)))
+                .map_err(|e| e.to_string())
         }
         "git.fileDiff" => git_file_diff(params),
         "git.stage" => {
             let worktree_path = string_param(&params, "worktreePath")?;
-            git::stage(Path::new(&worktree_path), &string_array_param(&params, "paths")?)?;
+            git::stage(
+                Path::new(&worktree_path),
+                &string_array_param(&params, "paths")?,
+            )?;
             Ok(Value::Null)
         }
         "git.unstage" => {
             let worktree_path = string_param(&params, "worktreePath")?;
-            git::unstage(Path::new(&worktree_path), &string_array_param(&params, "paths")?)?;
+            git::unstage(
+                Path::new(&worktree_path),
+                &string_array_param(&params, "paths")?,
+            )?;
             Ok(Value::Null)
         }
         "git.discard" => {
             let worktree_path = string_param(&params, "worktreePath")?;
             let entries = serde_json::from_value::<Vec<git::DiscardEntry>>(
-                params.get("entries").cloned().unwrap_or(Value::Array(vec![])),
+                params
+                    .get("entries")
+                    .cloned()
+                    .unwrap_or(Value::Array(vec![])),
             )
             .map_err(|e| e.to_string())?;
             git::discard(Path::new(&worktree_path), &entries)?;
@@ -142,7 +177,10 @@ fn dispatch(ptys: &pty::PtyManager, command: &str, params: Value) -> Result<Valu
         }
         "git.commit" => {
             let worktree_path = string_param(&params, "worktreePath")?;
-            git::commit(Path::new(&worktree_path), &string_param(&params, "message")?)?;
+            git::commit(
+                Path::new(&worktree_path),
+                &string_param(&params, "message")?,
+            )?;
             Ok(Value::Null)
         }
         "git.push" => {
@@ -162,7 +200,8 @@ fn dispatch(ptys: &pty::PtyManager, command: &str, params: Value) -> Result<Valu
         }
         "git.remoteBranches" | "git.listRemoteBranches" => {
             let repo_path = string_param(&params, "repoPath")?;
-            serde_json::to_value(git::remote_branches(Path::new(&repo_path))?).map_err(|e| e.to_string())
+            serde_json::to_value(git::remote_branches(Path::new(&repo_path))?)
+                .map_err(|e| e.to_string())
         }
         "git.worktreeAdd" => {
             let repo_path = string_param(&params, "repoPath")?;
@@ -192,7 +231,9 @@ fn dispatch(ptys: &pty::PtyManager, command: &str, params: Value) -> Result<Valu
         }
         "git.generateCommitMessage" => {
             let worktree_path = string_param(&params, "worktreePath")?;
-            Ok(json!(git::generate_commit_message(Path::new(&worktree_path))))
+            Ok(json!(git::generate_commit_message(Path::new(
+                &worktree_path
+            ))))
         }
         "fs.treeWithStatus" => {
             let worktree_path = string_param(&params, "worktreePath")?;
@@ -229,24 +270,45 @@ fn dispatch(ptys: &pty::PtyManager, command: &str, params: Value) -> Result<Valu
         "lsp.getDefinition" => {
             let worktree_path = string_param(&params, "worktreePath")?;
             let token = string_param(&params, "token")?;
-            serde_json::to_value(lsp::get_definition(Path::new(&worktree_path), &token)?).map_err(|e| e.to_string())
+            serde_json::to_value(lsp::get_definition(Path::new(&worktree_path), &token)?)
+                .map_err(|e| e.to_string())
         }
         "pty.create" => {
             let worktree_path = string_param(&params, "worktreePath")?;
-            let shell = params.get("shell").and_then(Value::as_str).map(str::to_string);
-            let command = params.get("command").and_then(Value::as_str).map(str::to_string);
-            let extra_env = params
+            let shell = params
+                .get("shell")
+                .and_then(Value::as_str)
+                .map(str::to_string);
+            let command = params
+                .get("command")
+                .and_then(Value::as_str)
+                .map(str::to_string);
+            let mut extra_env = params
                 .get("extraEnv")
                 .and_then(Value::as_object)
                 .map(|env| {
                     env.iter()
                         .filter_map(|(key, value)| Some((key.clone(), value.as_str()?.to_string())))
                         .collect::<HashMap<String, String>>()
-                });
-            Ok(json!(ptys.create(worktree_path, shell, command, extra_env)?))
+                })
+                .unwrap_or_default();
+            if extra_env.get("FORGEPAD_AGENT").map(String::as_str) == Some("1") {
+                if let Some(hooks) = hooks {
+                    extra_env.insert("FORGEPAD_PORT".to_string(), hooks.port().to_string());
+                }
+            }
+            Ok(json!(ptys.create(
+                worktree_path,
+                shell,
+                command,
+                Some(extra_env)
+            )?))
         }
         "pty.write" => {
-            ptys.write(&string_param(&params, "id")?, &string_param(&params, "data")?)?;
+            ptys.write(
+                &string_param(&params, "id")?,
+                &string_param(&params, "data")?,
+            )?;
             Ok(Value::Null)
         }
         "pty.resize" => {
@@ -260,8 +322,18 @@ fn dispatch(ptys: &pty::PtyManager, command: &str, params: Value) -> Result<Valu
             ptys.destroy(&string_param(&params, "id")?)?;
             Ok(Value::Null)
         }
-        "pty.reattach" => {
-            serde_json::to_value(ptys.reattach(&string_param(&params, "id")?)).map_err(|e| e.to_string())
+        "pty.reattach" => serde_json::to_value(ptys.reattach(&string_param(&params, "id")?))
+            .map_err(|e| e.to_string()),
+        "agent.permissionDecision" => {
+            let pty_id = string_param(&params, "ptyId")?;
+            let hooks = hooks.ok_or_else(|| "Hook server is not running.".to_string())?;
+            hooks.resolve_permission(&pty_id, hooks::decision_from_params(&params)?);
+            Ok(Value::Null)
+        }
+        "agent.settingsUpdate" => {
+            let hooks = hooks.ok_or_else(|| "Hook server is not running.".to_string())?;
+            hooks.update_settings(params.get("settings").unwrap_or(&params));
+            Ok(Value::Null)
         }
         _ => Err(format!("Unknown core command: {command}")),
     }
@@ -272,16 +344,26 @@ fn git_file_diff(params: Value) -> Result<Value, String> {
     let rel_path = string_param(&params, "relPath")?;
     let bucket = string_param(&params, "bucket")?;
     let status = string_param(&params, "status")?;
-    let old_path = params.get("oldPath").and_then(Value::as_str).map(str::to_string);
+    let old_path = params
+        .get("oldPath")
+        .and_then(Value::as_str)
+        .map(str::to_string);
     let path = Path::new(&worktree_path);
     let patch = if bucket == "staged" {
-        forgepad_core::command::command_output("git", &["diff", "--cached", "--", &rel_path], Some(path)).unwrap_or_default()
+        forgepad_core::command::command_output(
+            "git",
+            &["diff", "--cached", "--", &rel_path],
+            Some(path),
+        )
+        .unwrap_or_default()
     } else if bucket == "untracked" {
         String::new()
     } else {
-        forgepad_core::command::command_output("git", &["diff", "--", &rel_path], Some(path)).unwrap_or_default()
+        forgepad_core::command::command_output("git", &["diff", "--", &rel_path], Some(path))
+            .unwrap_or_default()
     };
-    let new_content = std::fs::read_to_string(files::resolve_inside_root(&worktree_path, &rel_path)?).ok();
+    let new_content =
+        std::fs::read_to_string(files::resolve_inside_root(&worktree_path, &rel_path)?).ok();
     Ok(json!({
         "path": rel_path,
         "oldPath": old_path,

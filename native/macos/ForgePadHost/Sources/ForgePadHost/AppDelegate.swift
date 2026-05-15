@@ -25,7 +25,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             controller?.handleBackendEvent(event)
         }
         controller.load()
-        backendSupervisor.startIfConfigured()
+        if ProcessInfo.processInfo.environment["FORGEPAD_ENABLE_NODE_BACKEND"] == "1" ||
+            ProcessInfo.processInfo.environment["FORGEPAD_BACKEND_COMMAND"] != nil {
+            backendSupervisor.startIfConfigured()
+        }
 
         NSApplication.shared.activate(ignoringOtherApps: true)
     }
