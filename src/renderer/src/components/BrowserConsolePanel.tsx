@@ -352,7 +352,7 @@ export function BrowserConsolePanel({ entries, onClear, onSendToAgent, onExecute
               onKeyDown={(e) => {
                 if (e.key === 'Enter') setSearchQuery('');
               }}
-              className="absolute right-1.5 cursor-pointer text-subtle hover:text-muted"
+              className="absolute right-1.5 text-subtle hover:text-muted"
             >
               <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
                 <path d="M2 2l6 6M8 2l-6 6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
@@ -372,7 +372,7 @@ export function BrowserConsolePanel({ entries, onClear, onSendToAgent, onExecute
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') toggleSelectAll();
             }}
-            className="flex cursor-pointer items-center gap-1 rounded px-1.5 py-0.5 text-subtle text-[12px] transition-colors hover:text-muted"
+            className="flex items-center gap-1 rounded px-1.5 py-0.5 text-subtle text-[12px] transition-colors hover:text-muted"
           >
             {allFilteredSelected ? (
               <svg width="13" height="13" viewBox="0 0 16 16" fill="none">
@@ -418,7 +418,7 @@ export function BrowserConsolePanel({ entries, onClear, onSendToAgent, onExecute
             className={[
               'flex h-[26px] items-center gap-1 rounded-[4px] px-2.5 font-medium text-[12px] transition-colors select-none',
               selectedIds.size > 0
-                ? 'cursor-pointer bg-accent text-white hover:bg-accent/90 active:bg-accent/80'
+                ? 'bg-accent text-white hover:bg-accent/90 active:bg-accent/80'
                 : 'cursor-not-allowed bg-accent/40 text-white/50',
             ].join(' ')}
           >
@@ -446,7 +446,7 @@ export function BrowserConsolePanel({ entries, onClear, onSendToAgent, onExecute
             className={[
               'flex size-[26px] items-center justify-center rounded-[4px] transition-colors',
               entries.length > 0
-                ? 'cursor-pointer text-danger/70 hover:text-danger'
+                ? 'text-danger/70 hover:text-danger'
                 : 'cursor-not-allowed text-subtle opacity-40',
             ].join(' ')}
           >
@@ -491,8 +491,8 @@ export function BrowserConsolePanel({ entries, onClear, onSendToAgent, onExecute
                   isScriptEntry
                     ? 'bg-accent/[0.03]'
                     : isSelected
-                      ? 'cursor-pointer bg-accent/[0.08]'
-                      : `cursor-pointer hover:bg-white/[0.03] ${bg}`,
+                      ? 'bg-accent/[0.08]'
+                      : `hover:bg-white/[0.03] ${bg}`,
                 ].join(' ')}
               >
                 {/* Checkbox (hidden for script i/o entries) */}

@@ -32,7 +32,7 @@ export function RightPanel() {
           {modes.map(({ mode: nextMode, labelKey, icon: Icon }) => (
             <div
               className={clsx(
-                'relative flex h-9 cursor-pointer items-center gap-1.5 whitespace-nowrap px-3 text-[13px] transition-colors select-none',
+                'relative flex h-9 items-center gap-1.5 whitespace-nowrap px-3 text-[13px] transition-colors select-none',
                 nextMode === mode ? 'text-text' : 'text-muted hover:text-text',
               )}
               key={nextMode}

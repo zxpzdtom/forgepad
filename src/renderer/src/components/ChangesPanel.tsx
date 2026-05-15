@@ -211,7 +211,7 @@ function TreeRow({
 
   return (
     <div
-      className="group flex h-7 cursor-pointer select-none items-center gap-1.5 rounded-[5px] pr-1.5 text-text hover:bg-white/[0.04]"
+      className="group flex h-7 select-none items-center gap-1.5 rounded-[5px] pr-1.5 text-text hover:bg-white/[0.04]"
       style={{ paddingLeft }}
       onClick={() => {
         if (node.isDir) {
@@ -259,7 +259,7 @@ function TreeRow({
         )}
         <input
           type="checkbox"
-          className="size-3.5 shrink-0 cursor-pointer accent-accent"
+          className="size-3.5 shrink-0 accent-accent"
           checked={allChecked}
           ref={(el) => {
             if (el) el.indeterminate = someChecked;

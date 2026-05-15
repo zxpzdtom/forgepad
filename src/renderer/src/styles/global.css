@@ -390,7 +390,6 @@ textarea {
     border-radius: 6px;
     background: transparent;
     color: var(--muted);
-    cursor: pointer;
 }
 
 .floating-search-bar button:hover:not(:disabled) {
@@ -819,7 +818,6 @@ textarea {
     font-size: 14px;
     line-height: 1.5;
     color: var(--muted);
-    cursor: pointer;
     overflow: hidden;
     display: -webkit-box;
     -webkit-line-clamp: 2;
@@ -874,7 +872,6 @@ textarea {
     place-items: center;
     color: var(--muted);
     background: transparent;
-    cursor: pointer;
     border: none;
     border-right: 1px solid var(--border);
 }
@@ -903,7 +900,6 @@ textarea {
     border: 1px solid transparent;
     border-radius: 6px;
     white-space: nowrap;
-    cursor: pointer;
 }
 
 .primary-button {
@@ -1003,7 +999,6 @@ textarea {
     padding: 0 9px;
     color: var(--muted);
     background: transparent;
-    cursor: pointer;
     font-size: 12px;
     display: inline-flex;
     align-items: center;
@@ -2009,7 +2004,6 @@ textarea {
     border: none;
     padding: 0;
     background: transparent;
-    cursor: pointer;
     border-radius: 6px;
     flex-shrink: 0;
     transition: transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -2088,7 +2082,6 @@ textarea {
     color: var(--subtle);
     background: transparent;
     border: 1px dashed var(--border);
-    cursor: pointer;
     border-radius: 6px;
     margin-left: 2px;
     transition:
@@ -2119,7 +2112,6 @@ textarea {
     border-radius: 8px;
     border: 1px solid var(--border);
     background: var(--surface-input);
-    cursor: pointer;
     display: grid;
     place-items: center;
     font-size: 18px;
@@ -2807,7 +2799,7 @@ textarea {
 /* ── NotificationsSection ────────────────────────────────────────────────── */
 
 [data-sketchy]
-    .group.relative.flex.cursor-pointer.select-none.flex-col.rounded-xl.border {
+    .group.relative.flex.select-none.flex-col.rounded-xl.border {
     border: 1.5px solid var(--border);
     border-radius: 4px;
     filter: url(#sketchy-subtle);

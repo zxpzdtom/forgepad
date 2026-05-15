@@ -78,7 +78,7 @@ function VolumeSlider({ value, onChange }: { value: number; onChange: (v: number
         step={1}
         value={value}
         onChange={(e) => onChange(Number(e.currentTarget.value))}
-        className="h-1.5 w-32 cursor-pointer appearance-none rounded-full bg-panel-3 accent-accent"
+        className="h-1.5 w-32 appearance-none rounded-full bg-panel-3 accent-accent"
         aria-label="Volume"
       />
       <span className="w-8 text-right font-mono text-[12px] text-muted tabular-nums">{value}%</span>
@@ -163,7 +163,7 @@ function SoundCard({
       aria-selected={isSelected}
       tabIndex={0}
       className={clsx(
-        'group relative flex cursor-pointer select-none flex-col rounded-xl border p-3 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-accent/60',
+        'group relative flex select-none flex-col rounded-xl border p-3 outline-none transition-colors focus-visible:ring-2 focus-visible:ring-accent/60',
         isSelected ? 'border-accent/50 bg-accent-surface' : 'border-border bg-surface-card hover:border-border hover:bg-panel-2',
       )}
       onClick={onSelect}

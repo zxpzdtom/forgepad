@@ -376,7 +376,7 @@ function SortableProjectGroup({
         <ProjectAvatar name={name} />
         <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap font-[510] text-[13px]">{name}</span>
         <button
-          className="grid size-5 shrink-0 cursor-pointer place-items-center rounded text-subtle opacity-0 transition-opacity hover:bg-panel-3 hover:text-text focus:opacity-100 group-hover/sidebar-project:opacity-100"
+          className="grid size-5 shrink-0 place-items-center rounded text-subtle opacity-0 transition-opacity hover:bg-panel-3 hover:text-text focus:opacity-100 group-hover/sidebar-project:opacity-100"
           type="button"
           title={t('sidebar.newWorktree')}
           onPointerDown={(event) => event.stopPropagation()}
@@ -389,7 +389,7 @@ function SortableProjectGroup({
         </button>
         <ArrowDownIcon
           className={clsx(
-            'shrink-0 cursor-pointer text-subtle transition-transform duration-200 ease-[ease]',
+            'shrink-0 text-subtle transition-transform duration-200 ease-[ease]',
             isCollapsed && '-rotate-90',
           )}
         />
@@ -498,7 +498,7 @@ function SortableWorkspaceRow({
               role="link"
               tabIndex={0}
               className={clsx(
-                'shrink-0 cursor-pointer rounded-[3px] px-[5px] py-px font-[560] font-mono text-[9px] leading-[16px] transition-colors',
+                'shrink-0 rounded-[3px] px-[5px] py-px font-[560] font-mono text-[9px] leading-[16px] transition-colors',
                 prMerged ? 'bg-[#22c55e]/10 text-[#22c55e] hover:bg-[#22c55e]/20' : 'bg-subtle/10 text-subtle hover:bg-subtle/20',
               )}
               title={prUrl ? `Open MR #${prNumber}` : `MR #${prNumber}`}
@@ -713,14 +713,14 @@ function DeleteWorktreeDialog({ branch, onClose, onConfirm }: { branch: string; 
         <div className="flex justify-end gap-2 border-border border-t px-4 py-3">
           <button
             type="button"
-            className="h-8 cursor-pointer rounded-md border border-border bg-transparent px-3 text-[13px] text-text hover:bg-panel-3"
+            className="h-8 rounded-md border border-border bg-transparent px-3 text-[13px] text-text hover:bg-panel-3"
             onClick={onClose}
           >
             {t('common.cancel')}
           </button>
           <button
             type="button"
-            className="h-8 cursor-pointer rounded-md border border-transparent bg-danger px-3 text-[13px] text-accent-contrast hover:brightness-110 disabled:opacity-50"
+            className="h-8 rounded-md border border-transparent bg-danger px-3 text-[13px] text-accent-contrast hover:brightness-110 disabled:opacity-50"
             disabled={loading}
             onClick={handleDelete}
           >
@@ -882,14 +882,14 @@ function NewPanelDialog({ onClose, onCreate }: { onClose: () => void; onCreate: 
         <div className="flex justify-end gap-2 border-border border-t px-4 py-3">
           <button
             type="button"
-            className="h-8 cursor-pointer rounded-md border border-border bg-transparent px-3 text-[13px] text-text hover:bg-panel-3"
+            className="h-8 rounded-md border border-border bg-transparent px-3 text-[13px] text-text hover:bg-panel-3"
             onClick={onClose}
           >
             {t('common.cancel')}
           </button>
           <button
             type="button"
-            className="h-8 cursor-pointer rounded-md border border-transparent bg-accent px-3 text-[13px] text-accent-contrast hover:brightness-110"
+            className="h-8 rounded-md border border-transparent bg-accent px-3 text-[13px] text-accent-contrast hover:brightness-110"
             onClick={handleSubmit}
           >
             {t('common.create')}
@@ -992,14 +992,14 @@ function EditPanelDialog({ panel, onClose }: { panel: WorkspacePanel; onClose: (
         <div className="flex justify-end gap-2 border-border border-t px-4 py-3">
           <button
             type="button"
-            className="h-8 cursor-pointer rounded-md border border-border bg-transparent px-3 text-[13px] text-text hover:bg-panel-3"
+            className="h-8 rounded-md border border-border bg-transparent px-3 text-[13px] text-text hover:bg-panel-3"
             onClick={onClose}
           >
             {t('common.cancel')}
           </button>
           <button
             type="button"
-            className="h-8 cursor-pointer rounded-md border border-transparent bg-accent px-3 text-[13px] text-accent-contrast hover:brightness-110"
+            className="h-8 rounded-md border border-transparent bg-accent px-3 text-[13px] text-accent-contrast hover:brightness-110"
             onClick={handleSubmit}
           >
             {t('common.save')}
@@ -1100,14 +1100,14 @@ function DeletePanelDialog({
         <div className="flex justify-end gap-2 border-border border-t px-4 py-3">
           <button
             type="button"
-            className="h-8 cursor-pointer rounded-md border border-border bg-transparent px-3 text-[13px] text-text hover:bg-panel-3"
+            className="h-8 rounded-md border border-border bg-transparent px-3 text-[13px] text-text hover:bg-panel-3"
             onClick={onClose}
           >
             {t('common.cancel')}
           </button>
           <button
             type="button"
-            className="h-8 cursor-pointer rounded-md border border-transparent bg-danger px-3 text-[13px] text-white hover:brightness-110"
+            className="h-8 rounded-md border border-transparent bg-danger px-3 text-[13px] text-white hover:brightness-110"
             onClick={onConfirm}
           >
             {t('common.delete')}
@@ -1360,7 +1360,7 @@ export function Sidebar() {
           <SidebarSkeleton />
         ) : projects.length === 0 ? (
           <button
-            className="flex w-full cursor-pointer items-center gap-2.5 rounded-lg border border-border border-dashed bg-transparent px-2.5 py-3.5 text-[13px] text-muted hover:border-subtle hover:bg-panel-2 hover:text-text"
+            className="flex w-full items-center gap-2.5 rounded-lg border border-border border-dashed bg-transparent px-2.5 py-3.5 text-[13px] text-muted hover:border-subtle hover:bg-panel-2 hover:text-text"
             type="button"
             onClick={openProject}
           >
@@ -1451,7 +1451,7 @@ export function Sidebar() {
 
       <div className="border-border border-t p-2">
         <button
-          className="flex h-8 w-full cursor-pointer items-center justify-center gap-1.5 rounded-md border border-border border-dashed bg-transparent text-muted text-xs hover:border-subtle hover:bg-panel-2 hover:text-text"
+          className="flex h-8 w-full items-center justify-center gap-1.5 rounded-md border border-border border-dashed bg-transparent text-muted text-xs hover:border-subtle hover:bg-panel-2 hover:text-text"
           type="button"
           onClick={openProject}
         >

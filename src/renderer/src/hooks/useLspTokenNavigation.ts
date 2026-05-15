@@ -131,7 +131,6 @@ export function useLspTokenNavigation(
         cmdHeldRef.current = true;
         if (hoveredTokenRef.current) {
           hoveredTokenRef.current.style.textDecoration = 'underline';
-          hoveredTokenRef.current.style.cursor = 'pointer';
         }
       }
     };
@@ -223,7 +222,6 @@ export function useLspTokenNavigation(
       hoveredTokenRef.current = props.tokenElement;
       if (cmdHeldRef.current) {
         props.tokenElement.style.textDecoration = 'underline';
-        props.tokenElement.style.cursor = 'pointer';
       }
     },
     [mode],

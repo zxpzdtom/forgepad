@@ -46,7 +46,7 @@ function SortablePopoutTab({
       {...listeners}
       onClick={onSelect}
       className={[
-        'popout-tab-item group relative flex h-7 max-w-[200px] min-w-[80px] cursor-pointer items-center gap-1.5 rounded-md px-2.5 text-[12px] transition-colors',
+        'popout-tab-item group relative flex h-7 max-w-[200px] min-w-[80px] items-center gap-1.5 rounded-md px-2.5 text-[12px] transition-colors',
         isActive ? 'bg-panel-3 text-text' : 'text-subtle hover:bg-panel-2 hover:text-muted',
       ].join(' ')}
     >

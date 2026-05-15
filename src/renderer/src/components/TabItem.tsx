@@ -46,7 +46,7 @@ export const TabItem = forwardRef<HTMLDivElement, TabItemProps>(function TabItem
     <div
       ref={ref}
       className={clsx(
-        'group/tab relative flex h-9 shrink-0 cursor-pointer items-center gap-1.5 px-3 text-[13px] transition-colors select-none',
+        'group/tab relative flex h-9 shrink-0 items-center gap-1.5 px-3 text-[13px] transition-colors select-none',
         active ? 'text-text' : 'text-muted hover:text-text',
         className,
       )}

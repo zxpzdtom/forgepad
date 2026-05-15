@@ -94,7 +94,7 @@ export function NewWorktreeDialog({
               />
               <button
                 type="button"
-                className="flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center rounded-md border border-border bg-panel-3 text-subtle hover:bg-panel-2 hover:text-text"
+                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-border bg-panel-3 text-subtle hover:bg-panel-2 hover:text-text"
                 title="Generate random name"
                 onClick={() => setBranch(generateRandomBranchName())}
               >
@@ -102,10 +102,10 @@ export function NewWorktreeDialog({
               </button>
             </div>
           </label>
-          <label className="flex cursor-pointer select-none items-center gap-2">
+          <label className="flex select-none items-center gap-2">
             <input
               type="checkbox"
-              className="size-3.5 cursor-pointer accent-accent"
+              className="size-3.5 accent-accent"
               checked={trackRemote}
               onChange={(e) => setTrackRemote(e.target.checked)}
             />
@@ -128,14 +128,14 @@ export function NewWorktreeDialog({
         <div className="flex justify-end gap-2 border-border border-t px-4 py-3">
           <button
             type="button"
-            className="h-8 cursor-pointer rounded-md border border-border bg-transparent px-3 text-[13px] text-text hover:bg-panel-3"
+            className="h-8 rounded-md border border-border bg-transparent px-3 text-[13px] text-text hover:bg-panel-3"
             onClick={onClose}
           >
             Cancel
           </button>
           <button
             type="button"
-            className="h-8 cursor-pointer rounded-md border border-transparent bg-accent px-3 text-[13px] text-accent-contrast hover:brightness-110 disabled:opacity-50"
+            className="h-8 rounded-md border border-transparent bg-accent px-3 text-[13px] text-accent-contrast hover:brightness-110 disabled:opacity-50"
             disabled={!branch.trim() || loading}
             onClick={() => void handleSubmit()}
           >

@@ -70,7 +70,7 @@ function Toggle({
       role="switch"
       aria-checked={checked}
       aria-label={label}
-      className={`relative inline-flex h-[22px] w-[40px] shrink-0 cursor-pointer items-center rounded-full transition-colors ${
+      className={`relative inline-flex h-[22px] w-[40px] shrink-0 items-center rounded-full transition-colors ${
         checked ? "bg-accent" : "bg-border"
       }`}
       onClick={() => onChange(!checked)}
@@ -234,7 +234,7 @@ function Slider({
         step={step}
         value={value}
         onChange={(e) => onChange(Number(e.target.value))}
-        className="h-1.5 w-[140px] cursor-pointer appearance-none rounded-full bg-border accent-accent"
+        className="h-1.5 w-[140px] appearance-none rounded-full bg-border accent-accent"
         aria-label={label}
       />
       <span className="min-w-[32px] text-right text-[12px] text-muted tabular-nums">
