@@ -1402,7 +1402,7 @@ export function Sidebar() {
                     >
                       <div
                         className={clsx(
-                          'grid transition-[grid-template-rows] duration-300 ease-in-out',
+                          'grid',
                           isCollapsed ? 'grid-rows-[0fr]' : 'grid-rows-[1fr]',
                         )}
                       >

@@ -46,7 +46,6 @@ import {
   Globe,
   TerminalSquare,
 } from "lucide-react";
-import { animate, motion, useReducedMotion } from "motion/react";
 
 export const ThemeContext = createContext<ResolvedTheme>("dark");
 export const useResolvedTheme = () => useContext(ThemeContext);
@@ -66,7 +65,6 @@ function isTextEntryTarget(target: EventTarget | null): boolean {
 
 function AppInner() {
   const resolvedTheme = useTheme();
-  const prefersReducedMotion = useReducedMotion();
   useAgentLifecycle();
   const { t } = useTranslation();
   const [quickSearchOpen, setQuickSearchOpen] = useState(false);
@@ -87,9 +85,6 @@ function AppInner() {
   } | null>(null);
   const fileColumnWidthRef = useRef<number | null>(null);
   const prevShellDockVisibleRef = useRef(false);
-  const horizontalAnimationRef = useRef<ReturnType<typeof animate> | null>(
-    null,
-  );
   const horizontalLayoutReadyRef = useRef(false);
   const horizontalLayoutRef = useRef({ sidebar: 0, rightPanel: 0 });
   const hydrated = useAppStore((state) => state.hydrated);
@@ -104,8 +99,6 @@ function AppInner() {
   const [sidebarPaneVisible, setSidebarPaneVisible] = useState(sidebarOpen);
   const [rightPanelPaneVisible, setRightPanelPaneVisible] =
     useState(rightPanelOpen);
-  const [horizontalPanelsAnimating, setHorizontalPanelsAnimating] =
-    useState(false);
   const terminalPanelOpen = useAppStore((state) => state.terminalPanelOpen);
   const openProject = useAppStore((state) => state.openProject);
   const createTerminal = useAppStore((state) => state.createTerminal);
@@ -511,8 +504,8 @@ function AppInner() {
   const hasTerminalTabs = hasAgentTabs || hasShellTabs;
   const hasFileTabs = workspaceTabs.some((tab) => tab.type !== "terminal");
 
-  // Animate sidebar & right panel sizes with Motion while keeping Allotment's
-  // resize model intact for manual dragging.
+  // Keep side-panel layout updates to a single resize. Animating Allotment sizes
+  // forces repeated full-width reflow in WKWebView and makes toggles feel heavy.
   useEffect(() => {
     const split = horizontalSplitRef.current;
     const el = document.querySelector(
@@ -528,7 +521,6 @@ function AppInner() {
     if (total <= 0) return;
 
     let disposed = false;
-    const from = { ...horizontalLayoutRef.current };
     const to = {
       sidebar: sidebarOpen ? sidebarWidthRef.current : 0,
       rightPanel: rightPanelOpen ? rightPanelWidthRef.current : 0,
@@ -542,9 +534,9 @@ function AppInner() {
 
     if (!horizontalLayoutReadyRef.current) {
       horizontalLayoutReadyRef.current = true;
-      setSidebarPaneVisible(sidebarOpen);
-      setRightPanelPaneVisible(rightPanelOpen);
       requestAnimationFrame(() => {
+        setSidebarPaneVisible(sidebarOpen);
+        setRightPanelPaneVisible(rightPanelOpen);
         if (!disposed) applySizes(to.sidebar, to.rightPanel);
       });
       return () => {
@@ -552,49 +544,17 @@ function AppInner() {
       };
     }
 
-    horizontalAnimationRef.current?.stop();
-    if (sidebarOpen) setSidebarPaneVisible(true);
-    if (rightPanelOpen) setRightPanelPaneVisible(true);
-    setHorizontalPanelsAnimating(true);
-    el.classList.add("panel-animating");
-
+    setSidebarPaneVisible(sidebarOpen);
+    setRightPanelPaneVisible(rightPanelOpen);
     requestAnimationFrame(() => {
       if (disposed) return;
-
-      if (prefersReducedMotion) {
-        applySizes(to.sidebar, to.rightPanel);
-        setSidebarPaneVisible(sidebarOpen);
-        setRightPanelPaneVisible(rightPanelOpen);
-        setHorizontalPanelsAnimating(false);
-        el.classList.remove("panel-animating");
-        return;
-      }
-
-      horizontalAnimationRef.current = animate(0, 1, {
-        type: "spring",
-        duration: 0.3,
-        bounce: 0,
-        onUpdate: (progress) => {
-          applySizes(
-            from.sidebar + (to.sidebar - from.sidebar) * progress,
-            from.rightPanel + (to.rightPanel - from.rightPanel) * progress,
-          );
-        },
-        onComplete: () => {
-          setSidebarPaneVisible(sidebarOpen);
-          setRightPanelPaneVisible(rightPanelOpen);
-          setHorizontalPanelsAnimating(false);
-          el.classList.remove("panel-animating");
-        },
-      });
+      applySizes(to.sidebar, to.rightPanel);
     });
 
     return () => {
       disposed = true;
-      horizontalAnimationRef.current?.stop();
-      el.classList.remove("panel-animating");
     };
-  }, [prefersReducedMotion, rightPanelOpen, sidebarOpen]);
+  }, [rightPanelOpen, sidebarOpen]);
 
   // When sidebar or right-panel toggles, keep the File column at its previous
   // width so the freed space goes entirely to the Agent column.
@@ -716,28 +676,9 @@ function AppInner() {
   const sidebarPaneMounted = sidebarOpen || sidebarPaneVisible;
   const rightPanelPaneMounted = rightPanelOpen || rightPanelPaneVisible;
 
-  const renderAnimatedSidePanel = (
-    side: "left" | "right",
-    open: boolean,
-    children: ReactNode,
-  ) => {
-    const offset = side === "left" ? -12 : 12;
-    const motionEnabled = !prefersReducedMotion;
-    return (
-      <motion.div
-        className="size-full overflow-hidden"
-        initial={false}
-        animate={{
-          opacity: open || !motionEnabled ? 1 : 0,
-          x: open || !motionEnabled ? 0 : offset,
-          filter: open || !motionEnabled ? "blur(0px)" : "blur(2px)",
-        }}
-        transition={{ type: "spring", duration: 0.3, bounce: 0 }}
-      >
-        {children}
-      </motion.div>
-    );
-  };
+  const renderSidePanel = (children: ReactNode) => (
+    <div className="size-full overflow-hidden">{children}</div>
+  );
 
   const renderWorkspaceArea = () => {
     if (!hasFileTabs) {
@@ -953,13 +894,11 @@ function AppInner() {
             >
               <Allotment.Pane
                 preferredSize={sidebarPaneMounted ? sidebarWidthRef.current : 0}
-                minSize={
-                  sidebarOpen && !horizontalPanelsAnimating ? 220 : 0
-                }
+                minSize={sidebarOpen ? 220 : 0}
                 maxSize={sidebarPaneMounted ? 360 : 0}
                 visible={sidebarPaneMounted}
               >
-                {renderAnimatedSidePanel("left", sidebarOpen, <Sidebar />)}
+                {renderSidePanel(<Sidebar />)}
               </Allotment.Pane>
 
               <Allotment.Pane minSize={hasAnyContent ? 460 : 420}>
@@ -970,13 +909,11 @@ function AppInner() {
                 preferredSize={
                   rightPanelPaneMounted ? rightPanelWidthRef.current : 0
                 }
-                minSize={
-                  rightPanelOpen && !horizontalPanelsAnimating ? 320 : 0
-                }
+                minSize={rightPanelOpen ? 320 : 0}
                 maxSize={rightPanelPaneMounted ? 560 : 0}
                 visible={rightPanelPaneMounted}
               >
-                {renderAnimatedSidePanel("right", rightPanelOpen, <RightPanel />)}
+                {renderSidePanel(<RightPanel />)}
               </Allotment.Pane>
             </Allotment>
           </div>
