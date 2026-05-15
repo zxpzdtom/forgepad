@@ -3,7 +3,6 @@ import { dirname, join, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
 
 const root = resolve(new URL("..", import.meta.url).pathname);
-const includeNode = process.argv.includes("--include-node");
 const appName = "ForgePad";
 const bundleRoot = join(root, "dist", "native-mac");
 const appRoot = join(bundleRoot, `${appName}.app`);
@@ -30,9 +29,6 @@ mkdirSync(macOS, { recursive: true });
 mkdirSync(resources, { recursive: true });
 
 run("pnpm", ["vite:build"]);
-if (includeNode) {
-  run("pnpm", ["backend:build"]);
-}
 run("cargo", [
   "build",
   "--release",
@@ -65,16 +61,9 @@ const coreBinary = join(
 
 copyFileOrDir(hostBinary, join(macOS, "ForgePadHost"));
 copyFileOrDir(coreBinary, join(resources, "forgepad-core-daemon"));
-if (includeNode) {
-  copyFileOrDir(process.execPath, join(resources, "node"));
-  copyFileOrDir(join(root, "out", "backend", "index.js"), join(resources, "backend", "index.js"));
-}
 copyFileOrDir(join(root, "dist", "renderer"), join(resources, "renderer"));
 chmodSync(join(macOS, "ForgePadHost"), 0o755);
 chmodSync(join(resources, "forgepad-core-daemon"), 0o755);
-if (includeNode) {
-  chmodSync(join(resources, "node"), 0o755);
-}
 
 const iconPath = join(root, "build", "icon.icns");
 if (existsSync(iconPath)) {
@@ -117,4 +106,4 @@ writeFileSync(join(contents, "PkgInfo"), "APPL????");
 
 run("xattr", ["-cr", appRoot]);
 
-console.log(`\nCreated ${appRoot}${includeNode ? " (portable, bundled Node backend)" : " (slim, Rust backend)"}`);
+console.log(`\nCreated ${appRoot} (Rust backend)`);

@@ -9,7 +9,6 @@ final class MainWindowController: NSWindowController, WKNavigationDelegate {
 
     convenience init(
         coreSupervisor: CoreSupervisor,
-        backendSupervisor: BackendSupervisor,
         openBrowserWindow: @escaping (URL, String?) -> Void
     ) {
         let window = NSWindow(
@@ -28,7 +27,6 @@ final class MainWindowController: NSWindowController, WKNavigationDelegate {
         self.init(
             window: window,
             coreSupervisor: coreSupervisor,
-            backendSupervisor: backendSupervisor,
             openBrowserWindow: openBrowserWindow
         )
     }
@@ -36,12 +34,10 @@ final class MainWindowController: NSWindowController, WKNavigationDelegate {
     init(
         window: NSWindow,
         coreSupervisor: CoreSupervisor,
-        backendSupervisor: BackendSupervisor,
         openBrowserWindow: @escaping (URL, String?) -> Void
     ) {
         self.bridge = HostBridge(
             coreSupervisor: coreSupervisor,
-            backendSupervisor: backendSupervisor,
             openBrowserWindow: openBrowserWindow
         )
         super.init(window: window)
@@ -180,25 +176,5 @@ final class MainWindowController: NSWindowController, WKNavigationDelegate {
             return
         }
         emit(name: type, payload: event["payload"] ?? NSNull())
-    }
-
-    func handleBackendEvent(_ event: [String: Any]) {
-        guard let type = event["type"] as? String else { return }
-        switch type {
-        case "agent.statusUpdate":
-            emit(name: "agent:status-update", payload: event["payload"] ?? NSNull())
-        case "agent.renameTab":
-            emit(name: "agent:rename-tab", payload: event["payload"] ?? NSNull())
-        case "agent.permissionRequest":
-            emit(name: "agent:permission-request", payload: event["payload"] ?? NSNull())
-        case "agent.permissionClear":
-            emit(name: "agent:permission-clear", payload: event["payload"] ?? NSNull())
-        case "agent.userPrompt":
-            emit(name: "agent:user-prompt", payload: event["payload"] ?? NSNull())
-        case "agent.completion":
-            emit(name: "agent:completion", payload: event["payload"] ?? NSNull())
-        default:
-            emit(name: type, payload: event["payload"] ?? NSNull())
-        }
     }
 }

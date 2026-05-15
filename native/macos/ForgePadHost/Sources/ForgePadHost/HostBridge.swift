@@ -3,17 +3,14 @@ import WebKit
 
 final class HostBridge: NSObject, WKScriptMessageHandler {
     private let coreSupervisor: CoreSupervisor
-    private let backendSupervisor: BackendSupervisor
     private let openBrowserWindow: (URL, String?) -> Void
     private let stateURL: URL
 
     init(
         coreSupervisor: CoreSupervisor,
-        backendSupervisor: BackendSupervisor,
         openBrowserWindow: @escaping (URL, String?) -> Void
     ) {
         self.coreSupervisor = coreSupervisor
-        self.backendSupervisor = backendSupervisor
         self.openBrowserWindow = openBrowserWindow
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? FileManager.default.homeDirectoryForCurrentUser

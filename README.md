@@ -40,11 +40,7 @@ ForgePad is organized around three main areas:
 pnpm install
 ```
 
-`node-pty` is rebuilt automatically during `postinstall`. If the native module needs a manual rebuild:
-
-```bash
-pnpm rebuild
-```
+The native macOS package uses the Rust core for PTY and backend behavior, so it does not rebuild or bundle a Node backend.
 
 ## Development
 
@@ -107,8 +103,7 @@ pnpm tauri:build
 | `pnpm check` | Run Biome checks |
 | `pnpm check:write` | Apply Biome fixes where possible |
 | `pnpm vite:build` | Build the renderer |
-| `pnpm native:mac:package` | Build the slim native macOS bundle with Rust backend |
-| `pnpm native:mac:package:portable` | Build the native macOS bundle with bundled Node backend |
+| `pnpm native:mac:package` | Build the native macOS bundle with Swift host and Rust backend |
 
 ## Project Structure
 

@@ -2,7 +2,6 @@ import AppKit
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var windowController: MainWindowController?
-    private let backendSupervisor = BackendSupervisor()
     private let coreSupervisor = CoreSupervisor()
     private var browserWindows: [BrowserWindowController] = []
 
@@ -12,7 +11,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let controller = MainWindowController(
             coreSupervisor: coreSupervisor,
-            backendSupervisor: backendSupervisor,
             openBrowserWindow: { [weak self] url, title in
                 self?.openBrowserWindow(url: url, title: title)
             }
@@ -21,14 +19,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         coreSupervisor.onEvent = { [weak controller] event in
             controller?.handleCoreEvent(event)
         }
-        backendSupervisor.onEvent = { [weak controller] event in
-            controller?.handleBackendEvent(event)
-        }
         controller.load()
-        if ProcessInfo.processInfo.environment["FORGEPAD_ENABLE_NODE_BACKEND"] == "1" ||
-            ProcessInfo.processInfo.environment["FORGEPAD_BACKEND_COMMAND"] != nil {
-            backendSupervisor.startIfConfigured()
-        }
 
         NSApplication.shared.activate(ignoringOtherApps: true)
     }
@@ -39,7 +30,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         coreSupervisor.stop()
-        backendSupervisor.stop()
     }
 
     private func openBrowserWindow(url: URL, title: String?) {

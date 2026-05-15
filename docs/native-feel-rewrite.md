@@ -127,15 +127,13 @@ This branch has started the split without breaking the existing app:
 - `crates/forgepad-core` exists as the extraction target for host-independent Rust services.
 - The first extracted Rust modules cover command execution, path safety, file tree/list/read/write helpers, Git/worktree operations, PTY lifecycle/replay/event callbacks, context bundle generation, and persisted state load/save.
 - `native/macos/ForgePadHost` is a compiling Swift/AppKit + WKWebView host spike with native menu wiring, delayed WebView reveal, and a document-start `window.forgepad` compatibility bridge.
-- `backend/src/index.ts` remains as an optional supervised JS backend process entry. The Swift host can start it with `FORGEPAD_BACKEND_COMMAND` or `FORGEPAD_ENABLE_NODE_BACKEND=1`.
 - `crates/forgepad-core/src/hooks.rs` now owns the default hook HTTP server, permission hold/resolve, prompt/stop parsing, and agent lifecycle events.
 - `forgepad-core-daemon` emits `core.ready` with `hookPort`, and agent PTYs receive `FORGEPAD_PORT` plus `FORGEPAD_PTY_ID` so existing hook scripts can call Rust directly.
 - `forgepad-core-daemon` is a JSON-lines Rust core coordinator. The Swift host supervises it with `CoreSupervisor`, sends host bridge commands over stdio, and forwards PTY events back to React.
 - Native browser popout now uses AppKit `NSWindow` + `WKWebView` through `BrowserWindowController`, replacing Electron popout for that path.
 - `crates/forgepad-core/src/lsp.rs` now owns text definition search parsing, further shrinking host responsibilities.
 - The macOS host loads bundled renderer assets through a Swift-owned `forgepad://` URL scheme. This avoids WKWebView `file://` ES module failure while keeping the WebView as a rendering surface.
-- `pnpm native:mac:package` now builds a slim Rust-backend bundle. It excludes Node and the Node backend.
-- `pnpm native:mac:package:portable` builds a self-contained legacy JS-backend bundle with the current Node binary copied into `Contents/Resources/node`.
+- `pnpm native:mac:package` now builds a Swift-hosted, Rust-backend bundle. It excludes Node and the legacy JS backend.
 
 ## Native Binding Strategy
 
@@ -151,7 +149,7 @@ The active implementation now uses the Rust subprocess route first. This keeps t
 Initial targets are intentionally practical:
 
 - Packaged app should remove bundled Chromium by removing Electron.
-- Current slim macOS bundle is about 39 MB and has no Node runtime. The portable bundle is about 120-130 MB larger because it includes Node.
+- Current macOS bundle is about 39 MB and has no Node runtime.
 - Current renderer assets are about 34 MB. The biggest remaining frontend chunks are Mermaid, Shiki language/theme assets, terminal/browser UI, and syntax-heavy editor paths.
 - Idle memory should be measured in three buckets: native shell, WebView renderer, backend/Rust services.
 - Baseline target after Electron removal: under current Electron idle usage by at least 30%.
@@ -161,7 +159,7 @@ Initial targets are intentionally practical:
 
 - Browser tabs and extension APIs are currently Electron-shaped.
 - See `docs/browser-migration.md` for the plan to replace Electron `<webview>` and `webContentsId`.
-- `node-pty` and `portable-pty` need one chosen owner; the target is Rust core.
+- PTY ownership has moved to `portable-pty` in Rust core for the native runtime.
 - IPC contract generation is not implemented yet.
 - A real native shell needs Xcode and Visual Studio project scaffolding, not just Rust/Tauri.
 - Some "lightness" gains may come from removing features or lazy-loading windows, not only changing frameworks.
