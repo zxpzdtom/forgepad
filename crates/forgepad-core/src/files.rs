@@ -73,6 +73,20 @@ pub fn read_file_data_url(worktree_path: impl AsRef<Path>, rel_path: &str) -> Co
     ))
 }
 
+pub fn read_abs_file(abs_path: impl AsRef<Path>) -> CoreResult<String> {
+    fs::read_to_string(abs_path).map_err(err)
+}
+
+pub fn read_abs_file_data_url(abs_path: impl AsRef<Path>) -> CoreResult<String> {
+    let path = abs_path.as_ref();
+    let data = fs::read(path).map_err(err)?;
+    Ok(format!(
+        "data:{};base64,{}",
+        mime_for(path),
+        BASE64.encode(data)
+    ))
+}
+
 pub fn write_file(
     worktree_path: impl AsRef<Path>,
     rel_path: &str,
@@ -176,6 +190,19 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         write_file(dir.path(), "nested/file.txt", "hello").unwrap();
         assert_eq!(read_file(dir.path(), "nested/file.txt").unwrap(), "hello");
+    }
+
+    #[test]
+    fn read_abs_file_data_url_uses_file_mime() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("icon.svg");
+        fs::write(&file, "<svg></svg>").unwrap();
+
+        assert!(
+            read_abs_file_data_url(&file)
+                .unwrap()
+                .starts_with("data:image/svg+xml;base64,")
+        );
     }
 
     #[test]

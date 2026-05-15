@@ -57,8 +57,7 @@ final class HostBridge: NSObject, WKScriptMessageHandler {
                 openProject { result in continuation.resume(returning: (result ?? NSNull()) as Any) }
             }
         case "app.openProjectFromPath":
-            guard let selectedPath = params["selectedPath"] as? String else { return NSNull() }
-            return projectResult(for: selectedPath) ?? NSNull()
+            return try await coreSupervisor.request(command: "app.projectFromPath", params: params)
         case "app.pickDirectory":
             return await withCheckedContinuation { continuation in
                 pickDirectory(title: params["title"] as? String) { result in continuation.resume(returning: (result ?? NSNull()) as Any) }
@@ -108,7 +107,17 @@ final class HostBridge: NSObject, WKScriptMessageHandler {
                 completion(nil)
                 return
             }
-            completion(self.projectResult(for: path))
+            Task { @MainActor in
+                do {
+                    let value = try await self.coreSupervisor.request(
+                        command: "app.projectFromPath",
+                        params: ["selectedPath": path]
+                    )
+                    completion(value as? [String: Any])
+                } catch {
+                    completion(nil)
+                }
+            }
         }
     }
 
@@ -123,51 +132,13 @@ final class HostBridge: NSObject, WKScriptMessageHandler {
         }
     }
 
-    private func projectResult(for path: String) -> [String: Any]? {
-        let url = URL(fileURLWithPath: path)
-        guard FileManager.default.fileExists(atPath: url.path) else { return nil }
-        let name = url.lastPathComponent.isEmpty ? "Project" : url.lastPathComponent
-        return [
-            "name": name,
-            "repoPath": url.path,
-            "branch": currentBranch(at: url) ?? "main",
-            "isGitRepo": isGitRepo(url)
-        ]
-    }
-
-    private func isGitRepo(_ url: URL) -> Bool {
-        runGit(["rev-parse", "--is-inside-work-tree"], cwd: url) == "true"
-    }
-
-    private func currentBranch(at url: URL) -> String? {
-        runGit(["branch", "--show-current"], cwd: url)
-    }
-
-    private func runGit(_ args: [String], cwd: URL) -> String? {
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-        process.arguments = ["git"] + args
-        process.currentDirectoryURL = cwd
-        let pipe = Pipe()
-        process.standardOutput = pipe
-        process.standardError = Pipe()
-        do {
-            try process.run()
-            process.waitUntilExit()
-            guard process.terminationStatus == 0 else { return nil }
-            let data = pipe.fileHandleForReading.readDataToEndOfFile()
-            return String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
-        } catch {
-            return nil
-        }
-    }
-
     private func isCoreCommand(_ command: String) -> Bool {
         command.hasPrefix("git.") ||
             command.hasPrefix("fs.") ||
             command.hasPrefix("pty.") ||
             command.hasPrefix("context.") ||
             command.hasPrefix("lsp.") ||
+            command == "app.projectFromPath" ||
             command.hasPrefix("agent.")
     }
 

@@ -3,7 +3,7 @@ use std::io::{self, BufRead, Write};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 
-use forgepad_core::{context, files, git, hooks, lsp, pty, state};
+use forgepad_core::{app, context, files, git, hooks, lsp, pty, state};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
@@ -127,6 +127,11 @@ fn dispatch(
     params: Value,
 ) -> Result<Value, String> {
     match command {
+        "app.projectFromPath" => {
+            let selected_path = string_param(&params, "selectedPath")?;
+            serde_json::to_value(app::project_from_path(Path::new(&selected_path))?)
+                .map_err(|e| e.to_string())
+        }
         "state.load" => serde_json::to_value(state::load_state()?).map_err(|e| e.to_string()),
         "state.save" => {
             state::save_state(params.get("state").unwrap_or(&Value::Null))?;
@@ -252,6 +257,14 @@ fn dispatch(
             let worktree_path = string_param(&params, "worktreePath")?;
             let rel_path = string_param(&params, "relPath")?;
             Ok(json!(files::read_file_data_url(worktree_path, &rel_path)?))
+        }
+        "fs.readAbsFile" => {
+            let abs_path = string_param(&params, "absPath")?;
+            Ok(json!(files::read_abs_file(abs_path)?))
+        }
+        "fs.readAbsFileDataUrl" => {
+            let abs_path = string_param(&params, "absPath")?;
+            Ok(json!(files::read_abs_file_data_url(abs_path)?))
         }
         "fs.writeFile" => {
             let worktree_path = string_param(&params, "worktreePath")?;

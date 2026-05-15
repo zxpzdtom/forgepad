@@ -130,6 +130,7 @@ This branch has started the split without breaking the existing app:
 - `crates/forgepad-core/src/hooks.rs` now owns the default hook HTTP server, permission hold/resolve, prompt/stop parsing, and agent lifecycle events.
 - `forgepad-core-daemon` emits `core.ready` with `hookPort`, and agent PTYs receive `FORGEPAD_PORT` plus `FORGEPAD_PTY_ID` so existing hook scripts can call Rust directly.
 - `forgepad-core-daemon` is a JSON-lines Rust core coordinator. The Swift host supervises it with `CoreSupervisor`, sends host bridge commands over stdio, and forwards PTY events back to React.
+- Project metadata resolution for opened folders and absolute-file reads now run through the Rust core; Swift keeps native file panels, shell integration, and window responsibilities.
 - Native browser popout now uses AppKit `NSWindow` + `WKWebView` through `BrowserWindowController`, replacing Electron popout for that path.
 - `crates/forgepad-core/src/lsp.rs` now owns text definition search parsing, further shrinking host responsibilities.
 - The macOS host loads bundled renderer assets through a Swift-owned `forgepad://` URL scheme. This avoids WKWebView `file://` ES module failure while keeping the WebView as a rendering surface.
