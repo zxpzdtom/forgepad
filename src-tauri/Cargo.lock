@@ -1098,6 +1098,7 @@ dependencies = [
  "base64 0.22.1",
  "chrono",
  "dirs 5.0.1",
+ "forgepad-core",
  "ignore",
  "notify",
  "objc2",
@@ -1111,6 +1112,20 @@ dependencies = [
  "tauri-plugin-dialog",
  "tauri-plugin-opener",
  "tauri-plugin-shell",
+ "uuid",
+]
+
+[[package]]
+name = "forgepad-core"
+version = "0.1.0"
+dependencies = [
+ "base64 0.22.1",
+ "chrono",
+ "dirs 5.0.1",
+ "ignore",
+ "portable-pty",
+ "serde",
+ "serde_json",
  "uuid",
 ]
 

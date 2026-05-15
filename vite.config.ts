@@ -9,6 +9,7 @@ const fromRoot = (path: string) => resolve(root, path);
 
 export default defineConfig({
   root: fromRoot("src/renderer"),
+  base: "./",
   plugins: [react(), tailwindcss()],
   clearScreen: false,
   server: {

@@ -1,0 +1,351 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "name": "forgepad.hostBridge",
+  "version": 1,
+  "description": "Renderer-facing host contract for the native-feel ForgePad rewrite. This is the source of truth to replace divergent Electron preload and Tauri invoke surfaces.",
+  "events": {
+    "fs.changed": {
+      "payload": "WorkspaceChangeEvent"
+    },
+    "pty.data": {
+      "payload": {
+        "id": "string",
+        "data": "string"
+      }
+    },
+    "pty.exit": {
+      "payload": {
+        "id": "string",
+        "exitCode": "number",
+        "signal": "number?"
+      }
+    },
+    "agent.statusUpdate": {
+      "payload": "AgentStatusUpdate"
+    },
+    "agent.focusTab": {
+      "payload": {
+        "ptyId": "string"
+      }
+    },
+    "agent.renameTab": {
+      "payload": {
+        "ptyId": "string",
+        "title": "string"
+      }
+    },
+    "agent.permissionRequest": {
+      "payload": "PendingPermission"
+    },
+    "agent.userPrompt": {
+      "payload": "AgentUserPromptData"
+    },
+    "agent.completion": {
+      "payload": "AgentCompletionData"
+    },
+    "menu.openSettings": {
+      "payload": "void"
+    }
+  },
+  "commands": {
+    "app.openProject": {
+      "params": {},
+      "result": "OpenProjectResult?"
+    },
+    "app.openProjectFromPath": {
+      "params": {
+        "selectedPath": "string"
+      },
+      "result": "OpenProjectResult?"
+    },
+    "app.pickDirectory": {
+      "params": {
+        "title": "string?"
+      },
+      "result": "string?"
+    },
+    "app.showEmojiPanel": {
+      "params": {},
+      "result": "void",
+      "nativeOwner": true
+    },
+    "app.setIcon": {
+      "params": {
+        "variant": "string"
+      },
+      "result": "void",
+      "nativeOwner": true
+    },
+    "app.isFocused": {
+      "params": {},
+      "result": "boolean",
+      "nativeOwner": true
+    },
+    "app.focusWindow": {
+      "params": {},
+      "result": "void",
+      "nativeOwner": true
+    },
+    "app.toggleMaximize": {
+      "params": {},
+      "result": "void",
+      "nativeOwner": true
+    },
+    "state.load": {
+      "params": {},
+      "result": "PersistedAppState?"
+    },
+    "state.save": {
+      "params": {
+        "state": "PersistedAppState"
+      },
+      "result": "void"
+    },
+    "git.currentBranch": {
+      "params": {
+        "worktreePath": "string"
+      },
+      "result": "string",
+      "coreOwner": "rust"
+    },
+    "git.branchStats": {
+      "params": {
+        "worktreePath": "string"
+      },
+      "result": "BranchStats",
+      "coreOwner": "rust"
+    },
+    "git.status": {
+      "params": {
+        "worktreePath": "string"
+      },
+      "result": "FileStatus[]",
+      "coreOwner": "rust"
+    },
+    "git.fileDiff": {
+      "params": {
+        "worktreePath": "string",
+        "relPath": "string",
+        "bucket": "GitBucket",
+        "status": "GitStatusKind",
+        "oldPath": "string?"
+      },
+      "result": "string",
+      "coreOwner": "rust"
+    },
+    "git.stage": {
+      "params": {
+        "worktreePath": "string",
+        "paths": "string[]"
+      },
+      "result": "void",
+      "coreOwner": "rust"
+    },
+    "git.unstage": {
+      "params": {
+        "worktreePath": "string",
+        "paths": "string[]"
+      },
+      "result": "void",
+      "coreOwner": "rust"
+    },
+    "git.discard": {
+      "params": {
+        "worktreePath": "string",
+        "entries": "GitDiscardEntry[]"
+      },
+      "result": "void",
+      "coreOwner": "rust"
+    },
+    "git.commit": {
+      "params": {
+        "worktreePath": "string",
+        "message": "string"
+      },
+      "result": "void",
+      "coreOwner": "rust"
+    },
+    "git.push": {
+      "params": {
+        "worktreePath": "string"
+      },
+      "result": "void",
+      "coreOwner": "rust"
+    },
+    "git.pull": {
+      "params": {
+        "worktreePath": "string"
+      },
+      "result": "void",
+      "coreOwner": "rust"
+    },
+    "git.worktreeAdd": {
+      "params": {
+        "repoPath": "string",
+        "branch": "string",
+        "trackRemote": "boolean?",
+        "worktreeBaseDir": "string?"
+      },
+      "result": "WorktreeAddResult",
+      "coreOwner": "rust"
+    },
+    "git.worktreeRemove": {
+      "params": {
+        "repoPath": "string",
+        "worktreePath": "string",
+        "branch": "string"
+      },
+      "result": "void",
+      "coreOwner": "rust"
+    },
+    "git.scanWorktrees": {
+      "params": {
+        "baseDir": "string"
+      },
+      "result": "WorktreeSummary[]",
+      "coreOwner": "rust"
+    },
+    "fs.treeWithStatus": {
+      "params": {
+        "worktreePath": "string"
+      },
+      "result": "FileNode[]",
+      "coreOwner": "rust"
+    },
+    "fs.listFiles": {
+      "params": {
+        "worktreePath": "string"
+      },
+      "result": "string[]",
+      "coreOwner": "rust"
+    },
+    "fs.readFile": {
+      "params": {
+        "worktreePath": "string",
+        "relPath": "string"
+      },
+      "result": "string",
+      "coreOwner": "rust"
+    },
+    "fs.readFileDataUrl": {
+      "params": {
+        "worktreePath": "string",
+        "relPath": "string"
+      },
+      "result": "string",
+      "coreOwner": "rust"
+    },
+    "fs.writeFile": {
+      "params": {
+        "worktreePath": "string",
+        "relPath": "string",
+        "content": "string"
+      },
+      "result": "void",
+      "coreOwner": "rust"
+    },
+    "fs.watch": {
+      "params": {
+        "worktreePath": "string"
+      },
+      "result": "string",
+      "coreOwner": "rust"
+    },
+    "fs.unwatch": {
+      "params": {
+        "watchId": "string"
+      },
+      "result": "void",
+      "coreOwner": "rust"
+    },
+    "pty.create": {
+      "params": {
+        "worktreePath": "string",
+        "shell": "string?",
+        "command": "string?",
+        "extraEnv": "Record<string,string>?"
+      },
+      "result": "string",
+      "coreOwner": "rust"
+    },
+    "pty.write": {
+      "params": {
+        "id": "string",
+        "data": "string"
+      },
+      "result": "void",
+      "coreOwner": "rust"
+    },
+    "pty.resize": {
+      "params": {
+        "id": "string",
+        "cols": "number",
+        "rows": "number"
+      },
+      "result": "void",
+      "coreOwner": "rust"
+    },
+    "pty.destroy": {
+      "params": {
+        "id": "string"
+      },
+      "result": "void",
+      "coreOwner": "rust"
+    },
+    "pty.reattach": {
+      "params": {
+        "id": "string"
+      },
+      "result": "PtyReplay",
+      "coreOwner": "rust"
+    },
+    "context.createBundle": {
+      "params": {
+        "input": "CreateBundleInput"
+      },
+      "result": "ContextBundleResult",
+      "coreOwner": "rust"
+    },
+    "shell.openPath": {
+      "params": {
+        "fullPath": "string"
+      },
+      "result": "void",
+      "nativeOwner": true
+    },
+    "shell.openExternal": {
+      "params": {
+        "url": "string"
+      },
+      "result": "void",
+      "nativeOwner": true
+    },
+    "shell.showItemInFolder": {
+      "params": {
+        "fullPath": "string"
+      },
+      "result": "void",
+      "nativeOwner": true
+    },
+    "browser.openWindow": {
+      "params": {
+        "url": "string",
+        "title": "string?"
+      },
+      "result": "void",
+      "nativeOwner": true,
+      "migrationRisk": "Electron webContents IDs and <webview> tabs must be replaced by native WebView windows."
+    },
+    "notification.pickAudio": {
+      "params": {},
+      "result": "PickedAudio?",
+      "nativeOwner": true
+    },
+    "notification.deleteAudio": {
+      "params": {
+        "assetPath": "string"
+      },
+      "result": "void"
+    }
+  }
+}

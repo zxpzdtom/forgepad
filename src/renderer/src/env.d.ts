@@ -1,9 +1,9 @@
-import type { ForgePadApi } from './tauri-api';
+import type { HostBridgeApi } from '@shared/host-bridge';
 import type { ForgePadPetApi } from '../../preload/pet';
 
 declare global {
   interface Window {
-    forgepad: ForgePadApi;
+    forgepad: HostBridgeApi;
     forgepadPet?: ForgePadPetApi;
     __TAURI_INTERNALS__?: unknown;
   }

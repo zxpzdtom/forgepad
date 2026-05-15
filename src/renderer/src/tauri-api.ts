@@ -1,4 +1,5 @@
 import type { AgentStatusUpdate } from '@shared/agent-lifecycle';
+import type { HostBridgeApi } from '@shared/host-bridge';
 import type {
   ContextBundleResult,
   CreateBundleInput,
@@ -42,7 +43,7 @@ function onEvent<T>(event: string, callback: (payload: T) => void) {
   };
 }
 
-export const tauriForgepadApi = {
+export const tauriForgepadApi: HostBridgeApi = {
   app: {
     openProject: () => invoke<OpenProjectResult | null>('app_open_project'),
     openProjectFromPath: (selectedPath: string) => invoke<OpenProjectResult | null>('app_open_project_from_path', { selectedPath }),
@@ -167,4 +168,4 @@ if (isTauri && !window.forgepad) {
   window.forgepad = tauriForgepadApi;
 }
 
-export type ForgePadApi = typeof tauriForgepadApi;
+export type ForgePadApi = HostBridgeApi;

@@ -1,4 +1,5 @@
 import type { AgentStatusUpdate } from "@shared/agent-lifecycle";
+import type { HostBridgeApi } from "@shared/host-bridge";
 import { IPC } from "@shared/ipc";
 import type {
   AgentCompletionData,
@@ -24,7 +25,7 @@ import type {
 } from "@shared/types";
 import { contextBridge, ipcRenderer, webUtils } from "electron";
 
-const api = {
+const api: HostBridgeApi = {
   app: {
     openProject: () =>
       ipcRenderer.invoke(
@@ -530,4 +531,4 @@ const api = {
 
 contextBridge.exposeInMainWorld("forgepad", api);
 
-export type ForgePadApi = typeof api;
+export type ForgePadApi = HostBridgeApi;
