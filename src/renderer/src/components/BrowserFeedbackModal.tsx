@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { File as PierreFile } from '@pierre/diffs/react';
-import { useResolvedTheme } from '@renderer/App';
+import { useResolvedTheme } from '@renderer/theme-context';
 import { useTranslation } from '@renderer/i18n';
 import { ChevronDown, MessageSquare, Send, X } from 'lucide-react';
 
@@ -50,7 +50,7 @@ export function BrowserFeedbackModal() {
   const canSubmit = comment.trim().length > 0;
 
   return (
-    <div className="fixed inset-0 z-[10000] grid place-items-center bg-black/85" onMouseDown={handleCancel}>
+    <div className="fixed inset-0 z-[10000] grid place-items-center bg-black/45 backdrop-blur-[2px]" onMouseDown={handleCancel}>
       <div
         className="flex max-h-[80vh] w-[min(520px,calc(100vw-32px))] flex-col overflow-hidden rounded-xl border border-border bg-surface-dialog shadow-[0_28px_70px_rgba(0,0,0,0.46)]"
         onMouseDown={(e) => e.stopPropagation()}

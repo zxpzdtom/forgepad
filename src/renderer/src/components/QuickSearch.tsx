@@ -4,7 +4,6 @@ import { useTranslation } from '@renderer/i18n';
 import {
   Bell,
   Bot,
-  CornerDownLeft,
   FileCode2,
   FolderOpen,
   GitBranch,
@@ -79,6 +78,16 @@ function matches(item: QuickSearchItem, query: string): boolean {
   const haystack = `${item.label} ${item.detail}`.toLowerCase();
   const words = query.trim().toLowerCase().split(/\s+/);
   return words.every((word) => haystack.includes(word));
+}
+
+function actionLabel(item: QuickSearchItem) {
+  if (item.id.startsWith('theme:')) return 'Apply';
+  if (item.id.startsWith('tab:')) return 'Switch';
+  if (item.id.startsWith('workspace:')) return 'Open';
+  if (item.id.startsWith('file:')) return 'Open';
+  if (item.id.startsWith('panel-')) return 'Show';
+  if (item.id.startsWith('agent:') || item.id === 'new-terminal') return 'New';
+  return 'Run';
 }
 
 export function QuickSearch({ open, onClose }: QuickSearchProps) {
@@ -455,7 +464,7 @@ export function QuickSearch({ open, onClose }: QuickSearchProps) {
             filteredItems.map((item, index) => (
               <button
                 className={clsx(
-                  'grid h-9 w-full grid-cols-[24px_minmax(120px,auto)_minmax(0,1fr)_18px] items-center gap-3 rounded-lg px-3 text-left transition-colors',
+                  'grid h-9 w-full grid-cols-[24px_minmax(120px,auto)_minmax(0,1fr)_52px] items-center gap-3 rounded-lg px-3 text-left transition-colors',
                   index === selectedIndex ? 'bg-panel-3 text-text' : 'text-muted hover:bg-panel-2 hover:text-text',
                 )}
                 key={item.id}
@@ -471,7 +480,14 @@ export function QuickSearch({ open, onClose }: QuickSearchProps) {
                 <span className="max-w-[400px] overflow-hidden text-ellipsis whitespace-nowrap text-muted text-sm">
                   {item.detail}
                 </span>
-                <CornerDownLeft size={15} className="text-subtle" />
+                <span
+                  className={clsx(
+                    'justify-self-end rounded border border-border px-1.5 py-0.5 font-[520] text-[10px]',
+                    index === selectedIndex ? 'text-muted' : 'text-subtle/70',
+                  )}
+                >
+                  {actionLabel(item)}
+                </span>
               </button>
             ))
           )}

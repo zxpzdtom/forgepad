@@ -5,6 +5,20 @@ enum HostBridgeBootstrap {
     (() => {
       if (window.forgepad) return;
 
+      if (!window.__forgepadKeepWarm) {
+        window.__forgepadKeepWarm = true;
+        const keepWarm = () => window.requestAnimationFrame(keepWarm);
+        window.requestAnimationFrame(keepWarm);
+      }
+
+      document.addEventListener("DOMContentLoaded", () => {
+        const prewarm = document.createElement("span");
+        prewarm.textContent = "ForgePad";
+        prewarm.style.cssText = "position:fixed;left:-9999px;top:-9999px;font:13px -apple-system,BlinkMacSystemFont,'SF Pro Text',sans-serif;opacity:0;pointer-events:none;";
+        document.documentElement.appendChild(prewarm);
+        window.requestAnimationFrame(() => prewarm.remove());
+      }, { once: true });
+
       function nativeLog(level, args) {
         try {
           window.webkit.messageHandlers.forgepadHost.postMessage({
@@ -79,7 +93,7 @@ enum HostBridgeBootstrap {
           openProjectFromPath: (selectedPath) => invoke("app.openProjectFromPath", { selectedPath }),
           showEmojiPanel: () => invoke("app.showEmojiPanel"),
           pickDirectory: (title) => invoke("app.pickDirectory", { title }),
-          setIcon: (_variant) => noopVoidPromise()
+          setIcon: (variant) => invoke("app.setIcon", { variant })
         },
         state: {
           load: () => invoke("state.load"),
@@ -101,19 +115,21 @@ enum HostBridgeBootstrap {
           removeWorktree: (repoPath, worktreePath, branch) => invoke("git.worktreeRemove", { repoPath, worktreePath, branch }),
           fetch: (repoPath) => invoke("git.fetch", { repoPath }),
           listRemoteBranches: (repoPath) => invoke("git.remoteBranches", { repoPath }),
-          getPrInfo: () => Promise.resolve(null),
+          getPrInfo: (worktreePath) => invoke("git.prInfo", { worktreePath }),
           scanWorktrees: (baseDir) => invoke("git.scanWorktrees", { baseDir })
         },
         fs: {
           getTreeWithStatus: (worktreePath) => invoke("fs.treeWithStatus", { worktreePath }),
           listFiles: (worktreePath) => invoke("fs.listFiles", { worktreePath }),
           readFile: (worktreePath, relPath) => invoke("fs.readFile", { worktreePath, relPath }),
+          readFilePreview: (worktreePath, relPath, maxBytes) => invoke("fs.readFilePreview", { worktreePath, relPath, maxBytes }),
           readFileAsDataUrl: (worktreePath, relPath) => invoke("fs.readFileDataUrl", { worktreePath, relPath }),
           readAbsFile: (absPath) => invoke("fs.readAbsFile", { absPath }),
+          readAbsFilePreview: (absPath, maxBytes) => invoke("fs.readAbsFilePreview", { absPath, maxBytes }),
           readAbsFileAsDataUrl: (absPath) => invoke("fs.readAbsFileDataUrl", { absPath }),
           writeFile: (worktreePath, relPath, content) => invoke("fs.writeFile", { worktreePath, relPath, content }),
-          watchWorkspace: () => Promise.resolve("native-watch-unimplemented"),
-          unwatchWorkspace: noopVoid,
+          watchWorkspace: (worktreePath) => invoke("fs.watchWorkspace", { worktreePath }),
+          unwatchWorkspace: (watchId) => { invoke("fs.unwatchWorkspace", { watchId }); },
           onChanged: (_watchId, callback) => on("fs.changed", callback)
         },
         pty: {
@@ -139,32 +155,30 @@ enum HostBridgeBootstrap {
         shell: {
           openPath: (fullPath) => invoke("shell.openPath", { fullPath }),
           openExternal: (url) => invoke("shell.openExternal", { url }),
-          openInIde: noopVoidPromise,
-          openInTerminal: noopVoidPromise,
+          openInIde: (fullPath) => invoke("shell.openInIde", { fullPath }),
+          openInTerminal: (fullPath) => invoke("shell.openInTerminal", { fullPath }),
           showItemInFolder: (fullPath) => invoke("shell.showItemInFolder", { fullPath }),
-          detectIdes: () => Promise.resolve([]),
-          openWithIde: noopVoidPromise,
-          detectTerminals: () => Promise.resolve([]),
-          openWithTerminal: noopVoidPromise
+          detectIdes: () => invoke("shell.detectIdes"),
+          openWithIde: (fullPath, ideId) => invoke("shell.openWithIde", { fullPath, ideId }),
+          detectTerminals: () => invoke("shell.detectTerminals"),
+          openWithTerminal: (fullPath, terminalId) => invoke("shell.openWithTerminal", { fullPath, terminalId })
+        },
+        dialog: {
+          confirm: (options) => invoke("dialog.confirm", options || {})
         },
         notification: {
-          pickAudio: () => Promise.resolve(null),
-          deleteAudio: noopVoidPromise
+          pickAudio: () => invoke("notification.pickAudio"),
+          deleteAudio: (assetPath) => invoke("notification.deleteAudio", { assetPath })
         },
         app2: {
           isFocused: () => invoke("app.isFocused"),
-          focusWindow: () => { invoke("app.focusWindow"); }
+          focusWindow: () => { invoke("app.focusWindow"); },
+          toggleMaximize: () => { invoke("app.toggleMaximize"); }
         },
+        native: {},
         nativeFiles: { getPath: (file) => file.name },
         browser: {
-          captureScreenshot: () => Promise.resolve(""),
-          setTouchEmulation: noopVoidPromise,
-          enableConsole: noopVoidPromise,
-          disableConsole: noopVoidPromise,
-          openDevTools: noopVoidPromise,
-          openWindow: (url, title) => invoke("browser.openWindow", { url, title }),
-          popout: (url, title) => invoke("browser.openWindow", { url, title }),
-          onConsoleEvent: () => noopUnsubscribe
+          openWindow: (url, title) => invoke("browser.openWindow", { url, title })
         },
         lsp: { getDefinition: (worktreePath, token) => invoke("lsp.getDefinition", { worktreePath, token }) },
         extension: {
@@ -172,17 +186,16 @@ enum HostBridgeBootstrap {
           install: () => Promise.resolve(null),
           uninstall: noopVoidPromise,
           openPopup: noopVoidPromise,
-          onTabCreate: () => noopUnsubscribe,
-          sendTabCreated: noopVoid
+          onTabCreate: () => noopUnsubscribe
         },
         pet: {
-          sendSettings: noopVoid,
-          command: noopVoid,
-          play: noopVoid,
-          stop: noopVoid,
-          importPet: () => Promise.resolve({ success: false, error: "unsupported" }),
-          deletePet: () => Promise.resolve({ success: true }),
-          listPets: () => Promise.resolve([])
+          sendSettings: (settings) => { invoke("pet.sendSettings", { settings }); },
+          command: (command) => { invoke("pet.command", { command }); },
+          play: (action) => { invoke("pet.play", { action }); },
+          stop: () => { invoke("pet.stop"); },
+          importPet: () => invoke("pet.importPet"),
+          deletePet: (petId) => invoke("pet.deletePet", { petId }),
+          listPets: () => invoke("pet.listPets")
         }
       };
     })();

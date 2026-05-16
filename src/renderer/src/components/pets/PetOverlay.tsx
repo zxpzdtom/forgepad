@@ -684,7 +684,7 @@ function PropEffectView({ effect }: { effect: NonNullable<PropEffect> }) {
 /**
  * Standalone pet overlay for the transparent pet window.
  *
- * The Electron window is sprite-sized and non-blocking. Autonomous play is
+ * The native pet window is sprite-sized and non-blocking. Autonomous play is
  * therefore expressed by moving the window across the screen: short strolls,
  * jumps, stair-step climbs, portal hops, and occasional walks along visible
  * app window tops. Any agent notification state cancels play immediately.

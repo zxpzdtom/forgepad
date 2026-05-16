@@ -4,6 +4,13 @@ export type GitBucket = 'staged' | 'unstaged' | 'untracked';
 
 export type RightPanelMode = 'files' | 'changes' | 'context';
 
+export type FilePreviewResult = {
+  content: string;
+  totalBytes: number;
+  previewBytes: number;
+  truncated: boolean;
+};
+
 export type Tab =
   | {
       id: string;
@@ -144,6 +151,8 @@ export type DiffFileData = {
   oldContent?: string;
   /** Full contents of the file after the change. */
   newContent?: string;
+  oldImageDataUrl?: string;
+  newImageDataUrl?: string;
   status: GitStatusKind;
   bucket: GitBucket;
   isBinary: boolean;
@@ -1488,7 +1497,7 @@ export type PetStageWindow = PetStageRect & {
   id: string;
   appName: string;
   title: string;
-  source: "electron" | "system";
+  source: "native" | "system";
 };
 
 export type PetStageSnapshot = {

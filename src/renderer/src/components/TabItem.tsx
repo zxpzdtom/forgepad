@@ -56,6 +56,9 @@ export const TabItem = forwardRef<HTMLDivElement, TabItemProps>(function TabItem
       title={tooltip ?? title}
       style={style}
       onClick={onSelect}
+      onMouseDown={(event) => {
+        if (event.button === 0) onSelect();
+      }}
       onKeyDown={handleKeyDown}
       onContextMenu={onContextMenu}
       {...rest}
@@ -69,6 +72,7 @@ export const TabItem = forwardRef<HTMLDivElement, TabItemProps>(function TabItem
           role="button"
           tabIndex={0}
           title={closeTitle}
+          onMouseDown={(event) => event.stopPropagation()}
           onClick={(event) => {
             event.stopPropagation();
             onClose();

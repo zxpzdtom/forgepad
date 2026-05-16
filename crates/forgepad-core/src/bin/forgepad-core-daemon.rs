@@ -1,8 +1,14 @@
-use std::collections::HashMap;
+use std::collections::{hash_map::DefaultHasher, HashMap};
+use std::hash::{Hash, Hasher};
 use std::io::{self, BufRead, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
+use std::thread;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+use base64::engine::general_purpose::STANDARD as BASE64;
+use base64::Engine;
 use forgepad_core::{app, context, files, git, hooks, lsp, pty, state};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -50,6 +56,7 @@ fn main() {
             );
         },
     );
+    let watchers = FsWatchManager::new(Arc::clone(&output));
     let hook_output = Arc::clone(&output);
     let hooks = match hooks::HookServer::start(move |event| emit(&hook_output, event)) {
         Ok(server) => Some(server),
@@ -89,7 +96,7 @@ fn main() {
         }
 
         let response = match serde_json::from_str::<Request>(&line) {
-            Ok(request) => handle_request(&ptys, hooks.as_ref(), request),
+            Ok(request) => handle_request(&ptys, &watchers, hooks.as_ref(), request),
             Err(error) => Response {
                 id: "unknown".into(),
                 value: None,
@@ -103,10 +110,11 @@ fn main() {
 
 fn handle_request(
     ptys: &pty::PtyManager,
+    watchers: &FsWatchManager,
     hooks: Option<&hooks::HookServer>,
     request: Request,
 ) -> Response {
-    match dispatch(ptys, hooks, &request.command, request.params) {
+    match dispatch(ptys, watchers, hooks, &request.command, request.params) {
         Ok(value) => Response {
             id: request.id,
             value: Some(value),
@@ -122,6 +130,7 @@ fn handle_request(
 
 fn dispatch(
     ptys: &pty::PtyManager,
+    watchers: &FsWatchManager,
     hooks: Option<&hooks::HookServer>,
     command: &str,
     params: Value,
@@ -149,6 +158,11 @@ fn dispatch(
         "git.branchStats" => {
             let worktree_path = string_param(&params, "worktreePath")?;
             serde_json::to_value(git::branch_stats(Path::new(&worktree_path)))
+                .map_err(|e| e.to_string())
+        }
+        "git.prInfo" => {
+            let worktree_path = string_param(&params, "worktreePath")?;
+            serde_json::to_value(git::pr_info(Path::new(&worktree_path))?)
                 .map_err(|e| e.to_string())
         }
         "git.fileDiff" => git_file_diff(params),
@@ -253,6 +267,17 @@ fn dispatch(
             let rel_path = string_param(&params, "relPath")?;
             Ok(json!(files::read_file(worktree_path, &rel_path)?))
         }
+        "fs.readFilePreview" => {
+            let worktree_path = string_param(&params, "worktreePath")?;
+            let rel_path = string_param(&params, "relPath")?;
+            let max_bytes = number_param(&params, "maxBytes")? as usize;
+            serde_json::to_value(files::read_file_preview(
+                worktree_path,
+                &rel_path,
+                max_bytes,
+            )?)
+            .map_err(|e| e.to_string())
+        }
         "fs.readFileDataUrl" => {
             let worktree_path = string_param(&params, "worktreePath")?;
             let rel_path = string_param(&params, "relPath")?;
@@ -261,6 +286,12 @@ fn dispatch(
         "fs.readAbsFile" => {
             let abs_path = string_param(&params, "absPath")?;
             Ok(json!(files::read_abs_file(abs_path)?))
+        }
+        "fs.readAbsFilePreview" => {
+            let abs_path = string_param(&params, "absPath")?;
+            let max_bytes = number_param(&params, "maxBytes")? as usize;
+            serde_json::to_value(files::read_abs_file_preview(abs_path, max_bytes)?)
+                .map_err(|e| e.to_string())
         }
         "fs.readAbsFileDataUrl" => {
             let abs_path = string_param(&params, "absPath")?;
@@ -271,6 +302,15 @@ fn dispatch(
             let rel_path = string_param(&params, "relPath")?;
             let content = string_param(&params, "content")?;
             files::write_file(worktree_path, &rel_path, &content)?;
+            Ok(Value::Null)
+        }
+        "fs.watchWorkspace" => {
+            let worktree_path = string_param(&params, "worktreePath")?;
+            Ok(json!(watchers.watch(PathBuf::from(worktree_path))))
+        }
+        "fs.unwatchWorkspace" => {
+            let watch_id = string_param(&params, "watchId")?;
+            watchers.unwatch(&watch_id);
             Ok(Value::Null)
         }
         "context.createBundle" => {
@@ -352,6 +392,118 @@ fn dispatch(
     }
 }
 
+struct FsWatchManager {
+    output: Arc<Mutex<io::Stdout>>,
+    next_id: AtomicUsize,
+    stops: Mutex<HashMap<String, Arc<AtomicBool>>>,
+}
+
+impl FsWatchManager {
+    fn new(output: Arc<Mutex<io::Stdout>>) -> Self {
+        Self {
+            output,
+            next_id: AtomicUsize::new(1),
+            stops: Mutex::new(HashMap::new()),
+        }
+    }
+
+    fn watch(&self, root: PathBuf) -> String {
+        let id = format!("fs-watch-{}", self.next_id.fetch_add(1, Ordering::Relaxed));
+        let stop = Arc::new(AtomicBool::new(false));
+        if let Ok(mut stops) = self.stops.lock() {
+            stops.insert(id.clone(), Arc::clone(&stop));
+        }
+
+        let output = Arc::clone(&self.output);
+        let watch_id = id.clone();
+        thread::spawn(move || {
+            let mut last = workspace_fingerprint(&root);
+            while !stop.load(Ordering::Relaxed) {
+                thread::sleep(Duration::from_millis(900));
+                let next = workspace_fingerprint(&root);
+                if next != last {
+                    last = next;
+                    emit(
+                        &output,
+                        json!({
+                            "type": "fs.changed",
+                            "payload": {
+                                "id": watch_id,
+                                "paths": [root.to_string_lossy().to_string()],
+                                "changedAt": unix_millis()
+                            }
+                        }),
+                    );
+                }
+            }
+        });
+
+        id
+    }
+
+    fn unwatch(&self, id: &str) {
+        if let Ok(mut stops) = self.stops.lock() {
+            if let Some(stop) = stops.remove(id) {
+                stop.store(true, Ordering::Relaxed);
+            }
+        }
+    }
+}
+
+fn workspace_fingerprint(root: &Path) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    fingerprint_path(root, 0, &mut hasher);
+    hasher.finish()
+}
+
+fn fingerprint_path(path: &Path, depth: usize, hasher: &mut DefaultHasher) {
+    if depth > 10 || should_skip(path) {
+        return;
+    }
+    let metadata = match std::fs::metadata(path) {
+        Ok(metadata) => metadata,
+        Err(_) => return,
+    };
+    path.to_string_lossy().hash(hasher);
+    metadata.len().hash(hasher);
+    if let Ok(modified) = metadata.modified() {
+        if let Ok(elapsed) = modified.duration_since(UNIX_EPOCH) {
+            elapsed.as_millis().hash(hasher);
+        }
+    }
+    if !metadata.is_dir() {
+        return;
+    }
+    let mut entries = match std::fs::read_dir(path) {
+        Ok(entries) => entries
+            .filter_map(Result::ok)
+            .map(|entry| entry.path())
+            .collect::<Vec<_>>(),
+        Err(_) => return,
+    };
+    entries.sort();
+    for entry in entries {
+        fingerprint_path(&entry, depth + 1, hasher);
+    }
+}
+
+fn should_skip(path: &Path) -> bool {
+    let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
+        return false;
+    };
+    matches!(
+        name,
+        ".git" | "node_modules" | "target" | "dist" | ".next" | ".turbo" | ".cache" | "build"
+    )
+}
+
+fn unix_millis() -> u64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_millis() as u64)
+        .unwrap_or_default()
+}
+
 fn git_file_diff(params: Value) -> Result<Value, String> {
     let worktree_path = string_param(&params, "worktreePath")?;
     let rel_path = string_param(&params, "relPath")?;
@@ -375,16 +527,61 @@ fn git_file_diff(params: Value) -> Result<Value, String> {
         forgepad_core::command::command_output("git", &["diff", "--", &rel_path], Some(path))
             .unwrap_or_default()
     };
-    let new_content =
-        std::fs::read_to_string(files::resolve_inside_root(&worktree_path, &rel_path)?).ok();
+    let file_path = files::resolve_inside_root(&worktree_path, &rel_path)?;
+    let mime = files::mime_for(&file_path);
+    let is_image = mime.starts_with("image/");
+    let numstat_args = if bucket == "staged" {
+        vec!["diff", "--cached", "--numstat", "--", &rel_path]
+    } else {
+        vec!["diff", "--numstat", "--", &rel_path]
+    };
+    let is_binary = is_image
+        || forgepad_core::command::command_output("git", &numstat_args, Some(path))
+            .map(|out| out.split_whitespace().take(2).any(|part| part == "-"))
+            .unwrap_or(false);
+    let new_content = if is_binary {
+        None
+    } else {
+        std::fs::read_to_string(&file_path).ok()
+    };
+    let old_content = if is_binary {
+        None
+    } else {
+        let spec = if bucket == "staged" {
+            format!("HEAD:{rel_path}")
+        } else {
+            format!(":{rel_path}")
+        };
+        forgepad_core::command::command_output("git", &["show", &spec], Some(path)).ok()
+    };
+    let new_image_data_url = if is_image && status != "deleted" {
+        files::read_file_data_url(&worktree_path, &rel_path).ok()
+    } else {
+        None
+    };
+    let old_image_data_url = if is_image && bucket != "untracked" {
+        let spec = if bucket == "staged" {
+            format!("HEAD:{rel_path}")
+        } else {
+            format!(":{rel_path}")
+        };
+        forgepad_core::command::command_output_bytes("git", &["show", &spec], Some(path))
+            .ok()
+            .map(|data| format!("data:{};base64,{}", mime, BASE64.encode(data)))
+    } else {
+        None
+    };
     Ok(json!({
         "path": rel_path,
         "oldPath": old_path,
         "patch": patch,
+        "oldContent": old_content,
         "newContent": new_content,
+        "oldImageDataUrl": old_image_data_url,
+        "newImageDataUrl": new_image_data_url,
         "status": status,
         "bucket": bucket,
-        "isBinary": false
+        "isBinary": is_binary
     }))
 }
 

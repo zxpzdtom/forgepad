@@ -5,7 +5,7 @@
 <h1 align="center">ForgePad</h1>
 
 <p align="center">
-  A desktop workspace for AI-assisted coding, bringing terminals, files, diffs, context, and agent sessions into one focused app.
+  A native-feel desktop workspace for AI-assisted coding, bringing terminals, files, diffs, context, and agent sessions into one focused app.
 </p>
 
 <p align="center">
@@ -14,25 +14,18 @@
 
 ## Highlights
 
+- **Native host shell**: macOS runs through a Swift/AppKit host with WKWebView; React is the shared UI surface.
+- **Rust core**: PTY, Git, file scanning, context generation, and filesystem work live in `crates/forgepad-core`.
 - **AI coding workspace**: Manage projects, worktrees, regular terminals, and AI coding tool terminals in one interface.
-- **File and diff preview**: Browse the file tree, inspect code, review Git changes, and select context directly.
-- **Context basket**: Build context bundles from files, diffs, code selections, comments, and task notes, then send them to the active terminal workflow.
-- **Workspace settings**: Configure themes, pet overlay behavior, run commands, terminal behavior, and workspace preferences.
-- **Two desktop shells**: Electron is the primary desktop shell, with Tauri support maintained in the same codebase.
-
-## Main Areas
-
-ForgePad is organized around three main areas:
-
-- **Left workspace panel**: Projects, worktrees, tasks, terminals, and app settings.
-- **Center workspace**: Terminal tabs, agent sessions, file preview, Markdown preview, and diff views.
-- **Right resource panel**: File tree, Git changes, context basket, and related actions.
+- **Files and changes**: Browse files and Git changes through `@pierre/trees`, inspect diffs, and select context directly.
+- **Typed host contract**: Renderer APIs are kept behind `src/shared/host-bridge.ts`.
 
 ## Requirements
 
 - Node.js 22 or newer.
 - pnpm.
-- Rust toolchain, only needed for Tauri development or builds.
+- Rust toolchain.
+- Xcode command line tools for the macOS native host.
 
 ## Install
 
@@ -40,80 +33,48 @@ ForgePad is organized around three main areas:
 pnpm install
 ```
 
-The native macOS package uses the Rust core for PTY and backend behavior, so it does not rebuild or bundle a Node backend.
-
 ## Development
 
-Run the Electron app:
+Run the full local app: Vite renderer plus the Swift/AppKit host.
 
 ```bash
 pnpm dev
 ```
 
-Run the Vite renderer only:
-
-```bash
-pnpm vite:dev
-```
-
-Run the Tauri app:
-
-```bash
-pnpm tauri:dev
-```
-
 ## Build
 
-Type-check the project:
-
-```bash
-pnpm typecheck
-```
-
-Build the Electron renderer and main process:
+Build the native macOS app bundle:
 
 ```bash
 pnpm build
 ```
 
-Create a macOS Electron DMG:
+The app is written to:
 
-```bash
-pnpm dist
-```
-
-Create an unpacked macOS Electron app directory:
-
-```bash
-pnpm dist:dir
-```
-
-Build the Tauri app:
-
-```bash
-pnpm tauri:build
+```text
+dist/native-mac/ForgePad.app
 ```
 
 ## Useful Scripts
 
 | Command | Description |
 | --- | --- |
+| `pnpm dev` | Run the Vite renderer and Swift/AppKit host for local development |
+| `pnpm build` | Type-check, test the Rust core, and build the native macOS bundle |
+| `pnpm typecheck` | Type-check the renderer and shared TypeScript |
 | `pnpm lint` | Check source files with Biome |
 | `pnpm format` | Format source files with Biome |
-| `pnpm check` | Run Biome checks |
-| `pnpm check:write` | Apply Biome fixes where possible |
-| `pnpm vite:build` | Build the renderer |
-| `pnpm native:mac:package` | Build the native macOS bundle with Swift host and Rust backend |
 
 ## Project Structure
 
 ```text
-src/main/       Electron main process
-src/preload/    Electron preload bridges
-src/renderer/   React renderer app
-src-tauri/      Tauri shell and Rust commands
-build/          App icons and packaging resources
-dist/           Build output
+native/macos/    Swift/AppKit host shell
+crates/          Rust core services
+src/renderer/    React renderer app
+src/shared/      Shared TypeScript types and host contract
+schema/          Host bridge schema
+build/           App icons and packaging resources
+dist/            Build output
 ```
 
 ## Notes

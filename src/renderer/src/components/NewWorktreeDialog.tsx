@@ -69,7 +69,7 @@ export function NewWorktreeDialog({
   };
 
   return (
-    <div className="fixed inset-0 z-[60] grid place-items-center bg-black/85" onMouseDown={onClose}>
+    <div className="fixed inset-0 z-[60] grid place-items-center bg-black/45 backdrop-blur-[2px]" onMouseDown={onClose}>
       <div
         className="w-[min(400px,90vw)] rounded-xl border border-border bg-panel-2 shadow-[0_20px_40px_rgba(0,0,0,0.4)]"
         onMouseDown={(e) => e.stopPropagation()}

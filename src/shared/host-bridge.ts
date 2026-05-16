@@ -8,6 +8,7 @@ import type {
   DeletePetResult,
   ExtensionInfo,
   FileNode,
+  FilePreviewResult,
   FileStatus,
   GitBucket,
   GitStatusKind,
@@ -72,13 +73,6 @@ export type NativeTerminal = {
   appName: string;
 };
 
-export type BrowserRect = {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-};
-
 export type ExtensionTabCreateRequest = {
   requestId: string;
   url: string;
@@ -131,8 +125,10 @@ export type HostBridgeApi = {
     getTreeWithStatus: (worktreePath: string) => Promise<FileNode[]>;
     listFiles: (worktreePath: string) => Promise<string[]>;
     readFile: (worktreePath: string, relPath: string) => Promise<string>;
+    readFilePreview: (worktreePath: string, relPath: string, maxBytes: number) => Promise<FilePreviewResult>;
     readFileAsDataUrl: (worktreePath: string, relPath: string) => Promise<string>;
     readAbsFile: (absPath: string) => Promise<string>;
+    readAbsFilePreview: (absPath: string, maxBytes: number) => Promise<FilePreviewResult>;
     readAbsFileAsDataUrl: (absPath: string) => Promise<string>;
     writeFile: (worktreePath: string, relPath: string, content: string) => Promise<void>;
     watchWorkspace: (worktreePath: string) => Promise<string>;
@@ -183,6 +179,14 @@ export type HostBridgeApi = {
     detectTerminals: () => Promise<NativeTerminal[]>;
     openWithTerminal: (fullPath: string, terminalId: string) => Promise<void>;
   };
+  dialog?: {
+    confirm: (options: {
+      title?: string;
+      message?: string;
+      confirmLabel?: string;
+      cancelLabel?: string;
+    }) => Promise<boolean>;
+  };
   notification: {
     pickAudio: () => Promise<PickedAudio | null>;
     deleteAudio: (assetPath: string) => Promise<void>;
@@ -192,24 +196,12 @@ export type HostBridgeApi = {
     focusWindow: () => void;
     toggleMaximize?: () => void;
   };
+  native?: Record<string, never>;
   nativeFiles: {
     getPath: (file: File) => string;
   };
   browser: {
-    captureScreenshot: (webContentsId: number, rect: BrowserRect) => Promise<string>;
-    setTouchEmulation: (webContentsId: number, enabled: boolean) => Promise<void>;
-    enableConsole: (webContentsId: number) => Promise<void>;
-    disableConsole: (webContentsId: number) => Promise<void>;
-    openDevTools: (webContentsId: number) => Promise<void>;
     openWindow?: (url: string, title?: string) => Promise<void>;
-    popout: (
-      url: string,
-      title?: string,
-      locale?: string,
-      theme?: string,
-      defaultHomepage?: string,
-    ) => Promise<void>;
-    onConsoleEvent: (callback: (raw: unknown) => void) => Unsubscribe;
   };
   lsp: {
     getDefinition: (worktreePath: string, token: string) => Promise<LspLocation[]>;
@@ -227,7 +219,6 @@ export type HostBridgeApi = {
       activeTabUrl?: string,
     ) => Promise<void>;
     onTabCreate: (callback: (data: ExtensionTabCreateRequest) => void) => Unsubscribe;
-    sendTabCreated: (requestId: string, webContentsId: number) => void;
   };
   pet: {
     sendSettings: (settings: PetSettings) => void;

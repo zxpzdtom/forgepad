@@ -289,6 +289,44 @@ textarea {
     resize: vertical;
 }
 
+html,
+body,
+#root {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+}
+
+input,
+textarea,
+[contenteditable="true"],
+.markdown-preview,
+.code-viewer,
+.editor-panel,
+.diff-panel,
+.context-preview,
+.terminal-panel .xterm,
+pre,
+code {
+    -webkit-user-select: text;
+    user-select: text;
+}
+
+button,
+[role="button"],
+[role="tab"],
+[role="menuitem"],
+.app-topbar,
+.tabbar,
+.column-tabbar,
+.right-panel,
+.sidebar-panel-content,
+.anchor-menu,
+.anchor-submenu {
+    -webkit-user-select: none;
+    user-select: none;
+}
+
 .muted {
     color: var(--muted);
 }
@@ -317,10 +355,33 @@ textarea {
 
 .terminal-panel {
     visibility: hidden;
+    opacity: 0;
+    transform: translateY(4px);
+    transition:
+        opacity 140ms cubic-bezier(0.2, 0, 0, 1),
+        transform 140ms cubic-bezier(0.2, 0, 0, 1),
+        visibility 0s linear 140ms;
 }
 
 .terminal-panel.active {
     visibility: visible;
+    opacity: 1;
+    transform: translateY(0);
+    transition:
+        opacity 140ms cubic-bezier(0.2, 0, 0, 1),
+        transform 140ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+.terminal-vertical-split > .allotment-module_splitViewContainer__rQnVa > .allotment-module_splitViewView__MGZ6O {
+    transition:
+        top 190ms cubic-bezier(0.2, 0, 0, 1),
+        height 190ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+.terminal-vertical-split.is-resizing-terminal
+    > .allotment-module_splitViewContainer__rQnVa
+    > .allotment-module_splitViewView__MGZ6O {
+    transition: none;
 }
 
 .terminal-host {
@@ -330,6 +391,21 @@ textarea {
     padding: 14px;
     overflow: hidden;
     background: var(--terminal-background, var(--surface-terminal));
+}
+
+.terminal-dock-shell {
+    animation: terminal-dock-in 160ms cubic-bezier(0.2, 0, 0, 1) both;
+}
+
+@keyframes terminal-dock-in {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
 }
 
 .terminal-fit-host {
@@ -400,6 +476,50 @@ textarea {
 .floating-search-bar button:disabled {
     cursor: default;
     opacity: 0.35;
+}
+
+.panel-resize-handle {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    z-index: 20;
+    width: 9px;
+    cursor: col-resize;
+    background: transparent;
+}
+
+.panel-resize-handle::after {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 4px;
+    width: 1px;
+    content: "";
+    background: transparent;
+    transition:
+        background-color 120ms ease-out,
+        opacity 120ms ease-out;
+}
+
+.panel-resize-handle:hover::after,
+.is-resizing-panel .panel-resize-handle::after {
+    background: color-mix(in srgb, var(--accent) 42%, transparent);
+}
+
+.panel-resize-handle-left {
+    left: -4px;
+}
+
+.panel-resize-handle-right {
+    right: -4px;
+}
+
+.is-resizing-panel {
+    cursor: col-resize;
+}
+
+.is-resizing-panel * {
+    cursor: col-resize !important;
 }
 
 .editor-panel,
@@ -1044,41 +1164,6 @@ textarea {
     height: 30px;
 }
 
-/* Change status dots */
-.change-status-dot {
-    display: inline-block;
-    width: 10px;
-    height: 10px;
-    border-radius: 2px;
-    border: 1.5px solid;
-    flex-shrink: 0;
-}
-
-.change-status-dot.add {
-    border-color: var(--ok);
-    background: oklch(50% 0.15 140 / 0.25);
-}
-
-.change-status-dot.del {
-    border-color: var(--danger);
-    background: oklch(50% 0.15 25 / 0.25);
-}
-
-.change-status-dot.mod {
-    border-color: var(--warn);
-    background: oklch(50% 0.15 85 / 0.25);
-}
-
-.change-status-dot.ren {
-    border-color: var(--accent-2);
-    background: oklch(50% 0.15 260 / 0.25);
-}
-
-.change-status-dot.conf {
-    border-color: var(--warn);
-    background: oklch(50% 0.2 85 / 0.35);
-}
-
 .mini-button {
     width: 30px;
     height: 23px;
@@ -1137,6 +1222,384 @@ textarea {
     border-color: var(--focus-border);
 }
 
+.changes-list {
+    position: relative;
+    align-content: start;
+    padding-right: 8px;
+    padding-bottom: 12px;
+}
+
+.changes-bucket {
+    flex: 0 0 auto;
+    min-width: 0;
+    overflow: visible;
+}
+
+.changes-bucket + .changes-bucket {
+    margin-top: 8px;
+}
+
+.changes-bucket-heading {
+    position: sticky;
+    top: 0;
+    z-index: 4;
+    display: flex;
+    min-width: 0;
+    min-height: 24px;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid color-mix(in srgb, var(--border) 54%, transparent);
+    padding: 4px 4px 4px 2px;
+    color: var(--muted);
+    background: color-mix(in srgb, var(--bg) 94%, transparent);
+    backdrop-filter: blur(10px);
+    font-size: 12px;
+}
+
+.change-native-tree {
+    display: grid;
+    gap: 1px;
+    padding-top: 3px;
+}
+
+.change-native-row {
+    --change-indent: calc(var(--change-depth, 0) * 15px);
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(28px, auto) 15px 24px;
+    min-height: 26px;
+    align-items: center;
+    gap: 5px;
+    border-radius: 5px;
+    padding: 0 4px 0 calc(3px + var(--change-indent));
+    color: var(--text);
+    user-select: none;
+    transition:
+        background-color 110ms ease,
+        color 110ms ease;
+}
+
+.change-native-row:hover {
+    background: color-mix(in srgb, var(--text) 5%, transparent);
+}
+
+.change-native-row.is-file.is-active {
+    background: color-mix(in srgb, var(--accent) 20%, transparent);
+    box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.change-native-row.is-directory {
+    background: transparent;
+    box-shadow: none;
+}
+
+.change-native-row.is-directory:hover {
+    background: color-mix(in srgb, var(--text) 5%, transparent);
+}
+
+.change-native-main {
+    display: flex;
+    min-width: 0;
+    height: 26px;
+    align-items: center;
+    gap: 5px;
+    padding: 0;
+    color: inherit;
+    background: transparent;
+    text-align: left;
+}
+
+.change-native-main:focus,
+.change-native-main:focus-visible,
+.change-native-check:focus,
+.change-native-check:focus-visible,
+.change-bucket-check:focus,
+.change-bucket-check:focus-visible {
+    outline: none;
+}
+
+.change-native-main:not(.is-directory) {
+    color: var(--text);
+}
+
+.change-native-chevron {
+    display: inline-grid;
+    width: 15px;
+    height: 18px;
+    flex: 0 0 auto;
+    place-items: center;
+    color: var(--muted);
+    transition: transform 140ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+.change-native-chevron.is-expanded {
+    transform: rotate(90deg);
+}
+
+.change-native-icon {
+    display: inline-grid;
+    width: 16px;
+    flex: 0 0 auto;
+    place-items: center;
+    color: var(--muted);
+}
+
+.change-native-name {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12.5px;
+}
+
+.change-row-stats {
+    display: inline-flex;
+    min-width: 28px;
+    justify-content: flex-end;
+    gap: 4px;
+    color: var(--subtle);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+}
+
+.change-stat-add {
+    color: var(--ok);
+}
+
+.change-stat-del {
+    color: var(--danger);
+}
+
+.change-status-box {
+    display: inline-grid;
+    width: 14px;
+    height: 14px;
+    place-items: center;
+    border: 1px solid currentColor;
+    border-radius: 3px;
+    background: color-mix(in srgb, currentColor 11%, transparent);
+    font:
+        700 8.5px/1 ui-monospace,
+        SFMono-Regular,
+        Menlo,
+        Monaco,
+        Consolas,
+        monospace;
+}
+
+.change-status-box.status-added,
+.change-status-box.status-untracked {
+    color: var(--ok);
+}
+
+.change-status-box.status-deleted {
+    color: var(--danger);
+}
+
+.change-status-box.status-modified {
+    color: var(--warn);
+}
+
+.change-status-box.status-renamed {
+    color: var(--accent-2);
+}
+
+.change-status-box.status-conflicted {
+    color: var(--text-warning-status);
+}
+
+.change-native-check {
+    display: grid;
+    width: 24px;
+    height: 24px;
+    place-items: center;
+    padding: 0;
+    background: transparent;
+    position: relative;
+}
+
+.change-native-check::before {
+    grid-area: 1 / 1;
+    width: 13px;
+    height: 13px;
+    border: 1px solid color-mix(in srgb, var(--border) 86%, white 8%);
+    border-radius: 4px;
+    background: color-mix(in srgb, var(--panel) 88%, transparent);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, white 6%, transparent);
+    content: "";
+    transition:
+        transform 110ms ease,
+        border-color 110ms ease,
+        background-color 110ms ease,
+        box-shadow 110ms ease;
+}
+
+.change-native-check::after {
+    position: absolute;
+    width: 7px;
+    height: 4px;
+    border-bottom: 1.7px solid white;
+    border-left: 1.7px solid white;
+    content: "";
+    opacity: 0;
+    transform: translateY(-1px) rotate(-45deg) scale(0.85);
+    transition:
+        opacity 90ms ease,
+        transform 110ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+.change-native-check:hover::before {
+    border-color: color-mix(in srgb, var(--accent) 76%, var(--border));
+}
+
+.change-native-check:active::before {
+    transform: scale(0.96);
+}
+
+.change-native-check.is-checked::before {
+    border-color: var(--accent);
+    background-color: var(--accent);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 34%, transparent);
+}
+
+.change-native-check.is-checked::after {
+    opacity: 1;
+    transform: translateY(-1px) rotate(-45deg) scale(1);
+}
+
+.change-native-check.is-mixed::before {
+    border-color: var(--accent);
+    background:
+        linear-gradient(var(--accent), var(--accent)) center / 7px 2px no-repeat,
+        color-mix(in srgb, var(--accent) 22%, var(--panel));
+}
+
+.change-native-check.is-mixed::after {
+    opacity: 0;
+}
+
+.change-native-children {
+    display: grid;
+    gap: 1px;
+}
+
+.change-bucket-check {
+    display: inline-flex;
+    min-width: 48px;
+    height: 22px;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 7px;
+    padding: 0;
+    color: var(--muted);
+    background: transparent;
+}
+
+.change-bucket-count {
+    color: var(--subtle);
+    font-size: 11px;
+}
+
+.change-bucket-check .change-native-check-mark {
+    position: relative;
+    display: grid;
+    width: 13px;
+    height: 13px;
+    place-items: center;
+    border: 1px solid color-mix(in srgb, var(--border) 86%, white 8%);
+    border-radius: 4px;
+    background: color-mix(in srgb, var(--panel) 88%, transparent);
+    box-shadow: inset 0 1px 0 color-mix(in srgb, white 6%, transparent);
+    transition:
+        border-color 110ms ease,
+        background-color 110ms ease,
+        box-shadow 110ms ease;
+}
+
+.change-bucket-check .change-native-check-mark::after {
+    width: 7px;
+    height: 4px;
+    border-bottom: 1.7px solid white;
+    border-left: 1.7px solid white;
+    content: "";
+    opacity: 0;
+    transform: translateY(-1px) rotate(-45deg) scale(0.85);
+    transition:
+        opacity 90ms ease,
+        transform 110ms cubic-bezier(0.2, 0, 0, 1);
+}
+
+.change-bucket-check:hover .change-native-check-mark {
+    border-color: color-mix(in srgb, var(--accent) 76%, var(--border));
+}
+
+.change-bucket-check.is-checked .change-native-check-mark {
+    border-color: var(--accent);
+    background: var(--accent);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 34%, transparent);
+}
+
+.change-bucket-check.is-checked .change-native-check-mark::after {
+    opacity: 1;
+    transform: translateY(-1px) rotate(-45deg) scale(1);
+}
+
+.change-bucket-check.is-mixed .change-native-check-mark {
+    border-color: var(--accent);
+    background:
+        linear-gradient(var(--accent), var(--accent)) center / 7px 2px no-repeat,
+        color-mix(in srgb, var(--accent) 22%, var(--panel));
+}
+
+.image-diff-pane {
+    display: grid;
+    min-width: 0;
+    grid-template-rows: auto minmax(180px, 1fr);
+    overflow: hidden;
+    border-radius: 7px;
+    background: var(--panel);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--border) 68%, transparent);
+}
+
+.image-diff-label {
+    min-height: 28px;
+    border-bottom: 1px solid color-mix(in srgb, var(--border) 72%, transparent);
+    padding: 6px 8px;
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 520;
+}
+
+.image-diff-pane img {
+    align-self: center;
+    justify-self: center;
+    max-width: 100%;
+    max-height: min(56vh, 520px);
+    object-fit: contain;
+    outline: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.image-diff-empty {
+    display: grid;
+    min-height: 180px;
+    place-items: center;
+    color: var(--subtle);
+    font-size: 12px;
+}
+
+.shortcut-recording-hint {
+    display: inline-flex;
+    min-height: 24px;
+    align-items: center;
+    gap: 5px;
+    border-radius: 6px;
+    padding: 0 8px;
+    color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 11%, transparent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 32%, transparent);
+    font-size: 11px;
+    font-weight: 520;
+}
+
 /* Agent command row input */
 .agent-command-row input {
     min-width: 0;
@@ -1183,6 +1646,81 @@ textarea {
 .tree-wrap > pierre-file-tree,
 .tree-wrap > div {
     height: 100%;
+}
+
+.boot-screen {
+    position: relative;
+    isolation: isolate;
+    background:
+        radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 25%),
+        var(--bg);
+}
+
+.boot-screen::before {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    content: "";
+    background-image:
+        linear-gradient(color-mix(in srgb, var(--border) 38%, transparent) 1px, transparent 1px),
+        linear-gradient(90deg, color-mix(in srgb, var(--border) 38%, transparent) 1px, transparent 1px);
+    background-size: 34px 34px;
+    mask-image: radial-gradient(circle at center, black, transparent 64%);
+    opacity: 0.34;
+}
+
+.boot-orbit {
+    position: relative;
+    width: 70px;
+    height: 70px;
+    border-radius: 999px;
+    background:
+        linear-gradient(var(--bg), var(--bg)) padding-box,
+        conic-gradient(from 90deg, transparent, color-mix(in srgb, var(--accent) 90%, white), transparent 68%) border-box;
+    border: 1px solid transparent;
+    box-shadow: 0 0 38px color-mix(in srgb, var(--accent) 22%, transparent);
+    animation: boot-orbit-turn 1.25s linear infinite;
+}
+
+.boot-orbit span {
+    position: absolute;
+    display: block;
+    width: 8px;
+    height: 8px;
+    border-radius: 999px;
+    background: var(--accent);
+    box-shadow: 0 0 16px color-mix(in srgb, var(--accent) 72%, transparent);
+}
+
+.boot-orbit span:nth-child(1) {
+    top: -4px;
+    left: 31px;
+}
+
+.boot-orbit span:nth-child(2) {
+    right: 6px;
+    bottom: 10px;
+    opacity: 0.62;
+    scale: 0.72;
+}
+
+.boot-orbit span:nth-child(3) {
+    bottom: 12px;
+    left: 4px;
+    opacity: 0.38;
+    scale: 0.55;
+}
+
+@keyframes boot-orbit-turn {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .boot-orbit {
+        animation: none;
+    }
 }
 
 /* Title bar drag region — enables native macOS double-click maximize */
@@ -1257,7 +1795,7 @@ textarea {
 }
 
 /* Dropdown menus.
-   Avoid CSS Anchor Positioning here: macOS WKWebView/Tauri support is inconsistent,
+   Avoid CSS Anchor Positioning here: macOS WKWebView support is inconsistent,
    so menus are positioned relative to their nearest .relative wrapper. */
 .anchor-menu {
     position: absolute !important;
@@ -2291,7 +2829,6 @@ textarea {
 [data-sketchy] .view-mode-toggle,
 [data-sketchy] .view-mode-btn,
 [data-sketchy] .tooltip-kbd,
-[data-sketchy] .change-status-dot,
 [data-sketchy] .dirty-dot,
 [data-sketchy] .emoji-picker-btn,
 [data-sketchy] .switcher-add,
@@ -2721,13 +3258,13 @@ textarea {
     border-top: 2px solid var(--border);
 }
 
-/* ── BrowserTab toolbar ──────────────────────────────────────────────────── */
+/* ── Browser toolbar remnants used by native-window placeholders ─────────── */
 
 [data-sketchy] .flex.h-10.shrink-0.items-center.gap-1.border-border.border-b {
     border-bottom: 2px solid var(--border);
 }
 
-/* Browser webview container */
+/* Browser preview container */
 [data-sketchy]
     .relative.shrink-0.overflow-hidden.rounded-xl.border.border-border {
     border: 2px solid var(--border);
@@ -2868,9 +3405,7 @@ textarea {
 }
 
 /* ── CSS border-shape experiment ─────────────────────────────────────────── */
-/* If the Electron Chromium supports the new CSS border-shape API (Level 4),  */
-/* use wobbly SVG path coordinates for the border shape. This takes           */
-/* precedence over the SVG filter approach for supported elements.            */
+/* Use wobbly SVG path coordinates for the border shape where supported.      */
 
 @supports (border-shape: circle(50%)) {
     [data-sketchy] .primary-button,

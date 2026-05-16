@@ -51,7 +51,11 @@ mod tests {
 
         assert_eq!(
             result.name,
-            dir.path().file_name().unwrap().to_string_lossy().to_string()
+            dir.path()
+                .file_name()
+                .unwrap()
+                .to_string_lossy()
+                .to_string()
         );
         assert_eq!(result.repo_path, dir.path().to_string_lossy().to_string());
         assert_eq!(result.branch, "main");

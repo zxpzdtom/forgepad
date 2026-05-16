@@ -6,6 +6,7 @@ import data from '@emoji-mart/data';
 import EmojiPicker from '@emoji-mart/react';
 import { useTranslation } from '@renderer/i18n';
 import { getDroppedPaths, isInternalDrop } from '@renderer/lib/drag-utils';
+import { confirmNative } from '@renderer/lib/native-dialog';
 import { useAppStore } from '@renderer/store/app-store';
 import type { AgentStatus } from '@shared/agent-lifecycle';
 import type { Project, WorkspacePanel } from '@shared/types';
@@ -364,7 +365,7 @@ function SortableProjectGroup({
       )}
     >
       <div
-        className="flex h-8 w-full cursor-grab items-center gap-1.5 rounded-md bg-transparent px-1.5 text-left text-text transition-colors duration-150 hover:bg-panel-2 active:cursor-grabbing"
+        className="flex h-8 w-full cursor-grab select-none items-center gap-1.5 rounded-md bg-transparent px-1.5 text-left text-text transition-colors duration-150 hover:bg-panel-2 active:cursor-grabbing"
         role="button"
         tabIndex={0}
         onClick={onToggle}
@@ -457,7 +458,7 @@ function SortableWorkspaceRow({
       ref={setNodeRef}
       style={style}
       className={clsx(
-        'group/sidebar-workspace relative flex w-full min-w-0 items-start gap-2 rounded-md px-2 py-1.5 text-left transition-colors duration-150',
+        'group/sidebar-workspace relative flex w-full min-w-0 select-none items-start gap-2 rounded-md px-2 py-1.5 text-left transition-colors duration-150',
         isLoading ? 'cursor-default opacity-60' : 'cursor-grab active:cursor-grabbing',
         !isLoading && !isActive && 'hover:bg-panel-2',
         isDragging && 'bg-panel-2 ring-1 ring-accent/20',
@@ -698,7 +699,7 @@ function DeleteWorktreeDialog({ branch, onClose, onConfirm }: { branch: string; 
   };
 
   return (
-    <div className="fixed inset-0 z-[60] grid place-items-center bg-black/85" onMouseDown={onClose}>
+    <div className="fixed inset-0 z-[60] grid place-items-center bg-black/45 backdrop-blur-[2px]" onMouseDown={onClose}>
       <div
         className="w-[min(380px,90vw)] rounded-xl border border-border bg-panel-2 shadow-[0_20px_40px_rgba(0,0,0,0.4)]"
         onMouseDown={(e) => e.stopPropagation()}
@@ -819,7 +820,7 @@ function NewPanelDialog({ onClose, onCreate }: { onClose: () => void; onCreate: 
   };
 
   return (
-    <div className="fixed inset-0 z-[60] grid place-items-center bg-black/85" onMouseDown={onClose}>
+    <div className="fixed inset-0 z-[60] grid place-items-center bg-black/45 backdrop-blur-[2px]" onMouseDown={onClose}>
       <div
         className="w-[min(320px,90vw)] rounded-xl border border-border bg-panel-2 shadow-[0_20px_40px_rgba(0,0,0,0.4)]"
         onMouseDown={(e) => e.stopPropagation()}
@@ -930,7 +931,7 @@ function EditPanelDialog({ panel, onClose }: { panel: WorkspacePanel; onClose: (
   };
 
   return (
-    <div className="fixed inset-0 z-[60] grid place-items-center bg-black/85" onMouseDown={onClose}>
+    <div className="fixed inset-0 z-[60] grid place-items-center bg-black/45 backdrop-blur-[2px]" onMouseDown={onClose}>
       <div
         className="w-[min(320px,90vw)] rounded-xl border border-border bg-panel-2 shadow-[0_20px_40px_rgba(0,0,0,0.4)]"
         onMouseDown={(e) => e.stopPropagation()}
@@ -1076,7 +1077,7 @@ function DeletePanelDialog({
   }, [onClose]);
 
   return (
-    <div className="fixed inset-0 z-[60] grid place-items-center bg-black/85" onMouseDown={onClose}>
+    <div className="fixed inset-0 z-[60] grid place-items-center bg-black/45 backdrop-blur-[2px]" onMouseDown={onClose}>
       <div
         className="w-[min(340px,90vw)] rounded-xl border border-border bg-panel-2 shadow-[0_20px_40px_rgba(0,0,0,0.4)]"
         onMouseDown={(e) => e.stopPropagation()}
@@ -1401,10 +1402,10 @@ export function Sidebar() {
                       }}
                     >
                       <div
-                        className={clsx(
-                          'grid',
-                          isCollapsed ? 'grid-rows-[0fr]' : 'grid-rows-[1fr]',
-                        )}
+          className={clsx(
+            'grid transition-[grid-template-rows] duration-180 ease-[cubic-bezier(0.2,0,0,1)]',
+            isCollapsed ? 'grid-rows-[0fr]' : 'grid-rows-[1fr]',
+          )}
                       >
                         <div className="overflow-hidden">
                           <SortableContext items={wsIds} strategy={verticalListSortingStrategy}>
@@ -1476,8 +1477,8 @@ export function Sidebar() {
               repoPath: contextMenu.project.repoPath,
             })
           }
-          onCloseProject={() => {
-            const confirmed = window.confirm(t('sidebar.removeConfirm', { name: contextMenu.project.name }));
+          onCloseProject={async () => {
+            const confirmed = await confirmNative(t('sidebar.removeConfirm', { name: contextMenu.project.name }));
             if (confirmed) removeProject(contextMenu.project.id);
           }}
         />

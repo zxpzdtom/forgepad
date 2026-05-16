@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from '@renderer/i18n';
 import { useNotificationSound } from '@renderer/hooks/useNotificationSound';
 import { BUILTIN_SOUNDS } from '@renderer/lib/builtin-sounds';
+import { confirmNative } from '@renderer/lib/native-dialog';
 import { useAppStore } from '@renderer/store/app-store';
 import type { NotificationSound } from '@shared/types';
 import { Check, Music, Pause, Pencil, Play, Plus, Trash2, Upload, Volume2 } from 'lucide-react';
@@ -98,7 +99,7 @@ function RenameDialog({ initial, onSave, onClose }: { initial: string; onSave: (
   }, []);
 
   return (
-    <div className="fixed inset-0 z-[70] grid place-items-center bg-black/80" onMouseDown={onClose}>
+    <div className="fixed inset-0 z-[70] grid place-items-center bg-black/45 backdrop-blur-[2px]" onMouseDown={onClose}>
       <div
         className="w-[min(360px,calc(100vw-32px))] overflow-hidden rounded-xl border border-border bg-surface-dialog shadow-[0_20px_60px_rgba(0,0,0,0.5)]"
         onMouseDown={(e) => e.stopPropagation()}
@@ -369,7 +370,7 @@ export function NotificationsSection() {
 
   const handleDelete = useCallback(
     async (sound: NotificationSound) => {
-      if (!window.confirm(t('settings.notifications.deleteConfirm', { name: sound.name }))) return;
+      if (!(await confirmNative(t('settings.notifications.deleteConfirm', { name: sound.name })))) return;
       // If deleting the currently selected sound, fallback to default
       if (ns.selectedSoundId === sound.id) {
         updateNotifications({ selectedSoundId: 'ping' });

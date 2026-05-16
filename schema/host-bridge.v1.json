@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "name": "forgepad.hostBridge",
   "version": 1,
-  "description": "Renderer-facing host contract for the native-feel ForgePad rewrite. This is the source of truth to replace divergent Electron preload and Tauri invoke surfaces.",
+  "description": "Renderer-facing host contract for the native-feel ForgePad rewrite.",
   "events": {
     "fs.changed": {
       "payload": "WorkspaceChangeEvent"
@@ -227,6 +227,15 @@
       "result": "string",
       "coreOwner": "rust"
     },
+    "fs.readFilePreview": {
+      "params": {
+        "worktreePath": "string",
+        "relPath": "string",
+        "maxBytes": "number"
+      },
+      "result": "FilePreviewResult",
+      "coreOwner": "rust"
+    },
     "fs.readFileDataUrl": {
       "params": {
         "worktreePath": "string",
@@ -334,7 +343,7 @@
       },
       "result": "void",
       "nativeOwner": true,
-      "migrationRisk": "Electron webContents IDs and <webview> tabs must be replaced by native WebView windows."
+      "notes": "Browser windows are owned by the native host."
     },
     "notification.pickAudio": {
       "params": {},

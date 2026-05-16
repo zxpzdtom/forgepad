@@ -3,10 +3,10 @@ import type { SelectedLineRange } from '@pierre/diffs';
 import { getFiletypeFromFileName } from '@pierre/diffs';
 import type { FileOptions, LineAnnotation } from '@pierre/diffs/react';
 import { File as PierreFile } from '@pierre/diffs/react';
-import { useResolvedTheme } from '@renderer/App';
+import { useResolvedTheme } from '@renderer/theme-context';
 import { useLspTokenNavigation } from '@renderer/hooks/useLspTokenNavigation';
 import { useAppStore } from '@renderer/store/app-store';
-import type { CodeSelectionItem, Tab, Workspace } from '@shared/types';
+import type { CodeSelectionItem, FilePreviewResult, Tab, Workspace } from '@shared/types';
 import {
   Check,
   ChevronDown,
@@ -60,6 +60,8 @@ type AnnotationMeta = { kind: 'pending' } | { kind: 'comment'; comment: CodeSele
 const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'ico', 'svg', 'avif']);
 const AUDIO_EXTENSIONS = new Set(['mp3', 'wav', 'ogg', 'flac', 'aac', 'm4a', 'wma']);
 const VIDEO_EXTENSIONS = new Set(['mp4', 'webm', 'mov', 'avi', 'mkv']);
+const RAW_MEDIA_PREVIEW_LIMIT = 256 * 1024;
+const TEXT_FILE_PREVIEW_LIMIT = 256 * 1024;
 
 function getExt(relPath: string): string {
   return relPath.split('.').pop()?.toLowerCase() ?? '';
@@ -84,6 +86,12 @@ function isPdfFile(relPath: string): boolean {
 function isMarkdownPath(path: string): boolean {
   const lower = path.toLowerCase();
   return lower.endsWith('.md') || lower.endsWith('.markdown');
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.ceil(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 // --- Slug generation for heading anchors ---
@@ -258,7 +266,7 @@ function MarkdownToc({
       if (!container) return;
       const target = container.querySelector(`#${CSS.escape(id)}`);
       if (target) {
-        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        target.scrollIntoView({ block: 'start' });
       }
     },
     [scrollContainerRef],
@@ -309,7 +317,7 @@ function MarkdownToc({
     if (!activeId) return;
     const el = itemRefs.current.get(activeId);
     if (el) {
-      el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      el.scrollIntoView({ block: 'nearest' });
     }
   }, [activeId]);
 
@@ -499,10 +507,11 @@ function getHighlightSupport() {
   return { registry, HighlightCtor };
 }
 
-function clearSearchHighlights() {
+function clearSearchHighlights(clearDomSelection = false) {
   const support = getHighlightSupport();
   support?.registry.delete(SEARCH_HIGHLIGHT);
   support?.registry.delete(ACTIVE_SEARCH_HIGHLIGHT);
+  if (clearDomSelection) window.getSelection()?.removeAllRanges();
 }
 
 function collectTextNodes(root: HTMLElement): TextNodeRange[] {
@@ -609,7 +618,7 @@ function scrollRangeIntoContainer(range: Range, container: HTMLElement) {
   scrollTarget.scrollTo({
     top: scrollTarget.scrollTop + target.top - containerRect.top - scrollTarget.clientHeight / 2,
     left: scrollTarget.scrollLeft + target.left - containerRect.left - Math.min(80, scrollTarget.clientWidth / 4),
-    behavior: 'smooth',
+    behavior: 'auto',
   });
 }
 
@@ -647,7 +656,7 @@ function scrollToLineElement(el: HTMLElement, scrollContainer: HTMLElement) {
   const containerRect = scrollContainer.getBoundingClientRect();
   scrollContainer.scrollTo({
     top: scrollContainer.scrollTop + elRect.top - containerRect.top - SCROLL_TO_LINE_OFFSET,
-    behavior: 'smooth',
+    behavior: 'auto',
   });
 }
 
@@ -671,6 +680,7 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
   const [fileText, setFileText] = useState('');
   const [lineCount, setLineCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [textPreview, setTextPreview] = useState<FilePreviewResult | null>(null);
   const [markdownMode, setMarkdownMode] = useState<MarkdownMode>('rendered');
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -868,6 +878,7 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
     let disposed = false;
     setLoading(true);
     setFileText('');
+    setTextPreview(null);
     setSearchRanges([]);
     setPendingSelection(null);
     setSelectedRange(null);
@@ -887,34 +898,44 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
         });
     }
 
-    // For media files (except PDF where there's no useful text fallback),
-    // still try loading as text so "Raw" mode works (shows base64 / binary).
-    // For PDF skip the text load entirely.
-    if (!isPdf) {
-      const textPromise = tab.absPath
-        ? window.forgepad.fs.readAbsFile(tab.absPath)
-        : window.forgepad.fs.readFile(workspace.worktreePath, tab.relPath);
-      textPromise
-        .then((text) => {
-          if (disposed) return;
-          setFileText(text);
-          setLineCount(text.split('\n').length);
-        })
-        .catch((error) => {
-          if (isMediaFile) return; // media preview already handles errors above
-          addToast('error', error instanceof Error ? error.message : 'Failed to load file.');
-        })
-        .finally(() => {
-          if (!disposed && !isMediaFile) setLoading(false);
-        });
-    } else {
-      // PDF: nothing to load as text, just wait for data URL
+    if (isMediaFile) {
+      return () => {
+        disposed = true;
+      };
     }
+
+    const textPromise = tab.absPath
+      ? window.forgepad.fs.readAbsFilePreview(tab.absPath, TEXT_FILE_PREVIEW_LIMIT)
+      : window.forgepad.fs.readFilePreview(workspace.worktreePath, tab.relPath, TEXT_FILE_PREVIEW_LIMIT);
+    textPromise
+      .then((preview) => {
+        if (disposed) return;
+        setTextPreview(preview);
+        setFileText(preview.content);
+        setLineCount(preview.content.split('\n').length);
+      })
+      .catch((error) => {
+        addToast('error', error instanceof Error ? error.message : 'Failed to load file.');
+      })
+      .finally(() => {
+        if (!disposed) setLoading(false);
+      });
 
     return () => {
       disposed = true;
     };
-  }, [addToast, tab.relPath, tab.absPath, workspace.worktreePath, isMediaFile, isPdf]);
+  }, [addToast, tab.relPath, tab.absPath, workspace.worktreePath, isMediaFile]);
+
+  useEffect(() => {
+    if (!isMediaFile || mediaViewMode !== 'raw' || !mediaUrl || fileText) return;
+
+    const rawText =
+      mediaUrl.length > RAW_MEDIA_PREVIEW_LIMIT
+        ? `${mediaUrl.slice(0, RAW_MEDIA_PREVIEW_LIMIT)}\n\n... truncated ${mediaUrl.length - RAW_MEDIA_PREVIEW_LIMIT} characters`
+        : mediaUrl;
+    setFileText(rawText);
+    setLineCount(rawText.split('\n').length);
+  }, [fileText, isMediaFile, mediaUrl, mediaViewMode]);
 
   useEffect(() => {
     setMarkdownMode('rendered');
@@ -1064,7 +1085,7 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
     setSearchOpen(false);
     setSearchQuery('');
     setSearchRanges([]);
-    clearSearchHighlights();
+    clearSearchHighlights(true);
   }, []);
 
   const goToMatch = useCallback(
@@ -1245,6 +1266,11 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
           <FileIcon filePath={tab.relPath} size={14} />
           {tab.relPath}
           {!isMediaFile && <span className="text-muted">{lineCount} lines</span>}
+          {textPreview?.truncated ? (
+            <span className="text-muted" title={`Showing ${formatBytes(textPreview.previewBytes)} of ${formatBytes(textPreview.totalBytes)}`}>
+              preview truncated
+            </span>
+          ) : null}
         </div>
         <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
           {isImage || isAudio || isVideo ? (
@@ -1342,8 +1368,10 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
             value={searchQuery}
             placeholder="Search file"
             onChange={(event) => {
-              setSearchQuery(event.currentTarget.value);
+              const nextQuery = event.currentTarget.value;
+              setSearchQuery(nextQuery);
               setActiveMatchIndex(0);
+              if (!nextQuery.trim()) clearSearchHighlights(true);
             }}
           />
           <span className="floating-search-count">{activeSearchLabel}</span>

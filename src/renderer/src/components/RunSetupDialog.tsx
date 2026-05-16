@@ -79,7 +79,7 @@ export function RunSetupDialog({
         : t('runSetup.helpText');
 
   return (
-    <div className="fixed inset-0 z-[60] grid place-items-center bg-black/85" onMouseDown={onClose}>
+    <div className="fixed inset-0 z-[60] grid place-items-center bg-black/45 backdrop-blur-[2px]" onMouseDown={onClose}>
       <div
         className="flex w-[min(480px,calc(100vw-32px))] max-h-[min(560px,calc(100vh-64px))] flex-col overflow-hidden rounded-xl border border-border bg-surface-dialog shadow-[0_28px_70px_rgba(0,0,0,0.46)]"
         onMouseDown={(e) => e.stopPropagation()}

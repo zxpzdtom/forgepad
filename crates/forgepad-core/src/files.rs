@@ -1,4 +1,5 @@
 use std::fs;
+use std::io::Read;
 use std::path::{Path, PathBuf};
 
 use base64::engine::general_purpose::STANDARD as BASE64;
@@ -18,6 +19,15 @@ pub struct FileNode {
     pub children: Option<Vec<FileNode>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub git_status: Option<String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FilePreview {
+    pub content: String,
+    pub total_bytes: u64,
+    pub preview_bytes: usize,
+    pub truncated: bool,
 }
 
 pub fn resolve_inside_root(root: impl AsRef<Path>, rel: &str) -> CoreResult<PathBuf> {
@@ -63,6 +73,15 @@ pub fn read_file(worktree_path: impl AsRef<Path>, rel_path: &str) -> CoreResult<
     fs::read_to_string(resolve_inside_root(worktree_path, rel_path)?).map_err(err)
 }
 
+pub fn read_file_preview(
+    worktree_path: impl AsRef<Path>,
+    rel_path: &str,
+    max_bytes: usize,
+) -> CoreResult<FilePreview> {
+    let path = resolve_inside_root(worktree_path, rel_path)?;
+    read_preview_path(&path, max_bytes)
+}
+
 pub fn read_file_data_url(worktree_path: impl AsRef<Path>, rel_path: &str) -> CoreResult<String> {
     let path = resolve_inside_root(worktree_path, rel_path)?;
     let data = fs::read(&path).map_err(err)?;
@@ -77,6 +96,13 @@ pub fn read_abs_file(abs_path: impl AsRef<Path>) -> CoreResult<String> {
     fs::read_to_string(abs_path).map_err(err)
 }
 
+pub fn read_abs_file_preview(
+    abs_path: impl AsRef<Path>,
+    max_bytes: usize,
+) -> CoreResult<FilePreview> {
+    read_preview_path(abs_path.as_ref(), max_bytes)
+}
+
 pub fn read_abs_file_data_url(abs_path: impl AsRef<Path>) -> CoreResult<String> {
     let path = abs_path.as_ref();
     let data = fs::read(path).map_err(err)?;
@@ -85,6 +111,32 @@ pub fn read_abs_file_data_url(abs_path: impl AsRef<Path>) -> CoreResult<String> 
         mime_for(path),
         BASE64.encode(data)
     ))
+}
+
+fn read_preview_path(path: &Path, max_bytes: usize) -> CoreResult<FilePreview> {
+    let total_bytes = fs::metadata(path).map_err(err)?.len();
+    let mut file = fs::File::open(path).map_err(err)?;
+    let mut bytes = Vec::with_capacity(max_bytes.saturating_add(1));
+    file.by_ref()
+        .take(max_bytes.saturating_add(1) as u64)
+        .read_to_end(&mut bytes)
+        .map_err(err)?;
+
+    let truncated = bytes.len() > max_bytes || total_bytes > max_bytes as u64;
+    if bytes.len() > max_bytes {
+        bytes.truncate(max_bytes);
+    }
+    if let Err(error) = std::str::from_utf8(&bytes) {
+        bytes.truncate(error.valid_up_to());
+    }
+
+    let content = String::from_utf8(bytes).map_err(err)?;
+    Ok(FilePreview {
+        preview_bytes: content.len(),
+        content,
+        total_bytes,
+        truncated,
+    })
 }
 
 pub fn write_file(
@@ -193,16 +245,27 @@ mod tests {
     }
 
     #[test]
+    fn read_file_preview_truncates_in_rust() {
+        let dir = tempfile::tempdir().unwrap();
+        write_file(dir.path(), "big.txt", "abcdef").unwrap();
+
+        let preview = read_file_preview(dir.path(), "big.txt", 3).unwrap();
+
+        assert_eq!(preview.content, "abc");
+        assert_eq!(preview.total_bytes, 6);
+        assert_eq!(preview.preview_bytes, 3);
+        assert!(preview.truncated);
+    }
+
+    #[test]
     fn read_abs_file_data_url_uses_file_mime() {
         let dir = tempfile::tempdir().unwrap();
         let file = dir.path().join("icon.svg");
         fs::write(&file, "<svg></svg>").unwrap();
 
-        assert!(
-            read_abs_file_data_url(&file)
-                .unwrap()
-                .starts_with("data:image/svg+xml;base64,")
-        );
+        assert!(read_abs_file_data_url(&file)
+            .unwrap()
+            .starts_with("data:image/svg+xml;base64,"));
     }
 
     #[test]

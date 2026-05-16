@@ -1,11 +1,22 @@
 import AppKit
 import WebKit
 
+final class ForgePadWebView: WKWebView {
+    override func willOpenMenu(_ menu: NSMenu, with event: NSEvent) {
+        if #available(macOS 13.3, *), isInspectable {
+            super.willOpenMenu(menu, with: event)
+            return
+        }
+        menu.removeAllItems()
+    }
+}
+
 final class MainWindowController: NSWindowController, WKNavigationDelegate {
     private let bridge: HostBridge
-    private let rendererSchemeHandler = RendererSchemeHandler()
     private var webView: WKWebView!
+    private var bootView: NSView?
     private(set) var hasLoadedRenderer = false
+    private var didRevealWindow = false
 
     convenience init(
         coreSupervisor: CoreSupervisor,
@@ -22,7 +33,12 @@ final class MainWindowController: NSWindowController, WKNavigationDelegate {
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
         window.isReleasedWhenClosed = false
-        window.backgroundColor = NSColor(red: 0.06, green: 0.07, blue: 0.09, alpha: 1.0)
+        window.appearance = NSAppearance(named: .darkAqua)
+        window.backgroundColor = NSColor(red: 0.031, green: 0.035, blue: 0.039, alpha: 1.0)
+        let occlusionSelector = Selector(("setWindowOcclusionDetectionEnabled:"))
+        if window.responds(to: occlusionSelector) {
+            window.perform(occlusionSelector, with: NSNumber(value: false))
+        }
         window.center()
         self.init(
             window: window,
@@ -61,10 +77,36 @@ final class MainWindowController: NSWindowController, WKNavigationDelegate {
         hasLoadedRenderer = true
         guard let window else { return }
 
+        webView = makeWebView()
+        webView.navigationDelegate = self
+        webView.alphaValue = 0
+
+        installNativeShell(in: window)
+        loadRenderer(rendererURL: rendererURL)
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
+            guard let self, !self.didRevealWindow else { return }
+            self.didRevealWindow = true
+            self.webView.alphaValue = 1
+        }
+    }
+
+    private func makeWebView() -> WKWebView {
         let config = WKWebViewConfiguration()
         config.preferences.javaScriptCanOpenWindowsAutomatically = true
+        config.preferences.setValue(true, forKey: "developerExtrasEnabled")
+        let idleSelector = Selector(("_setBoolValue:forKey:"))
+        if config.preferences.responds(to: idleSelector) {
+            config.preferences.perform(
+                idleSelector,
+                with: NSNumber(value: true),
+                with: "RequestIdleCallbackEnabled" as NSString
+            )
+        }
         config.suppressesIncrementalRendering = false
-        config.setURLSchemeHandler(rendererSchemeHandler, forURLScheme: "forgepad")
+        config.setURLSchemeHandler(RendererSchemeHandler(), forURLScheme: "forgepad")
+        config.setURLSchemeHandler(CustomPetSchemeHandler(), forURLScheme: "custom-pet")
 
         let userContent = WKUserContentController()
         userContent.add(bridge, name: "forgepadHost")
@@ -75,15 +117,82 @@ final class MainWindowController: NSWindowController, WKNavigationDelegate {
         ))
         config.userContentController = userContent
 
-        webView = WKWebView(frame: window.contentView?.bounds ?? .zero, configuration: config)
-        webView.navigationDelegate = self
-        webView.autoresizingMask = [.width, .height]
-        webView.setValue(false, forKey: "drawsBackground")
-        webView.alphaValue = 0
+        let view = ForgePadWebView(frame: .zero, configuration: config)
+        if #available(macOS 13.3, *) {
+            view.isInspectable = true
+        }
+        view.translatesAutoresizingMaskIntoConstraints = false
+        view.setValue(false, forKey: "drawsBackground")
+        view.layer?.backgroundColor = NSColor.clear.cgColor
+        return view
+    }
 
-        window.contentView = webView
-        loadRenderer(rendererURL: rendererURL)
-        window.makeKeyAndOrderFront(nil)
+    private func installNativeShell(in window: NSWindow) {
+        let root = NSVisualEffectView()
+        root.translatesAutoresizingMaskIntoConstraints = false
+        root.material = .hudWindow
+        root.blendingMode = .behindWindow
+        root.state = .active
+        root.wantsLayer = true
+        root.layer?.backgroundColor = NSColor(red: 0.031, green: 0.035, blue: 0.039, alpha: 1.0).cgColor
+
+        let boot = makeBootView()
+        root.addSubview(boot)
+        root.addSubview(webView)
+        bootView = boot
+
+        window.contentView = root
+
+        NSLayoutConstraint.activate([
+            boot.leadingAnchor.constraint(equalTo: root.leadingAnchor),
+            boot.trailingAnchor.constraint(equalTo: root.trailingAnchor),
+            boot.topAnchor.constraint(equalTo: root.topAnchor),
+            boot.bottomAnchor.constraint(equalTo: root.bottomAnchor),
+            webView.leadingAnchor.constraint(equalTo: root.leadingAnchor),
+            webView.trailingAnchor.constraint(equalTo: root.trailingAnchor),
+            webView.topAnchor.constraint(equalTo: root.topAnchor),
+            webView.bottomAnchor.constraint(equalTo: root.bottomAnchor),
+        ])
+    }
+
+    private func makeBootView() -> NSView {
+        let view = NSView()
+        view.translatesAutoresizingMaskIntoConstraints = false
+        view.wantsLayer = true
+        view.layer?.backgroundColor = NSColor(red: 0.031, green: 0.035, blue: 0.039, alpha: 1.0).cgColor
+
+        let label = NSTextField(labelWithString: "ForgePad")
+        label.translatesAutoresizingMaskIntoConstraints = false
+        label.font = NSFont.systemFont(ofSize: 22, weight: .semibold)
+        label.textColor = NSColor(calibratedWhite: 0.94, alpha: 1)
+        label.alignment = .center
+
+        let subtitle = NSTextField(labelWithString: "Warming workspace")
+        subtitle.translatesAutoresizingMaskIntoConstraints = false
+        subtitle.font = NSFont.systemFont(ofSize: 12, weight: .regular)
+        subtitle.textColor = NSColor(calibratedWhite: 0.58, alpha: 1)
+        subtitle.alignment = .center
+
+        let progress = NSProgressIndicator()
+        progress.translatesAutoresizingMaskIntoConstraints = false
+        progress.style = .spinning
+        progress.controlSize = .small
+        progress.isIndeterminate = true
+        progress.startAnimation(nil)
+
+        let stack = NSStackView(views: [label, subtitle, progress])
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        stack.orientation = .vertical
+        stack.alignment = .centerX
+        stack.spacing = 9
+        view.addSubview(stack)
+
+        NSLayoutConstraint.activate([
+            stack.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            stack.centerYAnchor.constraint(equalTo: view.centerYAnchor, constant: -12),
+        ])
+
+        return view
     }
 
     private func loadRenderer(rendererURL: URL?) {
@@ -101,17 +210,48 @@ final class MainWindowController: NSWindowController, WKNavigationDelegate {
     }
 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        revealWindowAfterFirstPaint()
+    }
+
+    private func revealWindowAfterFirstPaint() {
+        guard !didRevealWindow else {
+            fadeInWebView()
+            return
+        }
+        didRevealWindow = true
+        let reveal: @convention(block) () -> Void = { [weak self] in
+            guard let self else { return }
+            self.window?.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            self.fadeInWebView()
+        }
+
+        let selector = Selector(("_doAfterNextPresentationUpdate:"))
+        if webView.responds(to: selector) {
+            webView.perform(selector, with: reveal)
+        } else {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05, execute: reveal)
+        }
+    }
+
+    private func fadeInWebView() {
         NSAnimationContext.runAnimationGroup { context in
             context.duration = 0.08
             webView.animator().alphaValue = 1
+            bootView?.animator().alphaValue = 0
+        } completionHandler: { [weak self] in
+            self?.bootView?.removeFromSuperview()
+            self?.bootView = nil
         }
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        NSLog("[ForgePad native] renderer did fail \(error.localizedDescription)")
         showLoadFailure(error)
     }
 
     func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        NSLog("[ForgePad native] renderer did fail provisional \(error.localizedDescription)")
         showLoadFailure(error)
     }
 
@@ -124,6 +264,8 @@ final class MainWindowController: NSWindowController, WKNavigationDelegate {
         """
         webView.loadHTMLString(message, baseURL: nil)
         webView.alphaValue = 1
+        window?.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
     }
 
     private static func escapeHTML(_ value: String) -> String {
@@ -150,15 +292,36 @@ final class MainWindowController: NSWindowController, WKNavigationDelegate {
     }
 
     @objc func toggleDevToolsFromMenu() {
-        webView.perform(Selector(("_showInspector:")), with: nil)
+        if #available(macOS 13.3, *) {
+            webView.isInspectable = true
+        }
+        let showInspector = Selector(("_showInspector"))
+        let showInspectorWithSender = Selector(("_showInspector:"))
+        if webView.responds(to: showInspector) {
+            webView.perform(showInspector)
+            return
+        }
+        if webView.responds(to: showInspectorWithSender) {
+            webView.perform(showInspectorWithSender, with: self)
+            return
+        }
+        let alert = NSAlert()
+        alert.messageText = "ForgePad WebView is inspectable"
+        alert.informativeText = "Open Safari's Develop menu, then choose this Mac and ForgePad. The WebView is marked inspectable; this avoids the private inspector selector that can crash WKWebView."
+        alert.addButton(withTitle: "OK")
+        alert.runModal()
     }
 
     private func emit(name: String, payload: Any) {
+        emit(to: webView, name: name, payload: payload)
+    }
+
+    private func emit(to target: WKWebView?, name: String, payload: Any) {
         guard JSONSerialization.isValidJSONObject(["name": name, "payload": payload]),
               let data = try? JSONSerialization.data(withJSONObject: ["name": name, "payload": payload]),
               let json = String(data: data, encoding: .utf8)
         else { return }
-        webView.evaluateJavaScript("window.__forgepadNativeEmit && window.__forgepadNativeEmit(\(json));")
+        target?.evaluateJavaScript("window.__forgepadNativeEmit && window.__forgepadNativeEmit(\(json));")
     }
 
     private func emitMenuResult(name: String, payload: [String: Any]) {

@@ -4,7 +4,7 @@ import { useAppStore } from '@renderer/store/app-store';
 import { useTranslation } from '@renderer/i18n';
 import type { ShortcutActionId, ShortcutCombo } from '@shared/types';
 import { DEFAULT_SHORTCUTS, SHORTCUT_DEFINITIONS } from '@shared/types';
-import { RotateCcw } from 'lucide-react';
+import { Keyboard, RotateCcw } from 'lucide-react';
 
 import clsx from 'clsx';
 
@@ -101,6 +101,13 @@ export function ShortcutRecorder({ actionId, currentCombo }: ShortcutRecorderPro
 
   return (
     <div ref={ref} className="flex items-center gap-2">
+      {recording && (
+        <div className="shortcut-recording-hint">
+          <Keyboard size={13} />
+          <span>{t('shortcutRecorder.recording')}</span>
+        </div>
+      )}
+
       {/* Conflict warning */}
       {conflict && recording && (
         <div className="flex items-center gap-1.5 text-[11px] text-amber-400">
@@ -139,9 +146,9 @@ export function ShortcutRecorder({ actionId, currentCombo }: ShortcutRecorderPro
           setConflict(null);
         }}
         className={clsx(
-          'inline-flex min-w-[60px] items-center justify-center rounded-md border px-2.5 py-1 font-mono text-[11px] transition-all',
+          'inline-flex min-w-[60px] items-center justify-center rounded-md border px-2.5 py-1 font-mono text-[11px] transition-[background-color,border-color,color,box-shadow,transform]',
           recording
-            ? 'border-accent bg-accent/10 text-accent'
+            ? 'scale-[1.02] border-accent bg-accent/15 text-accent shadow-[0_0_0_3px_color-mix(in_srgb,var(--accent)_18%,transparent)]'
             : 'border-border bg-panel-2 text-muted hover:border-zinc-500 hover:text-text',
           !recording && isModified && 'ring-1 ring-accent/20',
         )}

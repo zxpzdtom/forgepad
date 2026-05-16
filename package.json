@@ -2,68 +2,18 @@
   "name": "forgepad",
   "version": "0.1.0",
   "private": true,
+  "productName": "ForgePad",
+  "bundleIdentifier": "com.forgepad.app",
   "description": "Terminal-first AI coding workspace with Pierre diffs and trees.",
-  "main": "./out/main/index.js",
   "type": "module",
   "scripts": {
-    "dev": "electron-vite dev",
-    "build": "tsc --noEmit && electron-vite build",
-    "preview": "electron-vite preview",
+    "dev": "sh -c 'pnpm exec vite --host 127.0.0.1 & renderer_pid=$!; trap \"kill $renderer_pid 2>/dev/null\" EXIT INT TERM; sleep 1; cd native/macos/ForgePadHost && FORGEPAD_WEB_URL=http://127.0.0.1:1420 FORGEPAD_CORE_COMMAND=\"cargo run --manifest-path ../../../crates/forgepad-core/Cargo.toml --bin forgepad-core-daemon\" swift run'",
+    "build": "pnpm typecheck && cargo test --manifest-path crates/forgepad-core/Cargo.toml && node scripts/package-native-mac.mjs",
     "typecheck": "tsc --noEmit",
-    "dist": "pnpm build && electron-builder --mac dmg",
-    "dist:dir": "pnpm build && electron-builder --mac dir",
     "lint": "biome lint src/",
     "format": "biome format --write src/",
     "check": "biome check src/",
-    "check:write": "biome check --write src/",
-    "vite:dev": "vite --host 127.0.0.1",
-    "vite:build": "vite build",
-    "native:mac": "cd native/macos/ForgePadHost && FORGEPAD_WEB_URL=http://127.0.0.1:1420 FORGEPAD_CORE_COMMAND='cargo run --manifest-path ../../../crates/forgepad-core/Cargo.toml --bin forgepad-core-daemon' swift run",
-    "native:mac:build": "cd native/macos/ForgePadHost && swift build",
-    "native:mac:package": "node scripts/package-native-mac.mjs",
-    "tauri": "tauri",
-    "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build"
-  },
-  "build": {
-    "appId": "com.forgepad.app",
-    "productName": "ForgePad",
-    "mac": {
-      "target": "dmg",
-      "icon": "build/icon.icns",
-      "category": "public.app-category.developer-tools",
-      "identity": null
-    },
-    "dmg": {
-      "contents": [
-        {
-          "x": 130,
-          "y": 220
-        },
-        {
-          "x": 410,
-          "y": 220,
-          "type": "link",
-          "path": "/Applications"
-        }
-      ]
-    },
-    "files": [
-      "out/**/*"
-    ],
-    "extraResources": [
-      {
-        "from": "build/app-icons",
-        "to": "app-icons",
-        "filter": [
-          "*.png"
-        ]
-      }
-    ],
-    "directories": {
-      "output": "dist"
-    },
-    "asar": true
+    "check:write": "biome check --write src/"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -89,30 +39,22 @@
     "lucide-react": "^0.577.0",
     "mermaid": "^11.14.0",
     "motion": "^12.38.0",
-    "node-pty": "^1.1.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "streamdown": "^2.5.0",
     "unicode-animations": "^1.0.3",
-    "zustand": "^5.0.11",
-    "@tauri-apps/api": "^2"
+    "zustand": "^5.0.11"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.13",
-    "@electron/rebuild": "^4.0.1",
     "@tailwindcss/vite": "^4.2.4",
     "@types/node": "^24.10.1",
     "@types/react": "^19.2.13",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^5.1.2",
-    "electron": "^40.2.1",
-    "electron-builder": "^26.8.1",
-    "electron-vite": "^5.0.0",
-    "esbuild": "^0.28.0",
     "tailwindcss": "^4.2.4",
     "typescript": "^5.9.3",
-    "vite": "^7.2.7",
-    "@tauri-apps/cli": "^2"
+    "vite": "^7.2.7"
   },
   "repository": "git@github.com:zxpzdtom/forgepad.git"
 }

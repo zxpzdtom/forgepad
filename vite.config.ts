@@ -6,7 +6,6 @@ import { resolve } from "node:path";
 
 const root = fileURLToPath(new URL(".", import.meta.url));
 const fromRoot = (path: string) => resolve(root, path);
-const nativeHostBuild = process.env.FORGEPAD_NATIVE_HOST === "1";
 
 export default defineConfig({
   root: fromRoot("src/renderer"),
@@ -17,24 +16,18 @@ export default defineConfig({
     port: 1420,
     strictPort: true,
   },
-  envPrefix: ["VITE_", "TAURI_"],
+  envPrefix: ["VITE_"],
   build: {
     outDir: fromRoot("dist/renderer"),
     emptyOutDir: true,
     rollupOptions: {
-      input: nativeHostBuild
-        ? {
-            index: fromRoot("src/renderer/index.html"),
-          }
-        : {
-            index: fromRoot("src/renderer/index.html"),
-            pet: fromRoot("src/renderer/pet.html"),
-            browser: fromRoot("src/renderer/browser.html"),
-          },
+      input: {
+        index: fromRoot("src/renderer/index.html"),
+      },
     },
   },
   define: {
-    __FORGEPAD_NATIVE_HOST__: JSON.stringify(nativeHostBuild),
+    __FORGEPAD_NATIVE_HOST__: JSON.stringify(true),
   },
   resolve: {
     alias: {

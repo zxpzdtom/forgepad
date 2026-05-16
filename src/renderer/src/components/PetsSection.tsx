@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
 import { useTranslation } from "@renderer/i18n";
+import { confirmNative } from "@renderer/lib/native-dialog";
 import { useAppStore } from "@renderer/store/app-store";
 import { SpriteAnimator } from "codex-pets-react";
 import { SegmentedControl } from "./SegmentedControl";
@@ -293,7 +294,7 @@ export function PetsSection() {
   };
 
   const handleDelete = async (petId: string, displayName: string) => {
-    if (!window.confirm(t("settings.pets.deleteConfirm"))) return;
+    if (!(await confirmNative(t("settings.pets.deleteConfirm")))) return;
     const result = await window.forgepad.pet.deletePet(petId);
     if (result.success) {
       removeCustomPet(petId);

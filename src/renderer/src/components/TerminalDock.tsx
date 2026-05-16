@@ -123,7 +123,7 @@ export function TerminalDock() {
   return (
     <section
       className={clsx(
-        'flex size-full min-h-0 flex-col border-border border-t bg-surface-terminal',
+        'terminal-dock-shell flex size-full min-h-0 flex-col border-border border-t bg-surface-terminal',
         dropHighlight && 'drop-target-active',
       )}
       onMouseDown={() => setFocusedColumn('agent')}

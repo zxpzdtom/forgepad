@@ -1,9 +1,9 @@
-import type { CSSProperties } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FileTreeContextMenuItem, GitStatusEntry } from '@pierre/trees';
 import { useTranslation } from '@renderer/i18n';
 import { FileTree, useFileTree, useFileTreeSelection } from '@pierre/trees/react';
-import { useResolvedTheme } from '@renderer/App';
+import { TREE_THEMES } from '@renderer/lib/file-tree-theme';
+import { useResolvedTheme } from '@renderer/theme-context';
 import { useAppStore } from '@renderer/store/app-store';
 import type { FileNode, Tab, Workspace } from '@shared/types';
 
@@ -146,48 +146,6 @@ function useActiveWorkspace(): Workspace | undefined {
   return workspaces.find((workspace) => workspace.id === activeWorkspaceId);
 }
 
-const TREE_THEME_SHARED = {
-  '--trees-font-family-override': 'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-  '--trees-font-size-override': '13px',
-  '--trees-padding-inline-override': '10px',
-  '--trees-border-radius-override': '6px',
-};
-
-const TREE_THEMES: Record<'dark' | 'light', CSSProperties> = {
-  dark: {
-    colorScheme: 'dark',
-    '--trees-bg-override': 'oklch(20.5% 0 0)',
-    '--trees-fg-override': 'oklch(98.5% 0 0)',
-    '--trees-fg-muted-override': 'oklch(75% 0 0)',
-    '--trees-bg-muted-override': 'oklch(26.9% 0 0)',
-    '--trees-search-fg-override': 'oklch(85% 0 0)',
-    '--trees-search-bg-override': 'oklch(20% 0 0)',
-    '--trees-border-color-override': 'oklch(100% 0 0 / 0.12)',
-    '--trees-selected-fg-override': 'oklch(97% 0.04 250)',
-    '--trees-selected-bg-override': 'oklch(35% 0.08 250)',
-    '--trees-selected-border-color-override': 'oklch(65% 0.2 250)',
-    '--trees-selected-focused-border-color-override': 'oklch(75% 0.2 250)',
-    '--trees-focus-ring-color-override': 'oklch(70% 0.15 250)',
-    ...TREE_THEME_SHARED,
-  } as CSSProperties,
-  light: {
-    colorScheme: 'light',
-    '--trees-bg-override': 'oklch(97% 0 0)',
-    '--trees-fg-override': 'oklch(15% 0 0)',
-    '--trees-fg-muted-override': 'oklch(45% 0 0)',
-    '--trees-bg-muted-override': 'oklch(93% 0 0)',
-    '--trees-search-fg-override': 'oklch(20% 0 0)',
-    '--trees-search-bg-override': 'oklch(97% 0 0)',
-    '--trees-border-color-override': 'oklch(0% 0 0 / 0.10)',
-    '--trees-selected-fg-override': 'oklch(15% 0.04 250)',
-    '--trees-selected-bg-override': 'oklch(90% 0.04 250)',
-    '--trees-selected-border-color-override': 'oklch(60% 0.15 250)',
-    '--trees-selected-focused-border-color-override': 'oklch(55% 0.2 250)',
-    '--trees-focus-ring-color-override': 'oklch(55% 0.15 250)',
-    ...TREE_THEME_SHARED,
-  } as CSSProperties,
-};
-
 export function FilesPanel() {
   const { t } = useTranslation();
   const resolvedTheme = useResolvedTheme();
@@ -281,7 +239,9 @@ export function FilesPanel() {
 
     const added = next.filter((p) => !prev.includes(p));
     const last = added.at(-1) ?? next.at(-1);
-    if (workspace && last && treeData.filePaths.has(last)) openFileTab(workspace.id, last);
+    if (workspace && last && treeData.filePaths.has(last)) {
+      openFileTab(workspace.id, last);
+    }
   }, [selectedTreePaths, openFileTab, treeData.filePaths, workspace]);
 
   // Reveal and select a file in the tree when triggered by a tab click
@@ -398,7 +358,11 @@ export function FilesPanel() {
           <button
             type="button"
             className="flex h-7 items-center gap-[7px] rounded-[5px] bg-transparent px-[9px] text-left text-text hover:bg-panel-3"
-            onClick={() => closeAfter(() => openFileTab(workspace.id, item.path))}
+            onClick={() =>
+              closeAfter(() => {
+                openFileTab(workspace.id, item.path);
+              })
+            }
           >
             <span className="flex size-4 shrink-0 items-center justify-center text-subtle">
               <IconFile />

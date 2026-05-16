@@ -8,6 +8,7 @@ export type ResolvedTheme = 'dark' | 'light';
 
 function resolveMode(theme: ThemeDefinition): ResolvedTheme {
   if (theme.mode === 'system') {
+    if (__FORGEPAD_NATIVE_HOST__) return 'dark';
     return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   }
   return theme.mode;

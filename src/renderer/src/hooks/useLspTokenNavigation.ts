@@ -2,11 +2,10 @@ import { useCallback, useEffect, useRef } from 'react';
 import { useAppStore } from '@renderer/store/app-store';
 import type { DiffTokenEventBaseProps, TokenEventBase } from '@pierre/diffs';
 
-/** Alias mappings mirroring electron.vite.config.ts resolve.alias */
+/** Alias mappings mirroring the renderer Vite config resolve.alias. */
 const PATH_ALIASES: Record<string, string> = {
   '@renderer/': 'src/renderer/src/',
   '@shared/': 'src/shared/',
-  '@main/': 'src/main/',
 };
 
 /** Common extensions to try when resolving an import path */

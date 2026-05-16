@@ -1,4 +1,4 @@
-import { type CSSProperties, type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
+import { type CSSProperties, type MouseEvent as ReactMouseEvent, type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from '@renderer/i18n';
 import { useAppStore } from '@renderer/store/app-store';
 import {
@@ -188,6 +188,18 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
   const createBrowserTab = useAppStore((state) => state.createBrowserTab);
   const projectActiveRunIndex = useAppStore((state) => state.projectActiveRunIndex);
   const setProjectActiveRunIndex = useAppStore((state) => state.setProjectActiveRunIndex);
+  const setSidebarOpen = useCallback(
+    (open: boolean) => {
+      useAppStore.setState({ sidebarOpen: open });
+    },
+    [],
+  );
+  const setRightPanelOpen = useCallback(
+    (open: boolean) => {
+      useAppStore.setState({ rightPanelOpen: open });
+    },
+    [],
+  );
 
   const activeWorkspace = workspaces.find((workspace) => workspace.id === activeWorkspaceId);
   const activeProject = activeWorkspace ? projects.find((p) => p.id === activeWorkspace.projectId) : undefined;
@@ -415,17 +427,32 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
     setMenuOpen(false);
   };
 
+  const handleTitlebarDoubleClick = useCallback((event: ReactMouseEvent<HTMLElement>) => {
+    if ((event.target as HTMLElement).closest('button, input, select, textarea, [role="button"], [role="menu"], [role="listbox"]')) {
+      return;
+    }
+    event.preventDefault();
+    window.getSelection()?.removeAllRanges();
+    window.forgepad.app2.toggleMaximize?.();
+  }, []);
+
   return (
     <header
-      className="app-topbar relative flex h-12 shrink-0 items-center border-border border-b bg-surface-toolbar px-3"
-      data-tauri-drag-region
+      className="app-topbar relative flex h-12 shrink-0 select-none items-center border-border border-b bg-surface-toolbar px-3"
+      onDoubleClick={handleTitlebarDoubleClick}
+      onMouseDown={(event) => {
+        if (event.detail > 1 && !(event.target as HTMLElement).closest('input, textarea, [contenteditable="true"]')) {
+          event.preventDefault();
+          window.getSelection()?.removeAllRanges();
+        }
+      }}
     >
       <div className="flex items-center pl-[80px]">
         <Tooltip label={sidebarOpen ? t('topbar.collapseSidebar') : t('topbar.expandSidebar')} position="bottom">
           <button
             className="icon-button border-transparent"
             type="button"
-            onClick={() => useAppStore.setState({ sidebarOpen: !sidebarOpen })}
+            onClick={() => setSidebarOpen(!sidebarOpen)}
           >
             {sidebarOpen ? <PanelLeftClose size={17} /> : <PanelLeftOpen size={17} />}
           </button>
@@ -433,7 +460,7 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
       </div>
 
       <button
-        className="absolute left-1/2 flex h-8 w-[min(460px,40vw)] -translate-x-1/2 items-center gap-2 rounded-lg border border-border bg-surface-search px-3 text-left text-muted shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] transition-colors hover:border-subtle hover:text-text"
+        className="absolute left-1/2 flex h-8 w-[min(460px,40vw)] -translate-x-1/2 select-none items-center gap-2 rounded-lg border border-border bg-surface-search px-3 text-left text-muted shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] transition-colors hover:border-subtle hover:text-text"
         type="button"
         title={t('topbar.searchForgePad')}
         onClick={onOpenSearch}
@@ -586,7 +613,7 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
           <button
             className="icon-button border-transparent"
             type="button"
-            onClick={() => useAppStore.setState({ rightPanelOpen: !rightPanelOpen })}
+            onClick={() => setRightPanelOpen(!rightPanelOpen)}
           >
             {rightPanelOpen ? <PanelRightClose size={17} /> : <PanelRightOpen size={17} />}
           </button>

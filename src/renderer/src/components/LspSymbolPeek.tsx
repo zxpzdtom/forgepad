@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { File as PierreFile } from '@pierre/diffs/react';
-import { useResolvedTheme } from '@renderer/App';
+import { useResolvedTheme } from '@renderer/theme-context';
 import { useAppStore } from '@renderer/store/app-store';
 import { useTranslation } from '@renderer/i18n';
 import type { LspLocation, Workspace } from '@shared/types';

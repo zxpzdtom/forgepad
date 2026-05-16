@@ -4,7 +4,7 @@ import type { FileDiffOptions, SelectedLineRange } from '@pierre/diffs';
 import { getFiletypeFromFileName, processFile } from '@pierre/diffs';
 import type { DiffLineAnnotation } from '@pierre/diffs/react';
 import { FileDiff, PatchDiff } from '@pierre/diffs/react';
-import { useResolvedTheme } from '@renderer/App';
+import { useResolvedTheme } from '@renderer/theme-context';
 import { useLspTokenNavigation } from '@renderer/hooks/useLspTokenNavigation';
 import { useAppStore } from '@renderer/store/app-store';
 import type { DiffCommentItem, DiffFileData, FileStatus, Tab, Workspace } from '@shared/types';
@@ -24,6 +24,36 @@ type PendingComment = {
 };
 
 type AnnotationMeta = { kind: 'pending' } | { kind: 'comment'; comment: DiffCommentItem };
+
+function isImageDiff(file: DiffFileData) {
+  return Boolean(file.oldImageDataUrl || file.newImageDataUrl);
+}
+
+function ImageDiff({ file }: { file: DiffFileData }) {
+  const { t } = useTranslation();
+  return (
+    <div className="grid gap-3 p-3">
+      <div className="grid grid-cols-2 gap-3">
+        <div className="image-diff-pane">
+          <div className="image-diff-label">{file.status === 'added' || file.bucket === 'untracked' ? 'Original' : 'Before'}</div>
+          {file.oldImageDataUrl ? (
+            <img src={file.oldImageDataUrl} alt={`${file.path} before`} />
+          ) : (
+            <div className="image-diff-empty">{file.bucket === 'untracked' ? t('changes.untracked') : t('diff.binaryOmitted')}</div>
+          )}
+        </div>
+        <div className="image-diff-pane">
+          <div className="image-diff-label">After</div>
+          {file.newImageDataUrl ? (
+            <img src={file.newImageDataUrl} alt={`${file.path} after`} />
+          ) : (
+            <div className="image-diff-empty">{file.status === 'deleted' ? 'Deleted' : t('diff.binaryOmitted')}</div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function DiffContent({
   file,
@@ -272,7 +302,9 @@ function DiffFileEntry({
           </div>
         </header>
       )}
-      {file.isBinary ? (
+      {isImageDiff(file) ? (
+        <ImageDiff file={file} />
+      ) : file.isBinary ? (
         <div className="grid min-h-[90px] place-items-center text-muted">{t('diff.binaryOmitted')}</div>
       ) : file.patch.trim() ? (
         <DiffContent

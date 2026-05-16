@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PatchDiff } from '@pierre/diffs/react';
-import { useResolvedTheme } from '@renderer/App';
+import { useResolvedTheme } from '@renderer/theme-context';
 import { useTranslation } from '@renderer/i18n';
+import { confirmNative } from '@renderer/lib/native-dialog';
 import { type SettingsSection, useAppStore } from '@renderer/store/app-store';
 import type { AgentPreset, ShortcutCategory } from '@shared/types';
 import { DEFAULT_SETTINGS, DEFAULT_SHORTCUTS, SHORTCUT_DEFINITIONS } from '@shared/types';
@@ -299,7 +300,7 @@ function EditPresetDialog({
   const canSave = label.trim().length > 0 && command.trim().length > 0;
 
   return (
-    <div className="fixed inset-0 z-[60] grid place-items-center bg-black/85" onMouseDown={onClose}>
+    <div className="fixed inset-0 z-[60] grid place-items-center bg-black/45 backdrop-blur-[2px]" onMouseDown={onClose}>
       <div
         className="w-[min(480px,calc(100vw-32px))] overflow-hidden rounded-xl border border-border bg-surface-dialog shadow-[0_28px_70px_rgba(0,0,0,0.46)]"
         onMouseDown={(e) => e.stopPropagation()}
@@ -559,8 +560,8 @@ function AgentSection() {
     setEditingPreset(null);
   };
 
-  const handleRemove = (preset: AgentPreset) => {
-    if (window.confirm(t('settings.agent.deleteConfirm', { name: preset.label }))) {
+  const handleRemove = async (preset: AgentPreset) => {
+    if (await confirmNative(t('settings.agent.deleteConfirm', { name: preset.label }))) {
       removeAgentPreset(preset.id);
     }
   };
@@ -845,8 +846,8 @@ function AdvancedSection() {
   const settings = useAppStore((state) => state.settings);
   const updateSettings = useAppStore((state) => state.updateSettings);
 
-  const handleReset = () => {
-    if (window.confirm(t('settings.advanced.resetConfirm'))) {
+  const handleReset = async () => {
+    if (await confirmNative(t('settings.advanced.resetConfirm'))) {
       updateSettings({ ...DEFAULT_SETTINGS });
     }
   };
@@ -906,8 +907,8 @@ function ShortcutsSection() {
         <button
           type="button"
           className="secondary-button small"
-          onClick={() => {
-            if (window.confirm(t('settings.shortcuts.resetConfirm'))) {
+          onClick={async () => {
+            if (await confirmNative(t('settings.shortcuts.resetConfirm'))) {
               resetAllShortcuts();
             }
           }}

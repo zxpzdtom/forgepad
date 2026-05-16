@@ -63,7 +63,7 @@ export function TabBar() {
     if (!activeFileTabId || !tabListRef.current) return;
     const el = tabListRef.current.querySelector<HTMLElement>(`[data-tab-id="${activeFileTabId}"]`);
     if (el) {
-      el.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+      el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
     }
   }, [activeFileTabId, tabListRef]);
 

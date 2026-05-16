@@ -1,4 +1,4 @@
-import { Component, type ErrorInfo, lazy, type ReactNode, Suspense, useCallback, useRef, useState } from 'react';
+import { Component, type ErrorInfo, lazy, type ReactNode, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from '@renderer/i18n';
 
 import { getDroppedPaths, hasDraggableFiles, isInternalDrop } from '@renderer/lib/drag-utils';
@@ -15,21 +15,35 @@ const NativeBrowserTab = ({ tab }: { tab: Extract<import('@shared/types').Tab, {
     window.forgepad.browser.openWindow?.(tab.url || 'about:blank', tab.title || 'Browser');
   }, [tab.title, tab.url]);
 
+  useEffect(() => {
+    if (!tab.url || tab.url === 'about:blank') return;
+    if (!/^https?:\/\/(localhost|127\.0\.0\.1|\[::1\]|0\.0\.0\.0)(?::\d+)?/i.test(tab.url)) return;
+    const timer = window.setTimeout(openNativeWindow, 80);
+    return () => window.clearTimeout(timer);
+  }, [openNativeWindow, tab.url]);
+
   return (
-    <div className="flex size-full items-center justify-center bg-bg p-6 text-center">
-      <div className="flex max-w-[360px] flex-col items-center gap-3">
-        <p className="m-0 text-muted text-sm">{t('browser.nativeWindowOnly')}</p>
-        <button type="button" className="secondary-button" onClick={openNativeWindow}>
+    <div className="flex size-full flex-col bg-bg">
+      <div className="flex h-9 shrink-0 items-center gap-2 border-border border-b bg-surface-toolbar px-2">
+        <div className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap rounded-md border border-border bg-surface-search px-2 py-1 font-mono text-[11px] text-muted">
+          {tab.url || 'about:blank'}
+        </div>
+        <button type="button" className="secondary-button h-7 min-h-7 px-2 text-xs" onClick={openNativeWindow}>
           {t('browser.openNativeWindow')}
         </button>
+      </div>
+      <div className="grid min-h-0 flex-1 place-items-center bg-bg p-6 text-center">
+        <div className="max-w-sm text-muted text-sm">
+          <div className="mb-2 font-medium text-text">{tab.title || 'Browser'}</div>
+          <div className="font-mono text-[11px] text-subtle">{tab.url || 'about:blank'}</div>
+          <div className="mt-3">{t('browser.nativeWindowOnly')}</div>
+        </div>
       </div>
     </div>
   );
 };
 
-const BrowserTab = __FORGEPAD_NATIVE_HOST__
-  ? lazy(async () => ({ default: NativeBrowserTab }))
-  : lazy(() => import('./BrowserTab').then((module) => ({ default: module.BrowserTab })));
+const BrowserTab = NativeBrowserTab;
 const DiffViewer = lazy(() => import('./DiffViewer').then((module) => ({ default: module.DiffViewer })));
 const FileEditor = lazy(() => import('./FileEditor').then((module) => ({ default: module.FileEditor })));
 const LspSymbolPeek = lazy(() => import('./LspSymbolPeek').then((module) => ({ default: module.LspSymbolPeek })));
@@ -96,8 +110,8 @@ export function FileColumn() {
 
   const fileTabs = tabs.filter((tab) => tab.workspaceId === activeWorkspaceId && tab.type !== 'terminal');
 
-  // Keep ALL browser tabs across every workspace mounted so that webviews
-  // survive workspace switches without reloading (display:none preserves state).
+  // Keep all browser tabs across every workspace mounted so native browser
+  // placeholders survive workspace switches without churn.
   const allBrowserTabs = tabs.filter((tab) => tab.type === 'browser');
 
   const columnActiveId = activeFileTabId ?? fileTabs[0]?.id;
@@ -180,7 +194,7 @@ export function FileColumn() {
       onDrop={handleDrop}
     >
       <div className="relative min-h-0 flex-1 overflow-hidden">
-        {/* Browser tabs from ALL workspaces stay mounted to preserve webview state across workspace switches */}
+        {/* Browser tabs from all workspaces stay mounted to preserve tab state across workspace switches */}
         {allBrowserTabs.map((tab) => {
           const isVisible = tab.workspaceId === activeWorkspaceId && tab.id === activeFileTab?.id;
           return (

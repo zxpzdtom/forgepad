@@ -1,9 +1,12 @@
-import { chmodSync, cpSync, existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { execFileSync } from "node:child_process";
 
 const root = resolve(new URL("..", import.meta.url).pathname);
-const appName = "ForgePad";
+const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8"));
+const appName = pkg.productName || "ForgePad";
+const bundleIdentifier = pkg.bundleIdentifier || "com.forgepad.app";
+const appVersion = pkg.version || "0.1.0";
 const bundleRoot = join(root, "dist", "native-mac");
 const appRoot = join(bundleRoot, `${appName}.app`);
 const contents = join(appRoot, "Contents");
@@ -28,12 +31,7 @@ rmSync(bundleRoot, { recursive: true, force: true });
 mkdirSync(macOS, { recursive: true });
 mkdirSync(resources, { recursive: true });
 
-run("pnpm", ["vite:build"], {
-  env: {
-    ...process.env,
-    FORGEPAD_NATIVE_HOST: "1",
-  },
-});
+run("pnpm", ["exec", "vite", "build"]);
 run("cargo", [
   "build",
   "--release",
@@ -88,7 +86,7 @@ writeFileSync(
   <key>CFBundleIconFile</key>
   <string>AppIcon</string>
   <key>CFBundleIdentifier</key>
-  <string>com.forgepad.app.native</string>
+  <string>${bundleIdentifier}</string>
   <key>CFBundleInfoDictionaryVersion</key>
   <string>6.0</string>
   <key>CFBundleName</key>
@@ -96,9 +94,9 @@ writeFileSync(
   <key>CFBundlePackageType</key>
   <string>APPL</string>
   <key>CFBundleShortVersionString</key>
-  <string>0.1.0</string>
+  <string>${appVersion}</string>
   <key>CFBundleVersion</key>
-  <string>0.1.0</string>
+  <string>${appVersion}</string>
   <key>LSMinimumSystemVersion</key>
   <string>13.0</string>
   <key>NSHighResolutionCapable</key>

@@ -33,6 +33,14 @@ pub struct BranchStats {
     pub deletions: i64,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PullRequestInfo {
+    pub number: i64,
+    pub url: String,
+    pub merged: bool,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Deserialize)]
 pub struct DiscardEntry {
     pub path: String,
@@ -236,6 +244,33 @@ pub fn remote_branches(repo_path: &Path) -> CoreResult<Vec<String>> {
         .map(|s| s.trim().to_string())
         .filter(|s| !s.contains("HEAD"))
         .collect())
+}
+
+pub fn pr_info(worktree_path: &Path) -> CoreResult<Option<PullRequestInfo>> {
+    let out = match command_output(
+        "gh",
+        &["pr", "view", "--json", "number,url,mergedAt,state"],
+        Some(worktree_path),
+    ) {
+        Ok(out) => out,
+        Err(_) => return Ok(None),
+    };
+
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct GhPrInfo {
+        number: i64,
+        url: String,
+        merged_at: Option<String>,
+        state: Option<String>,
+    }
+
+    let parsed: GhPrInfo = serde_json::from_str(&out).map_err(crate::err)?;
+    Ok(Some(PullRequestInfo {
+        number: parsed.number,
+        url: parsed.url,
+        merged: parsed.merged_at.is_some() || parsed.state.as_deref() == Some("MERGED"),
+    }))
 }
 
 pub fn generate_commit_message(worktree_path: &Path) -> String {

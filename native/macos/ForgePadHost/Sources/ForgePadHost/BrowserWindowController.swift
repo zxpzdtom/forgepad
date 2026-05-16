@@ -24,7 +24,11 @@ final class BrowserWindowController: NSWindowController, WKNavigationDelegate {
         guard let window else { return }
         let config = WKWebViewConfiguration()
         config.preferences.javaScriptCanOpenWindowsAutomatically = true
+        config.preferences.setValue(true, forKey: "developerExtrasEnabled")
         webView = WKWebView(frame: window.contentView?.bounds ?? .zero, configuration: config)
+        if #available(macOS 13.3, *) {
+            webView.isInspectable = true
+        }
         webView.navigationDelegate = self
         webView.autoresizingMask = [.width, .height]
         webView.alphaValue = 0

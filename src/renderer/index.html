@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark" data-theme-id="dark">
     <head>
         <meta charset="UTF-8" />
         <meta
@@ -7,7 +7,33 @@
             content="default-src 'self'; connect-src 'self' ipc: http://ipc.localhost http://localhost:* http://127.0.0.1:* ws://localhost:* ws://127.0.0.1:*; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: file: custom-pet: chrome-extension:; font-src 'self' data:; media-src 'self' data: blob:;"
         />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <meta name="color-scheme" content="dark light" />
         <title>ForgePad</title>
+        <style>
+            :root {
+                background: #08090a;
+                color-scheme: dark;
+            }
+
+            html,
+            body,
+            #root {
+                width: 100%;
+                height: 100%;
+                margin: 0;
+                background: #08090a;
+            }
+
+            body {
+                overflow: hidden;
+            }
+
+            #root:empty {
+                background:
+                    radial-gradient(circle at 50% 42%, rgba(94, 106, 210, 0.16), transparent 28%),
+                    #08090a;
+            }
+        </style>
     </head>
     <body>
         <div id="root"></div>

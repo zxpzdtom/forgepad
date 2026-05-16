@@ -138,7 +138,6 @@ impl PtyManager {
     }
 
     pub fn resize(&self, _id: &str, _cols: u16, _rows: u16) -> CoreResult<()> {
-        // The initial extraction keeps the old Tauri behavior, which was a no-op.
         // Resizing will move here when we store the master PTY handle in core.
         Ok(())
     }
