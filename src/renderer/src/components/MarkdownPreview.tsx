@@ -81,6 +81,61 @@ type MarkdownAnchorProps = React.AnchorHTMLAttributes<HTMLAnchorElement> & {
   node?: unknown;
 };
 
+async function resolveLocalMarkdownImageUrl(
+  src: string,
+  workspacePath: string,
+  markdownPath: string,
+  markdownAbsPath?: string,
+) {
+  if (!src || isRemoteOrEmbeddedUrl(src)) return src;
+  const [pathWithoutSuffix] = src.split(/[?#]/, 1);
+  if (markdownAbsPath && window.forgepad.fs.absFileUrl) {
+    return window.forgepad.fs.absFileUrl(resolveAbsMarkdownImagePath(pathWithoutSuffix, markdownAbsPath));
+  }
+  if (!markdownAbsPath && window.forgepad.fs.fileUrl) {
+    return window.forgepad.fs.fileUrl(workspacePath, resolveMarkdownImagePath(pathWithoutSuffix, markdownPath));
+  }
+  return src;
+}
+
+async function rewriteLocalMarkdownImageSources(
+  markdownText: string,
+  workspacePath: string,
+  markdownPath: string,
+  markdownAbsPath?: string,
+) {
+  const replacements = new Map<string, string>();
+  const sources = new Set<string>();
+
+  for (const match of markdownText.matchAll(/!\[[^\]]*]\(([^)\s]+)(?:\s+"[^"]*")?\)/g)) {
+    sources.add(match[1]);
+  }
+  for (const match of markdownText.matchAll(/<img\b[^>]*\bsrc=(["'])(.*?)\1/gi)) {
+    sources.add(match[2]);
+  }
+
+  await Promise.all(
+    Array.from(sources).map(async (src) => {
+      if (isRemoteOrEmbeddedUrl(src)) return;
+      try {
+        replacements.set(src, await resolveLocalMarkdownImageUrl(src, workspacePath, markdownPath, markdownAbsPath));
+      } catch {
+        // Leave the source untouched; GitHub-compatible markdown should stay readable
+        // even when a local file cannot be resolved inside ForgePad.
+      }
+    }),
+  );
+
+  if (replacements.size === 0) return markdownText;
+  return markdownText.replace(/!\[([^\]]*)]\(([^)\s]+)((?:\s+"[^"]*")?)\)/g, (full, alt, src, title) => {
+    const replacement = replacements.get(src);
+    return replacement ? `![${alt}](${replacement}${title})` : full;
+  }).replace(/(<img\b[^>]*\bsrc=)(["'])(.*?)\2/gi, (full, prefix, quote, src) => {
+    const replacement = replacements.get(src);
+    return replacement ? `${prefix}${quote}${replacement}${quote}` : full;
+  });
+}
+
 function createMarkdownImageComponent(workspacePath: string, markdownPath: string, markdownAbsPath?: string) {
   const MarkdownImage = ({ node: _, src, alt, ...props }: MarkdownImageProps) => {
     const rawSrc = typeof src === 'string' ? src : '';
@@ -92,25 +147,22 @@ function createMarkdownImageComponent(workspacePath: string, markdownPath: strin
 
       if (!rawSrc || isRemoteOrEmbeddedUrl(rawSrc)) return;
 
-      const [pathWithoutSuffix] = rawSrc.split(/[?#]/, 1);
-      const loadImage = markdownAbsPath
-        ? window.forgepad.fs.readAbsFileAsDataUrl(resolveAbsMarkdownImagePath(pathWithoutSuffix, markdownAbsPath))
-        : window.forgepad.fs.readFileAsDataUrl(workspacePath, resolveMarkdownImagePath(pathWithoutSuffix, markdownPath));
-
-      loadImage
-        .then((dataUrl) => {
-          if (!disposed) setResolvedSrc(dataUrl);
-        })
-        .catch(() => {
-          if (!disposed) setResolvedSrc(rawSrc);
-        });
+      resolveLocalMarkdownImageUrl(rawSrc, workspacePath, markdownPath, markdownAbsPath).then((url) => {
+        if (!disposed) setResolvedSrc(url);
+      }).catch(() => {
+        if (!disposed) setResolvedSrc(rawSrc);
+      });
 
       return () => {
         disposed = true;
       };
     }, [rawSrc]);
 
-    return <img {...props} src={resolvedSrc} alt={alt ?? ''} />;
+    const handleError = () => {
+      setResolvedSrc(rawSrc);
+    };
+
+    return <img {...props} src={resolvedSrc} alt={alt ?? ''} onError={handleError} />;
   };
 
   MarkdownImage.displayName = 'MarkdownImage';
@@ -171,6 +223,18 @@ export function MarkdownPreview({
 }: MarkdownPreviewProps) {
   const openFileTab = useAppStore((state) => state.openFileTab);
   const openExternalFileTab = useAppStore((state) => state.openExternalFileTab);
+  const [renderMarkdownText, setRenderMarkdownText] = useState(markdownText);
+
+  useEffect(() => {
+    let disposed = false;
+    setRenderMarkdownText(markdownText);
+    rewriteLocalMarkdownImageSources(markdownText, workspacePath, markdownPath, absPath).then((nextText) => {
+      if (!disposed) setRenderMarkdownText(nextText);
+    });
+    return () => {
+      disposed = true;
+    };
+  }, [absPath, markdownPath, markdownText, workspacePath]);
 
   const previewComponents = useMemo<Components>(
     () => ({
@@ -188,7 +252,7 @@ export function MarkdownPreview({
       linkSafety={{ enabled: false }}
       plugins={theme === 'dark' ? streamdownPluginsDark : streamdownPluginsLight}
     >
-      {markdownText}
+      {renderMarkdownText}
     </Streamdown>
   );
 }

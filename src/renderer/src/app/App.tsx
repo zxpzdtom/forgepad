@@ -9,6 +9,7 @@ import {
   useState,
 } from "react";
 import { AgentColumn } from "@renderer/components/AgentColumn";
+import { agentPresetIcon } from "@renderer/components/AgentIcons";
 import { AgentQuickBar } from "@renderer/components/AgentQuickBar";
 import { AgentTabBar } from "@renderer/components/AgentTabBar";
 import { FileColumn } from "@renderer/components/FileColumn";
@@ -32,12 +33,18 @@ import {
 } from "@renderer/lib/drag-utils";
 import { eventMatchesCombo } from "@renderer/lib/shortcut-utils";
 import { useAppStore } from "@renderer/store/app-store";
-import { ThemeContext } from "@renderer/theme-context";
+import { ThemeContext } from "@renderer/app/theme-context";
 import type {
+  AgentSessionHistoryItem,
   PetPlayAction,
   ShortcutActionId,
 } from "@shared/types";
 import { DEFAULT_SHORTCUTS } from "@shared/types";
+import {
+  WorkerPoolContextProvider,
+  type WorkerInitializationRenderOptions,
+  type WorkerPoolOptions,
+} from "@pierre/diffs/react";
 import { Allotment } from "allotment";
 import clsx from "clsx";
 import { motion, useReducedMotion } from "motion/react";
@@ -45,7 +52,7 @@ import {
   Bot,
   FolderOpen,
   GitBranch,
-  Globe,
+  Sparkles,
   TerminalSquare,
 } from "lucide-react";
 
@@ -54,6 +61,62 @@ const SettingsPanel = lazy(() =>
     default: module.SettingsPanel,
   })),
 );
+
+const pierreWorkerPoolOptions: WorkerPoolOptions = {
+  poolSize: Math.max(2, Math.min(4, navigator.hardwareConcurrency || 2)),
+  totalASTLRUCacheSize: 80,
+  workerFactory: () =>
+    new Worker(new URL("@pierre/diffs/worker/worker.js", import.meta.url), {
+      type: "module",
+    }),
+};
+
+const pierreHighlighterOptions: WorkerInitializationRenderOptions = {
+  langs: [
+    "bash",
+    "css",
+    "html",
+    "javascript",
+    "json",
+    "jsx",
+    "markdown",
+    "python",
+    "rust",
+    "swift",
+    "tsx",
+    "typescript",
+  ],
+  preferredHighlighter: "shiki-js",
+  tokenizeMaxLineLength: 800,
+};
+
+const NATIVE_DRAG_REGION_SELECTOR = [
+  ".app-topbar",
+  ".sidebar > :first-child",
+  ".boot-screen",
+  ".popout-tabbar",
+].join(",");
+
+const NATIVE_NO_DRAG_SELECTOR = [
+  "button",
+  "input",
+  "select",
+  "textarea",
+  "[contenteditable=\"true\"]",
+  "[role=\"button\"]",
+  "[role=\"tab\"]",
+  "[role=\"radio\"]",
+  "[role=\"radiogroup\"]",
+  "[role=\"menu\"]",
+  "[role=\"listbox\"]",
+  ".tabs-scroll",
+  ".toolbar-actions",
+  ".toolbar-select",
+  ".tabbar-actions",
+  ".right-panel-tabs",
+  ".right-panel-actions",
+  ".popout-tab-item",
+].join(",");
 
 function isTextEntryTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
@@ -81,6 +144,24 @@ function BootScreen() {
   );
 }
 
+function relativeSessionTime(timestamp: number): string {
+  const diff = Math.max(0, Date.now() - timestamp);
+  const minute = 60_000;
+  const hour = 60 * minute;
+  const day = 24 * hour;
+  if (diff < minute) return "刚刚";
+  if (diff < hour) return `${Math.floor(diff / minute)} 分钟前`;
+  if (diff < day) return `${Math.floor(diff / hour)} 小时前`;
+  return `${Math.floor(diff / day)} 天前`;
+}
+
+function agentLabelFromSession(session: AgentSessionHistoryItem): string {
+  if (session.agentPresetId === "claude") return "Claude";
+  if (session.agentPresetId === "codex") return "Codex";
+  if (session.agentPresetId === "gemini") return "Gemini";
+  return session.agentPresetId ?? "Agent";
+}
+
 function AppInner() {
   const resolvedTheme = useTheme();
   const prefersReducedMotion = useReducedMotion();
@@ -106,6 +187,7 @@ function AppInner() {
   const projects = useAppStore((state) => state.projects);
   const workspaces = useAppStore((state) => state.workspaces);
   const tabs = useAppStore((state) => state.tabs);
+  const agentSessionHistory = useAppStore((state) => state.agentSessionHistory);
   const activeWorkspaceId = useAppStore((state) => state.activeWorkspaceId);
   const activeTabId = useAppStore((state) => state.activeTabId);
   const focusedColumn = useAppStore((state) => state.focusedColumn);
@@ -115,6 +197,7 @@ function AppInner() {
   const openProject = useAppStore((state) => state.openProject);
   const createTerminal = useAppStore((state) => state.createTerminal);
   const createAgentTerminal = useAppStore((state) => state.createAgentTerminal);
+  const resumeAgentSession = useAppStore((state) => state.resumeAgentSession);
   const createBrowserTab = useAppStore((state) => state.createBrowserTab);
   const defaultBrowserHomepage = useAppStore(
     (state) => state.settings.defaultBrowserHomepage,
@@ -135,6 +218,25 @@ function AppInner() {
     () => ({ ...DEFAULT_SHORTCUTS, ...(keyboardShortcuts ?? {}) }),
     [keyboardShortcuts],
   );
+
+  useEffect(() => {
+    if (!window.forgepad.app2.startWindowDrag) return;
+
+    const handleMouseDown = (event: MouseEvent) => {
+      if (event.button !== 0 || event.detail > 1) return;
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) return;
+      if (target.closest(NATIVE_NO_DRAG_SELECTOR)) return;
+      if (!target.closest(NATIVE_DRAG_REGION_SELECTOR)) return;
+
+      event.preventDefault();
+      window.getSelection()?.removeAllRanges();
+      window.forgepad.app2.startWindowDrag?.();
+    };
+
+    document.addEventListener("mousedown", handleMouseDown, true);
+    return () => document.removeEventListener("mousedown", handleMouseDown, true);
+  }, []);
 
   useEffect(() => {
     let disposed = false;
@@ -158,6 +260,11 @@ function AppInner() {
       disposed = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    window.forgepad.pet.sendSettings(petSettings);
+  }, [hydrated, petSettings]);
 
   useEffect(() => {
     let saveTimer: number | undefined;
@@ -584,6 +691,13 @@ function AppInner() {
     prevShellDockVisibleRef.current = shellDockVisibleEarly;
   }, [shellDockVisibleEarly]);
 
+  const activeWorkspaceSessions = activeWorkspace
+    ? agentSessionHistory
+        .filter((session) => session.workspaceId === activeWorkspace.id)
+        .sort((a, b) => b.updatedAt - a.updatedAt)
+        .slice(0, 5)
+    : [];
+
   const renderEmptyState = () => {
     if (projects.length === 0) {
       return (
@@ -610,49 +724,82 @@ function AppInner() {
     }
 
     return (
-      <section className="flex size-full flex-col items-center justify-center gap-3.5 p-8 text-center">
-        <TerminalSquare size={30} />
-        <h1 className="m-0 font-semibold text-[22px]">
-          {activeWorkspace?.name ?? t("app.emptyState.noWorkspace")}
-        </h1>
-        <p className="m-0 flex max-w-[460px] items-center gap-[7px] text-muted leading-relaxed">
-          {activeWorkspace ? (
-            <>
-              <GitBranch size={14} />{" "}
-              {activeWorkspace.branch || t("app.emptyState.detached")}
-            </>
-          ) : (
-            t("app.emptyState.pickProject")
-          )}
-        </p>
-        {activeWorkspace ? (
-          <div className="flex gap-2">
-            <button
-              className="primary-button"
-              type="button"
-              onClick={() => createAgentTerminal(activeWorkspace.id)}
-            >
-              <Bot size={16} />
-              {t("app.emptyState.newAgent")}
-            </button>
-            <button
-              className="secondary-button"
-              type="button"
-              onClick={() => createTerminal(activeWorkspace.id)}
-            >
-              <TerminalSquare size={16} />
-              {t("app.emptyState.terminal")}
-            </button>
-            <button
-              className="secondary-button"
-              type="button"
-              onClick={() => openBrowser()}
-            >
-              <Globe size={16} />
-              {t("app.emptyState.browser")}
-            </button>
+      <section className="empty-workspace forgepad-start-surface flex size-full min-h-0 flex-col overflow-auto px-8 py-10">
+        <div className="mx-auto flex w-full max-w-[980px] flex-1 flex-col justify-center gap-7">
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 font-mono text-[12px] font-semibold text-accent uppercase tracking-[0.08em]">
+              <GitBranch size={14} />
+              {activeWorkspace?.branch || t("app.emptyState.detached")}
+            </div>
+            <div className="flex items-center justify-between gap-4">
+              <h1 className="m-0 text-balance font-semibold text-[30px] text-text">
+                {activeWorkspace ? "开始一个新的会话" : t("app.emptyState.noWorkspace")}
+              </h1>
+              {activeWorkspaceSessions.length > 0 ? (
+                <span className="rounded-full border border-accent/35 px-3 py-1 font-medium text-accent text-xs">
+                  {activeWorkspaceSessions.length} 个可恢复
+                </span>
+              ) : null}
+            </div>
+            <p className="m-0 max-w-[620px] text-muted text-sm leading-relaxed">
+              {activeWorkspace ? "选择一个 Agent 开始，或者从下面恢复最近的会话历史。" : t("app.emptyState.pickProject")}
+            </p>
           </div>
-        ) : null}
+
+          {activeWorkspace ? (
+            <div className="start-composer rounded-lg border border-border bg-panel/70 shadow-[0_18px_60px_rgba(0,0,0,0.18)] backdrop-blur">
+              <div className="min-h-[110px] p-5 text-[17px] text-subtle">描述一项任务，ForgePad 会派出代理并行尝试...</div>
+              <div className="flex items-center justify-between gap-3 border-border border-t p-3">
+                <button className="secondary-button h-8" type="button" onClick={() => createAgentTerminal(activeWorkspace.id)}>
+                  <Bot size={15} />
+                  {t("app.emptyState.newAgent")}
+                </button>
+                <div className="flex gap-2">
+                  <button className="secondary-button h-8" type="button" onClick={() => createTerminal(activeWorkspace.id)}>
+                    <TerminalSquare size={15} />
+                    {t("app.emptyState.terminal")}
+                  </button>
+                  <button className="primary-button h-8" type="button" onClick={() => createAgentTerminal(activeWorkspace.id)}>
+                    <Sparkles size={15} />
+                    开始会话
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {activeWorkspaceSessions.length > 0 ? (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between text-[12px] text-subtle uppercase tracking-[0.08em]">
+                <span>会话历史 · {activeWorkspace?.branch || activeWorkspace?.name}</span>
+                <span>{activeWorkspaceSessions.length}</span>
+              </div>
+              <div className="overflow-hidden rounded-lg border border-border bg-panel/60">
+                {activeWorkspaceSessions.map((session) => (
+                  <button
+                    key={`${session.workspaceId}:${session.sessionId}`}
+                    className="group flex w-full items-center gap-3 border-border border-b px-4 py-3 text-left last:border-b-0 hover:bg-panel-2"
+                    type="button"
+                    onClick={() => void resumeAgentSession(session)}
+                  >
+                    <span className="grid size-9 shrink-0 place-items-center rounded-full bg-panel-2 text-accent shadow-[inset_0_0_0_1px_var(--border)]">
+                      {session.agentPresetId ? agentPresetIcon(session.agentPresetId, 18) : <Bot size={17} />}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-medium text-[14px] text-text">{session.title}</span>
+                      <span className="mt-1 flex items-center gap-2 text-[12px] text-subtle">
+                        <span className="font-semibold text-accent">{agentLabelFromSession(session)}</span>
+                        <span className="font-mono">{session.sessionId.slice(0, 8)}</span>
+                        <span>{relativeSessionTime(session.updatedAt)}</span>
+                      </span>
+                    </span>
+                    <span className="text-muted text-xs opacity-0 transition-opacity group-hover:opacity-100">恢复</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </div>
       </section>
     );
   };
@@ -950,7 +1097,7 @@ function AppInner() {
           </motion.div>
         )}
 
-        <PetWidget />
+        {!__FORGEPAD_NATIVE_HOST__ ? <PetWidget /> : null}
         <QuickSearch
           open={quickSearchOpen}
           onClose={() => setQuickSearchOpen(false)}
@@ -964,7 +1111,12 @@ function AppInner() {
 export function App() {
   return (
     <I18nProvider>
-      <AppInner />
+      <WorkerPoolContextProvider
+        poolOptions={pierreWorkerPoolOptions}
+        highlighterOptions={pierreHighlighterOptions}
+      >
+        <AppInner />
+      </WorkerPoolContextProvider>
     </I18nProvider>
   );
 }

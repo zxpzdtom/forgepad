@@ -130,10 +130,10 @@ export function useAgentLifecycle(): void {
 
       const tab = state.tabs.find((t) => t.type === 'terminal' && t.ptyId === ptyId);
       if (tab) {
-        state.setActiveTab(tab.id);
         if (tab.workspaceId !== state.activeWorkspaceId) {
           state.setActiveWorkspace(tab.workspaceId);
         }
+        state.setActiveTab(tab.id);
       }
     });
 
@@ -186,14 +186,15 @@ function playNotificationSound(
 
   // Try custom sound
   const custom = ns.customSounds.find((s) => s.id === ns.selectedSoundId);
-  if (custom?.dataUrl) {
-    try {
-      const audio = new Audio(custom.dataUrl);
-      audio.volume = volume;
-      audio.play().catch(() => {});
-    } catch {
-      // Ignore
-    }
+  if (custom?.assetPath && window.forgepad.fs.absFileUrl) {
+    window.forgepad.fs
+      .absFileUrl(custom.assetPath)
+      .then((url) => {
+        const audio = new Audio(url);
+        audio.volume = volume;
+        return audio.play();
+      })
+      .catch(() => {});
     return;
   }
 

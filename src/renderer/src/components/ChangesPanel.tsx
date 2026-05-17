@@ -11,6 +11,8 @@ import {
   Folder,
   FolderOpen,
   GitCommitHorizontal,
+  List,
+  ListTree,
   RefreshCw,
   RotateCcw,
   Sparkles,
@@ -30,10 +32,14 @@ function statusKey(status: FileStatus): string {
   return `${status.bucket}:${status.path}`;
 }
 
-function bucketTitle(bucket: GitBucket, t: (key: string) => string): string {
-  if (bucket === 'staged') return t('changes.staged');
-  if (bucket === 'untracked') return t('changes.untracked');
-  return t('changes.workingTree');
+type ChangeSection = 'staged' | 'changes';
+
+function sectionTitle(section: ChangeSection, t: (key: string) => string): string {
+  return section === 'staged' ? t('changes.staged') : t('changes.changes');
+}
+
+function belongsToSection(status: FileStatus, section: ChangeSection): boolean {
+  return section === 'staged' ? status.bucket === 'staged' : status.bucket !== 'staged';
 }
 
 type ChangeTreeNode = {
@@ -43,7 +49,10 @@ type ChangeTreeNode = {
   children: ChangeTreeNode[];
   file?: FileStatus;
   aggregateStatus?: GitStatusKind;
+  displayStatus?: GitStatusKind;
 };
+
+type ChangesViewMode = 'tree' | 'flat';
 
 const STATUS_PRIORITY: GitStatusKind[] = ['conflicted', 'deleted', 'modified', 'renamed', 'added', 'untracked'];
 
@@ -60,10 +69,32 @@ function statusLabel(status: GitStatusKind): string {
   return 'M';
 }
 
-function buildChangeTree(files: FileStatus[]): ChangeTreeNode[] {
+function showStagedRenameAsDelete(file: FileStatus, splitStagedRenamePaths: Set<string>): boolean {
+  return file.bucket === 'staged' && file.status === 'renamed' && Boolean(file.oldPath) && splitStagedRenamePaths.has(file.path);
+}
+
+function displayPath(file: FileStatus, splitStagedRenamePaths: Set<string>): string {
+  return showStagedRenameAsDelete(file, splitStagedRenamePaths) ? (file.oldPath ?? file.path) : file.path;
+}
+
+function displayStatus(file: FileStatus, splitStagedRenamePaths: Set<string>): GitStatusKind {
+  return showStagedRenameAsDelete(file, splitStagedRenamePaths) ? 'deleted' : file.status;
+}
+
+function splitDisplayPath(path: string): { name: string; directory: string } {
+  const index = path.lastIndexOf('/');
+  if (index === -1) return { name: path, directory: '' };
+  return {
+    name: path.slice(index + 1),
+    directory: path.slice(0, index),
+  };
+}
+
+function buildChangeTree(files: FileStatus[], splitStagedRenamePaths: Set<string>): ChangeTreeNode[] {
   const root: ChangeTreeNode = { name: '', path: '', kind: 'directory', children: [] };
   for (const file of files) {
-    const parts = file.path.split('/').filter(Boolean);
+    const path = displayPath(file, splitStagedRenamePaths);
+    const parts = path.split('/').filter(Boolean);
     let current = root;
     for (let index = 0; index < parts.length; index++) {
       const name = parts[index];
@@ -74,7 +105,10 @@ function buildChangeTree(files: FileStatus[]): ChangeTreeNode[] {
         child = { name, path, kind: isFile ? 'file' : 'directory', children: [] };
         current.children.push(child);
       }
-      if (isFile) child.file = file;
+      if (isFile) {
+        child.file = file;
+        child.displayStatus = displayStatus(file, splitStagedRenamePaths);
+      }
       current = child;
     }
   }
@@ -99,8 +133,9 @@ function sortAndAggregate(node: ChangeTreeNode): GitStatusKind | undefined {
     return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
   });
   if (node.file) {
-    node.aggregateStatus = node.file.status;
-    return node.file.status;
+    const status = node.displayStatus ?? node.file.status;
+    node.aggregateStatus = status;
+    return status;
   }
   const childStatuses = node.children.map(sortAndAggregate).filter((status): status is GitStatusKind => status != null);
   const aggregate = childStatuses.sort((a, b) => statusRank(a) - statusRank(b))[0];
@@ -111,6 +146,16 @@ function sortAndAggregate(node: ChangeTreeNode): GitStatusKind | undefined {
 function collectFiles(node: ChangeTreeNode): FileStatus[] {
   if (node.file) return [node.file];
   return node.children.flatMap(collectFiles);
+}
+
+function changeStats(files: FileStatus[]): { additions: number; deletions: number } {
+  return files.reduce(
+    (stats, file) => ({
+      additions: stats.additions + (file.additions ?? 0),
+      deletions: stats.deletions + (file.deletions ?? 0),
+    }),
+    { additions: 0, deletions: 0 },
+  );
 }
 
 function defaultExpandedPaths(nodes: ChangeTreeNode[]): Set<string> {
@@ -130,10 +175,10 @@ function ChangeStatusBadge({ status }: { status: GitStatusKind }) {
   return <span className={`change-status-box status-${status}`}>{statusLabel(status)}</span>;
 }
 
-function ChangeStats({ file }: { file: FileStatus }) {
-  const additions = file.additions ?? 0;
-  const deletions = file.deletions ?? 0;
-  if (additions <= 0 && deletions <= 0) return <span className="change-row-stats" />;
+function ChangeStats({ additions, deletions }: { additions: number; deletions: number }) {
+  if (additions <= 0 && deletions <= 0) {
+    return <span className="change-row-stats" />;
+  }
   return (
     <span className="change-row-stats">
       {additions > 0 ? <span className="change-stat-add">+{additions}</span> : null}
@@ -145,7 +190,8 @@ function ChangeStats({ file }: { file: FileStatus }) {
 function ChangeTreeRow({
   node,
   depth,
-  bucket,
+  section,
+  splitStagedRenamePaths,
   activePath,
   expandedPaths,
   selectedKeys,
@@ -155,13 +201,14 @@ function ChangeTreeRow({
 }: {
   node: ChangeTreeNode;
   depth: number;
-  bucket: GitBucket;
+  section: ChangeSection;
+  splitStagedRenamePaths: Set<string>;
   activePath?: string;
   expandedPaths: Set<string>;
   selectedKeys: Set<string>;
   onToggleExpanded: (path: string) => void;
   onToggleSelection: (files: FileStatus[]) => void;
-  onOpenDiff: (path: string) => void;
+  onOpenDiff: (file: FileStatus, displayPath: string, displayStatus: GitStatusKind) => void;
 }) {
   const isDirectory = node.kind === 'directory';
   const isExpanded = expandedPaths.has(node.path);
@@ -170,8 +217,13 @@ function ChangeTreeRow({
   const allChecked = files.length > 0 && checkedCount === files.length;
   const mixed = checkedCount > 0 && !allChecked;
   const status = node.aggregateStatus ?? node.file?.status ?? 'modified';
-  const isActive = node.file?.path === activePath;
-  const rowClassName = `change-native-row ${isDirectory ? 'is-directory' : 'is-file'}${!isDirectory && isActive ? ' is-active' : ''}`;
+  const fileDisplayStatus = node.file ? displayStatus(node.file, splitStagedRenamePaths) : undefined;
+  const nodeDisplayPath = node.file ? displayPath(node.file, splitStagedRenamePaths) : node.path;
+  const isActive = node.file ? nodeDisplayPath === activePath : false;
+  const stats = useMemo(() => (node.file ? changeStats(files) : null), [files, node.file]);
+  const rowClassName = `change-native-row ${isDirectory ? 'is-directory' : 'is-file'}${!isDirectory && isActive ? ' is-active' : ''}${
+    fileDisplayStatus === 'deleted' ? ' is-deleted' : ''
+  }`;
 
   return (
     <>
@@ -181,7 +233,7 @@ function ChangeTreeRow({
           type="button"
           onClick={() => {
             if (isDirectory) onToggleExpanded(node.path);
-            else if (node.file) onOpenDiff(node.file.path);
+            else if (node.file) onOpenDiff(node.file, nodeDisplayPath, fileDisplayStatus ?? node.file.status);
           }}
         >
           <span className={`change-native-chevron${isExpanded ? ' is-expanded' : ''}`}>
@@ -194,7 +246,11 @@ function ChangeTreeRow({
             {node.name}
           </span>
         </button>
-        {node.file ? <ChangeStats file={node.file} /> : <span className="change-row-stats">{files.length}</span>}
+        {stats ? (
+          <ChangeStats additions={stats.additions} deletions={stats.deletions} />
+        ) : (
+          <span className="change-row-stats" />
+        )}
         <ChangeStatusBadge status={status} />
         <button
           className={`change-native-check${allChecked ? ' is-checked' : ''}${mixed ? ' is-mixed' : ''}`}
@@ -210,10 +266,11 @@ function ChangeTreeRow({
         <div className="change-native-children">
           {node.children.map((child) => (
             <ChangeTreeRow
-              key={`${bucket}:${child.path}:${child.kind}`}
+              key={`${section}:${child.path}:${child.kind}`}
               node={child}
               depth={depth + 1}
-              bucket={bucket}
+              section={section}
+              splitStagedRenamePaths={splitStagedRenamePaths}
               activePath={activePath}
               expandedPaths={expandedPaths}
               selectedKeys={selectedKeys}
@@ -228,25 +285,84 @@ function ChangeTreeRow({
   );
 }
 
-function ChangesBucketTree({
-  bucket,
+function ChangeFileRow({
+  file,
+  splitStagedRenamePaths,
+  activePath,
+  selected,
+  onToggleSelection,
+  onOpenDiff,
+}: {
+  file: FileStatus;
+  splitStagedRenamePaths: Set<string>;
+  activePath?: string;
+  selected: boolean;
+  onToggleSelection: (file: FileStatus) => void;
+  onOpenDiff: (file: FileStatus, displayPath: string, displayStatus: GitStatusKind) => void;
+}) {
+  const stats = changeStats([file]);
+  const path = displayPath(file, splitStagedRenamePaths);
+  const pathParts = splitDisplayPath(path);
+  const status = displayStatus(file, splitStagedRenamePaths);
+  const rowClassName = `change-native-row is-file${path === activePath ? ' is-active' : ''}${status === 'deleted' ? ' is-deleted' : ''}`;
+
+  return (
+    <div className={rowClassName} style={{ '--change-depth': 0 } as CSSProperties}>
+      <button className="change-native-main" type="button" onClick={() => onOpenDiff(file, path, status)}>
+        <span className="change-native-chevron" />
+        <span className="change-native-icon">
+          <FileIcon filePath={file.path} size={15} />
+        </span>
+        <span className="change-flat-label" title={file.oldPath ? `${file.oldPath} -> ${file.path}` : file.path}>
+          <span className="change-flat-name">{pathParts.name}</span>
+          {pathParts.directory ? <span className="change-flat-path">{pathParts.directory}</span> : null}
+        </span>
+      </button>
+      <ChangeStats additions={stats.additions} deletions={stats.deletions} />
+      <ChangeStatusBadge status={status} />
+      <button
+        className={`change-native-check${selected ? ' is-checked' : ''}`}
+        type="button"
+        aria-label={selected ? '取消选择' : '选择'}
+        onClick={(event) => {
+          event.stopPropagation();
+          onToggleSelection(file);
+        }}
+      />
+    </div>
+  );
+}
+
+function ChangesSectionTree({
+  section,
   files,
+  splitStagedRenamePaths,
+  viewMode,
   activePath,
   selectedKeys,
   setSelectedKeys,
   onOpenDiff,
 }: {
-  bucket: GitBucket;
+  section: ChangeSection;
   files: FileStatus[];
+  splitStagedRenamePaths: Set<string>;
+  viewMode: ChangesViewMode;
   activePath?: string;
   selectedKeys: Set<string>;
   setSelectedKeys: React.Dispatch<React.SetStateAction<Set<string>>>;
-  onOpenDiff: (path: string) => void;
+  onOpenDiff: (file: FileStatus, displayPath: string, displayStatus: GitStatusKind) => void;
 }) {
   const { t } = useTranslation();
-  const nodes = useMemo(() => buildChangeTree(files), [files]);
+  const nodes = useMemo(() => buildChangeTree(files, splitStagedRenamePaths), [files, splitStagedRenamePaths]);
   const [expandedPaths, setExpandedPaths] = useState(() => defaultExpandedPaths(nodes));
-  const treeSignature = useMemo(() => files.map((file) => file.path).sort().join('\n'), [files]);
+  const treeSignature = useMemo(
+    () =>
+      files
+        .map((file) => displayPath(file, splitStagedRenamePaths))
+        .sort()
+        .join('\n'),
+    [files, splitStagedRenamePaths],
+  );
   const previousSignatureRef = useRef(treeSignature);
   const selectedCount = useMemo(
     () => files.reduce((count, file) => count + (selectedKeys.has(statusKey(file)) ? 1 : 0), 0),
@@ -263,8 +379,17 @@ function ChangesBucketTree({
 
   useEffect(() => {
     const validKeys = new Set(files.map(statusKey));
-    setSelectedKeys((current) => new Set([...current].filter((key) => !key.startsWith(`${bucket}:`) || validKeys.has(key))));
-  }, [bucket, files, setSelectedKeys]);
+    setSelectedKeys(
+      (current) =>
+        new Set(
+          [...current].filter((key) => {
+            const bucket = key.slice(0, key.indexOf(':')) as GitBucket;
+            const isSectionKey = section === 'staged' ? bucket === 'staged' : bucket !== 'staged';
+            return !isSectionKey || validKeys.has(key);
+          }),
+        ),
+    );
+  }, [files, section, setSelectedKeys]);
 
   const toggleExpanded = useCallback((path: string) => {
     setExpandedPaths((current) => {
@@ -291,6 +416,19 @@ function ChangesBucketTree({
     [selectedKeys, setSelectedKeys],
   );
 
+  const toggleFileSelection = useCallback(
+    (file: FileStatus) => {
+      setSelectedKeys((current) => {
+        const next = new Set(current);
+        const key = statusKey(file);
+        if (next.has(key)) next.delete(key);
+        else next.add(key);
+        return next;
+      });
+    },
+    [setSelectedKeys],
+  );
+
   const toggleBucketSelection = useCallback(() => {
     setSelectedKeys((current) => {
       const next = new Set(current);
@@ -306,7 +444,7 @@ function ChangesBucketTree({
   return (
     <section className="changes-bucket">
       <div className="changes-bucket-heading">
-        <span className="font-[510]">{bucketTitle(bucket, t)}</span>
+        <span className="font-[510]">{sectionTitle(section, t)}</span>
         <button
           className={`change-bucket-check${allSelected ? ' is-checked' : ''}${partiallySelected ? ' is-mixed' : ''}`}
           type="button"
@@ -321,20 +459,40 @@ function ChangesBucketTree({
         </button>
       </div>
       <div className="change-native-tree">
-        {nodes.map((node) => (
-          <ChangeTreeRow
-            key={`${bucket}:${node.path}:${node.kind}`}
-            node={node}
-            depth={0}
-            bucket={bucket}
-            activePath={activePath}
-            expandedPaths={expandedPaths}
-            selectedKeys={selectedKeys}
-            onToggleExpanded={toggleExpanded}
-            onToggleSelection={toggleSelection}
-            onOpenDiff={onOpenDiff}
-          />
-        ))}
+        {viewMode === 'flat'
+          ? [...files]
+              .sort((a, b) =>
+                displayPath(a, splitStagedRenamePaths).localeCompare(displayPath(b, splitStagedRenamePaths), undefined, {
+                  numeric: true,
+                  sensitivity: 'base',
+                }),
+              )
+              .map((file) => (
+                <ChangeFileRow
+                  key={statusKey(file)}
+                  file={file}
+                  splitStagedRenamePaths={splitStagedRenamePaths}
+                  activePath={activePath}
+                  selected={selectedKeys.has(statusKey(file))}
+                  onToggleSelection={toggleFileSelection}
+                  onOpenDiff={onOpenDiff}
+                />
+              ))
+          : nodes.map((node) => (
+              <ChangeTreeRow
+                key={`${section}:${node.path}:${node.kind}`}
+                node={node}
+                depth={0}
+                section={section}
+                splitStagedRenamePaths={splitStagedRenamePaths}
+                activePath={activePath}
+                expandedPaths={expandedPaths}
+                selectedKeys={selectedKeys}
+                onToggleExpanded={toggleExpanded}
+                onToggleSelection={toggleSelection}
+                onOpenDiff={onOpenDiff}
+              />
+            ))}
       </div>
     </section>
   );
@@ -349,19 +507,20 @@ export function ChangesPanel() {
   const [loading, setLoading] = useState(false);
   const [syncing, setSyncing] = useState<'push' | 'pull' | null>(null);
   const [generating, setGenerating] = useState(false);
+  const [viewMode, setViewMode] = useState<ChangesViewMode>('tree');
   const addToast = useAppStore((state) => state.addToast);
   const openDiffTab = useAppStore((state) => state.openDiffTab);
   const triggerGitRefresh = useAppStore((state) => state.triggerGitRefresh);
   const gitRefreshEpoch = useAppStore((state) => state.gitRefreshEpoch);
   const spinnerStyle = useAppStore((state) => state.settings.spinnerStyle);
   const commitPromptTemplate = useAppStore((state) => state.settings.commitPromptTemplate);
+  const defaultAgentCommand = useAppStore((state) => state.settings.defaultAgentCommand);
   const activeWorkspaceId = useAppStore((state) => state.activeWorkspaceId);
   const branchStats = useAppStore((state) => (activeWorkspaceId ? state.branchStats[activeWorkspaceId] : undefined));
-  const activeDiffPath = useAppStore(
-    (state) => state.tabs.find((tab) => tab.workspaceId === activeWorkspaceId && tab.type === 'diff')?.activePath,
-  );
+  const activeDiffTab = useAppStore((state) => state.tabs.find((tab) => tab.workspaceId === activeWorkspaceId && tab.type === 'diff'));
 
   const prevSignature = useRef('');
+  const commitTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   const load = useCallback(
     async (silent?: boolean) => {
@@ -374,7 +533,6 @@ export function ChangesPanel() {
         setSelectedKeys((current) => new Set([...current].filter((key) => next.some((status) => statusKey(status) === key))));
         if (sig !== prevSignature.current) {
           prevSignature.current = sig;
-          if (silent) triggerGitRefresh();
         }
       } catch (error) {
         addToast('error', error instanceof Error ? error.message : t('changes.failedLoadStatus'));
@@ -410,20 +568,24 @@ export function ChangesPanel() {
   const selectedStaged = useMemo(() => selected.filter((status) => status.bucket === 'staged'), [selected]);
   const selectedDiscardable = useMemo(() => selected.filter((status) => status.bucket !== 'staged'), [selected]);
 
-  const byBucket = useMemo(() => {
-    const buckets: Record<GitBucket, FileStatus[]> = {
+  const bySection = useMemo(() => {
+    const sections: Record<ChangeSection, FileStatus[]> = {
       staged: [],
-      unstaged: [],
-      untracked: [],
+      changes: [],
     };
-    for (const status of statuses) buckets[status.bucket].push(status);
-    return buckets;
+    for (const status of statuses) sections[belongsToSection(status, 'staged') ? 'staged' : 'changes'].push(status);
+    return sections;
   }, [statuses]);
 
+  const splitStagedRenamePaths = useMemo(
+    () => new Set(statuses.filter((status) => status.bucket !== 'staged').map((status) => status.path)),
+    [statuses],
+  );
+
   const onOpenDiff = useCallback(
-    (path: string) => {
+    (file: FileStatus, path: string, status: GitStatusKind) => {
       if (!workspace) return;
-      openDiffTab(workspace.id, path);
+      openDiffTab(workspace.id, path, file.bucket, status, status === 'deleted' ? undefined : file.oldPath);
     },
     [openDiffTab, workspace],
   );
@@ -483,10 +645,19 @@ export function ChangesPanel() {
     if (!workspace || generating) return;
     setGenerating(true);
     try {
-      const message = await window.forgepad.git.generateCommitMessage(workspace.worktreePath, commitPromptTemplate);
+      const message = await window.forgepad.git.generateCommitMessage(
+        workspace.worktreePath,
+        commitPromptTemplate,
+        defaultAgentCommand,
+      );
       setCommitMessage(message);
-      await load();
-      triggerGitRefresh();
+      window.requestAnimationFrame(() => {
+        const textarea = commitTextareaRef.current;
+        if (!textarea) return;
+        const end = message.length;
+        textarea.focus();
+        textarea.setSelectionRange(end, end);
+      });
     } catch (error) {
       addToast('error', error instanceof Error ? error.message : t('changes.gitOpFailed'));
     } finally {
@@ -498,7 +669,8 @@ export function ChangesPanel() {
     return <div className="grid min-h-[90px] place-items-center text-muted">{t('changes.openProjectFirst')}</div>;
   }
 
-  const bucketOrder: GitBucket[] = ['staged', 'unstaged', 'untracked'];
+  const sectionOrder: ChangeSection[] = ['staged', 'changes'];
+  const showInitialLoading = loading && statuses.length === 0;
 
   return (
     <section className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-hidden py-2.5 pl-2.5">
@@ -520,13 +692,35 @@ export function ChangesPanel() {
         >
           <Trash2 size={15} />
         </button>
-        <button className="icon-button" type="button" title={t('changes.refreshChanges')} onClick={() => void load()}>
+        <button className="icon-button" type="button" title={t('changes.refreshChanges')} onClick={() => void load(true)}>
           <RefreshCw size={15} />
         </button>
+        <div className="ml-auto view-mode-toggle" role="radiogroup" aria-label={t('changes.viewMode')}>
+          <button
+            className={`view-mode-btn${viewMode === 'tree' ? ' active' : ''}`}
+            type="button"
+            role="radio"
+            aria-checked={viewMode === 'tree'}
+            title={t('changes.treeView')}
+            onClick={() => setViewMode('tree')}
+          >
+            <ListTree size={15} />
+          </button>
+          <button
+            className={`view-mode-btn${viewMode === 'flat' ? ' active' : ''}`}
+            type="button"
+            role="radio"
+            aria-checked={viewMode === 'flat'}
+            title={t('changes.flatView')}
+            onClick={() => setViewMode('flat')}
+          >
+            <List size={15} />
+          </button>
+        </div>
       </div>
 
       <div className="changes-list scrollbar-thin flex min-h-0 flex-1 flex-col gap-1 overflow-auto">
-        {loading && (
+        {showInitialLoading && (
           <div className="grid min-h-[52px] place-items-center text-muted">
             <span className="flex items-center gap-1.5 text-xs">
               <Spinner name={spinnerStyle} size={16} dotSize={2} />
@@ -536,16 +730,18 @@ export function ChangesPanel() {
         {!loading && statuses.length === 0 && (
           <div className="grid min-h-[52px] place-items-center text-muted">{t('changes.cleanWorkingTree')}</div>
         )}
-        {!loading &&
-          bucketOrder.map((bucket) => {
-            const files = byBucket[bucket];
+        {!showInitialLoading &&
+          sectionOrder.map((section) => {
+            const files = bySection[section];
             if (files.length === 0) return null;
             return (
-              <ChangesBucketTree
-                key={bucket}
-                bucket={bucket}
+              <ChangesSectionTree
+                key={section}
+                section={section}
                 files={files}
-                activePath={activeDiffPath}
+                splitStagedRenamePaths={splitStagedRenamePaths}
+                viewMode={viewMode}
+                activePath={activeDiffTab?.activePath}
                 selectedKeys={selectedKeys}
                 setSelectedKeys={setSelectedKeys}
                 onOpenDiff={onOpenDiff}
@@ -557,6 +753,7 @@ export function ChangesPanel() {
       <div className="mr-2.5 grid gap-2 border-border border-t pt-2.5">
         <div className="relative">
           <textarea
+            ref={commitTextareaRef}
             className="commit-textarea pr-8"
             value={commitMessage}
             onChange={(event) => setCommitMessage(event.currentTarget.value)}

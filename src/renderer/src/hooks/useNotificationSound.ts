@@ -72,11 +72,11 @@ export function useNotificationSound() {
         return;
       }
 
-      // Try custom sound (data URL stored in settings)
+      // Try custom sound through the native file scheme.
       const custom = settings.customSounds.find((s) => s.id === id);
-      if (custom?.dataUrl) {
-        try {
-          const audio = new Audio(custom.dataUrl);
+      if (custom?.assetPath && window.forgepad.fs.absFileUrl) {
+        window.forgepad.fs.absFileUrl(custom.assetPath).then((url) => {
+          const audio = new Audio(url);
           audio.volume = volume;
           const playPromise = audio.play();
           stopCurrentRef.current = () => {
@@ -88,9 +88,9 @@ export function useNotificationSound() {
               // Autoplay blocked; ignore silently
             });
           }
-        } catch {
+        }).catch(() => {
           // Ignore audio errors
-        }
+        });
         return;
       }
 

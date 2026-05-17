@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./build/icon.png" alt="ForgePad icon" width="96" height="96">
+  <img src="./src/renderer/public/app-icons/graphite.png" alt="ForgePad icon" width="96" height="96">
 </p>
 
 <h1 align="center">ForgePad</h1>

@@ -46,7 +46,6 @@ const NativeBrowserTab = ({ tab }: { tab: Extract<import('@shared/types').Tab, {
 const BrowserTab = NativeBrowserTab;
 const DiffViewer = lazy(() => import('./DiffViewer').then((module) => ({ default: module.DiffViewer })));
 const FileEditor = lazy(() => import('./FileEditor').then((module) => ({ default: module.FileEditor })));
-const LspSymbolPeek = lazy(() => import('./LspSymbolPeek').then((module) => ({ default: module.LspSymbolPeek })));
 
 /** Error boundary so a crashing BrowserTab doesn't take down the whole column */
 class BrowserErrorBoundary extends Component<
@@ -106,7 +105,6 @@ export function FileColumn() {
   const setFocusedColumn = useAppStore((state) => state.setFocusedColumn);
   const openFileTab = useAppStore((state) => state.openFileTab);
   const openExternalFileTab = useAppStore((state) => state.openExternalFileTab);
-  const symbolPeek = useAppStore((state) => state.symbolPeek);
 
   const fileTabs = tabs.filter((tab) => tab.workspaceId === activeWorkspaceId && tab.type !== 'terminal');
 
@@ -211,37 +209,44 @@ export function FileColumn() {
             </div>
           );
         })}
-        {/* Non-browser tabs: only render the active one in the current workspace */}
+        {/* Keep opened file/diff/context tabs mounted so switching tabs preserves loaded content and scroll state. */}
         {activeWorkspace &&
           fileTabs.map((tab) => {
             if (tab.type === 'browser') return null; // already rendered above
             const isActive = tab.id === activeFileTab?.id;
-            if (!isActive) return null;
+            const paneStyle = {
+              visibility: isActive ? 'visible' : 'hidden',
+              pointerEvents: isActive ? 'auto' : 'none',
+              zIndex: isActive ? 1 : 0,
+            } as const;
             if (tab.type === 'file') {
               return (
-                <Suspense key={tab.id} fallback={null}>
-                  <FileEditor tab={tab} workspace={activeWorkspace} />
-                </Suspense>
+                <div key={tab.id} className="absolute inset-0" style={paneStyle} aria-hidden={!isActive}>
+                  <Suspense fallback={null}>
+                    <FileEditor tab={tab} workspace={activeWorkspace} />
+                  </Suspense>
+                </div>
               );
             }
             if (tab.type === 'diff') {
               return (
-                <Suspense key={tab.id} fallback={null}>
-                  <DiffViewer tab={tab} workspace={activeWorkspace} />
-                </Suspense>
+                <div key={tab.id} className="absolute inset-0" style={paneStyle} aria-hidden={!isActive}>
+                  <Suspense fallback={null}>
+                    <DiffViewer tab={tab} workspace={activeWorkspace} />
+                  </Suspense>
+                </div>
               );
             }
             if (tab.type === 'context-preview') {
-              return <ContextPreview key={tab.id} />;
+              return (
+                <div key={tab.id} className="absolute inset-0" style={paneStyle} aria-hidden={!isActive}>
+                  <ContextPreview />
+                </div>
+              );
             }
             return null;
           })}
       </div>
-      {symbolPeek && activeWorkspace && (
-        <Suspense fallback={null}>
-          <LspSymbolPeek workspace={activeWorkspace} />
-        </Suspense>
-      )}
     </div>
   );
 }

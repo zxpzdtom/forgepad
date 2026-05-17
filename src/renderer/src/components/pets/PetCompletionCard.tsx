@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import type { CompletionCard } from "@shared/types";
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { CompletionCard } from '@shared/types';
+
 export type WorkingAgentSummary = {
   ptyId: string;
   title: string;
@@ -10,6 +11,22 @@ export type WorkingAgentSummary = {
 const AUTO_DISMISS_MS = 8_000;
 /** Shorter dismiss delay after the user has hovered and left. */
 const POST_HOVER_DISMISS_MS = 3_000;
+const PANEL_STYLE: React.CSSProperties = {
+  pointerEvents: 'auto',
+  zIndex: 100,
+  background: 'linear-gradient(180deg, rgba(30, 31, 40, 0.96), rgba(18, 19, 26, 0.94))',
+  backdropFilter: 'blur(18px)',
+  WebkitBackdropFilter: 'blur(18px)',
+  border: '1px solid rgba(255, 255, 255, 0.14)',
+  borderRadius: 16,
+  padding: 12,
+  boxShadow: '0 14px 34px rgba(0, 0, 0, 0.34), 0 2px 8px rgba(0, 0, 0, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.08)',
+  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+  userSelect: 'none',
+  WebkitUserSelect: 'none',
+  cursor: 'default',
+  color: 'rgba(255, 255, 255, 0.92)',
+};
 
 /**
  * Completion notification card displayed above the pet when an agent finishes.
@@ -26,7 +43,7 @@ export function PetCompletionCard({
   workingAgents,
   onWorkingAgentView,
   onHoverChange,
-  variant = "widget",
+  variant = 'widget',
 }: {
   card: CompletionCard;
   onDismiss: () => void;
@@ -35,7 +52,7 @@ export function PetCompletionCard({
   onWorkingAgentView?: (ptyId: string) => void;
   onHoverChange?: (hovered: boolean) => void;
   /** 'widget' = inside main window, 'overlay' = desktop pet window */
-  variant?: "widget" | "overlay";
+  variant?: 'widget' | 'overlay';
 }) {
   const [visible, setVisible] = useState(false);
   const [hovered, setHovered] = useState(false);
@@ -94,11 +111,11 @@ export function PetCompletionCard({
     [onWorkingAgentView],
   );
 
-  const isOverlay = variant === "overlay";
+  const isOverlay = variant === 'overlay';
 
   // Truncate text to a reasonable length for single-line display
   const truncate = (text: string, maxLen: number) => {
-    const cleaned = text.replace(/\s+/g, " ").trim();
+    const cleaned = text.replace(/\s+/g, ' ').trim();
     if (cleaned.length <= maxLen) return cleaned;
     return `${cleaned.slice(0, maxLen - 1)}…`;
   };
@@ -106,53 +123,65 @@ export function PetCompletionCard({
   return (
     <div
       style={{
-        position: isOverlay ? undefined : "absolute",
-        bottom: isOverlay ? undefined : "100%",
-        left: isOverlay ? undefined : "50%",
+        ...PANEL_STYLE,
+        position: isOverlay ? undefined : 'absolute',
+        bottom: isOverlay ? undefined : '100%',
+        left: isOverlay ? undefined : '50%',
         transform: isOverlay
-          ? `scale(${visible ? 1 : 0.9})`
-          : `translateX(-50%) scale(${visible ? 1 : 0.9})`,
-        marginBottom: isOverlay ? 0 : 8,
+          ? `translateY(${visible ? 0 : 6}px) scale(${visible ? 1 : 0.96})`
+          : `translateX(-50%) translateY(${visible ? 0 : 6}px) scale(${visible ? 1 : 0.96})`,
+        marginBottom: isOverlay ? 0 : 10,
         opacity: visible ? 1 : 0,
-        transition: "opacity 0.2s ease, transform 0.2s ease",
-        pointerEvents: "auto",
-        zIndex: 100,
-        background: "rgba(20, 20, 28, 0.92)",
-        backdropFilter: "blur(12px)",
-        WebkitBackdropFilter: "blur(12px)",
-        border: "1px solid rgba(255, 255, 255, 0.12)",
-        borderRadius: 12,
-        padding: "8px 12px",
-        width: isOverlay ? 320 : undefined,
-        minWidth: 240,
-        maxWidth: 340,
-        boxShadow:
-          "0 4px 20px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.05)",
-        fontFamily:
-          '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-        userSelect: "none",
-        WebkitUserSelect: "none",
-        cursor: "default",
+        transition: 'opacity 0.18s ease, transform 0.18s cubic-bezier(0.2, 0, 0, 1)',
+        width: isOverlay ? 336 : undefined,
+        minWidth: 270,
+        maxWidth: 360,
       }}
       onPointerDown={(e) => e.stopPropagation()}
       onPointerEnter={handlePointerEnter}
       onPointerLeave={handlePointerLeave}
     >
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
+        <span
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            minHeight: 22,
+            borderRadius: 999,
+            padding: '0 8px',
+            background: 'rgba(86, 200, 132, 0.14)',
+            border: '1px solid rgba(86, 200, 132, 0.24)',
+            fontSize: 11,
+            fontWeight: 700,
+            color: 'rgba(126, 230, 162, 0.95)',
+          }}
+        >
+          Finished
+        </span>
+        {visibleWorkingAgents.length > 0 && (
+          <span style={{ fontSize: 10, color: 'rgba(255, 255, 255, 0.5)' }}>{visibleWorkingAgents.length} working</span>
+        )}
+      </div>
+
       {/* User input line */}
       <div
         style={{
-          display: "flex",
-          gap: 4,
-          marginBottom: 3,
+          display: 'flex',
+          gap: 7,
+          marginBottom: 6,
           minWidth: 0,
-          alignItems: "flex-start",
+          alignItems: 'flex-start',
+          borderRadius: 10,
+          background: 'rgba(255, 255, 255, 0.055)',
+          border: '1px solid rgba(255, 255, 255, 0.075)',
+          padding: '7px 9px',
         }}
       >
         <span
           style={{
             fontSize: 11,
             fontWeight: 600,
-            color: "rgba(80, 200, 120, 0.8)",
+            color: 'rgba(80, 200, 120, 0.8)',
             flexShrink: 0,
           }}
         >
@@ -161,33 +190,37 @@ export function PetCompletionCard({
         <span
           style={{
             minWidth: 0,
-            fontSize: 11,
-            color: "rgba(255, 255, 255, 0.75)",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
+            fontSize: 12,
+            color: 'rgba(255, 255, 255, 0.78)',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
             lineHeight: 1.4,
           }}
         >
-          {truncate(card.userPrompt || "No prompt captured", 100)}
+          {truncate(card.userPrompt || 'No prompt captured', 100)}
         </span>
       </div>
 
       {/* AI response line */}
       <div
         style={{
-          display: "flex",
-          gap: 4,
-          marginBottom: 6,
+          display: 'flex',
+          gap: 7,
+          marginBottom: 10,
           minWidth: 0,
-          alignItems: "flex-start",
+          alignItems: 'flex-start',
+          borderRadius: 10,
+          background: 'rgba(255, 255, 255, 0.04)',
+          border: '1px solid rgba(255, 255, 255, 0.06)',
+          padding: '7px 9px',
         }}
       >
         <span
           style={{
             fontSize: 11,
             fontWeight: 600,
-            color: "rgba(220, 160, 80, 0.8)",
+            color: 'rgba(220, 160, 80, 0.8)',
             flexShrink: 0,
           }}
         >
@@ -196,34 +229,34 @@ export function PetCompletionCard({
         <span
           style={{
             minWidth: 0,
-            fontSize: 11,
-            color: "rgba(255, 255, 255, 0.75)",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
+            fontSize: 12,
+            color: 'rgba(255, 255, 255, 0.78)',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
             lineHeight: 1.4,
           }}
         >
-          {truncate(card.aiResponse || "Finished.", 100)}
+          {truncate(card.aiResponse || 'Finished.', 100)}
         </span>
       </div>
 
       {/* Hover expansion: working agents list */}
       {hovered && visibleWorkingAgents.length > 0 && (
-        <div style={{ marginBottom: 6 }}>
+        <div style={{ marginBottom: 10 }}>
           <div
             style={{
-              borderTop: "1px solid rgba(255, 255, 255, 0.1)",
-              marginBottom: 6,
-              paddingTop: 6,
+              borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+              marginBottom: 7,
+              paddingTop: 8,
             }}
           >
             <span
               style={{
                 fontSize: 10,
                 fontWeight: 600,
-                color: "rgba(255, 255, 255, 0.4)",
-                textTransform: "uppercase",
+                color: 'rgba(255, 255, 255, 0.4)',
+                textTransform: 'uppercase',
                 letterSpacing: 0.5,
               }}
             >
@@ -240,36 +273,38 @@ export function PetCompletionCard({
                 viewWorkingAgent(agent.ptyId);
               }}
               style={{
-                display: "flex",
-                alignItems: "center",
+                display: 'flex',
+                alignItems: 'center',
                 gap: 6,
-                width: "100%",
-                padding: "3px 0",
+                width: '100%',
+                minHeight: 28,
+                padding: '4px 6px',
                 border: 0,
-                background: "transparent",
-                cursor: "pointer",
-                fontFamily: "inherit",
-                textAlign: "left",
+                borderRadius: 8,
+                background: 'transparent',
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                textAlign: 'left',
               }}
             >
               <span
                 style={{
                   width: 6,
                   height: 6,
-                  borderRadius: "50%",
-                  background: "rgba(100, 180, 255, 0.8)",
+                  borderRadius: '50%',
+                  background: 'rgba(100, 180, 255, 0.8)',
                   flexShrink: 0,
-                  animation: "pulse 2s ease-in-out infinite",
+                  animation: 'pulse 2s ease-in-out infinite',
                 }}
               />
               <span
                 style={{
                   minWidth: 0,
                   fontSize: 10,
-                  color: "rgba(255, 255, 255, 0.65)",
-                  overflow: "hidden",
-                  textOverflow: "ellipsis",
-                  whiteSpace: "nowrap",
+                  color: 'rgba(255, 255, 255, 0.65)',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
                 }}
               >
                 {agent.userPrompt || agent.title}
@@ -280,7 +315,7 @@ export function PetCompletionCard({
       )}
 
       {/* Action buttons */}
-      <div style={{ display: "flex", gap: 6 }}>
+      <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
         <CompletionButton
           label="Dismiss"
           bgColor="rgba(80, 80, 80, 0.5)"
@@ -334,18 +369,20 @@ function CompletionButton({
       onMouseLeave={() => setHovered(false)}
       style={{
         flex: primary ? 1.5 : 1,
-        padding: "5px 10px",
-        fontSize: 11,
+        minHeight: 30,
+        padding: '6px 11px',
+        fontSize: 12,
         fontWeight: 600,
-        color: "rgba(255, 255, 255, 0.92)",
+        color: 'rgba(255, 255, 255, 0.92)',
         background: hovered ? bgHover : bgColor,
         border: `1px solid ${borderColor}`,
-        borderRadius: 6,
-        cursor: "pointer",
-        transition: "background 0.15s ease",
-        outline: "none",
-        fontFamily: "inherit",
+        borderRadius: 8,
+        cursor: 'pointer',
+        transition: 'background 0.15s ease, transform 0.12s ease',
+        outline: 'none',
+        fontFamily: 'inherit',
         lineHeight: 1.2,
+        transform: hovered ? 'translateY(-1px)' : 'translateY(0)',
       }}
     >
       {label}

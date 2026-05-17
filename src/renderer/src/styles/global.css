@@ -297,6 +297,13 @@ body,
     -webkit-touch-callout: none;
 }
 
+html.pet-window,
+body.pet-window,
+#root.pet-window {
+    background: transparent !important;
+    color-scheme: light dark;
+}
+
 input,
 textarea,
 [contenteditable="true"],
@@ -304,12 +311,42 @@ textarea,
 .code-viewer,
 .editor-panel,
 .diff-panel,
+.pierre-plain-text,
+diffs-container,
 .context-preview,
 .terminal-panel .xterm,
 pre,
 code {
     -webkit-user-select: text;
     user-select: text;
+}
+
+diffs-container {
+    display: block;
+    width: 100%;
+    min-width: 0;
+}
+
+.diff-scroll-region {
+    background: var(--surface-card);
+}
+
+.diff-file-entry {
+    min-width: 0;
+}
+
+.diff-file-entry.is-fill-height {
+    flex: 1 0 auto;
+    min-height: 100%;
+    margin-bottom: 0;
+}
+
+.diff-file-entry.is-addition {
+    background: color-mix(in srgb, var(--bg) 88%, #0dbe4e);
+}
+
+.diff-file-entry.is-deletion {
+    background: color-mix(in srgb, var(--bg) 88%, var(--danger));
 }
 
 button,
@@ -1214,6 +1251,10 @@ button,
 
 .commit-textarea {
     min-height: 58px;
+    max-height: 132px;
+    resize: vertical;
+    overflow: auto;
+    line-height: 1.45;
 }
 
 .composer textarea:focus,
@@ -1287,6 +1328,13 @@ button,
     box-shadow: inset 2px 0 0 var(--accent);
 }
 
+.change-native-row.is-deleted .change-native-name {
+    color: var(--muted);
+    text-decoration-line: line-through;
+    text-decoration-thickness: 1.5px;
+    text-decoration-color: color-mix(in srgb, currentColor 72%, transparent);
+}
+
 .change-native-row.is-directory {
     background: transparent;
     box-shadow: none;
@@ -1351,14 +1399,40 @@ button,
     font-size: 12.5px;
 }
 
+.change-flat-label {
+    display: flex;
+    min-width: 0;
+    align-items: baseline;
+    gap: 6px;
+    font-size: 12.5px;
+}
+
+.change-flat-name {
+    flex: 0 0 auto;
+    max-width: min(190px, 58%);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text);
+}
+
+.change-flat-path {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--subtle);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 .change-row-stats {
     display: inline-flex;
-    min-width: 28px;
+    min-width: 46px;
     justify-content: flex-end;
     gap: 4px;
     color: var(--subtle);
     font-size: 11px;
     font-variant-numeric: tabular-nums;
+    white-space: nowrap;
 }
 
 .change-stat-add {
@@ -1669,6 +1743,51 @@ button,
     opacity: 0.34;
 }
 
+.forgepad-start-surface {
+    position: relative;
+    background:
+        radial-gradient(circle at 12% 0%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 32%),
+        radial-gradient(circle at 82% 18%, color-mix(in srgb, var(--warn) 10%, transparent), transparent 28%),
+        linear-gradient(180deg, color-mix(in srgb, var(--panel) 32%, transparent), transparent 42%),
+        var(--bg);
+}
+
+.forgepad-start-surface::before {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    content: "";
+    background-image:
+        linear-gradient(color-mix(in srgb, var(--border) 24%, transparent) 1px, transparent 1px),
+        linear-gradient(90deg, color-mix(in srgb, var(--border) 24%, transparent) 1px, transparent 1px);
+    background-size: 26px 26px;
+    mask-image: linear-gradient(180deg, black, transparent 74%);
+    opacity: 0.18;
+}
+
+.forgepad-start-surface > * {
+    position: relative;
+    z-index: 1;
+}
+
+.start-composer {
+    position: relative;
+    overflow: hidden;
+}
+
+.start-composer::before {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    content: "";
+    background: linear-gradient(110deg, color-mix(in srgb, var(--warn) 14%, transparent), transparent 48%);
+}
+
+.start-composer > * {
+    position: relative;
+    z-index: 1;
+}
+
 .boot-orbit {
     position: relative;
     width: 70px;
@@ -1726,12 +1845,7 @@ button,
 /* Title bar drag region — enables native macOS double-click maximize */
 .app-topbar,
 .sidebar > :first-child,
-.tabbar,
-.right-panel > :first-child,
-.column-tabbar,
-.surface-toolbar,
 .boot-screen,
-.empty-workspace,
 .popout-tabbar {
     -webkit-app-region: drag;
 }
@@ -1742,27 +1856,7 @@ button,
 .app-topbar [role="button"],
 .sidebar > :first-child button,
 .sidebar > :first-child .toolbar-actions,
-.tabbar button,
-.tabbar [role="tab"],
-.tabbar .tabs-scroll,
-.tabbar .toolbar-select,
-.tabbar .tabbar-actions,
-.right-panel > :first-child button,
-.right-panel > :first-child .right-panel-tabs,
-.right-panel > :first-child .right-panel-actions,
-.column-tabbar button,
-.column-tabbar [role="tab"],
-.column-tabbar .tabs-scroll,
-.column-tabbar .tabbar-actions,
-.surface-toolbar button,
-.surface-toolbar .toolbar-actions,
-.surface-toolbar select,
-.surface-toolbar input,
-.surface-toolbar [role="radio"],
-.surface-toolbar [role="button"],
-.surface-toolbar [role="radiogroup"],
 .boot-screen button,
-.empty-workspace button,
 .popout-tabbar button,
 .popout-tabbar .popout-tab-item {
     -webkit-app-region: no-drag;
@@ -2493,23 +2587,6 @@ button,
     border-radius: 4px;
 }
 
-/* ── LSP Symbol Peek Panel ── */
-.symbol-peek-panel {
-    box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.15);
-    animation: peek-slide-up 0.15s ease-out;
-}
-
-@keyframes peek-slide-up {
-    from {
-        transform: translateY(100%);
-        opacity: 0;
-    }
-    to {
-        transform: translateY(0);
-        opacity: 1;
-    }
-}
-
 /* ─── Panel Switcher (inside Sidebar) ─────────────────────────── */
 
 .panel-switcher {
@@ -3214,13 +3291,6 @@ button,
     .grid.w-max.min-w-\\[160px\\].gap-\\[3px\\].rounded-\\[7px\\].border.border-border {
     border: 2px solid var(--border);
     border-radius: 4px;
-    filter: url(#sketchy-subtle);
-}
-
-/* ── LspSymbolPeek ───────────────────────────────────────────────────────── */
-
-[data-sketchy] .symbol-peek-panel {
-    border-top: 2px solid var(--border);
     filter: url(#sketchy-subtle);
 }
 

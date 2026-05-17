@@ -2,6 +2,7 @@ import { arrayMove } from '@dnd-kit/sortable';
 import type { AgentStatus } from '@shared/agent-lifecycle';
 import type {
   AgentPreset,
+  AgentSessionHistoryItem,
   AppSettings,
   CodeSelectionItem,
   ContextBundleResult,
@@ -15,7 +16,6 @@ import type {
   FileStatus,
   GitBucket,
   GitStatusKind,
-  LspSymbolPeekState,
   NotificationSettings,
   NotificationSound,
   PersistedAppState,
@@ -59,6 +59,7 @@ type AppState = {
   workspaces: Workspace[];
   tasks: Task[];
   tabs: Tab[];
+  agentSessionHistory: AgentSessionHistoryItem[];
   activeWorkspaceId: string | null;
   activeTabId: string | null;
   activeAgentTabId: string | null;
@@ -112,8 +113,6 @@ type AppState = {
   feedbackModalOpen: boolean;
   /** Pending element selection for feedback modal */
   pendingFeedback: { tabId: string; element: SelectedElementInfo } | null;
-  /** LSP symbol peek panel state (Cmd+Click results) */
-  symbolPeek: LspSymbolPeekState;
   handleAgentStatusUpdate: (ptyId: string, status: AgentStatus) => void;
   setPendingPermission: (permission: import('@shared/types').PendingPermission | null) => void;
   setAgentUserPrompt: (ptyId: string, prompt: string) => void;
@@ -132,6 +131,7 @@ type AppState = {
   setActiveWorkspace: (workspaceId: string | null) => void;
   createTerminal: (workspaceId?: string, initialCommand?: string) => Promise<string | null>;
   createAgentTerminal: (workspaceId?: string, commandOverride?: string, presetId?: string) => Promise<string | null>;
+  resumeAgentSession: (session: AgentSessionHistoryItem) => Promise<string | null>;
   addTab: (tab: Tab) => void;
   closeTab: (tabId: string) => void;
   closeOtherTabs: (tabId: string) => void;
@@ -140,7 +140,13 @@ type AppState = {
   setActiveTab: (tabId: string | null) => void;
   openFileTab: (workspaceId: string, relPath: string, lineNumber?: number) => void;
   openExternalFileTab: (workspaceId: string, absPath: string) => void;
-  openDiffTab: (workspaceId: string, activePath?: string) => void;
+  openDiffTab: (
+    workspaceId: string,
+    activePath?: string,
+    activeBucket?: GitBucket,
+    activeStatus?: GitStatusKind,
+    activeOldPath?: string,
+  ) => void;
   openContextPreviewTab: (workspaceId?: string) => void;
   setRightPanelMode: (mode: RightPanelMode) => void;
   setTerminalPanelOpen: (open: boolean) => void;
@@ -232,8 +238,6 @@ type AppState = {
   setProjectActiveRunIndex: (projectId: string, index: number) => void;
   /** Update run commands for a specific project */
   setProjectRunCommands: (projectId: string, commands: { name: string; command: string }[]) => void;
-  openSymbolPeek: (peek: NonNullable<LspSymbolPeekState>) => void;
-  closeSymbolPeek: () => void;
   clearTabTargetLine: (tabId: string) => void;
   updateNotificationSettings: (partial: Partial<NotificationSettings>) => void;
   addCustomSound: (sound: NotificationSound) => void;
@@ -275,6 +279,30 @@ function serializeForSave(state: AppState): PersistedAppState {
     workspaceActiveAgentTabIds[state.activeWorkspaceId] = state.activeAgentTabId;
   }
 
+  const savedAgentSessions = state.tabs
+    .filter(
+      (tab): tab is Extract<Tab, { type: 'terminal' }> =>
+        tab.type === 'terminal' && tab.isAgent === true && !!tab.sessionId && !!tab.sessionConfirmed,
+    )
+    .map<AgentSessionHistoryItem>((tab) => ({
+      id: `${tab.workspaceId}:${tab.sessionId}`,
+      workspaceId: tab.workspaceId,
+      title: tab.title,
+      sessionId: tab.sessionId,
+      agentPresetId: tab.agentPresetId,
+      agentCommand: tab.agentCommand,
+      updatedAt: now(),
+    }));
+  const agentSessionHistory = [...savedAgentSessions, ...state.agentSessionHistory].reduce<AgentSessionHistoryItem[]>(
+    (items, item) => {
+      if (items.some((existing) => existing.workspaceId === item.workspaceId && existing.sessionId === item.sessionId)) {
+        return items;
+      }
+      return [...items, item];
+    },
+    [],
+  );
+
   return {
     schemaVersion: 2,
     panels: state.panels,
@@ -283,13 +311,9 @@ function serializeForSave(state: AppState): PersistedAppState {
     workspaces: state.workspaces,
     tasks: state.tasks,
     tabs: state.tabs
-      .filter(
-        (tab) =>
-          tab.type === 'browser' ||
-          tab.type !== 'terminal' ||
-          (tab.type === 'terminal' && tab.isAgent && tab.sessionId && tab.sessionConfirmed),
-      )
+      .filter((tab) => tab.type === 'browser' || tab.type !== 'terminal')
       .map((tab) => (tab.type === 'file' ? { ...tab, targetLine: undefined } : tab)),
+    agentSessionHistory,
     activeWorkspaceId: state.activeWorkspaceId,
     activeTabId: state.tabs.find((tab) => tab.id === state.activeTabId)?.type === 'terminal' ? null : state.activeTabId,
     workspaceActiveAgentTabIds,
@@ -397,6 +421,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   workspaces: [],
   tasks: [],
   tabs: [],
+  agentSessionHistory: [],
   activeWorkspaceId: null,
   activeTabId: null,
   activeAgentTabId: null,
@@ -428,7 +453,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   browserHistory: [],
   feedbackModalOpen: false,
   pendingFeedback: null,
-  symbolPeek: null,
   projectActiveRunIndex: {},
   handleAgentStatusUpdate: (ptyId, status) => {
     // Reset the working-timeout whenever we receive any hook event.
@@ -738,8 +762,31 @@ export const useAppStore = create<AppState>((set, get) => ({
       state?.activeWorkspaceId && workspaces.some((workspace) => workspace.id === state.activeWorkspaceId)
         ? state.activeWorkspaceId
         : (workspaces[0]?.id ?? null);
+    const restoredAgentSessions = (state?.tabs ?? [])
+      .filter(
+        (tab): tab is Extract<Tab, { type: 'terminal' }> =>
+          tab.type === 'terminal' && tab.isAgent === true && !!tab.sessionId && !!tab.sessionConfirmed,
+      )
+      .map<AgentSessionHistoryItem>((tab) => ({
+        id: `${tab.workspaceId}:${tab.sessionId}`,
+        workspaceId: tab.workspaceId,
+        title: tab.title,
+        sessionId: tab.sessionId,
+        agentPresetId: tab.agentPresetId,
+        agentCommand: tab.agentCommand,
+        updatedAt: now(),
+      }));
+    const agentSessionHistory = [...restoredAgentSessions, ...(state?.agentSessionHistory ?? [])].reduce<AgentSessionHistoryItem[]>(
+      (items, item) => {
+        if (!workspaces.some((workspace) => workspace.id === item.workspaceId)) return items;
+        if (items.some((existing) => existing.workspaceId === item.workspaceId && existing.sessionId === item.sessionId)) return items;
+        return [...items, item];
+      },
+      [],
+    );
     const tabs = (state?.tabs ?? [])
       .filter((tab) => workspaces.some((workspace) => workspace.id === tab.workspaceId))
+      .filter((tab) => !(tab.type === 'terminal' && tab.isAgent))
       .map((tab) =>
         // Reset browser tab transient state on restore
         tab.type === 'browser' ? { ...tab, isLoading: false } : tab,
@@ -775,12 +822,11 @@ export const useAppStore = create<AppState>((set, get) => ({
       workspaces,
       tasks,
       tabs,
+      agentSessionHistory,
       activeWorkspaceId,
       activeTabId: restoredActiveTabId,
       activeAgentTabId:
-        (rememberedAgentTabId && restoredAgentTabs.some((t) => t.id === rememberedAgentTabId) ? rememberedAgentTabId : null) ??
-        restoredAgentTabs.at(-1)?.id ??
-        null,
+        (rememberedAgentTabId && restoredAgentTabs.some((t) => t.id === rememberedAgentTabId) ? rememberedAgentTabId : null) ?? null,
       activeShellTabId: restoredShellTabs.at(-1)?.id ?? null,
       activeFileTabId: restoredFileTabs.at(-1)?.id ?? null,
       workspaceActiveAgentTabIds,
@@ -796,12 +842,10 @@ export const useAppStore = create<AppState>((set, get) => ({
       hydrated: true,
     });
 
-    // Send initial pet settings to the overlay window
-    if (settings.pets?.enabled) {
-      window.forgepad.pet.sendSettings(settings.pets);
-    }
+    // Send initial pet settings to the native overlay window. Always sync the
+    // value so the host can explicitly show or hide its separate pet window.
+    window.forgepad.pet.sendSettings(settings.pets);
 
-    get().restoreAgentSessions();
     get().refreshBranchStats();
     // Discover worktrees on disk that aren't tracked yet
     get().syncWorktreesFromDisk();
@@ -816,7 +860,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   addToast: (kind, message) => {
     const toast: Toast = { id: id(), kind, message };
     set((state) => ({ toasts: [...state.toasts, toast] }));
-    setTimeout(() => get().dismissToast(toast.id), 5000);
+    setTimeout(() => get().dismissToast(toast.id), kind === 'error' ? 12000 : 5000);
   },
 
   dismissToast: (toastId) =>
@@ -1053,6 +1097,64 @@ export const useAppStore = create<AppState>((set, get) => ({
     }
   },
 
+  resumeAgentSession: async (session) => {
+    const workspace = findWorkspace(get(), session.workspaceId);
+    if (!workspace) return null;
+
+    const existing = get().tabs.find(
+      (tab) => tab.type === 'terminal' && tab.isAgent && tab.workspaceId === session.workspaceId && tab.sessionId === session.sessionId,
+    );
+    if (existing?.type === 'terminal') {
+      get().setActiveTab(existing.id);
+      return existing.ptyId;
+    }
+
+    const preset = get().settings.agentPresets.find((item) => item.id === session.agentPresetId);
+    const restoreTemplate = preset?.restoreTemplate;
+    if (!restoreTemplate) {
+      get().addToast('error', `No restore command configured for ${session.title}.`);
+      return null;
+    }
+
+    try {
+      const command = restoreTemplate.replace('{sessionId}', session.sessionId);
+      const ptyId = await window.forgepad.pty.create(
+        workspace.worktreePath,
+        get().settings.defaultShell || undefined,
+        command,
+        {
+          FORGEPAD_WORKSPACE_ID: workspace.id,
+          FORGEPAD_AGENT: '1',
+          FORGEPAD_SESSION_ID: session.sessionId,
+        },
+      );
+      const tab: Tab = {
+        id: id(),
+        workspaceId: workspace.id,
+        type: 'terminal',
+        title: session.title,
+        ptyId,
+        isAgent: true,
+        agentPresetId: session.agentPresetId,
+        agentCommand: session.agentCommand ?? preset?.command,
+        sessionId: session.sessionId,
+        sessionConfirmed: true,
+      };
+      get().addTab(tab);
+      set((state) => ({
+        terminalPanelOpen: true,
+        agentStatuses: { ...state.agentStatuses, [ptyId]: 'idle' },
+        agentSessionHistory: state.agentSessionHistory.map((item) =>
+          item.workspaceId === session.workspaceId && item.sessionId === session.sessionId ? { ...item, updatedAt: now() } : item,
+        ),
+      }));
+      return ptyId;
+    } catch (error) {
+      get().addToast('error', error instanceof Error ? error.message : `Failed to restore ${session.title}.`);
+      return null;
+    }
+  },
+
   addTab: (tab) =>
     set((state) => {
       // Insert new agent tabs right after the currently active agent tab
@@ -1091,23 +1193,34 @@ export const useAppStore = create<AppState>((set, get) => ({
     const tab = get().tabs.find((item) => item.id === tabId);
     if (tab?.type === 'terminal') window.forgepad.pty.destroy(tab.ptyId);
     set((state) => {
+      const chooseNeighbor = (items: Tab[]) => {
+        const index = items.findIndex((item) => item.id === tabId);
+        if (index === -1) return null;
+        return items[index + 1]?.id ?? items[index - 1]?.id ?? null;
+      };
       const tabs = state.tabs.filter((item) => item.id !== tabId);
-      const wsTabs = tabs.filter((item) => item.workspaceId === state.activeWorkspaceId);
+      const originalWsTabs = state.tabs.filter((item) => item.workspaceId === tab?.workspaceId);
+      const originalAgentTabs = originalWsTabs.filter((item) => item.type === 'terminal' && item.isAgent);
+      const originalShellTabs = originalWsTabs.filter((item) => item.type === 'terminal' && !item.isAgent);
+      const originalFileTabs = originalWsTabs.filter((item) => item.type !== 'terminal');
       const patch: Partial<AppState> = { tabs };
       if (state.activeTabId === tabId) {
-        patch.activeTabId = wsTabs.at(-1)?.id ?? null;
+        if (tab?.type === 'terminal' && tab.isAgent) {
+          patch.activeTabId = chooseNeighbor(originalAgentTabs);
+        } else if (tab?.type === 'terminal') {
+          patch.activeTabId = chooseNeighbor(originalShellTabs);
+        } else {
+          patch.activeTabId = chooseNeighbor(originalFileTabs);
+        }
       }
       if (tab?.type === 'terminal' && tab.isAgent && state.activeAgentTabId === tabId) {
-        const remaining = wsTabs.filter((t) => t.type === 'terminal' && t.isAgent);
-        patch.activeAgentTabId = remaining.at(-1)?.id ?? null;
+        patch.activeAgentTabId = chooseNeighbor(originalAgentTabs);
       }
       if (tab?.type === 'terminal' && !tab.isAgent && state.activeShellTabId === tabId) {
-        const remaining = wsTabs.filter((t) => t.type === 'terminal' && !t.isAgent);
-        patch.activeShellTabId = remaining.at(-1)?.id ?? null;
+        patch.activeShellTabId = chooseNeighbor(originalShellTabs);
       }
       if (tab && tab.type !== 'terminal' && state.activeFileTabId === tabId) {
-        const remaining = wsTabs.filter((t) => t.type !== 'terminal');
-        patch.activeFileTabId = remaining.at(-1)?.id ?? null;
+        patch.activeFileTabId = chooseNeighbor(originalFileTabs);
       }
       // Clean up PTY-related state for closed terminal tabs
       if (tab?.type === 'terminal') {
@@ -1271,16 +1384,20 @@ export const useAppStore = create<AppState>((set, get) => ({
     });
   },
 
-  openDiffTab: (workspaceId, activePath) => {
+  openDiffTab: (workspaceId, activePath, activeBucket, activeStatus, activeOldPath) => {
     const existing = get().tabs.find((tab) => tab.workspaceId === workspaceId && tab.type === 'diff');
     if (existing) {
       set({
-        tabs: get().tabs.map((tab) => (tab.id === existing.id && tab.type === 'diff' ? { ...tab, activePath } : tab)),
+        tabs: get().tabs.map((tab) =>
+          tab.id === existing.id && tab.type === 'diff'
+            ? { ...tab, activePath, activeBucket, activeStatus, activeOldPath }
+            : tab,
+        ),
       });
       get().setActiveTab(existing.id);
       return;
     }
-    get().addTab({ id: id(), workspaceId, type: 'diff', activePath });
+    get().addTab({ id: id(), workspaceId, type: 'diff', activePath, activeBucket, activeStatus, activeOldPath });
   },
 
   openContextPreviewTab: (workspaceId) => {
@@ -2371,14 +2488,6 @@ export const useAppStore = create<AppState>((set, get) => ({
         p.id === projectId ? { ...p, runCommands: commands.length > 0 ? commands : undefined } : p,
       ),
     })),
-
-  openSymbolPeek: (peek) => {
-    set({ symbolPeek: peek });
-  },
-
-  closeSymbolPeek: () => {
-    set({ symbolPeek: null });
-  },
 
   clearTabTargetLine: (tabId) => {
     set({

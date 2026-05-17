@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { SpriteAnimator } from "codex-pets-react";
-import type { AgentStatus, AgentStatusUpdate } from "@shared/agent-lifecycle";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { SpriteAnimator } from 'codex-pets-react';
+import type { AgentStatus, AgentStatusUpdate } from '@shared/agent-lifecycle';
 import type {
   CompletionCard,
   PendingPermission,
@@ -10,29 +10,23 @@ import type {
   PetStageRect,
   PetStageSnapshot,
   PetStageWindow,
-} from "@shared/types";
-import {
-  agentStatusToAnimation,
-  forgePetAtlas,
-  getPetSpritesheetUrl,
-  type ForgePetAnimationName,
-} from "./pet-registry";
-import { PetApprovalPopup } from "./PetApprovalPopup";
-import {
-  PetCompletionCard,
-  type WorkingAgentSummary,
-} from "./PetCompletionCard";
+} from '@shared/types';
+import { agentStatusToAnimation, forgePetAtlas, getPetSpritesheetUrl, type ForgePetAnimationName } from './pet-registry';
+import { PetApprovalPopup } from './PetApprovalPopup';
+import { PetCompletionCard, type WorkingAgentSummary } from './PetCompletionCard';
 
 const BASE_SPRITE_WIDTH = 192;
 const BASE_SPRITE_HEIGHT = 208;
 const EDGE_MARGIN = 8;
+const FLOATING_PANEL_GAP = 4;
+const FLOATING_WINDOW_PAD = 36;
 
 type MotionPoint = { x: number; y: number };
 type MotionAction = PetPlayAction;
-type PortalPhase = "enter" | "exit" | "close";
+type PortalPhase = 'enter' | 'exit' | 'close';
 type PortalEffect = { phase: PortalPhase; seed: number } | null;
 type PropEffect = {
-  kind: "springPad" | "balloon" | "rocket" | "sparkTrail";
+  kind: 'springPad' | 'balloon' | 'rocket' | 'sparkTrail';
   seed: number;
 } | null;
 type MotionLayout = {
@@ -41,7 +35,8 @@ type MotionLayout = {
   spriteOffsetX: number;
   spriteOffsetY: number;
 };
-type PetDebugAction = MotionAction | "random";
+type FloatingPanelSize = { width: number; height: number };
+type PetDebugAction = MotionAction | 'random';
 type AgentMessagePreview = { userPrompt?: string; aiResponse?: string };
 
 const STATUS_PRIORITY: Record<AgentStatus, number> = {
@@ -52,22 +47,20 @@ const STATUS_PRIORITY: Record<AgentStatus, number> = {
 };
 
 const DEBUG_ACTIONS: MotionAction[] = [
-  "stroll",
-  "hop",
-  "stairs",
-  "portal",
-  "windowTop",
-  "zigzag",
-  "spring",
-  "peek",
-  "balloon",
-  "rocket",
+  'stroll',
+  'hop',
+  'stairs',
+  'portal',
+  'windowTop',
+  'zigzag',
+  'spring',
+  'peek',
+  'balloon',
+  'rocket',
 ];
 
-function highestAgentStatus(
-  statuses: Record<string, AgentStatus>,
-): AgentStatus {
-  let highest: AgentStatus = "idle";
+function highestAgentStatus(statuses: Record<string, AgentStatus>): AgentStatus {
+  let highest: AgentStatus = 'idle';
   for (const status of Object.values(statuses)) {
     if (STATUS_PRIORITY[status] > STATUS_PRIORITY[highest]) {
       highest = status;
@@ -76,54 +69,48 @@ function highestAgentStatus(
   return highest;
 }
 
-const PLAY_MODE_INTERVALS: Record<
-  PetSettings["petPlayMode"],
-  { min: number; max: number }
-> = {
+const PLAY_MODE_INTERVALS: Record<PetSettings['petPlayMode'], { min: number; max: number }> = {
   cozy: { min: 18_000, max: 35_000 },
   playful: { min: 4_500, max: 10_000 },
   adventure: { min: 3_000, max: 7_000 },
 };
 
-const PLAY_MODE_WEIGHTS: Record<
-  PetSettings["petPlayMode"],
-  Array<{ action: MotionAction; weight: number }>
-> = {
+const PLAY_MODE_WEIGHTS: Record<PetSettings['petPlayMode'], Array<{ action: MotionAction; weight: number }>> = {
   cozy: [
-    { action: "stroll", weight: 32 },
-    { action: "hop", weight: 18 },
-    { action: "stairs", weight: 12 },
-    { action: "portal", weight: 7 },
-    { action: "windowTop", weight: 7 },
-    { action: "zigzag", weight: 8 },
-    { action: "spring", weight: 10 },
-    { action: "peek", weight: 6 },
-    { action: "balloon", weight: 5 },
-    { action: "rocket", weight: 2 },
+    { action: 'stroll', weight: 32 },
+    { action: 'hop', weight: 18 },
+    { action: 'stairs', weight: 12 },
+    { action: 'portal', weight: 7 },
+    { action: 'windowTop', weight: 7 },
+    { action: 'zigzag', weight: 8 },
+    { action: 'spring', weight: 10 },
+    { action: 'peek', weight: 6 },
+    { action: 'balloon', weight: 5 },
+    { action: 'rocket', weight: 2 },
   ],
   playful: [
-    { action: "stroll", weight: 16 },
-    { action: "hop", weight: 17 },
-    { action: "stairs", weight: 15 },
-    { action: "portal", weight: 14 },
-    { action: "windowTop", weight: 16 },
-    { action: "zigzag", weight: 9 },
-    { action: "spring", weight: 8 },
-    { action: "peek", weight: 5 },
-    { action: "balloon", weight: 7 },
-    { action: "rocket", weight: 4 },
+    { action: 'stroll', weight: 16 },
+    { action: 'hop', weight: 17 },
+    { action: 'stairs', weight: 15 },
+    { action: 'portal', weight: 14 },
+    { action: 'windowTop', weight: 16 },
+    { action: 'zigzag', weight: 9 },
+    { action: 'spring', weight: 8 },
+    { action: 'peek', weight: 5 },
+    { action: 'balloon', weight: 7 },
+    { action: 'rocket', weight: 4 },
   ],
   adventure: [
-    { action: "stroll", weight: 8 },
-    { action: "hop", weight: 14 },
-    { action: "stairs", weight: 16 },
-    { action: "portal", weight: 18 },
-    { action: "windowTop", weight: 18 },
-    { action: "zigzag", weight: 10 },
-    { action: "spring", weight: 8 },
-    { action: "peek", weight: 8 },
-    { action: "balloon", weight: 7 },
-    { action: "rocket", weight: 6 },
+    { action: 'stroll', weight: 8 },
+    { action: 'hop', weight: 14 },
+    { action: 'stairs', weight: 16 },
+    { action: 'portal', weight: 18 },
+    { action: 'windowTop', weight: 18 },
+    { action: 'zigzag', weight: 10 },
+    { action: 'spring', weight: 8 },
+    { action: 'peek', weight: 8 },
+    { action: 'balloon', weight: 7 },
+    { action: 'rocket', weight: 6 },
   ],
 };
 
@@ -394,9 +381,7 @@ function easeOut(t: number): number {
   return 1 - (1 - t) ** 3;
 }
 
-function chooseWeighted<T extends string>(
-  choices: Array<{ action: T; weight: number }>,
-): T {
+function chooseWeighted<T extends string>(choices: Array<{ action: T; weight: number }>): T {
   const total = choices.reduce((sum, choice) => sum + choice.weight, 0);
   let roll = Math.random() * total;
   for (const choice of choices) {
@@ -406,24 +391,19 @@ function chooseWeighted<T extends string>(
   return choices[choices.length - 1].action;
 }
 
-function choosePlayModeAction(
-  stage: PetStageSnapshot,
-  mode: PetSettings["petPlayMode"],
-): MotionAction {
+function choosePlayModeAction(stage: PetStageSnapshot, mode: PetSettings['petPlayMode']): MotionAction {
   const weights =
     stage.windows.length > 0
       ? PLAY_MODE_WEIGHTS[mode]
       : PLAY_MODE_WEIGHTS[mode].map((choice) =>
-          choice.action === "windowTop" || choice.action === "peek"
-            ? { ...choice, action: "spring" as const }
-            : choice,
+          choice.action === 'windowTop' || choice.action === 'peek' ? { ...choice, action: 'spring' as const } : choice,
         );
   return chooseWeighted(weights);
 }
 
 function animationForDelta(dx: number): ForgePetAnimationName {
-  if (Math.abs(dx) < 10) return "jumping";
-  return dx < 0 ? "running-left" : "running-right";
+  if (Math.abs(dx) < 10) return 'jumping';
+  return dx < 0 ? 'running-left' : 'running-right';
 }
 
 function spriteSize(settings: PetSettings | null): {
@@ -447,6 +427,18 @@ function normalMotionLayout(settings: PetSettings | null): MotionLayout {
   };
 }
 
+function floatingPanelMotionLayout(settings: PetSettings | null, panel: { width: number; height: number }): MotionLayout {
+  const size = spriteSize(settings);
+  const width = Math.max(size.width, panel.width) + FLOATING_WINDOW_PAD * 2;
+  const height = FLOATING_WINDOW_PAD + panel.height + FLOATING_PANEL_GAP + size.height + FLOATING_WINDOW_PAD;
+  return {
+    width,
+    height,
+    spriteOffsetX: Math.round((width - size.width) / 2),
+    spriteOffsetY: Math.round(FLOATING_WINDOW_PAD + panel.height + FLOATING_PANEL_GAP),
+  };
+}
+
 function paddedMotionLayout(
   settings: PetSettings | null,
   padding: { left: number; top: number; right: number; bottom: number },
@@ -467,30 +459,30 @@ function paddedMotionLayout(
 
 function propMotionLayout(
   settings: PetSettings | null,
-  kind: "portal" | "spring" | "balloon" | "rocket" | "spark",
+  kind: 'portal' | 'spring' | 'balloon' | 'rocket' | 'spark',
 ): MotionLayout {
-  if (kind === "portal")
+  if (kind === 'portal')
     return paddedMotionLayout(settings, {
-      left: 38,
-      top: 68,
-      right: 38,
-      bottom: 24,
+      left: 54,
+      top: 76,
+      right: 54,
+      bottom: 40,
     });
-  if (kind === "spring")
+  if (kind === 'spring')
     return paddedMotionLayout(settings, {
       left: 42,
       top: 58,
       right: 42,
       bottom: 36,
     });
-  if (kind === "balloon")
+  if (kind === 'balloon')
     return paddedMotionLayout(settings, {
       left: 58,
       top: 150,
       right: 58,
       bottom: 36,
     });
-  if (kind === "rocket")
+  if (kind === 'rocket')
     return paddedMotionLayout(settings, {
       left: 92,
       top: 78,
@@ -530,12 +522,8 @@ function fallbackStage(): PetStageSnapshot {
   };
 }
 
-function nearestDisplay(
-  stage: PetStageSnapshot,
-  point: MotionPoint,
-): PetStageRect {
-  const displays =
-    stage.displays.length > 0 ? stage.displays : [stage.workArea];
+function nearestDisplay(stage: PetStageSnapshot, point: MotionPoint): PetStageRect {
+  const displays = stage.displays.length > 0 ? stage.displays : [stage.workArea];
   const containing = displays.find(
     (display) =>
       point.x >= display.x &&
@@ -554,50 +542,27 @@ function nearestDisplay(
       x: display.x + display.width / 2,
       y: display.y + display.height / 2,
     };
-    const bestDistance =
-      (bestCenter.x - point.x) ** 2 + (bestCenter.y - point.y) ** 2;
-    const displayDistance =
-      (displayCenter.x - point.x) ** 2 + (displayCenter.y - point.y) ** 2;
+    const bestDistance = (bestCenter.x - point.x) ** 2 + (bestCenter.y - point.y) ** 2;
+    const displayDistance = (displayCenter.x - point.x) ** 2 + (displayCenter.y - point.y) ** 2;
     return displayDistance < bestDistance ? display : best;
   }, displays[0]);
 }
 
-function clampToStage(
-  stage: PetStageSnapshot,
-  point: MotionPoint,
-  size: { width: number; height: number },
-): MotionPoint {
+function clampToStage(stage: PetStageSnapshot, point: MotionPoint, size: { width: number; height: number }): MotionPoint {
   const area = nearestDisplay(stage, point);
   return {
-    x: clamp(
-      point.x,
-      area.x + EDGE_MARGIN,
-      area.x + area.width - size.width - EDGE_MARGIN,
-    ),
-    y: clamp(
-      point.y,
-      area.y + EDGE_MARGIN,
-      area.y + area.height - size.height - EDGE_MARGIN,
-    ),
+    x: clamp(point.x, area.x + EDGE_MARGIN, area.x + area.width - size.width - EDGE_MARGIN),
+    y: clamp(point.y, area.y + EDGE_MARGIN, area.y + area.height - size.height - EDGE_MARGIN),
   };
 }
 
-function desktopY(
-  stage: PetStageSnapshot,
-  x: number,
-  size: { height: number },
-): number {
+function desktopY(stage: PetStageSnapshot, x: number, size: { height: number }): number {
   const area = nearestDisplay(stage, { x, y: window.screenY });
   return area.y + area.height - size.height - EDGE_MARGIN;
 }
 
-function pickWindow(
-  stage: PetStageSnapshot,
-  size: { width: number; height: number },
-): PetStageWindow | null {
-  const usable = stage.windows.filter(
-    (win) => win.width > size.width + 80 && win.height > size.height * 0.7,
-  );
+function pickWindow(stage: PetStageSnapshot, size: { width: number; height: number }): PetStageWindow | null {
+  const usable = stage.windows.filter((win) => win.width > size.width + 80 && win.height > size.height * 0.7);
   if (usable.length === 0) return null;
 
   const current = { x: window.screenX, y: window.screenY };
@@ -613,30 +578,15 @@ function pickWindow(
   return nearby[Math.floor(Math.random() * nearby.length)]?.win ?? usable[0];
 }
 
-function randomDesktopPoint(
-  stage: PetStageSnapshot,
-  size: { width: number; height: number },
-): MotionPoint {
+function randomDesktopPoint(stage: PetStageSnapshot, size: { width: number; height: number }): MotionPoint {
   const area = nearestDisplay(stage, { x: window.screenX, y: window.screenY });
   return {
-    x: randomBetween(
-      area.x + EDGE_MARGIN,
-      area.x + area.width - size.width - EDGE_MARGIN,
-    ),
-    y: randomBetween(
-      area.y + 48,
-      area.y + area.height - size.height - EDGE_MARGIN,
-    ),
+    x: randomBetween(area.x + EDGE_MARGIN, area.x + area.width - size.width - EDGE_MARGIN),
+    y: randomBetween(area.y + 48, area.y + area.height - size.height - EDGE_MARGIN),
   };
 }
 
-function PortalDoorEffect({
-  effect,
-  scale,
-}: {
-  effect: NonNullable<PortalEffect>;
-  scale: number;
-}) {
+function PortalDoorEffect({ effect, scale }: { effect: NonNullable<PortalEffect>; scale: number }) {
   const doorWidth = Math.round(154 * scale);
   const doorHeight = Math.round(214 * scale);
   const hue = Math.round(effect.seed * 18);
@@ -666,10 +616,10 @@ function PortalDoorEffect({
 function PropEffectView({ effect }: { effect: NonNullable<PropEffect> }) {
   return (
     <div className="pet-prop" aria-hidden>
-      {effect.kind === "springPad" && <div className="pet-prop__spring" />}
-      {effect.kind === "balloon" && <div className="pet-prop__balloon" />}
-      {effect.kind === "rocket" && <div className="pet-prop__rocket" />}
-      {(effect.kind === "sparkTrail" || effect.kind === "rocket") && (
+      {effect.kind === 'springPad' && <div className="pet-prop__spring" />}
+      {effect.kind === 'balloon' && <div className="pet-prop__balloon" />}
+      {effect.kind === 'rocket' && <div className="pet-prop__rocket" />}
+      {(effect.kind === 'sparkTrail' || effect.kind === 'rocket') && (
         <>
           <div className="pet-prop__spark one" />
           <div className="pet-prop__spark two" />
@@ -691,17 +641,12 @@ function PropEffectView({ effect }: { effect: NonNullable<PropEffect> }) {
  */
 export function PetOverlay() {
   const [petSettings, setPetSettings] = useState<PetSettings | null>(null);
-  const [animation, setAnimation] = useState<ForgePetAnimationName>("idle");
+  const [animation, setAnimation] = useState<ForgePetAnimationName>('idle');
   const [dragging, setDragging] = useState(false);
-  const [pendingPermission, setPendingPermission] =
-    useState<PendingPermission | null>(null);
+  const [pendingPermission, setPendingPermission] = useState<PendingPermission | null>(null);
   const [isPermissionStatus, setIsPermissionStatus] = useState(false);
-  const [agentStatuses, setAgentStatuses] = useState<
-    Record<string, AgentStatus>
-  >({});
-  const [agentMessages, setAgentMessages] = useState<
-    Record<string, AgentMessagePreview>
-  >({});
+  const [agentStatuses, setAgentStatuses] = useState<Record<string, AgentStatus>>({});
+  const [agentMessages, setAgentMessages] = useState<Record<string, AgentMessagePreview>>({});
   const [completionCards, setCompletionCards] = useState<CompletionCard[]>([]);
   const [completionHovered, setCompletionHovered] = useState(false);
   /** Whether the user is hovering the pet sprite or its working-agents panel. */
@@ -710,9 +655,8 @@ export function PetOverlay() {
   const [portalEffect, setPortalEffect] = useState<PortalEffect>(null);
   const [propEffect, setPropEffect] = useState<PropEffect>(null);
   const [petHidden, setPetHidden] = useState(false);
-  const [motionLayout, setMotionLayout] = useState<MotionLayout>(() =>
-    normalMotionLayout(null),
-  );
+  const [motionLayout, setMotionLayout] = useState<MotionLayout>(() => normalMotionLayout(null));
+  const [floatingPanelSize, setFloatingPanelSize] = useState<FloatingPanelSize | null>(null);
 
   const dragOffset = useRef({ x: 0, y: 0 });
   const pointerDownPos = useRef<{ x: number; y: number } | null>(null);
@@ -724,8 +668,11 @@ export function PetOverlay() {
   const wheelCooldownRef = useRef(0);
   const frameRef = useRef<number>();
   const scheduleNextRef = useRef<(delayOverride?: number) => void>(() => {});
+  const approvalPanelRef = useRef<HTMLDivElement>(null);
+  const completionPanelRef = useRef<HTMLDivElement>(null);
+  const workingPanelRef = useRef<HTMLDivElement>(null);
 
-  const agentStatusRef = useRef<AgentStatus>("idle");
+  const agentStatusRef = useRef<AgentStatus>('idle');
   const isPermissionStatusRef = useRef(false);
   const isWanderingRef = useRef(false);
   const draggingRef = useRef(false);
@@ -733,6 +680,7 @@ export function PetOverlay() {
   const pendingPermissionRef = useRef<PendingPermission | null>(null);
   const agentStatusesRef = useRef<Record<string, AgentStatus>>({});
   const agentMessagesRef = useRef<Record<string, AgentMessagePreview>>({});
+  const completionCardsRef = useRef<CompletionCard[]>([]);
   const stageRef = useRef<PetStageSnapshot | null>(null);
   const motionLayoutRef = useRef<MotionLayout>(normalMotionLayout(null));
   const motionRunIdRef = useRef(0);
@@ -743,12 +691,8 @@ export function PetOverlay() {
   const resetIdleTimer = useCallback(() => {
     clearTimeout(idleTimer.current);
     idleTimer.current = setTimeout(() => {
-      if (
-        agentStatusRef.current === "idle" &&
-        !isWanderingRef.current &&
-        !draggingRef.current
-      ) {
-        setAnimation("waiting");
+      if (agentStatusRef.current === 'idle' && !isWanderingRef.current && !draggingRef.current) {
+        setAnimation('waiting');
       }
     }, 8000);
   }, []);
@@ -757,19 +701,17 @@ export function PetOverlay() {
     const settings = petSettingsRef.current;
     return Boolean(
       settings?.enabled &&
-      agentStatusRef.current === "idle" &&
-      !isPermissionStatusRef.current &&
-      !pendingPermissionRef.current &&
-      !draggingRef.current,
+        agentStatusRef.current === 'idle' &&
+        !isPermissionStatusRef.current &&
+        !pendingPermissionRef.current &&
+        completionCardsRef.current.length === 0 &&
+        !draggingRef.current,
     );
   }, []);
 
   const isAutonomousAllowed = useCallback(() => {
     const settings = petSettingsRef.current;
-    return Boolean(
-      isMotionAllowed() &&
-      (settings?.allowRandomMove ?? true),
-    );
+    return Boolean(isMotionAllowed() && (settings?.allowRandomMove ?? true));
   }, [isMotionAllowed]);
 
   const clearAutonomousTimers = useCallback(() => {
@@ -784,7 +726,7 @@ export function PetOverlay() {
   const restoreStatusAnimation = useCallback(() => {
     if (draggingRef.current) return;
     setAnimation(agentStatusToAnimation(agentStatusRef.current));
-    if (agentStatusRef.current === "idle") {
+    if (agentStatusRef.current === 'idle') {
       resetIdleTimer();
     }
   }, [resetIdleTimer]);
@@ -792,14 +734,24 @@ export function PetOverlay() {
   const applyMotionLayout = useCallback((layout: MotionLayout) => {
     motionLayoutRef.current = layout;
     setMotionLayout(layout);
-    window.forgepadPet?.resizeWindow(
-      Math.round(layout.width),
-      Math.round(layout.height),
-    );
+    window.forgepadPet?.resizeWindow(Math.round(layout.width), Math.round(layout.height));
     window.forgepadPet?.moveWindow(
       Math.round(positionRef.current.x - layout.spriteOffsetX),
       Math.round(positionRef.current.y - layout.spriteOffsetY),
     );
+  }, []);
+
+  const clampPositionForLayout = useCallback((stage: PetStageSnapshot, point: MotionPoint, layout: MotionLayout) => {
+    const area = stage.workArea;
+    const minX = area.x + layout.spriteOffsetX + EDGE_MARGIN;
+    const maxX = area.x + area.width - layout.width + layout.spriteOffsetX - EDGE_MARGIN;
+    const minY = area.y + layout.spriteOffsetY + EDGE_MARGIN;
+    const maxY = area.y + area.height - layout.height + layout.spriteOffsetY - EDGE_MARGIN;
+
+    return {
+      x: clamp(point.x, Math.min(minX, maxX), Math.max(minX, maxX)),
+      y: clamp(point.y, Math.min(minY, maxY), Math.max(minY, maxY)),
+    };
   }, []);
 
   const resetMotionLayout = useCallback(() => {
@@ -821,8 +773,7 @@ export function PetOverlay() {
     (update: AgentStatusUpdate) => {
       const currentStatus = agentStatusesRef.current[update.ptyId];
       const effectiveStatus =
-        currentStatus === "permission" &&
-        (update.status === "working" || update.status === "idle")
+        currentStatus === 'permission' && (update.status === 'working' || update.status === 'idle')
           ? currentStatus
           : update.status;
       const nextStatuses = {
@@ -834,9 +785,9 @@ export function PetOverlay() {
 
       const primaryStatus = highestAgentStatus(nextStatuses);
       agentStatusRef.current = primaryStatus;
-      setIsPermissionStatus(primaryStatus === "permission");
+      setIsPermissionStatus(primaryStatus === 'permission');
 
-      if (primaryStatus === "idle") {
+      if (primaryStatus === 'idle') {
         restoreStatusAnimation();
         scheduleNextRef.current(900);
       } else {
@@ -853,10 +804,7 @@ export function PetOverlay() {
     const y = Math.round(point.y);
     const layout = motionLayoutRef.current;
     positionRef.current = { x, y };
-    window.forgepadPet?.moveWindow(
-      Math.round(x - layout.spriteOffsetX),
-      Math.round(y - layout.spriteOffsetY),
-    );
+    window.forgepadPet?.moveWindow(Math.round(x - layout.spriteOffsetX), Math.round(y - layout.spriteOffsetY));
   }, []);
 
   const readStage = useCallback(async () => {
@@ -950,7 +898,7 @@ export function PetOverlay() {
       await animateTo(target, {
         runId,
         duration: 850 + distance * 4,
-        animation: direction < 0 ? "running-left" : "running-right",
+        animation: direction < 0 ? 'running-left' : 'running-right',
       });
     },
     [animateTo],
@@ -971,7 +919,7 @@ export function PetOverlay() {
         runId,
         duration: 760,
         jumpHeight: randomBetween(52, 104),
-        animation: "jumping",
+        animation: 'jumping',
       });
     },
     [animateTo],
@@ -989,9 +937,7 @@ export function PetOverlay() {
           stage,
           {
             x: positionRef.current.x + direction * randomBetween(22, 36),
-            y:
-              positionRef.current.y +
-              (climbing ? -randomBetween(10, 16) : randomBetween(10, 15)),
+            y: positionRef.current.y + (climbing ? -randomBetween(10, 16) : randomBetween(10, 15)),
           },
           size,
         );
@@ -999,7 +945,7 @@ export function PetOverlay() {
           runId,
           duration: 210,
           jumpHeight: 16,
-          animation: "jumping",
+          animation: 'jumping',
         });
         if (!ok) return;
       }
@@ -1014,32 +960,26 @@ export function PetOverlay() {
       const win = Math.random() < 0.58 ? pickWindow(stage, size) : null;
       const target = win
         ? {
-            x: randomBetween(
-              win.x + EDGE_MARGIN,
-              win.x + win.width - size.width - EDGE_MARGIN,
-            ),
-            y: Math.max(
-              nearestDisplay(stage, win).y + EDGE_MARGIN,
-              win.y - size.height + 6,
-            ),
+            x: randomBetween(win.x + EDGE_MARGIN, win.x + win.width - size.width - EDGE_MARGIN),
+            y: Math.max(nearestDisplay(stage, win).y + EDGE_MARGIN, win.y - size.height + 6),
           }
         : randomDesktopPoint(stage, size);
 
-      applyMotionLayout(propMotionLayout(petSettingsRef.current, "portal"));
-      setAnimation("waving");
+      applyMotionLayout(propMotionLayout(petSettingsRef.current, 'portal'));
+      setAnimation('waving');
       const enterSeed = Math.random();
       const exitSeed = Math.random();
-      setPortalEffect({ phase: "enter", seed: enterSeed });
+      setPortalEffect({ phase: 'enter', seed: enterSeed });
       if (!(await pause(500, runId))) return;
       setPetHidden(true);
       if (!(await pause(90, runId))) return;
       moveWindowTo(clampToStage(stage, target, size));
-      setPortalEffect({ phase: "exit", seed: exitSeed });
-      setAnimation("jumping");
+      setPortalEffect({ phase: 'exit', seed: exitSeed });
+      setAnimation('jumping');
       if (!(await pause(180, runId))) return;
       setPetHidden(false);
       if (!(await pause(420, runId))) return;
-      setPortalEffect({ phase: "close", seed: exitSeed });
+      setPortalEffect({ phase: 'close', seed: exitSeed });
       await pause(280, runId);
       setPortalEffect(null);
     },
@@ -1048,8 +988,8 @@ export function PetOverlay() {
 
   const doZigzag = useCallback(
     async (stage: PetStageSnapshot, runId: number) => {
-      applyMotionLayout(propMotionLayout(petSettingsRef.current, "spark"));
-      setPropEffect({ kind: "sparkTrail", seed: Math.random() });
+      applyMotionLayout(propMotionLayout(petSettingsRef.current, 'spark'));
+      setPropEffect({ kind: 'sparkTrail', seed: Math.random() });
       let direction = Math.random() < 0.5 ? -1 : 1;
       const steps = randomInt(3, 5);
       for (let i = 0; i < steps; i += 1) {
@@ -1059,9 +999,7 @@ export function PetOverlay() {
           stage,
           {
             x: positionRef.current.x + direction * randomBetween(44, 86),
-            y:
-              positionRef.current.y +
-              (i % 2 === 0 ? -1 : 1) * randomBetween(18, 42),
+            y: positionRef.current.y + (i % 2 === 0 ? -1 : 1) * randomBetween(18, 42),
           },
           size,
         );
@@ -1069,7 +1007,7 @@ export function PetOverlay() {
           runId,
           duration: 230,
           jumpHeight: 10,
-          animation: direction < 0 ? "running-left" : "running-right",
+          animation: direction < 0 ? 'running-left' : 'running-right',
         });
         if (!ok) return;
         direction *= -1;
@@ -1082,8 +1020,8 @@ export function PetOverlay() {
 
   const doSpring = useCallback(
     async (stage: PetStageSnapshot, runId: number) => {
-      applyMotionLayout(propMotionLayout(petSettingsRef.current, "spring"));
-      setPropEffect({ kind: "springPad", seed: Math.random() });
+      applyMotionLayout(propMotionLayout(petSettingsRef.current, 'spring'));
+      setPropEffect({ kind: 'springPad', seed: Math.random() });
       const size = spriteSize(petSettingsRef.current);
       const direction = Math.random() < 0.5 ? -1 : 1;
       const crouch = clampToStage(
@@ -1094,13 +1032,13 @@ export function PetOverlay() {
         },
         size,
       );
-      setAnimation("waving");
+      setAnimation('waving');
       if (!(await pause(160, runId))) return;
       if (
         !(await animateTo(crouch, {
           runId,
           duration: 140,
-          animation: "waving",
+          animation: 'waving',
         }))
       )
         return;
@@ -1117,7 +1055,7 @@ export function PetOverlay() {
           runId,
           duration: 180,
           jumpHeight: 26,
-          animation: "jumping",
+          animation: 'jumping',
         }))
       )
         return;
@@ -1133,7 +1071,7 @@ export function PetOverlay() {
         runId,
         duration: 820,
         jumpHeight: randomBetween(112, 168),
-        animation: "jumping",
+        animation: 'jumping',
       });
       setPropEffect(null);
     },
@@ -1155,8 +1093,7 @@ export function PetOverlay() {
       const target = topPeek
         ? {
             x: clamp(
-              (fromLeft ? win.x + 18 : win.x + win.width - size.width - 18) +
-                randomBetween(-18, 18),
+              (fromLeft ? win.x + 18 : win.x + win.width - size.width - 18) + randomBetween(-18, 18),
               win.x + EDGE_MARGIN,
               win.x + win.width - size.width - EDGE_MARGIN,
             ),
@@ -1165,13 +1102,9 @@ export function PetOverlay() {
         : {
             x: fromLeft
               ? Math.max(display.x + EDGE_MARGIN, win.x - size.width + 8)
-              : Math.min(
-                  display.x + display.width - size.width - EDGE_MARGIN,
-                  win.x + win.width - 8,
-                ),
+              : Math.min(display.x + display.width - size.width - EDGE_MARGIN, win.x + win.width - 8),
             y: clamp(
-              win.y +
-                randomBetween(42, Math.max(58, win.height - size.height * 0.5)),
+              win.y + randomBetween(42, Math.max(58, win.height - size.height * 0.5)),
               display.y + EDGE_MARGIN,
               display.y + display.height - size.height - EDGE_MARGIN,
             ),
@@ -1182,13 +1115,13 @@ export function PetOverlay() {
           runId,
           duration: 880,
           jumpHeight: topPeek ? randomBetween(68, 104) : randomBetween(42, 76),
-          animation: "jumping",
+          animation: 'jumping',
         }))
       ) {
         return;
       }
 
-      setAnimation("waving");
+      setAnimation('waving');
       if (!(await pause(520, runId))) return;
 
       const nudge = topPeek
@@ -1201,7 +1134,7 @@ export function PetOverlay() {
         !(await animateTo(nudge, {
           runId,
           duration: 260,
-          animation: fromLeft ? "running-right" : "running-left",
+          animation: fromLeft ? 'running-right' : 'running-left',
         }))
       ) {
         return;
@@ -1217,7 +1150,7 @@ export function PetOverlay() {
         {
           runId,
           duration: 780,
-          animation: "jumping",
+          animation: 'jumping',
           fall: true,
         },
       );
@@ -1227,9 +1160,9 @@ export function PetOverlay() {
 
   const doBalloon = useCallback(
     async (stage: PetStageSnapshot, runId: number) => {
-      applyMotionLayout(propMotionLayout(petSettingsRef.current, "balloon"));
-      setPropEffect({ kind: "balloon", seed: Math.random() });
-      setAnimation("waving");
+      applyMotionLayout(propMotionLayout(petSettingsRef.current, 'balloon'));
+      setPropEffect({ kind: 'balloon', seed: Math.random() });
+      setAnimation('waving');
       if (!(await pause(360, runId))) return;
 
       const size = spriteSize(petSettingsRef.current);
@@ -1247,7 +1180,7 @@ export function PetOverlay() {
           runId,
           duration: 1_120,
           jumpHeight: 18,
-          animation: "jumping",
+          animation: 'jumping',
         }))
       ) {
         return;
@@ -1265,7 +1198,7 @@ export function PetOverlay() {
         !(await animateTo(glide, {
           runId,
           duration: 1_060,
-          animation: drift < 0 ? "running-left" : "running-right",
+          animation: drift < 0 ? 'running-left' : 'running-right',
         }))
       ) {
         return;
@@ -1275,17 +1208,14 @@ export function PetOverlay() {
       const landingX = clamp(
         glide.x + drift * randomBetween(20, 64),
         nearestDisplay(stage, glide).x + EDGE_MARGIN,
-        nearestDisplay(stage, glide).x +
-          nearestDisplay(stage, glide).width -
-          size.width -
-          EDGE_MARGIN,
+        nearestDisplay(stage, glide).x + nearestDisplay(stage, glide).width - size.width - EDGE_MARGIN,
       );
       await animateTo(
         { x: landingX, y: desktopY(stage, landingX, size) },
         {
           runId,
           duration: 740,
-          animation: "jumping",
+          animation: 'jumping',
           fall: true,
         },
       );
@@ -1295,9 +1225,9 @@ export function PetOverlay() {
 
   const doRocket = useCallback(
     async (stage: PetStageSnapshot, runId: number) => {
-      applyMotionLayout(propMotionLayout(petSettingsRef.current, "rocket"));
-      setPropEffect({ kind: "rocket", seed: Math.random() });
-      setAnimation("running-right");
+      applyMotionLayout(propMotionLayout(petSettingsRef.current, 'rocket'));
+      setPropEffect({ kind: 'rocket', seed: Math.random() });
+      setAnimation('running-right');
       if (!(await pause(220, runId))) return;
 
       const size = spriteSize(petSettingsRef.current);
@@ -1315,7 +1245,7 @@ export function PetOverlay() {
           runId,
           duration: 520,
           jumpHeight: randomBetween(44, 82),
-          animation: direction < 0 ? "running-left" : "running-right",
+          animation: direction < 0 ? 'running-left' : 'running-right',
         }))
       ) {
         return;
@@ -1329,13 +1259,13 @@ export function PetOverlay() {
           size.width -
           EDGE_MARGIN,
       );
-      setPropEffect({ kind: "sparkTrail", seed: Math.random() });
+      setPropEffect({ kind: 'sparkTrail', seed: Math.random() });
       await animateTo(
         { x: landingX, y: desktopY(stage, landingX, size) },
         {
           runId,
           duration: 760,
-          animation: "jumping",
+          animation: 'jumping',
           fall: true,
         },
       );
@@ -1359,47 +1289,33 @@ export function PetOverlay() {
         const onLeft = Math.random() < 0.5;
         const sideX = onLeft
           ? Math.max(display.x + EDGE_MARGIN, win.x - size.width + 6)
-          : Math.min(
-              display.x + display.width - size.width - EDGE_MARGIN,
-              win.x + win.width - 6,
-            );
-        const minY = clamp(
-          win.y + 24,
-          display.y + EDGE_MARGIN,
-          display.y + display.height - size.height - EDGE_MARGIN,
-        );
+          : Math.min(display.x + display.width - size.width - EDGE_MARGIN, win.x + win.width - 6);
+        const minY = clamp(win.y + 24, display.y + EDGE_MARGIN, display.y + display.height - size.height - EDGE_MARGIN);
         const maxY = clamp(
           win.y + win.height - size.height - 24,
           display.y + EDGE_MARGIN,
           display.y + display.height - size.height - EDGE_MARGIN,
         );
-        const startY = randomBetween(
-          Math.min(minY, maxY),
-          Math.max(minY, maxY),
-        );
+        const startY = randomBetween(Math.min(minY, maxY), Math.max(minY, maxY));
         const entered = await animateTo(
           { x: sideX, y: startY },
           {
             runId,
             duration: 940,
             jumpHeight: randomBetween(54, 96),
-            animation: "jumping",
+            animation: 'jumping',
           },
         );
         if (!entered) return;
 
         const edgeDirection = Math.random() < 0.5 ? -1 : 1;
-        const endY = clamp(
-          startY + edgeDirection * randomBetween(70, 180),
-          Math.min(minY, maxY),
-          Math.max(minY, maxY),
-        );
+        const endY = clamp(startY + edgeDirection * randomBetween(70, 180), Math.min(minY, maxY), Math.max(minY, maxY));
         const edgeWalked = await animateTo(
           { x: sideX, y: endY },
           {
             runId,
             duration: 880 + Math.abs(endY - startY) * 3.2,
-            animation: onLeft ? "running-right" : "running-left",
+            animation: onLeft ? 'running-right' : 'running-left',
           },
         );
         if (!edgeWalked) return;
@@ -1414,11 +1330,11 @@ export function PetOverlay() {
           {
             runId,
             duration: 820,
-            animation: "jumping",
+            animation: 'jumping',
             fall: true,
           },
         );
-        setAnimation("waving");
+        setAnimation('waving');
         await pause(240, runId);
         return;
       }
@@ -1433,54 +1349,42 @@ export function PetOverlay() {
           runId,
           duration: 980,
           jumpHeight: randomBetween(68, 112),
-          animation: "jumping",
+          animation: 'jumping',
         },
       );
       if (!ok) return;
 
       const direction = Math.random() < 0.5 ? -1 : 1;
-      const walkDistance = randomBetween(
-        Math.min(90, win.width * 0.18),
-        Math.min(260, win.width * 0.55),
-      );
+      const walkDistance = randomBetween(Math.min(90, win.width * 0.18), Math.min(260, win.width * 0.55));
       const endX = clamp(startX + direction * walkDistance, minX, maxX);
       const walked = await animateTo(
         { x: endX, y: topY },
         {
           runId,
           duration: 1_000 + Math.abs(endX - startX) * 3.5,
-          animation: direction < 0 ? "running-left" : "running-right",
+          animation: direction < 0 ? 'running-left' : 'running-right',
         },
       );
       if (!walked) return;
 
       const nextWindow = stage.windows
-        .filter(
-          (candidate) =>
-            candidate.id !== win.id && candidate.width > size.width + 80,
-        )
+        .filter((candidate) => candidate.id !== win.id && candidate.width > size.width + 80)
         .sort(() => Math.random() - 0.5)[0];
       if (nextWindow && Math.random() < 0.34) {
         const nextDisplay = nearestDisplay(stage, nextWindow);
-        const nextX = randomBetween(
-          nextWindow.x + EDGE_MARGIN,
-          nextWindow.x + nextWindow.width - size.width - EDGE_MARGIN,
-        );
-        const nextY = Math.max(
-          nextDisplay.y + EDGE_MARGIN,
-          nextWindow.y - size.height + 6,
-        );
+        const nextX = randomBetween(nextWindow.x + EDGE_MARGIN, nextWindow.x + nextWindow.width - size.width - EDGE_MARGIN);
+        const nextY = Math.max(nextDisplay.y + EDGE_MARGIN, nextWindow.y - size.height + 6);
         const landed = await animateTo(
           { x: nextX, y: nextY },
           {
             runId,
             duration: 1_040,
             jumpHeight: randomBetween(98, 152),
-            animation: "jumping",
+            animation: 'jumping',
           },
         );
         if (!landed) return;
-        setAnimation("waving");
+        setAnimation('waving');
         await pause(360, runId);
       }
 
@@ -1496,11 +1400,11 @@ export function PetOverlay() {
           {
             runId,
             duration: 880,
-            animation: "jumping",
+            animation: 'jumping',
             fall: true,
           },
         );
-        setAnimation("waving");
+        setAnimation('waving');
         await pause(260, runId);
       }
     },
@@ -1509,29 +1413,18 @@ export function PetOverlay() {
 
   const playMotionAction = useCallback(
     async (action: MotionAction, stage: PetStageSnapshot, runId: number) => {
-      if (action === "stroll") await doStroll(stage, runId);
-      if (action === "hop") await doHop(stage, runId);
-      if (action === "stairs") await doStairs(stage, runId);
-      if (action === "portal") await doPortal(stage, runId);
-      if (action === "windowTop") await doWindowTopWalk(stage, runId);
-      if (action === "zigzag") await doZigzag(stage, runId);
-      if (action === "spring") await doSpring(stage, runId);
-      if (action === "peek") await doPeek(stage, runId);
-      if (action === "balloon") await doBalloon(stage, runId);
-      if (action === "rocket") await doRocket(stage, runId);
+      if (action === 'stroll') await doStroll(stage, runId);
+      if (action === 'hop') await doHop(stage, runId);
+      if (action === 'stairs') await doStairs(stage, runId);
+      if (action === 'portal') await doPortal(stage, runId);
+      if (action === 'windowTop') await doWindowTopWalk(stage, runId);
+      if (action === 'zigzag') await doZigzag(stage, runId);
+      if (action === 'spring') await doSpring(stage, runId);
+      if (action === 'peek') await doPeek(stage, runId);
+      if (action === 'balloon') await doBalloon(stage, runId);
+      if (action === 'rocket') await doRocket(stage, runId);
     },
-    [
-      doHop,
-      doPortal,
-      doStairs,
-      doStroll,
-      doWindowTopWalk,
-      doBalloon,
-      doPeek,
-      doRocket,
-      doSpring,
-      doZigzag,
-    ],
+    [doHop, doPortal, doStairs, doStroll, doWindowTopWalk, doBalloon, doPeek, doRocket, doSpring, doZigzag],
   );
 
   const runAutonomousAction = useCallback(async () => {
@@ -1541,16 +1434,12 @@ export function PetOverlay() {
     motionRunIdRef.current = runId;
     isWanderingRef.current = true;
     clearTimeout(idleTimer.current);
-    positionRef.current = {
-      x: window.screenX + motionLayoutRef.current.spriteOffsetX,
-      y: window.screenY + motionLayoutRef.current.spriteOffsetY,
-    };
 
     try {
       const stage = await readStage();
       if (runId !== motionRunIdRef.current || !isAutonomousAllowed()) return;
 
-      const mode = petSettingsRef.current?.petPlayMode ?? "playful";
+      const mode = petSettingsRef.current?.petPlayMode ?? 'playful';
       await playMotionAction(choosePlayModeAction(stage, mode), stage, runId);
     } finally {
       if (runId === motionRunIdRef.current) {
@@ -1563,25 +1452,17 @@ export function PetOverlay() {
         scheduleNextRef.current();
       }
     }
-  }, [
-    isAutonomousAllowed,
-    playMotionAction,
-    readStage,
-    resetMotionLayout,
-    restoreStatusAnimation,
-  ]);
+  }, [isAutonomousAllowed, playMotionAction, readStage, resetMotionLayout, restoreStatusAnimation]);
 
   const scheduleNextAutonomous = useCallback(
     (delayOverride?: number) => {
       clearTimeout(wanderTimerRef.current);
       if (!isAutonomousAllowed()) return;
 
-      const mode = petSettingsRef.current?.petPlayMode ?? "playful";
+      const mode = petSettingsRef.current?.petPlayMode ?? 'playful';
       const interval = PLAY_MODE_INTERVALS[mode];
       const speed = clamp(petSettingsRef.current?.petSpeed ?? 2, 0.5, 5);
-      const delay =
-        delayOverride ??
-        randomBetween(interval.min, interval.max) / Math.sqrt(speed / 2);
+      const delay = delayOverride ?? randomBetween(interval.min, interval.max) / Math.sqrt(speed / 2);
       wanderTimerRef.current = setTimeout(() => {
         void runAutonomousAction();
       }, delay);
@@ -1594,7 +1475,7 @@ export function PetOverlay() {
   }, [isMotionAllowed]);
 
   const playInteractiveAction = useCallback(
-    async (requestedAction: PetDebugAction = "random") => {
+    async (requestedAction: PetDebugAction = 'random') => {
       if (!canPlayInteractiveAction()) return;
 
       const runId = motionRunIdRef.current + 1;
@@ -1602,21 +1483,13 @@ export function PetOverlay() {
       clearAutonomousTimers();
       clearTimeout(idleTimer.current);
       isWanderingRef.current = true;
-      positionRef.current = {
-        x: window.screenX + motionLayoutRef.current.spriteOffsetX,
-        y: window.screenY + motionLayoutRef.current.spriteOffsetY,
-      };
 
       try {
         const stage = await readStage();
-        if (runId !== motionRunIdRef.current || !canPlayInteractiveAction())
-          return;
+        if (runId !== motionRunIdRef.current || !canPlayInteractiveAction()) return;
 
-        const mode = petSettingsRef.current?.petPlayMode ?? "playful";
-        const action =
-          requestedAction === "random"
-            ? choosePlayModeAction(stage, mode)
-            : requestedAction;
+        const mode = petSettingsRef.current?.petPlayMode ?? 'playful';
+        const action = requestedAction === 'random' ? choosePlayModeAction(stage, mode) : requestedAction;
         await playMotionAction(action, stage, runId);
       } finally {
         if (runId === motionRunIdRef.current) {
@@ -1630,14 +1503,7 @@ export function PetOverlay() {
         }
       }
     },
-    [
-      canPlayInteractiveAction,
-      clearAutonomousTimers,
-      playMotionAction,
-      readStage,
-      resetMotionLayout,
-      restoreStatusAnimation,
-    ],
+    [canPlayInteractiveAction, clearAutonomousTimers, playMotionAction, readStage, resetMotionLayout, restoreStatusAnimation],
   );
 
   useEffect(() => {
@@ -1648,13 +1514,13 @@ export function PetOverlay() {
     const api = window.forgepadPet;
     if (!api?.onCommand) return;
     return api.onCommand((command: PetCommand) => {
-      if (command.type === "stop") {
+      if (command.type === 'stop') {
         cancelAutonomousMotion();
         return;
       }
 
-      const action = command.action ?? "random";
-      if (action === "random" || DEBUG_ACTIONS.includes(action)) {
+      const action = command.action ?? 'random';
+      if (action === 'random' || DEBUG_ACTIONS.includes(action)) {
         void playInteractiveAction(action);
       }
     });
@@ -1683,6 +1549,11 @@ export function PetOverlay() {
     pendingPermissionRef.current = pendingPermission;
     if (pendingPermission) cancelAutonomousMotion();
   }, [cancelAutonomousMotion, pendingPermission]);
+
+  useEffect(() => {
+    completionCardsRef.current = completionCards;
+    if (completionCards.length > 0) cancelAutonomousMotion();
+  }, [cancelAutonomousMotion, completionCards]);
 
   useEffect(() => {
     draggingRef.current = dragging;
@@ -1743,7 +1614,7 @@ export function PetOverlay() {
       const card: CompletionCard = {
         id: `${data.ptyId}:${Date.now()}`,
         ptyId: data.ptyId,
-        userPrompt: previous.userPrompt ?? "",
+        userPrompt: previous.userPrompt ?? '',
         aiResponse: data.aiMessage,
         timestamp: Date.now(),
       };
@@ -1754,7 +1625,7 @@ export function PetOverlay() {
       // Completion means the agent has finished its turn — transition to idle
       // so the pet returns to its default animation instead of staying in
       // the "review" state indefinitely until the user switches to that tab.
-      applyAgentStatusUpdate({ ptyId: data.ptyId, status: "idle" });
+      applyAgentStatusUpdate({ ptyId: data.ptyId, status: 'idle' });
     });
   }, [applyAgentStatusUpdate]);
 
@@ -1767,14 +1638,14 @@ export function PetOverlay() {
         setPendingPermission(null);
         const nextStatuses = {
           ...agentStatusesRef.current,
-          [data.ptyId]: "idle" as AgentStatus,
+          [data.ptyId]: 'idle' as AgentStatus,
         };
         agentStatusesRef.current = nextStatuses;
         setAgentStatuses(nextStatuses);
         const primaryStatus = highestAgentStatus(nextStatuses);
         agentStatusRef.current = primaryStatus;
-        setIsPermissionStatus(primaryStatus === "permission");
-        if (primaryStatus === "idle") {
+        setIsPermissionStatus(primaryStatus === 'permission');
+        if (primaryStatus === 'idle') {
           restoreStatusAnimation();
           scheduleNextRef.current(900);
         }
@@ -1784,11 +1655,11 @@ export function PetOverlay() {
       setPendingPermission(data);
       const nextStatuses = {
         ...agentStatusesRef.current,
-        [data.ptyId]: "permission" as AgentStatus,
+        [data.ptyId]: 'permission' as AgentStatus,
       };
       agentStatusesRef.current = nextStatuses;
       setAgentStatuses(nextStatuses);
-      agentStatusRef.current = "permission";
+      agentStatusRef.current = 'permission';
       setIsPermissionStatus(true);
       cancelAutonomousMotion();
     });
@@ -1796,30 +1667,20 @@ export function PetOverlay() {
 
   const handleApprove = useCallback(() => {
     if (!pendingPermission) return;
-    window.forgepadPet?.sendPermissionDecision(
-      pendingPermission.ptyId,
-      "allow",
-    );
+    window.forgepadPet?.sendPermissionDecision(pendingPermission.ptyId, 'allow');
     setPendingPermission(null);
   }, [pendingPermission]);
 
   const handleAllowAlways = useCallback(() => {
     if (!pendingPermission) return;
-    window.forgepadPet?.sendPermissionDecision(
-      pendingPermission.ptyId,
-      "allowAlways",
-    );
+    window.forgepadPet?.sendPermissionDecision(pendingPermission.ptyId, 'allowAlways');
     setPendingPermission(null);
   }, [pendingPermission]);
 
   const handleAnswer = useCallback(
     (answers: Record<string, string>) => {
       if (!pendingPermission) return;
-      window.forgepadPet?.sendPermissionDecision(
-        pendingPermission.ptyId,
-        "answer",
-        answers,
-      );
+      window.forgepadPet?.sendPermissionDecision(pendingPermission.ptyId, 'answer', answers);
       setPendingPermission(null);
     },
     [pendingPermission],
@@ -1827,7 +1688,7 @@ export function PetOverlay() {
 
   const handleDeny = useCallback(() => {
     if (!pendingPermission) return;
-    window.forgepadPet?.sendPermissionDecision(pendingPermission.ptyId, "deny");
+    window.forgepadPet?.sendPermissionDecision(pendingPermission.ptyId, 'deny');
     setPendingPermission(null);
   }, [pendingPermission]);
 
@@ -1852,12 +1713,18 @@ export function PetOverlay() {
       };
 
       draggingRef.current = true;
-      cancelAutonomousMotion();
+      motionRunIdRef.current += 1;
+      isWanderingRef.current = false;
+      setPortalEffect(null);
+      setPropEffect(null);
+      setPetHidden(false);
+      clearAutonomousTimers();
+      void readStage();
       setDragging(true);
-      setAnimation("idle");
+      setAnimation('idle');
       resetIdleTimer();
     },
-    [cancelAutonomousMotion, resetIdleTimer],
+    [clearAutonomousTimers, readStage, resetIdleTimer],
   );
 
   const handlePointerMove = useCallback(
@@ -1871,13 +1738,16 @@ export function PetOverlay() {
 
       const newX = e.screenX - dragOffset.current.x;
       const newY = e.screenY - dragOffset.current.y;
-      moveWindowTo({ x: newX, y: newY });
+      const layout = motionLayoutRef.current;
+      const stage = stageRef.current ?? fallbackStage();
+      const next = clampPositionForLayout(stage, { x: newX, y: newY }, layout);
+      moveWindowTo(next);
 
-      if (e.movementX > 2) setAnimation("running-right");
-      else if (e.movementX < -2) setAnimation("running-left");
-      else if (e.movementY < -2) setAnimation("jumping");
+      if (e.movementX > 2) setAnimation('running-right');
+      else if (e.movementX < -2) setAnimation('running-left');
+      else if (e.movementY < -2) setAnimation('jumping');
     },
-    [moveWindowTo],
+    [clampPositionForLayout, moveWindowTo],
   );
 
   const handlePointerUp = useCallback(
@@ -1892,16 +1762,16 @@ export function PetOverlay() {
         const dy = e.screenY - pointerDownPos.current.y;
         if (Math.abs(dx) < 5 && Math.abs(dy) < 5) {
           const shortcutAction: PetDebugAction | null = e.altKey
-            ? "portal"
+            ? 'portal'
             : e.shiftKey
-              ? "random"
+              ? 'random'
               : e.metaKey || e.ctrlKey
-                ? "balloon"
+                ? 'balloon'
                 : null;
           if (shortcutAction) {
             void playInteractiveAction(shortcutAction);
           } else {
-            void playInteractiveAction("random");
+            void playInteractiveAction('random');
           }
         }
       }
@@ -1910,18 +1780,14 @@ export function PetOverlay() {
       restoreStatusAnimation();
       if (isAutonomousAllowed()) scheduleNextRef.current(900);
     },
-    [
-      isAutonomousAllowed,
-      playInteractiveAction,
-      restoreStatusAnimation,
-    ],
+    [isAutonomousAllowed, playInteractiveAction, restoreStatusAnimation],
   );
 
   const handleDoubleClick = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      void playInteractiveAction(Math.random() < 0.45 ? "spring" : "random");
+      void playInteractiveAction(Math.random() < 0.45 ? 'spring' : 'random');
     },
     [playInteractiveAction],
   );
@@ -1930,7 +1796,7 @@ export function PetOverlay() {
     (e: React.MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      void playInteractiveAction("portal");
+      void playInteractiveAction('portal');
     },
     [playInteractiveAction],
   );
@@ -1944,7 +1810,7 @@ export function PetOverlay() {
       if (now - wheelCooldownRef.current < 900) return;
       wheelCooldownRef.current = now;
 
-      void playInteractiveAction(e.deltaY < 0 ? "balloon" : "zigzag");
+      void playInteractiveAction(e.deltaY < 0 ? 'balloon' : 'zigzag');
     },
     [playInteractiveAction],
   );
@@ -1956,13 +1822,8 @@ export function PetOverlay() {
     if (!canPlayInteractiveAction() || isWanderingRef.current) return;
 
     hoverTimerRef.current = setTimeout(() => {
-      if (
-        !canPlayInteractiveAction() ||
-        isWanderingRef.current ||
-        draggingRef.current
-      )
-        return;
-      setAnimation("waving");
+      if (!canPlayInteractiveAction() || isWanderingRef.current || draggingRef.current) return;
+      setAnimation('waving');
       resetIdleTimer();
     }, 260);
   }, [canPlayInteractiveAction, resetIdleTimer]);
@@ -1970,26 +1831,22 @@ export function PetOverlay() {
   const handlePointerLeave = useCallback(() => {
     clearTimeout(hoverTimerRef.current);
     // Small delay so moving from sprite → working-agents panel doesn't flicker
-    petHoverLeaveTimer.current = setTimeout(
-      () => setPetSpriteHovered(false),
-      120,
-    );
-    if (!draggingRef.current && !isWanderingRef.current)
-      restoreStatusAnimation();
+    petHoverLeaveTimer.current = setTimeout(() => setPetSpriteHovered(false), 120);
+    if (!draggingRef.current && !isWanderingRef.current) restoreStatusAnimation();
   }, [restoreStatusAnimation]);
 
   const showApproval = pendingPermission !== null;
-  const currentCompletionCard = showApproval
-    ? null
-    : (completionCards[0] ?? null);
+  const currentCompletionCard = showApproval ? null : (completionCards[0] ?? null);
   const showCompletion = currentCompletionCard !== null;
   const workingAgents: WorkingAgentSummary[] = Object.entries(agentStatuses)
-    .filter(([, status]) => status === "working")
+    .filter(([, status]) => status === 'working')
     .map(([ptyId]) => ({
       ptyId,
       title: agentMessages[ptyId]?.userPrompt || `Agent ${ptyId.slice(-4)}`,
       userPrompt: agentMessages[ptyId]?.userPrompt,
     }));
+  const showHoverPanel = petSpriteHovered && !showApproval && !showCompletion && workingAgents.length > 0;
+  const floatingPanelKind = showApproval ? 'approval' : showCompletion ? 'completion' : showHoverPanel ? 'working' : null;
 
   const dismissCompletionCard = useCallback((cardId: string) => {
     setCompletionCards((cards) => cards.filter((card) => card.id !== cardId));
@@ -2012,64 +1869,91 @@ export function PetOverlay() {
 
   const prevShowApproval = useRef(false);
 
+  useLayoutEffect(() => {
+    const wrapper =
+      floatingPanelKind === 'approval'
+        ? approvalPanelRef.current
+        : floatingPanelKind === 'completion'
+          ? completionPanelRef.current
+          : floatingPanelKind === 'working'
+            ? workingPanelRef.current
+            : null;
+
+    if (!wrapper) {
+      setFloatingPanelSize(null);
+      return;
+    }
+
+    const target = (wrapper.firstElementChild as HTMLElement | null) ?? wrapper;
+    const updateSize = () => {
+      const next = {
+        width: Math.ceil(target.offsetWidth || target.getBoundingClientRect().width),
+        height: Math.ceil(target.offsetHeight || target.getBoundingClientRect().height),
+      };
+      if (!next.width || !next.height) return;
+      setFloatingPanelSize((prev) => (prev?.width === next.width && prev.height === next.height ? prev : next));
+    };
+
+    updateSize();
+    const Observer = window.ResizeObserver;
+    if (!Observer) return;
+    const observer = new Observer(updateSize);
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [floatingPanelKind, pendingPermission, currentCompletionCard?.id, completionHovered, workingAgents.length]);
+
   useEffect(() => {
     if (!petSettings) return;
-    const api = window.forgepadPet;
-    if (!api?.resizeWindow) return;
 
-    const scale = petSettings.petSize;
-    const spriteW = Math.round(BASE_SPRITE_WIDTH * scale);
-    const spriteH = Math.round(BASE_SPRITE_HEIGHT * scale);
+    if (floatingPanelKind) {
+      const isQuestion = pendingPermission?.questions && pendingPermission.questions.length > 0;
+      const optionCount = isQuestion ? (pendingPermission.questions![0].options.length ?? 0) : 0;
+      const hasDescription = isQuestion && pendingPermission.questions![0].options.some((o) => o.description);
 
-    const hasFloatingPanel = showApproval || showCompletion;
-    const showHoverPanel =
-      petSpriteHovered &&
-      !showApproval &&
-      !showCompletion &&
-      workingAgents.length > 0;
+      const optionItemH = hasDescription ? 62 : 42;
+      const approvalPopupH = isQuestion ? 142 + optionCount * optionItemH : 154;
+      const completionPopupH = 172 + (completionHovered ? Math.min(workingAgents.length, 6) * 32 + 34 : 0);
+      const hoverPopupH = 46 + Math.min(workingAgents.length, 6) * 32 + (workingAgents.length > 6 ? 20 : 0) + 10;
 
-    if (hasFloatingPanel) {
-      const isQuestion =
-        pendingPermission?.questions && pendingPermission.questions.length > 0;
-      const optionCount = isQuestion
-        ? (pendingPermission.questions![0].options.length ?? 0)
-        : 0;
-      const hasDescription =
-        isQuestion &&
-        pendingPermission.questions![0].options.some((o) => o.description);
-      const optionItemH = hasDescription ? 48 : 34;
-      const approvalPopupH = isQuestion ? 106 + optionCount * optionItemH : 120;
-      const completionPopupH =
-        128 +
-        (completionHovered ? Math.min(workingAgents.length, 6) * 24 + 28 : 0);
-      const popupH = showApproval ? approvalPopupH : completionPopupH;
-      const panelW = showApproval ? (isQuestion ? 320 : 280) : 340;
-      // Ensure window is wide enough for the centered panel above the sprite
-      const totalW = Math.max(spriteW, panelW);
-      const totalH = spriteH + popupH;
-      api.resizeWindow(totalW, totalH);
-    } else if (showHoverPanel) {
-      // Hover working agents panel: estimate height and resize window
-      const agentCount = Math.min(workingAgents.length, 6);
-      const hoverPanelH =
-        30 + agentCount * 24 + (workingAgents.length > 6 ? 16 : 0) + 8;
-      // Use 280 to match PetWorkingAgentsPanel maxWidth, ensuring the panel
-      // is never clipped by the window boundary.
-      const totalW = Math.max(spriteW, 280);
-      const totalH = spriteH + hoverPanelH;
-      api.resizeWindow(totalW, totalH);
-    } else if (prevShowApproval.current) {
-      api.resizeWindow(spriteW, spriteH);
+      const estimatedPanel = showApproval
+        ? { width: isQuestion ? 360 : 328, height: approvalPopupH }
+        : showCompletion
+          ? { width: 360, height: completionPopupH }
+          : { width: 320, height: hoverPopupH };
+      const panel = floatingPanelSize ?? estimatedPanel;
+      const layout = floatingPanelMotionLayout(petSettings, panel);
+
+      let disposed = false;
+      readStage()
+        .then((stage) => {
+          if (disposed) return;
+          positionRef.current = clampPositionForLayout(stage, positionRef.current, layout);
+          applyMotionLayout(layout);
+        })
+        .catch(() => applyMotionLayout(layout));
+      prevShowApproval.current = true;
+      return () => {
+        disposed = true;
+      };
     }
-    prevShowApproval.current = hasFloatingPanel || showHoverPanel;
+
+    if (prevShowApproval.current) {
+      resetMotionLayout();
+    }
+    prevShowApproval.current = false;
   }, [
+    applyMotionLayout,
+    clampPositionForLayout,
+    floatingPanelKind,
+    floatingPanelSize,
     showApproval,
     showCompletion,
     completionHovered,
     workingAgents.length,
-    petSpriteHovered,
     petSettings,
     pendingPermission,
+    readStage,
+    resetMotionLayout,
   ]);
 
   if (!petSettings?.enabled) return null;
@@ -2080,27 +1964,23 @@ export function PetOverlay() {
   return (
     <div
       style={{
-        position: "relative",
-        width: "100vw",
-        height: "100vh",
-        overflow: "visible",
+        position: 'relative',
+        width: '100vw',
+        height: '100vh',
+        overflow: 'visible',
       }}
     >
-      {(portalEffect || propEffect) && (
-        <style>{`${PORTAL_DOOR_CSS}\n${PROP_EFFECT_CSS}`}</style>
-      )}
+      {(portalEffect || propEffect) && <style>{`${PORTAL_DOOR_CSS}\n${PROP_EFFECT_CSS}`}</style>}
       {showApproval && pendingPermission && (
         <div
-          style={
-            {
-              position: "fixed",
-              positionAnchor: "--pet-sprite",
-              bottom: "anchor(top)",
-              justifySelf: "anchor-center",
-              marginBottom: 4,
-              zIndex: 6,
-            } as React.CSSProperties
-          }
+          ref={approvalPanelRef}
+          style={{
+            position: 'absolute',
+            top: FLOATING_WINDOW_PAD,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 6,
+          }}
         >
           <PetApprovalPopup
             permission={pendingPermission}
@@ -2114,16 +1994,14 @@ export function PetOverlay() {
       )}
       {currentCompletionCard && (
         <div
-          style={
-            {
-              position: "fixed",
-              positionAnchor: "--pet-sprite",
-              bottom: "anchor(top)",
-              justifySelf: "anchor-center",
-              marginBottom: 4,
-              zIndex: 5,
-            } as React.CSSProperties
-          }
+          ref={completionPanelRef}
+          style={{
+            position: 'absolute',
+            top: FLOATING_WINDOW_PAD,
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 5,
+          }}
         >
           <PetCompletionCard
             key={currentCompletionCard.id}
@@ -2138,38 +2016,29 @@ export function PetOverlay() {
         </div>
       )}
       {/* Hover working agents panel — only when no popup/card is active */}
-      {petSpriteHovered &&
-        !showApproval &&
-        !showCompletion &&
-        workingAgents.length > 0 && (
-          <div
-            onPointerEnter={() => {
-              clearTimeout(petHoverLeaveTimer.current);
-              setPetSpriteHovered(true);
-            }}
-            onPointerLeave={() => {
-              petHoverLeaveTimer.current = setTimeout(
-                () => setPetSpriteHovered(false),
-                120,
-              );
-            }}
-            style={
-              {
-                position: "fixed",
-                positionAnchor: "--pet-sprite",
-                bottom: "anchor(top)",
-                justifySelf: "anchor-center",
-                marginBottom: 4,
-                zIndex: 7,
-              } as React.CSSProperties
-            }
-          >
-            <PetWorkingAgentsPanel
-              agents={workingAgents}
-              onAgentClick={focusAgentByPtyId}
-            />
-          </div>
-        )}
+      {showHoverPanel && (
+        <div
+          ref={workingPanelRef}
+          onPointerEnter={() => {
+            clearTimeout(petHoverLeaveTimer.current);
+            setPetSpriteHovered(true);
+          }}
+          onPointerLeave={() => {
+            petHoverLeaveTimer.current = setTimeout(() => setPetSpriteHovered(false), 120);
+          }}
+          style={
+            {
+              position: 'absolute',
+              top: FLOATING_WINDOW_PAD,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              zIndex: 7,
+            } as React.CSSProperties
+          }
+        >
+          <PetWorkingAgentsPanel agents={workingAgents} onAgentClick={focusAgentByPtyId} />
+        </div>
+      )}
       <div
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
@@ -2182,33 +2051,29 @@ export function PetOverlay() {
         onWheel={handleWheel}
         style={
           {
-            position: "absolute",
+            position: 'absolute',
             left: `${motionLayout.spriteOffsetX}px`,
-            bottom: 0,
+            top: `${motionLayout.spriteOffsetY}px`,
             width: `${currentSpriteSize.width}px`,
             height: `${currentSpriteSize.height}px`,
-            cursor: dragging ? "grabbing" : "grab",
-            touchAction: "none",
-            userSelect: "none",
-            WebkitUserSelect: "none",
-            overflow: "visible",
-            anchorName: "--pet-sprite",
+            cursor: dragging ? 'grabbing' : 'grab',
+            touchAction: 'none',
+            userSelect: 'none',
+            WebkitUserSelect: 'none',
+            overflow: 'visible',
+            anchorName: '--pet-sprite',
           } as React.CSSProperties
         }
       >
-        {portalEffect && (
-          <PortalDoorEffect effect={portalEffect} scale={petSettings.petSize} />
-        )}
+        {portalEffect && <PortalDoorEffect effect={portalEffect} scale={petSettings.petSize} />}
         {propEffect && <PropEffectView effect={propEffect} />}
         <div
           style={{
-            position: "relative",
+            position: 'relative',
             zIndex: 4,
             opacity: petHidden ? 0 : 1,
-            transform: petHidden
-              ? "translateY(6px) scale(0.86)"
-              : "translateY(0) scale(1)",
-            transition: "opacity 140ms ease, transform 140ms ease",
+            transform: petHidden ? 'translateY(6px) scale(0.86)' : 'translateY(0) scale(1)',
+            transition: 'opacity 140ms ease, transform 140ms ease',
           }}
         >
           <SpriteAnimator<ForgePetAnimationName>
@@ -2239,50 +2104,52 @@ function PetWorkingAgentsPanel({
   return (
     <div
       style={{
-        background: "rgba(20, 20, 28, 0.92)",
-        backdropFilter: "blur(12px)",
-        WebkitBackdropFilter: "blur(12px)",
-        border: "1px solid rgba(255, 255, 255, 0.12)",
-        borderRadius: 10,
-        padding: "6px 10px",
-        minWidth: 180,
-        maxWidth: 280,
-        boxShadow:
-          "0 4px 20px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.05)",
-        fontFamily:
-          '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-        userSelect: "none",
-        WebkitUserSelect: "none",
-        marginBottom: 4,
-        pointerEvents: "auto",
+        background: 'linear-gradient(180deg, rgba(30, 31, 40, 0.96), rgba(18, 19, 26, 0.94))',
+        backdropFilter: 'blur(18px)',
+        WebkitBackdropFilter: 'blur(18px)',
+        border: '1px solid rgba(255, 255, 255, 0.14)',
+        borderRadius: 14,
+        padding: 10,
+        minWidth: 220,
+        maxWidth: 320,
+        boxShadow: '0 14px 34px rgba(0, 0, 0, 0.34), 0 2px 8px rgba(0, 0, 0, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.08)',
+        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+        userSelect: 'none',
+        WebkitUserSelect: 'none',
+        marginBottom: 6,
+        pointerEvents: 'auto',
       }}
     >
       <div
         style={{
-          fontSize: 10,
-          fontWeight: 600,
-          color: "rgba(100, 180, 255, 0.8)",
-          marginBottom: 4,
-          textTransform: "uppercase",
-          letterSpacing: 0.5,
+          display: 'flex',
+          alignItems: 'center',
+          minHeight: 22,
+          width: 'fit-content',
+          borderRadius: 999,
+          padding: '0 8px',
+          background: 'rgba(100, 180, 255, 0.14)',
+          border: '1px solid rgba(100, 180, 255, 0.24)',
+          fontSize: 11,
+          fontWeight: 700,
+          color: 'rgba(130, 190, 255, 0.94)',
+          marginBottom: 8,
+          textTransform: 'uppercase',
+          letterSpacing: 0.4,
         }}
       >
         Working ({agents.length})
       </div>
       {agents.slice(0, 6).map((agent) => (
-        <WorkingAgentRow
-          key={agent.ptyId}
-          agent={agent}
-          onClick={() => onAgentClick?.(agent.ptyId)}
-        />
+        <WorkingAgentRow key={agent.ptyId} agent={agent} onClick={() => onAgentClick?.(agent.ptyId)} />
       ))}
       {agents.length > 6 && (
         <div
           style={{
-            fontSize: 9,
-            color: "rgba(255, 255, 255, 0.4)",
-            textAlign: "center",
-            marginTop: 2,
+            fontSize: 10,
+            color: 'rgba(255, 255, 255, 0.4)',
+            textAlign: 'center',
+            marginTop: 6,
           }}
         >
           +{agents.length - 6} more
@@ -2292,13 +2159,7 @@ function PetWorkingAgentsPanel({
   );
 }
 
-function WorkingAgentRow({
-  agent,
-  onClick,
-}: {
-  agent: WorkingAgentSummary;
-  onClick: () => void;
-}) {
+function WorkingAgentRow({ agent, onClick }: { agent: WorkingAgentSummary; onClick: () => void }) {
   const [hovered, setHovered] = useState(false);
 
   return (
@@ -2312,38 +2173,40 @@ function WorkingAgentRow({
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 6,
-        width: "100%",
-        padding: "3px 4px",
+        display: 'flex',
+        alignItems: 'center',
+        gap: 8,
+        width: '100%',
+        minHeight: 30,
+        padding: '5px 7px',
         border: 0,
-        borderRadius: 4,
-        background: hovered ? "rgba(255, 255, 255, 0.08)" : "transparent",
-        cursor: "pointer",
-        fontFamily: "inherit",
-        textAlign: "left",
-        transition: "background 0.12s ease",
+        borderRadius: 9,
+        background: hovered ? 'rgba(255, 255, 255, 0.09)' : 'transparent',
+        cursor: 'pointer',
+        fontFamily: 'inherit',
+        textAlign: 'left',
+        transition: 'background 0.12s ease, transform 0.12s ease',
+        transform: hovered ? 'translateY(-1px)' : 'translateY(0)',
       }}
     >
       <span
         style={{
-          width: 6,
-          height: 6,
-          borderRadius: "50%",
-          background: "rgba(100, 180, 255, 0.8)",
+          width: 7,
+          height: 7,
+          borderRadius: '50%',
+          background: 'rgba(100, 180, 255, 0.8)',
           flexShrink: 0,
-          animation: "pulse 2s ease-in-out infinite",
+          animation: 'pulse 2s ease-in-out infinite',
         }}
       />
       <span
         style={{
           minWidth: 0,
-          fontSize: 10,
-          color: "rgba(255, 255, 255, 0.7)",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          whiteSpace: "nowrap",
+          fontSize: 11,
+          color: 'rgba(255, 255, 255, 0.74)',
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
         }}
       >
         {agent.userPrompt || agent.title}

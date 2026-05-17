@@ -46,8 +46,9 @@ export const TabItem = forwardRef<HTMLDivElement, TabItemProps>(function TabItem
     <div
       ref={ref}
       className={clsx(
-        'group/tab relative flex h-9 shrink-0 items-center gap-1.5 px-3 text-[13px] transition-colors select-none',
-        active ? 'text-text' : 'text-muted hover:text-text',
+        'group/tab relative flex h-8 shrink-0 items-center gap-1.5 rounded-md px-2 text-[13px] outline-none transition-[background-color,color] select-none',
+        active ? 'text-text' : 'text-muted hover:bg-panel-2 hover:text-text',
+        onClose && 'pr-7',
         className,
       )}
       role="tab"
@@ -64,11 +65,11 @@ export const TabItem = forwardRef<HTMLDivElement, TabItemProps>(function TabItem
       {...rest}
     >
       {icon}
-      <span className="max-w-[180px] overflow-hidden text-ellipsis whitespace-nowrap">{title}</span>
+      <span className="min-w-0 max-w-[180px] overflow-hidden text-ellipsis whitespace-nowrap">{title}</span>
       {suffix}
       {onClose && (
         <span
-          className="grid size-4 place-items-center rounded text-subtle opacity-0 transition-opacity hover:text-text focus:opacity-100 group-hover/tab:opacity-100"
+          className="absolute right-1 grid size-5 place-items-center rounded text-subtle opacity-0 transition-[opacity,scale,color,background-color] duration-150 ease-out hover:bg-panel hover:text-text focus:opacity-100 focus:scale-100 group-hover/tab:opacity-100 group-hover/tab:scale-100"
           role="button"
           tabIndex={0}
           title={closeTitle}
@@ -88,7 +89,7 @@ export const TabItem = forwardRef<HTMLDivElement, TabItemProps>(function TabItem
           <X size={11} />
         </span>
       )}
-      {active && <span className="absolute right-3 bottom-0 left-3 h-[2px] rounded-full bg-accent" />}
+      {active && <span className="absolute right-2 bottom-0 left-2 h-[2px] rounded-full bg-accent" />}
     </div>
   );
 });

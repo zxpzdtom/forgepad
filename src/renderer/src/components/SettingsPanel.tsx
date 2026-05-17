@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PatchDiff } from '@pierre/diffs/react';
-import { useResolvedTheme } from '@renderer/theme-context';
+import { useResolvedTheme } from '@renderer/app/theme-context';
 import { useTranslation } from '@renderer/i18n';
 import { confirmNative } from '@renderer/lib/native-dialog';
 import { type SettingsSection, useAppStore } from '@renderer/store/app-store';

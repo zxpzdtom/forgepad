@@ -8,12 +8,7 @@
   "type": "module",
   "scripts": {
     "dev": "sh -c 'pnpm exec vite --host 127.0.0.1 & renderer_pid=$!; trap \"kill $renderer_pid 2>/dev/null\" EXIT INT TERM; sleep 1; cd native/macos/ForgePadHost && FORGEPAD_WEB_URL=http://127.0.0.1:1420 FORGEPAD_CORE_COMMAND=\"cargo run --manifest-path ../../../crates/forgepad-core/Cargo.toml --bin forgepad-core-daemon\" swift run'",
-    "build": "pnpm typecheck && cargo test --manifest-path crates/forgepad-core/Cargo.toml && node scripts/package-native-mac.mjs",
-    "typecheck": "tsc --noEmit",
-    "lint": "biome lint src/",
-    "format": "biome format --write src/",
-    "check": "biome check src/",
-    "check:write": "biome check --write src/"
+    "build": "tsc --noEmit && cargo test --manifest-path crates/forgepad-core/Cargo.toml && node scripts/package-native-mac.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

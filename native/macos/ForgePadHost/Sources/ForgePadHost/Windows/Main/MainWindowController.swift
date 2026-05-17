@@ -13,6 +13,7 @@ final class ForgePadWebView: WKWebView {
 
 final class MainWindowController: NSWindowController, WKNavigationDelegate {
     private let bridge: HostBridge
+    private let workspaceFileSchemeHandler = WorkspaceFileSchemeHandler()
     private var webView: WKWebView!
     private var bootView: NSView?
     private(set) var hasLoadedRenderer = false
@@ -20,7 +21,9 @@ final class MainWindowController: NSWindowController, WKNavigationDelegate {
 
     convenience init(
         coreSupervisor: CoreSupervisor,
-        openBrowserWindow: @escaping (URL, String?) -> Void
+        openBrowserWindow: @escaping (URL, String?) -> Void,
+        sendPetSettings: @escaping (Any) -> Void,
+        sendPetCommand: @escaping (Any) -> Void
     ) {
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 1420, height: 920),
@@ -43,24 +46,36 @@ final class MainWindowController: NSWindowController, WKNavigationDelegate {
         self.init(
             window: window,
             coreSupervisor: coreSupervisor,
-            openBrowserWindow: openBrowserWindow
+            openBrowserWindow: openBrowserWindow,
+            sendPetSettings: sendPetSettings,
+            sendPetCommand: sendPetCommand
         )
     }
 
     init(
         window: NSWindow,
         coreSupervisor: CoreSupervisor,
-        openBrowserWindow: @escaping (URL, String?) -> Void
+        openBrowserWindow: @escaping (URL, String?) -> Void,
+        sendPetSettings: @escaping (Any) -> Void,
+        sendPetCommand: @escaping (Any) -> Void
     ) {
         self.bridge = HostBridge(
             coreSupervisor: coreSupervisor,
-            openBrowserWindow: openBrowserWindow
+            workspaceFileSchemeHandler: workspaceFileSchemeHandler,
+            openBrowserWindow: openBrowserWindow,
+            sendPetSettings: sendPetSettings,
+            sendPetCommand: sendPetCommand
         )
         super.init(window: window)
     }
 
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+
+    deinit {
+        webView?.configuration.userContentController.removeScriptMessageHandler(forName: "forgepadHost")
+        webView?.navigationDelegate = nil
     }
 
     override func windowDidLoad() {
@@ -106,6 +121,7 @@ final class MainWindowController: NSWindowController, WKNavigationDelegate {
         }
         config.suppressesIncrementalRendering = false
         config.setURLSchemeHandler(RendererSchemeHandler(), forURLScheme: "forgepad")
+        config.setURLSchemeHandler(workspaceFileSchemeHandler, forURLScheme: "forgepad-file")
         config.setURLSchemeHandler(CustomPetSchemeHandler(), forURLScheme: "custom-pet")
 
         let userContent = WKUserContentController()
@@ -338,6 +354,28 @@ final class MainWindowController: NSWindowController, WKNavigationDelegate {
             emit(name: "pty.exit:\(id)", payload: payload)
             return
         }
+        switch type {
+        case "agent.statusUpdate":
+            emit(name: "agent:status-update", payload: event["payload"] ?? NSNull())
+            return
+        case "agent.permissionRequest":
+            emit(name: "agent:permission-request", payload: event["payload"] ?? NSNull())
+            return
+        case "agent.userPrompt":
+            emit(name: "agent:user-prompt", payload: event["payload"] ?? NSNull())
+            return
+        case "agent.completion":
+            emit(name: "agent:completion", payload: event["payload"] ?? NSNull())
+            return
+        default:
+            break
+        }
         emit(name: type, payload: event["payload"] ?? NSNull())
+    }
+
+    func focusAgentFromPet(_ ptyId: String?) {
+        window?.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        emit(name: "agent:focus-tab", payload: ptyId ?? "__pet_click__")
     }
 }

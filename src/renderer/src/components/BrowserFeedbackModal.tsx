@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { File as PierreFile } from '@pierre/diffs/react';
-import { useResolvedTheme } from '@renderer/theme-context';
+import { useResolvedTheme } from '@renderer/app/theme-context';
 import { useTranslation } from '@renderer/i18n';
 import { ChevronDown, MessageSquare, Send, X } from 'lucide-react';
 
@@ -117,7 +117,6 @@ export function BrowserFeedbackModal() {
                         disableFileHeader: true,
                         disableLineNumbers: true,
                       }}
-                      disableWorkerPool
                     />
                   </div>
                 )}

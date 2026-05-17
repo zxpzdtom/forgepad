@@ -6,6 +6,7 @@ export type RightPanelMode = 'files' | 'changes' | 'context';
 
 export type FilePreviewResult = {
   content: string;
+  lineCount: number;
   totalBytes: number;
   previewBytes: number;
   truncated: boolean;
@@ -37,7 +38,15 @@ export type Tab =
       /** 1-based line number to scroll to after opening (cleared after scroll). */
       targetLine?: number;
     }
-  | { id: string; workspaceId: string; type: 'diff'; activePath?: string }
+  | {
+      id: string;
+      workspaceId: string;
+      type: 'diff';
+      activePath?: string;
+      activeBucket?: GitBucket;
+      activeStatus?: GitStatusKind;
+      activeOldPath?: string;
+    }
   | {
       id: string;
       workspaceId: string;
@@ -54,6 +63,16 @@ export type Tab =
       canGoBack: boolean;
       canGoForward: boolean;
     };
+
+export type AgentSessionHistoryItem = {
+  id: string;
+  workspaceId: string;
+  title: string;
+  sessionId: string;
+  agentPresetId?: string;
+  agentCommand?: string;
+  updatedAt: number;
+};
 
 /** A URL visited in the browser tab, stored for history/autocomplete */
 export type BrowserHistoryEntry = {
@@ -151,8 +170,8 @@ export type DiffFileData = {
   oldContent?: string;
   /** Full contents of the file after the change. */
   newContent?: string;
-  oldImageDataUrl?: string;
-  newImageDataUrl?: string;
+  oldImageUrl?: string;
+  newImageUrl?: string;
   status: GitStatusKind;
   bucket: GitBucket;
   isBinary: boolean;
@@ -236,6 +255,7 @@ export type PersistedAppState = {
   workspaces: Workspace[];
   tasks: Task[];
   tabs: Tab[];
+  agentSessionHistory?: AgentSessionHistoryItem[];
   activeWorkspaceId: string | null;
   activeTabId: string | null;
   /** Per-workspace last-selected agent tab id, so switching workspaces remembers the agent tab */
@@ -1384,8 +1404,6 @@ export type NotificationSound = {
   source: 'built-in' | 'custom';
   /** For custom sounds: the userData file path (used as key for deletion) */
   assetPath?: string;
-  /** For custom sounds: data URL for playback */
-  dataUrl?: string;
   createdAt: number;
 };
 
@@ -1736,13 +1754,3 @@ export type LspLocation = {
   /** The text of the matching line (for preview) */
   lineText: string;
 };
-
-export type LspSymbolPeekState = {
-  locations: LspLocation[];
-  token: string;
-  kind: 'definition';
-  /** File where Cmd+Click originated */
-  originFile?: string;
-  /** Line number in origin file */
-  originLine?: number;
-} | null;

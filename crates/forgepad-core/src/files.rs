@@ -2,8 +2,6 @@ use std::fs;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
-use base64::engine::general_purpose::STANDARD as BASE64;
-use base64::Engine;
 use serde::{Deserialize, Serialize};
 
 use crate::{err, CoreResult};
@@ -25,6 +23,7 @@ pub struct FileNode {
 #[serde(rename_all = "camelCase")]
 pub struct FilePreview {
     pub content: String,
+    pub line_count: usize,
     pub total_bytes: u64,
     pub preview_bytes: usize,
     pub truncated: bool,
@@ -82,16 +81,6 @@ pub fn read_file_preview(
     read_preview_path(&path, max_bytes)
 }
 
-pub fn read_file_data_url(worktree_path: impl AsRef<Path>, rel_path: &str) -> CoreResult<String> {
-    let path = resolve_inside_root(worktree_path, rel_path)?;
-    let data = fs::read(&path).map_err(err)?;
-    Ok(format!(
-        "data:{};base64,{}",
-        mime_for(&path),
-        BASE64.encode(data)
-    ))
-}
-
 pub fn read_abs_file(abs_path: impl AsRef<Path>) -> CoreResult<String> {
     fs::read_to_string(abs_path).map_err(err)
 }
@@ -101,16 +90,6 @@ pub fn read_abs_file_preview(
     max_bytes: usize,
 ) -> CoreResult<FilePreview> {
     read_preview_path(abs_path.as_ref(), max_bytes)
-}
-
-pub fn read_abs_file_data_url(abs_path: impl AsRef<Path>) -> CoreResult<String> {
-    let path = abs_path.as_ref();
-    let data = fs::read(path).map_err(err)?;
-    Ok(format!(
-        "data:{};base64,{}",
-        mime_for(path),
-        BASE64.encode(data)
-    ))
 }
 
 fn read_preview_path(path: &Path, max_bytes: usize) -> CoreResult<FilePreview> {
@@ -131,7 +110,14 @@ fn read_preview_path(path: &Path, max_bytes: usize) -> CoreResult<FilePreview> {
     }
 
     let content = String::from_utf8(bytes).map_err(err)?;
+    let line_count = content
+        .as_bytes()
+        .iter()
+        .filter(|&&byte| byte == b'\n')
+        .count()
+        + 1;
     Ok(FilePreview {
+        line_count,
         preview_bytes: content.len(),
         content,
         total_bytes,
@@ -252,20 +238,10 @@ mod tests {
         let preview = read_file_preview(dir.path(), "big.txt", 3).unwrap();
 
         assert_eq!(preview.content, "abc");
+        assert_eq!(preview.line_count, 1);
         assert_eq!(preview.total_bytes, 6);
         assert_eq!(preview.preview_bytes, 3);
         assert!(preview.truncated);
-    }
-
-    #[test]
-    fn read_abs_file_data_url_uses_file_mime() {
-        let dir = tempfile::tempdir().unwrap();
-        let file = dir.path().join("icon.svg");
-        fs::write(&file, "<svg></svg>").unwrap();
-
-        assert!(read_abs_file_data_url(&file)
-            .unwrap()
-            .starts_with("data:image/svg+xml;base64,"));
     }
 
     #[test]

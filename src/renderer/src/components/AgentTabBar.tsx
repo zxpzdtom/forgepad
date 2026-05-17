@@ -116,7 +116,7 @@ export function AgentTabBar() {
 
               return (
                 <SortableTabItem
-                  className="min-w-[80px] max-w-[240px]"
+                  className="min-w-[56px] max-w-[220px]"
                   key={tab.id}
                   id={tab.id}
                   active={tab.id === activeId}

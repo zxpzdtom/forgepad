@@ -1,5 +1,5 @@
 import { type CSSProperties, useEffect, useMemo, useRef, useState } from 'react';
-import { useResolvedTheme } from '@renderer/theme-context';
+import { useResolvedTheme } from '@renderer/app/theme-context';
 import { eventMatchesCombo } from '@renderer/lib/shortcut-utils';
 import { useAppStore } from '@renderer/store/app-store';
 import type { ShortcutCombo, Tab, Workspace } from '@shared/types';

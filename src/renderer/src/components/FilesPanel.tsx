@@ -3,7 +3,7 @@ import type { FileTreeContextMenuItem, GitStatusEntry } from '@pierre/trees';
 import { useTranslation } from '@renderer/i18n';
 import { FileTree, useFileTree, useFileTreeSelection } from '@pierre/trees/react';
 import { TREE_THEMES } from '@renderer/lib/file-tree-theme';
-import { useResolvedTheme } from '@renderer/theme-context';
+import { useResolvedTheme } from '@renderer/app/theme-context';
 import { useAppStore } from '@renderer/store/app-store';
 import type { FileNode, Tab, Workspace } from '@shared/types';
 

@@ -57,7 +57,6 @@ export type PtyReplay = {
 export type PickedAudio = {
   fileName: string;
   assetPath: string;
-  dataUrl: string;
 };
 
 export type NativeIde = {
@@ -108,7 +107,7 @@ export type HostBridgeApi = {
     commit: (worktreePath: string, message: string) => Promise<void>;
     push: (worktreePath: string) => Promise<void>;
     pull: (worktreePath: string) => Promise<void>;
-    generateCommitMessage: (worktreePath: string, promptTemplate: string) => Promise<string>;
+    generateCommitMessage: (worktreePath: string, promptTemplate: string, agentCommand?: string) => Promise<string>;
     addWorktree: (
       repoPath: string,
       branch: string,
@@ -126,10 +125,10 @@ export type HostBridgeApi = {
     listFiles: (worktreePath: string) => Promise<string[]>;
     readFile: (worktreePath: string, relPath: string) => Promise<string>;
     readFilePreview: (worktreePath: string, relPath: string, maxBytes: number) => Promise<FilePreviewResult>;
-    readFileAsDataUrl: (worktreePath: string, relPath: string) => Promise<string>;
+    fileUrl?: (worktreePath: string, relPath: string) => Promise<string>;
+    absFileUrl?: (absPath: string) => Promise<string>;
     readAbsFile: (absPath: string) => Promise<string>;
     readAbsFilePreview: (absPath: string, maxBytes: number) => Promise<FilePreviewResult>;
-    readAbsFileAsDataUrl: (absPath: string) => Promise<string>;
     writeFile: (worktreePath: string, relPath: string, content: string) => Promise<void>;
     watchWorkspace: (worktreePath: string) => Promise<string>;
     unwatchWorkspace: (watchId: string) => void;
@@ -195,6 +194,7 @@ export type HostBridgeApi = {
     isFocused: () => Promise<boolean>;
     focusWindow: () => void;
     toggleMaximize?: () => void;
+    startWindowDrag?: () => void;
   };
   native?: Record<string, never>;
   nativeFiles: {

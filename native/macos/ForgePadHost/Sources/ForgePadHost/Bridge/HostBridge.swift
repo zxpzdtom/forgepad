@@ -4,15 +4,24 @@ import WebKit
 
 final class HostBridge: NSObject, WKScriptMessageHandler {
     private let coreSupervisor: CoreSupervisor
+    private let workspaceFileSchemeHandler: WorkspaceFileSchemeHandler
     private let openBrowserWindow: (URL, String?) -> Void
+    private let sendPetSettings: (Any) -> Void
+    private let sendPetCommand: (Any) -> Void
     private let stateURL: URL
 
     init(
         coreSupervisor: CoreSupervisor,
-        openBrowserWindow: @escaping (URL, String?) -> Void
+        workspaceFileSchemeHandler: WorkspaceFileSchemeHandler,
+        openBrowserWindow: @escaping (URL, String?) -> Void,
+        sendPetSettings: @escaping (Any) -> Void,
+        sendPetCommand: @escaping (Any) -> Void
     ) {
         self.coreSupervisor = coreSupervisor
+        self.workspaceFileSchemeHandler = workspaceFileSchemeHandler
         self.openBrowserWindow = openBrowserWindow
+        self.sendPetSettings = sendPetSettings
+        self.sendPetCommand = sendPetCommand
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
             ?? FileManager.default.homeDirectoryForCurrentUser
         stateURL = base.appendingPathComponent("ForgePad/forgepad-state.json")
@@ -35,6 +44,12 @@ final class HostBridge: NSObject, WKScriptMessageHandler {
         else { return }
 
         let params = body["params"] as? [String: Any] ?? [:]
+
+        if command == "app.startWindowDrag" {
+            startWindowDrag(from: message.webView)
+            resolve(id: id, value: NSNull(), error: nil, webView: message.webView)
+            return
+        }
 
         Task { @MainActor in
             do {
@@ -90,13 +105,34 @@ final class HostBridge: NSObject, WKScriptMessageHandler {
         case "notification.deleteAudio":
             try deleteNotificationAudio(assetPath: requiredString(params, "assetPath"))
             return NSNull()
+        case "fs.fileUrl":
+            if let absPath = params["absPath"] as? String, !absPath.isEmpty {
+                return try workspaceFileSchemeHandler.registerAbsoluteFile(absPath: absPath)
+            }
+            return try workspaceFileSchemeHandler.registerWorkspaceFile(
+                worktreePath: requiredString(params, "worktreePath"),
+                relPath: requiredString(params, "relPath")
+            )
         case "pet.importPet":
-            return await importCustomPet()
+            guard let sourcePath = await pickCustomPetDirectory() else {
+                return ["success": false, "error": "cancelled"]
+            }
+            return try await coreSupervisor.request(command: "pet.importPet", params: ["sourcePath": sourcePath])
         case "pet.deletePet":
-            return deleteCustomPet(petId: try requiredString(params, "petId"))
+            return try await coreSupervisor.request(command: command, params: params)
         case "pet.listPets":
-            return listCustomPets()
-        case "pet.sendSettings", "pet.command", "pet.play", "pet.stop":
+            return try await coreSupervisor.request(command: command, params: params)
+        case "pet.sendSettings":
+            sendPetSettings(params["settings"] ?? params)
+            return NSNull()
+        case "pet.command":
+            sendPetCommand(params["command"] ?? params)
+            return NSNull()
+        case "pet.play":
+            sendPetCommand(["type": "play", "action": params["action"] ?? "random"])
+            return NSNull()
+        case "pet.stop":
+            sendPetCommand(["type": "stop"])
             return NSNull()
         case "shell.openExternal":
             if let url = params["url"] as? String, let parsed = URL(string: url) {
@@ -171,6 +207,13 @@ final class HostBridge: NSObject, WKScriptMessageHandler {
         return response == .alertFirstButtonReturn
     }
 
+    private func startWindowDrag(from webView: WKWebView?) {
+        guard let window = webView?.window ?? NSApp.keyWindow ?? NSApp.mainWindow,
+              let event = NSApp.currentEvent
+        else { return }
+        window.performDrag(with: event)
+    }
+
     func openProject(completion: @escaping ([String: Any]?) -> Void) {
         pickDirectory(title: "Open Project") { [weak self] path in
             guard let self, let path else {
@@ -229,12 +272,9 @@ final class HostBridge: NSObject, WKScriptMessageHandler {
         let fileName = "\(sanitized)_\(Int(Date().timeIntervalSince1970 * 1000)).\(ext)"
         let destination = soundsDir.appendingPathComponent(fileName)
         try FileManager.default.copyItem(at: source, to: destination)
-        let data = try Data(contentsOf: destination)
-        let mime = mimeType(forAudioExtension: ext)
         return [
             "fileName": fileName,
             "assetPath": destination.path,
-            "dataUrl": "data:\(mime);base64,\(data.base64EncodedString())",
         ]
     }
 
@@ -260,18 +300,7 @@ final class HostBridge: NSObject, WKScriptMessageHandler {
         return sanitized.isEmpty ? "sound" : String(sanitized)
     }
 
-    private func mimeType(forAudioExtension ext: String) -> String {
-        switch ext {
-        case "wav":
-            return "audio/wav"
-        case "ogg":
-            return "audio/ogg"
-        default:
-            return "audio/mpeg"
-        }
-    }
-
-    private func importCustomPet() async -> [String: Any] {
+    private func pickCustomPetDirectory() async -> String? {
         await withCheckedContinuation { continuation in
             let panel = NSOpenPanel()
             panel.title = "Import Custom Pet"
@@ -280,11 +309,8 @@ final class HostBridge: NSObject, WKScriptMessageHandler {
             panel.canChooseDirectories = true
             panel.allowsMultipleSelection = false
             panel.begin { [weak self] response in
-                guard response == .OK, let source = panel.url, let self else {
-                    continuation.resume(returning: ["success": false, "error": "cancelled"])
-                    return
-                }
-                continuation.resume(returning: self.copyCustomPet(from: source))
+                _ = self
+                continuation.resume(returning: response == .OK ? panel.url?.path : nil)
             }
         }
     }

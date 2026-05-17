@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useAppStore } from '@renderer/store/app-store';
 import type { DiffTokenEventBaseProps, TokenEventBase } from '@pierre/diffs';
+import type { LspLocation } from '@shared/types';
 
 /** Alias mappings mirroring the renderer Vite config resolve.alias. */
 const PATH_ALIASES: Record<string, string> = {
@@ -10,6 +11,11 @@ const PATH_ALIASES: Record<string, string> = {
 
 /** Common extensions to try when resolving an import path */
 const EXTENSIONS_TO_TRY = ['', '.ts', '.tsx', '.js', '.jsx', '/index.ts', '/index.tsx', '/index.js', '/index.jsx'];
+
+type ImportResolution = {
+  importPath: string;
+  exportedName: string | null;
+};
 
 /**
  * Strip surrounding quotes (single, double, backtick) from a string.
@@ -98,14 +104,149 @@ async function resolveImportPath(worktreePath: string, importPath: string, curre
   return null;
 }
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function tokenPattern(token: string): RegExp {
+  return new RegExp(`(^|[^\\w$])${escapeRegExp(token)}([^\\w$]|$)`);
+}
+
+function importBlocksForLine(content: string, lineNumber: number): string[] {
+  const lines = content.split('\n');
+  const blocks: string[] = [];
+  const lineIndex = Math.max(0, lineNumber - 1);
+
+  for (let start = lineIndex; start >= 0; start--) {
+    if (!/\bimport\b/.test(lines[start])) continue;
+
+    const blockLines: string[] = [];
+    for (let index = start; index < lines.length; index++) {
+      blockLines.push(lines[index]);
+      const block = blockLines.join('\n');
+      if (/from\s*['"][^'"]+['"]/.test(block) || /^import\s*['"][^'"]+['"]/.test(block.trim())) {
+        blocks.push(block);
+        break;
+      }
+      if (index - start > 20) break;
+    }
+    break;
+  }
+
+  return blocks;
+}
+
+function importedSymbolFromBlock(block: string, localName: string): ImportResolution | null {
+  if (!tokenPattern(localName).test(block)) return null;
+
+  const fromMatch = block.match(/from\s*['"]([^'"]+)['"]/);
+  const sideEffectMatch = block.trim().match(/^import\s*['"]([^'"]+)['"]/);
+  const importPath = fromMatch?.[1] ?? sideEffectMatch?.[1];
+  if (!importPath) return null;
+
+  const namedMatch = block.match(/\{([\s\S]*?)\}/);
+  if (namedMatch) {
+    const namedImports = namedMatch[1].split(',');
+    for (const item of namedImports) {
+      const parts = item.trim().split(/\s+as\s+/);
+      const exported = parts[0]?.trim();
+      const local = (parts[1] ?? parts[0])?.trim();
+      if (local === localName && exported) {
+        return { importPath, exportedName: exported };
+      }
+    }
+  }
+
+  const namespaceMatch = block.match(/import\s+\*\s+as\s+([A-Za-z_$][\w$]*)\s+from/);
+  if (namespaceMatch?.[1] === localName) {
+    return { importPath, exportedName: null };
+  }
+
+  const defaultMatch = block.match(/import\s+([A-Za-z_$][\w$]*)\s*(?:,|\s+from)/);
+  if (defaultMatch?.[1] === localName) {
+    return { importPath, exportedName: 'default' };
+  }
+
+  return null;
+}
+
+function findDefinitionLine(content: string, exportedName: string | null): number {
+  if (!exportedName) return 1;
+
+  const lines = content.split('\n');
+  if (exportedName === 'default') {
+    const defaultIndex = lines.findIndex((line) => /\bexport\s+default\b/.test(line));
+    return defaultIndex >= 0 ? defaultIndex + 1 : 1;
+  }
+
+  const name = escapeRegExp(exportedName);
+  const definitionPatterns = [
+    new RegExp(`\\bexport\\s+(?:declare\\s+)?(?:const|let|var|function|class|interface|type|enum)\\s+${name}\\b`),
+    new RegExp(`\\b(?:const|let|var|function|class|interface|type|enum)\\s+${name}\\b`),
+  ];
+
+  for (const pattern of definitionPatterns) {
+    const index = lines.findIndex((line) => pattern.test(line));
+    if (index >= 0) return index + 1;
+  }
+
+  return 1;
+}
+
+async function resolveImportedSymbolDefinition(
+  worktreePath: string,
+  currentFilePath: string,
+  lineNumber: number,
+  token: string,
+): Promise<{ filePath: string; lineNumber: number } | null> {
+  let currentContent: string;
+  try {
+    currentContent = await window.forgepad.fs.readFile(worktreePath, currentFilePath);
+  } catch {
+    return null;
+  }
+
+  for (const block of importBlocksForLine(currentContent, lineNumber)) {
+    const imported = importedSymbolFromBlock(block, token);
+    if (!imported) continue;
+
+    const filePath = await resolveImportPath(worktreePath, imported.importPath, currentFilePath);
+    if (!filePath) return null;
+
+    try {
+      const targetContent = await window.forgepad.fs.readFile(worktreePath, filePath);
+      return {
+        filePath,
+        lineNumber: findDefinitionLine(targetContent, imported.exportedName),
+      };
+    } catch {
+      return { filePath, lineNumber: 1 };
+    }
+  }
+
+  return null;
+}
+
+function chooseBestDefinitionLocation(locations: LspLocation[], token: string, originFile: string): LspLocation {
+  const definitionPattern = new RegExp(
+    `\\b(?:export\\s+)?(?:declare\\s+)?(?:const|let|var|function|class|interface|type|enum)\\s+${escapeRegExp(token)}\\b`,
+  );
+  return (
+    locations.find((loc) => loc.filePath !== originFile && definitionPattern.test(loc.lineText)) ??
+    locations.find((loc) => definitionPattern.test(loc.lineText)) ??
+    locations.find((loc) => loc.filePath !== originFile) ??
+    locations[0]
+  );
+}
+
 /**
  * Returns `onTokenClick`, `onTokenEnter`, and `onTokenLeave` callbacks
  * compatible with `@pierre/diffs` options (both File and FileDiff modes).
  *
  * Behaviour:
  * - Cmd/Ctrl + Click on an import path string → directly open the file
- * - Cmd/Ctrl + Click on a symbol → Go to Definition (grep search)
- * - Alt + Click  or  Cmd/Ctrl + Shift + Click → Find References
+ * - Cmd/Ctrl + Click on an imported symbol → open the imported file at its definition line
+ * - Cmd/Ctrl + Click on a symbol → directly open the best definition match
  * - Only the "additions" side is handled in diff mode (ignores deleted lines)
  */
 export function useLspTokenNavigation(
@@ -115,9 +256,7 @@ export function useLspTokenNavigation(
   /** Set to 'diff' to restrict clicks to the additions side. */
   mode: 'file' | 'diff' = 'file',
 ) {
-  const openSymbolPeek = useAppStore((s) => s.openSymbolPeek);
   const openFileTab = useAppStore((s) => s.openFileTab);
-  const closeSymbolPeek = useAppStore((s) => s.closeSymbolPeek);
 
   // Track whether modifier key is held for underline styling
   const cmdHeldRef = useRef(false);
@@ -175,7 +314,6 @@ export function useLspTokenNavigation(
           const resolved = await resolveImportPath(worktreePath, stripped, filePath);
           if (resolved) {
             openFileTab(workspaceId, resolved, 1);
-            closeSymbolPeek();
             return;
           }
           // Could not resolve → fall through to grep search using the last segment
@@ -188,31 +326,23 @@ export function useLspTokenNavigation(
 
         if (!token || token.length < 2) return;
 
+        const importedDefinition = await resolveImportedSymbolDefinition(worktreePath, filePath, props.lineNumber, token);
+        if (importedDefinition) {
+          openFileTab(workspaceId, importedDefinition.filePath, importedDefinition.lineNumber);
+          return;
+        }
+
         const locations = await window.forgepad.lsp.getDefinition(worktreePath, token);
 
         if (locations.length === 0) return;
 
-        // Single definition → jump directly to the file and line
-        if (locations.length === 1) {
-          const loc = locations[0];
-          openFileTab(workspaceId, loc.filePath, loc.lineNumber);
-          closeSymbolPeek();
-          return;
-        }
-
-        // Multiple results → show peek panel
-        openSymbolPeek({
-          locations,
-          token,
-          kind: 'definition',
-          originFile: filePath,
-          originLine: props.lineNumber,
-        });
+        const loc = chooseBestDefinitionLocation(locations, token, filePath);
+        openFileTab(workspaceId, loc.filePath, loc.lineNumber);
       } catch (err) {
         console.error('[useLspTokenNavigation] search failed:', err);
       }
     },
-    [worktreePath, filePath, workspaceId, mode, openSymbolPeek, openFileTab, closeSymbolPeek],
+    [worktreePath, filePath, workspaceId, mode, openFileTab],
   );
 
   const onTokenEnter = useCallback(

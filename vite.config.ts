@@ -23,8 +23,12 @@ export default defineConfig({
     rollupOptions: {
       input: {
         index: fromRoot("src/renderer/index.html"),
+        pet: fromRoot("src/renderer/pet.html"),
       },
     },
+  },
+  worker: {
+    format: "es",
   },
   define: {
     __FORGEPAD_NATIVE_HOST__: JSON.stringify(true),

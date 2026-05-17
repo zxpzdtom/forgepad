@@ -1,9 +1,21 @@
-import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type MutableRefObject,
+  type ReactNode,
+} from 'react';
 import type { SelectedLineRange } from '@pierre/diffs';
-import { getFiletypeFromFileName } from '@pierre/diffs';
-import type { FileOptions, LineAnnotation } from '@pierre/diffs/react';
-import { File as PierreFile } from '@pierre/diffs/react';
-import { useResolvedTheme } from '@renderer/theme-context';
+import { getFiletypeFromFileName, Virtualizer as PierreVirtualizer } from '@pierre/diffs';
+import type { FileOptions, LineAnnotation, VirtualFileMetrics } from '@pierre/diffs/react';
+import { File as PierreFile, VirtualizerContext } from '@pierre/diffs/react';
+import { useResolvedTheme } from '@renderer/app/theme-context';
 import { useLspTokenNavigation } from '@renderer/hooks/useLspTokenNavigation';
 import { useAppStore } from '@renderer/store/app-store';
 import type { CodeSelectionItem, FilePreviewResult, Tab, Workspace } from '@shared/types';
@@ -62,6 +74,14 @@ const AUDIO_EXTENSIONS = new Set(['mp3', 'wav', 'ogg', 'flac', 'aac', 'm4a', 'wm
 const VIDEO_EXTENSIONS = new Set(['mp4', 'webm', 'mov', 'avi', 'mkv']);
 const RAW_MEDIA_PREVIEW_LIMIT = 256 * 1024;
 const TEXT_FILE_PREVIEW_LIMIT = 256 * 1024;
+const CODE_RENDER_LOADING_LINE_THRESHOLD = 800;
+const PIERRE_FILE_METRICS: VirtualFileMetrics = {
+  hunkLineCount: 50,
+  lineHeight: 20,
+  diffHeaderHeight: 0,
+  hunkSeparatorHeight: 32,
+  fileGap: 0,
+};
 
 function getExt(relPath: string): string {
   return relPath.split('.').pop()?.toLowerCase() ?? '';
@@ -81,6 +101,15 @@ function isVideoFile(relPath: string): boolean {
 
 function isPdfFile(relPath: string): boolean {
   return getExt(relPath) === 'pdf';
+}
+
+function readMediaUrl(tab: FileTab, workspace: Workspace): Promise<string> {
+  if (tab.absPath) {
+    if (!window.forgepad.fs.absFileUrl) return Promise.reject(new Error('Native file URL support is unavailable.'));
+    return window.forgepad.fs.absFileUrl(tab.absPath);
+  }
+  if (!window.forgepad.fs.fileUrl) return Promise.reject(new Error('Native file URL support is unavailable.'));
+  return window.forgepad.fs.fileUrl(workspace.worktreePath, tab.relPath);
 }
 
 function isMarkdownPath(path: string): boolean {
@@ -485,6 +514,13 @@ pre,
 [data-code] {
   align-self: stretch;
 }
+[data-file],
+[data-code],
+[data-line],
+[data-line] span {
+  -webkit-user-select: text;
+  user-select: text;
+}
 ::highlight(${SEARCH_HIGHLIGHT}) {
   color: inherit;
   background: rgba(233, 189, 97, 0.38);
@@ -670,6 +706,100 @@ function normalizeSearchSelection(selection: string): string {
   return selection.replace(/\r?\n/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
+const FILE_SKELETON_WIDTHS = [68, 92, 54, 78, 88, 46, 72, 96, 60, 84, 50, 76];
+
+function SkeletonBlock({ className = '', style }: { className?: string; style?: CSSProperties }) {
+  return <div className={clsx('animate-pulse rounded bg-muted/15', className)} style={style} />;
+}
+
+function FilePreviewSkeleton() {
+  return (
+    <div className="code-viewer-scroll scrollbar-thin scroll-mask min-h-0 flex-1 overflow-hidden bg-bg p-4" aria-busy="true">
+      <div className="mb-4 flex items-center gap-3 border-border border-b pb-3">
+        <SkeletonBlock className="h-4 w-4 rounded" />
+        <SkeletonBlock className="h-3 w-36" />
+        <SkeletonBlock className="ml-auto h-3 w-20" />
+      </div>
+      <div className="grid gap-2 font-mono">
+        {FILE_SKELETON_WIDTHS.map((width, index) => (
+          <div key={`${width}-${index}`} className="grid grid-cols-[3rem_minmax(0,1fr)] items-center gap-4">
+            <SkeletonBlock className="ml-auto h-3 w-6 bg-muted/10" />
+            <div className="flex items-center gap-2">
+              <SkeletonBlock className="h-3" style={{ width: `${width}%` }} />
+              {index % 4 === 1 ? <SkeletonBlock className="h-3 w-12 bg-accent/10" /> : null}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function ImagePreviewSkeleton() {
+  return (
+    <div className="scrollbar-thin scroll-mask flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-surface-inset p-6" aria-busy="true">
+      <div className="relative aspect-[4/3] w-full max-w-2xl overflow-hidden rounded-lg border border-border/60 bg-panel shadow-sm">
+        <SkeletonBlock className="absolute inset-0 rounded-none bg-muted/10" />
+        <div className="absolute inset-x-8 bottom-8 grid gap-3">
+          <SkeletonBlock className="h-4 w-2/5 bg-bg/60" />
+          <SkeletonBlock className="h-3 w-3/5 bg-bg/45" />
+        </div>
+        <div className="absolute right-8 top-8 h-16 w-16 rounded-full bg-bg/45" />
+      </div>
+    </div>
+  );
+}
+
+function InlineFileRenderSkeleton() {
+  return (
+    <div className="pointer-events-none sticky top-0 z-10 border-border border-b bg-bg/92 px-4 py-2 backdrop-blur" aria-busy="true">
+      <div className="grid grid-cols-[3rem_minmax(0,1fr)] items-center gap-4">
+        <SkeletonBlock className="ml-auto h-3 w-6 bg-muted/10" />
+        <SkeletonBlock className="h-3 w-1/2" />
+      </div>
+    </div>
+  );
+}
+
+function VirtualizedCodeSurface({
+  children,
+  loading,
+  rootRef,
+}: {
+  children: ReactNode;
+  loading: boolean;
+  rootRef: MutableRefObject<HTMLDivElement | null>;
+}) {
+  const [virtualizer] = useState(
+    () =>
+      new PierreVirtualizer({
+        overscrollSize: 1200,
+        intersectionObserverMargin: 1200,
+      }),
+  );
+
+  const setRoot = useCallback(
+    (node: HTMLDivElement | null) => {
+      rootRef.current = node;
+      if (node) {
+        virtualizer.setup(node);
+      } else {
+        virtualizer.cleanUp();
+      }
+    },
+    [rootRef, virtualizer],
+  );
+
+  return (
+    <VirtualizerContext.Provider value={virtualizer}>
+      <div ref={setRoot} className="code-viewer-scroll scrollbar-thin scroll-mask relative min-h-0 flex-1 overflow-auto bg-bg">
+        {loading ? <InlineFileRenderSkeleton /> : null}
+        <div className="flex min-h-full flex-col">{children}</div>
+      </div>
+    </VirtualizerContext.Provider>
+  );
+}
+
 // --- Main component ---
 
 export function FileEditor({ tab, workspace }: FileEditorProps) {
@@ -680,6 +810,8 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
   const [fileText, setFileText] = useState('');
   const [lineCount, setLineCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [codeRenderPending, setCodeRenderPending] = useState(false);
+  const [deferCodeMount, setDeferCodeMount] = useState(false);
   const [textPreview, setTextPreview] = useState<FilePreviewResult | null>(null);
   const [markdownMode, setMarkdownMode] = useState<MarkdownMode>('rendered');
   const [searchOpen, setSearchOpen] = useState(false);
@@ -689,6 +821,7 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
   const [pendingSelection, setPendingSelection] = useState<PendingCodeSelection | null>(null);
   const [selectedRange, setSelectedRange] = useState<SelectedLineRange | null>(null);
   const [mediaUrl, setMediaUrl] = useState('');
+  const [rawMediaText, setRawMediaText] = useState('');
   const [mediaViewMode, setMediaViewMode] = useState<'preview' | 'raw'>('preview');
   const resolvedTheme = useResolvedTheme();
   const addToast = useAppStore((state) => state.addToast);
@@ -841,6 +974,7 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
         }
       },
       onPostRender: (node: HTMLElement) => {
+        requestAnimationFrame(() => setCodeRenderPending(false));
         const lineNumber = pendingScrollLineRef.current;
         if (!lineNumber) return;
         const root = node.shadowRoot;
@@ -870,27 +1004,48 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
   // the computed language is "text".
   const detectedLang = useMemo(() => getFiletypeFromFileName(tab.relPath), [tab.relPath]);
   const isPlainText = detectedLang === 'text';
+  const useLightweightCodeViewer = isPlainText;
+  const fileLines = useMemo(() => (useLightweightCodeViewer ? fileText.split('\n') : []), [fileText, useLightweightCodeViewer]);
 
   const pierreFileData = useMemo(() => ({ name: tab.relPath, contents: fileText }), [tab.relPath, fileText]);
+
+  useEffect(() => {
+    if (loading || !fileText || showMediaPreview || showRenderedMarkdown || useLightweightCodeViewer) {
+      setCodeRenderPending(false);
+      setDeferCodeMount(false);
+      return;
+    }
+
+    if (lineCount < CODE_RENDER_LOADING_LINE_THRESHOLD) {
+      setCodeRenderPending(false);
+      setDeferCodeMount(false);
+      return;
+    }
+
+    setCodeRenderPending(true);
+    setDeferCodeMount(true);
+    const frame = requestAnimationFrame(() => setDeferCodeMount(false));
+    return () => cancelAnimationFrame(frame);
+  }, [fileText, lineCount, loading, showMediaPreview, showRenderedMarkdown, useLightweightCodeViewer]);
 
   // --- Load file ---
   useEffect(() => {
     let disposed = false;
     setLoading(true);
+    setCodeRenderPending(false);
+    setDeferCodeMount(false);
     setFileText('');
     setTextPreview(null);
     setSearchRanges([]);
     setPendingSelection(null);
     setSelectedRange(null);
     setMediaUrl('');
+    setRawMediaText('');
 
     if (isMediaFile) {
-      const mediaPromise = tab.absPath
-        ? window.forgepad.fs.readAbsFileAsDataUrl(tab.absPath)
-        : window.forgepad.fs.readFileAsDataUrl(workspace.worktreePath, tab.relPath);
-      mediaPromise
-        .then((dataUrl) => {
-          if (!disposed) setMediaUrl(dataUrl);
+      readMediaUrl(tab, workspace)
+        .then((url) => {
+          if (!disposed) setMediaUrl(url);
         })
         .catch((error) => addToast('error', error instanceof Error ? error.message : 'Failed to load file preview.'))
         .finally(() => {
@@ -912,7 +1067,7 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
         if (disposed) return;
         setTextPreview(preview);
         setFileText(preview.content);
-        setLineCount(preview.content.split('\n').length);
+        setLineCount(preview.lineCount ?? preview.content.split('\n').length);
       })
       .catch((error) => {
         addToast('error', error instanceof Error ? error.message : 'Failed to load file.');
@@ -927,15 +1082,33 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
   }, [addToast, tab.relPath, tab.absPath, workspace.worktreePath, isMediaFile]);
 
   useEffect(() => {
-    if (!isMediaFile || mediaViewMode !== 'raw' || !mediaUrl || fileText) return;
+    if (!isMediaFile || mediaViewMode !== 'raw' || rawMediaText || fileText) return;
 
-    const rawText =
-      mediaUrl.length > RAW_MEDIA_PREVIEW_LIMIT
-        ? `${mediaUrl.slice(0, RAW_MEDIA_PREVIEW_LIMIT)}\n\n... truncated ${mediaUrl.length - RAW_MEDIA_PREVIEW_LIMIT} characters`
-        : mediaUrl;
-    setFileText(rawText);
-    setLineCount(rawText.split('\n').length);
-  }, [fileText, isMediaFile, mediaUrl, mediaViewMode]);
+    let disposed = false;
+    const rawPromise = tab.absPath
+      ? window.forgepad.fs.readAbsFilePreview(tab.absPath, RAW_MEDIA_PREVIEW_LIMIT)
+      : window.forgepad.fs.readFilePreview(workspace.worktreePath, tab.relPath, RAW_MEDIA_PREVIEW_LIMIT);
+
+    rawPromise
+      .then((preview) => {
+        if (disposed) return;
+        const rawText = preview.truncated
+          ? `${preview.content}\n\n... truncated ${Math.max(0, preview.totalBytes - preview.previewBytes)} bytes`
+          : preview.content;
+        setRawMediaText(rawText);
+        setFileText(rawText);
+        setLineCount(rawText.split('\n').length);
+      })
+      .catch((error) => addToast('error', error instanceof Error ? error.message : 'Failed to load raw preview.'));
+
+    return () => {
+      disposed = true;
+    };
+  }, [addToast, fileText, isMediaFile, rawMediaText, mediaViewMode, tab.absPath, tab.relPath, workspace.worktreePath]);
+
+  const handleMediaLoadError = useCallback(() => {
+    addToast('error', 'Failed to load native file preview.');
+  }, [addToast]);
 
   useEffect(() => {
     setMarkdownMode('rendered');
@@ -965,7 +1138,7 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
     if (!scrollContainer) return;
 
     // For the plain-text fallback (no @pierre/diffs), scroll directly.
-    if (isPlainText) {
+    if (useLightweightCodeViewer) {
       const rows = scrollContainer.querySelectorAll('tr');
       const line = pendingScrollLineRef.current;
       if (line && line <= rows.length) {
@@ -978,6 +1151,13 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
     // For @pierre/diffs: the onPostRender callback below will handle it.
     // But if the file is already rendered (same file, just a new targetLine),
     // onPostRender may not fire again. In that case, do a manual DOM query.
+    if (lineCount >= CODE_RENDER_LOADING_LINE_THRESHOLD) {
+      scrollContainer.scrollTo({
+        top: Math.max(0, (tab.targetLine - 1) * PIERRE_FILE_METRICS.lineHeight),
+        behavior: 'auto',
+      });
+    }
+
     const diffsHost = scrollContainer.querySelector('diffs-container') as HTMLElement | null;
     const root = diffsHost?.shadowRoot;
     if (root) {
@@ -1000,7 +1180,7 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
       }
     }
     // Otherwise onPostRender will handle it when the component renders.
-  }, [tab.targetLine, tab.id, loading, clearTabTargetLine, isPlainText]);
+  }, [tab.targetLine, tab.id, loading, lineCount, clearTabTargetLine, useLightweightCodeViewer]);
 
   // --- Search (for rendered markdown & code viewer modes) ---
 
@@ -1256,7 +1436,7 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
   );
 
   return (
-    <section className="absolute inset-0 flex min-h-0 min-w-0 flex-col bg-bg">
+    <section className="editor-panel absolute inset-0 flex min-h-0 min-w-0 flex-col bg-bg">
       {/* Toolbar */}
       <div className="flex min-h-[42px] items-center justify-between gap-3 border-border border-b bg-panel px-3">
         <div
@@ -1389,18 +1569,22 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
 
       {/* Content area */}
       {loading ? (
-        <div className="grid min-h-[90px] place-items-center text-muted">Loading file</div>
+        isImage ? (
+          <ImagePreviewSkeleton />
+        ) : (
+          <FilePreviewSkeleton />
+        )
       ) : showMediaPreview && isImage && mediaUrl ? (
         <div className="scrollbar-thin scroll-mask flex min-h-0 flex-1 items-center justify-center overflow-auto bg-surface-inset p-6">
-          <img className="max-h-full max-w-full rounded object-contain" src={mediaUrl} alt={tab.relPath} />
+          <img className="max-h-full max-w-full rounded object-contain" src={mediaUrl} alt={tab.relPath} onError={handleMediaLoadError} />
         </div>
       ) : showMediaPreview && isAudio && mediaUrl ? (
         <div className="flex min-h-0 flex-1 items-center justify-center bg-surface-inset p-8">
-          <audio controls className="w-full max-w-2xl" src={mediaUrl} />
+          <audio controls className="w-full max-w-2xl" src={mediaUrl} onError={handleMediaLoadError} />
         </div>
       ) : showMediaPreview && isVideo && mediaUrl ? (
         <div className="flex min-h-0 flex-1 items-center justify-center bg-surface-inset p-4">
-          <video controls className="max-h-full max-w-full rounded" src={mediaUrl} />
+          <video controls className="max-h-full max-w-full rounded" src={mediaUrl} onError={handleMediaLoadError} />
         </div>
       ) : showMediaPreview && isPdf && mediaUrl ? (
         <iframe
@@ -1433,46 +1617,45 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
             <MarkdownToc items={tocItems} activeId={activeTocId} scrollContainerRef={scrollRef} collapsed={!tocOpen} />
           ) : null}
         </div>
-      ) : (
-        <div ref={codeViewerRef} className="scrollbar-thin scroll-mask flex min-h-0 flex-1 flex-col overflow-auto bg-bg">
-          {/* Code viewer via @pierre/diffs File component */}
-          {showCodeViewer ? (
-            isPlainText ? (
-              <pre
-                className="pierre-plain-text m-0 flex-1 overflow-auto p-4 font-mono text-text"
-                style={{
-                  fontSize: `${editorFontSize}px`,
-                  lineHeight: 1.6,
-                  tabSize: 4,
-                }}
-              >
-                <table className="border-collapse">
-                  <tbody>
-                    {fileText.split('\n').map((line, i) => (
-                      <tr key={i}>
-                        <td className="select-none pr-4 text-right align-top text-subtle/50" style={{ minWidth: '3em' }}>
-                          {i + 1}
-                        </td>
-                        <td className="whitespace-pre-wrap break-all">{line || '\u00A0'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </pre>
-            ) : (
-              <PierreFile
-                className="min-h-full flex-1"
-                file={pierreFileData}
-                options={fileOptions}
-                selectedLines={selectedRange}
-                lineAnnotations={lineAnnotations}
-                renderAnnotation={renderAnnotation}
-                disableWorkerPool
-                style={{ fontSize: `${editorFontSize}px`, height: '100%', minHeight: '100%' }}
-              />
-            )
-          ) : null}
+      ) : useLightweightCodeViewer ? (
+        <div ref={codeViewerRef} className="code-viewer-scroll scrollbar-thin scroll-mask flex min-h-0 flex-1 flex-col overflow-auto bg-bg">
+          <pre
+            className="pierre-plain-text m-0 flex-1 overflow-auto p-4 font-mono text-text"
+            style={{
+              fontSize: `${editorFontSize}px`,
+              lineHeight: 1.6,
+              tabSize: 4,
+            }}
+          >
+            <table className="border-collapse">
+              <tbody>
+                {fileLines.map((line, i) => (
+                  <tr key={i}>
+                    <td className="select-none pr-4 text-right align-top text-subtle/50" style={{ minWidth: '3em' }}>
+                      {i + 1}
+                    </td>
+                    <td className="whitespace-pre-wrap break-all">{line || '\u00A0'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </pre>
         </div>
+      ) : (
+        <VirtualizedCodeSurface rootRef={codeViewerRef} loading={codeRenderPending || deferCodeMount}>
+          {showCodeViewer && !deferCodeMount ? (
+            <PierreFile
+              className="min-h-full flex-1"
+              file={pierreFileData}
+              options={fileOptions}
+              metrics={PIERRE_FILE_METRICS}
+              selectedLines={selectedRange}
+              lineAnnotations={lineAnnotations}
+              renderAnnotation={renderAnnotation}
+              style={{ fontSize: `${editorFontSize}px`, minHeight: '100%' }}
+            />
+          ) : null}
+        </VirtualizedCodeSurface>
       )}
     </section>
   );

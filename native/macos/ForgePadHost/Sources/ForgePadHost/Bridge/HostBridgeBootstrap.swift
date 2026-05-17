@@ -5,7 +5,8 @@ enum HostBridgeBootstrap {
     (() => {
       if (window.forgepad) return;
 
-      if (!window.__forgepadKeepWarm) {
+      const shouldKeepWarm = window.top === window && !/\\/pet\\.html(?:$|[?#])/.test(window.location.pathname);
+      if (shouldKeepWarm && !window.__forgepadKeepWarm) {
         window.__forgepadKeepWarm = true;
         const keepWarm = () => window.requestAnimationFrame(keepWarm);
         window.requestAnimationFrame(keepWarm);
@@ -110,7 +111,7 @@ enum HostBridgeBootstrap {
           commit: (worktreePath, message) => invoke("git.commit", { worktreePath, message }),
           push: (worktreePath) => invoke("git.push", { worktreePath }),
           pull: (worktreePath) => invoke("git.pull", { worktreePath }),
-          generateCommitMessage: (worktreePath, promptTemplate) => invoke("git.generateCommitMessage", { worktreePath, promptTemplate }),
+          generateCommitMessage: (worktreePath, promptTemplate, agentCommand) => invoke("git.generateCommitMessage", { worktreePath, promptTemplate, agentCommand }),
           addWorktree: (repoPath, branch, trackRemote, worktreeBaseDir) => invoke("git.worktreeAdd", { repoPath, branch, trackRemote, worktreeBaseDir }),
           removeWorktree: (repoPath, worktreePath, branch) => invoke("git.worktreeRemove", { repoPath, worktreePath, branch }),
           fetch: (repoPath) => invoke("git.fetch", { repoPath }),
@@ -123,10 +124,10 @@ enum HostBridgeBootstrap {
           listFiles: (worktreePath) => invoke("fs.listFiles", { worktreePath }),
           readFile: (worktreePath, relPath) => invoke("fs.readFile", { worktreePath, relPath }),
           readFilePreview: (worktreePath, relPath, maxBytes) => invoke("fs.readFilePreview", { worktreePath, relPath, maxBytes }),
-          readFileAsDataUrl: (worktreePath, relPath) => invoke("fs.readFileDataUrl", { worktreePath, relPath }),
+          fileUrl: (worktreePath, relPath) => invoke("fs.fileUrl", { worktreePath, relPath }),
+          absFileUrl: (absPath) => invoke("fs.fileUrl", { absPath }),
           readAbsFile: (absPath) => invoke("fs.readAbsFile", { absPath }),
           readAbsFilePreview: (absPath, maxBytes) => invoke("fs.readAbsFilePreview", { absPath, maxBytes }),
-          readAbsFileAsDataUrl: (absPath) => invoke("fs.readAbsFileDataUrl", { absPath }),
           writeFile: (worktreePath, relPath, content) => invoke("fs.writeFile", { worktreePath, relPath, content }),
           watchWorkspace: (worktreePath) => invoke("fs.watchWorkspace", { worktreePath }),
           unwatchWorkspace: (watchId) => { invoke("fs.unwatchWorkspace", { watchId }); },
@@ -173,7 +174,8 @@ enum HostBridgeBootstrap {
         app2: {
           isFocused: () => invoke("app.isFocused"),
           focusWindow: () => { invoke("app.focusWindow"); },
-          toggleMaximize: () => { invoke("app.toggleMaximize"); }
+          toggleMaximize: () => { invoke("app.toggleMaximize"); },
+          startWindowDrag: () => { invoke("app.startWindowDrag"); }
         },
         native: {},
         nativeFiles: { getPath: (file) => file.name },

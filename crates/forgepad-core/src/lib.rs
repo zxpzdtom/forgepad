@@ -5,6 +5,7 @@ pub mod files;
 pub mod git;
 pub mod hooks;
 pub mod lsp;
+pub mod pets;
 pub mod pty;
 pub mod state;
 

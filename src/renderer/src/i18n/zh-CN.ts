@@ -376,6 +376,7 @@ const zhCN: Record<TranslationKeys, string> = {
 
   // ── Changes Panel ──
   "changes.staged": "已暂存",
+  "changes.changes": "变更",
   "changes.untracked": "未追踪",
   "changes.workingTree": "未暂存",
   "changes.selectBucket": "选择此分类",
@@ -384,6 +385,9 @@ const zhCN: Record<TranslationKeys, string> = {
   "changes.unstage": "取消暂存",
   "changes.discardSelected": "丢弃选中",
   "changes.refreshChanges": "刷新变更",
+  "changes.viewMode": "变更显示模式",
+  "changes.treeView": "树状视图",
+  "changes.flatView": "平铺列表",
   "changes.cleanWorkingTree": "没有 Git 变更",
   "changes.commitMessage": "提交信息",
   "changes.commitStaged": "提交暂存",
@@ -398,9 +402,9 @@ const zhCN: Record<TranslationKeys, string> = {
   "changes.pullTitle": "从远程拉取变更",
   "changes.pushing": "推送中…",
   "changes.pulling": "拉取中…",
-  "changes.generateAI": "AI 生成",
+  "changes.generateAI": "生成",
   "changes.generating": "生成中…",
-  "changes.generateTitle": "使用 AI 生成提交消息",
+  "changes.generateTitle": "根据当前变更生成提交消息",
 
   // ── Context Panel ──
   "context.askAgent": "询问代理如何处理选中的上下文",
@@ -506,6 +510,11 @@ const zhCN: Record<TranslationKeys, string> = {
   "diff.failedLoadDiffs": "加载差异失败。",
 
   // ── Toast ──
+  "toast.info": "通知",
+  "toast.success": "成功",
+  "toast.error": "错误",
+  "toast.copy": "复制消息",
+  "toast.copied": "已复制",
   "toast.dismiss": "关闭",
 
   // ── Rename Modal ──

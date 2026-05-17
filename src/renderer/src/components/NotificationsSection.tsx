@@ -315,9 +315,9 @@ export function NotificationsSection() {
             setPlayingId(null);
           }
         }
-      } else if (sound.dataUrl) {
-        try {
-          const audio = new Audio(sound.dataUrl);
+      } else if (sound.assetPath && window.forgepad.fs.absFileUrl) {
+        window.forgepad.fs.absFileUrl(sound.assetPath).then((url) => {
+          const audio = new Audio(url);
           audio.volume = ns.volume / 100;
           audio.play().catch(() => {
             addToast('error', t('settings.notifications.failedPlayPreview'));
@@ -333,10 +333,10 @@ export function NotificationsSection() {
           };
           // Store stop in ref via play hook is complex; just track via state
           audio.onpause = () => setPlayingId((prev) => (prev === sound.id ? null : prev));
-        } catch {
+        }).catch(() => {
           addToast('error', t('settings.notifications.failedPlayPreview'));
           setPlayingId(null);
-        }
+        });
       }
     },
     [playingId, ns.volume, stopCurrent, addToast],
@@ -356,7 +356,6 @@ export function NotificationsSection() {
         durationMs: 3000, // Estimate; real duration not easily available from main
         source: 'custom',
         assetPath: result.assetPath,
-        dataUrl: result.dataUrl,
         createdAt: Date.now(),
       };
       addCustomSound(sound);

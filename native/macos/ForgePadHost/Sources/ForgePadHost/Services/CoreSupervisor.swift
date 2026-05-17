@@ -16,8 +16,19 @@ final class CoreSupervisor {
             ?? bundledCoreCommand()
 
         let shell = Process()
-        shell.executableURL = URL(fileURLWithPath: "/bin/zsh")
-        shell.arguments = ["-lc", command]
+        let parts = Self.splitCommand(command)
+        if let executable = parts.first {
+            if executable.hasPrefix("/") {
+                shell.executableURL = URL(fileURLWithPath: executable)
+                shell.arguments = Array(parts.dropFirst())
+            } else {
+                shell.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+                shell.arguments = parts
+            }
+        } else {
+            shell.executableURL = URL(fileURLWithPath: "/bin/zsh")
+            shell.arguments = ["-lc", command]
+        }
 
         let stdout = Pipe()
         let stderr = Pipe()
@@ -69,8 +80,10 @@ final class CoreSupervisor {
     }
 
     func stop() {
+        sendShutdownRequest()
         stdoutPipe?.fileHandleForReading.readabilityHandler = nil
         stderrPipe?.fileHandleForReading.readabilityHandler = nil
+        Thread.sleep(forTimeInterval: 0.15)
         if let process, process.isRunning {
             process.terminate()
         }
@@ -79,6 +92,59 @@ final class CoreSupervisor {
         stdoutPipe = nil
         stderrPipe = nil
         stdinPipe = nil
+    }
+
+    private func sendShutdownRequest() {
+        guard let stdinPipe else { return }
+        let payload: [String: Any] = [
+            "id": UUID().uuidString,
+            "command": "core.shutdown",
+            "params": [:]
+        ]
+        guard let data = try? JSONSerialization.data(withJSONObject: payload) else { return }
+        try? stdinPipe.fileHandleForWriting.write(contentsOf: data)
+        try? stdinPipe.fileHandleForWriting.write(contentsOf: Data("\n".utf8))
+    }
+
+    private static func splitCommand(_ command: String) -> [String] {
+        var parts: [String] = []
+        var current = ""
+        var quote: Character?
+        var escaping = false
+
+        for char in command {
+            if escaping {
+                current.append(char)
+                escaping = false
+                continue
+            }
+            if char == "\\" {
+                escaping = true
+                continue
+            }
+            if let activeQuote = quote {
+                if char == activeQuote {
+                    quote = nil
+                } else {
+                    current.append(char)
+                }
+                continue
+            }
+            if char == "\"" || char == "'" {
+                quote = char
+            } else if char.isWhitespace {
+                if !current.isEmpty {
+                    parts.append(current)
+                    current = ""
+                }
+            } else {
+                current.append(char)
+            }
+        }
+        if !current.isEmpty {
+            parts.append(current)
+        }
+        return parts
     }
 
     func request(command: String, params: [String: Any]) async throws -> Any {

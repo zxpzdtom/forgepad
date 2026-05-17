@@ -145,7 +145,7 @@ export function TerminalDock() {
                 <SortableTabItem
                   key={tab.id}
                   id={tab.id}
-                  className="min-w-[80px] max-w-[240px]"
+                  className="min-w-[56px] max-w-[220px]"
                   active={tab.id === activeId}
                   icon={terminalIcon(tab)}
                   title={tab.title}

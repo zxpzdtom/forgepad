@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from '@renderer/i18n';
 import type { FileDiffOptions, SelectedLineRange } from '@pierre/diffs';
-import { getFiletypeFromFileName, processFile } from '@pierre/diffs';
 import type { DiffLineAnnotation } from '@pierre/diffs/react';
-import { FileDiff, PatchDiff } from '@pierre/diffs/react';
-import { useResolvedTheme } from '@renderer/theme-context';
+import { PatchDiff } from '@pierre/diffs/react';
+import { useResolvedTheme } from '@renderer/app/theme-context';
 import { useLspTokenNavigation } from '@renderer/hooks/useLspTokenNavigation';
 import { useAppStore } from '@renderer/store/app-store';
 import type { DiffCommentItem, DiffFileData, FileStatus, Tab, Workspace } from '@shared/types';
@@ -25,8 +24,121 @@ type PendingComment = {
 
 type AnnotationMeta = { kind: 'pending' } | { kind: 'comment'; comment: DiffCommentItem };
 
+const diffViewerUnsafeCSS = `
+  :host {
+    --diffs-font-features: "tnum";
+  }
+
+  [data-unmodified-lines] {
+    display: inline-block;
+    min-width: max-content;
+    overflow: visible;
+    text-overflow: clip;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+
+  [data-separator-content] {
+    min-width: max-content;
+    color: var(--diffs-fg-number);
+  }
+
+  [data-diff],
+  [data-code],
+  [data-line],
+  [data-line] span {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+
+`;
+
+const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'ico', 'svg', 'avif']);
+
+function isImagePath(path: string): boolean {
+  return IMAGE_EXTENSIONS.has(path.split('.').pop()?.toLowerCase() ?? '');
+}
+
 function isImageDiff(file: DiffFileData) {
-  return Boolean(file.oldImageDataUrl || file.newImageDataUrl);
+  return Boolean(file.oldImageUrl || file.newImageUrl);
+}
+
+function createSyntheticPatch(file: DiffFileData): string {
+  if (file.patch.trim() && (file.status !== 'renamed' || hasPatchHunks(file.patch))) return file.patch;
+
+  if (file.status === 'renamed' && file.newContent != null) {
+    const lines = file.newContent.split(/\r?\n/);
+    if (lines.at(-1) === '') lines.pop();
+    const lineCount = lines.length;
+    return [
+      `diff --git a/${file.oldPath ?? file.path} b/${file.path}`,
+      'new file mode 100644',
+      '--- /dev/null',
+      `+++ b/${file.path}`,
+      `@@ -0,0 +1,${lineCount} @@`,
+      ...lines.map((line) => `+${line}`),
+    ].join('\n');
+  }
+
+  if ((file.status === 'added' || file.bucket === 'untracked') && file.newContent != null) {
+    const lines = file.newContent.split(/\r?\n/);
+    if (lines.at(-1) === '') lines.pop();
+    const lineCount = lines.length;
+    return [
+      `diff --git a/${file.path} b/${file.path}`,
+      'new file mode 100644',
+      '--- /dev/null',
+      `+++ b/${file.path}`,
+      `@@ -0,0 +1,${lineCount} @@`,
+      ...lines.map((line) => `+${line}`),
+    ].join('\n');
+  }
+
+  if (file.status === 'deleted' && file.oldContent != null) {
+    const lines = file.oldContent.split(/\r?\n/);
+    if (lines.at(-1) === '') lines.pop();
+    const lineCount = lines.length;
+    const oldPath = file.oldPath ?? file.path;
+    return [
+      `diff --git a/${oldPath} b/${file.path}`,
+      'deleted file mode 100644',
+      `--- a/${oldPath}`,
+      '+++ /dev/null',
+      `@@ -1,${lineCount} +0,0 @@`,
+      ...lines.map((line) => `-${line}`),
+    ].join('\n');
+  }
+
+  return file.patch;
+}
+
+function hasPatchHunks(patch: string): boolean {
+  return /^@@\s/m.test(patch);
+}
+
+function hasTextualDiff(file: DiffFileData): boolean {
+  return (
+    hasPatchHunks(file.patch) ||
+    (file.status === 'renamed' && file.newContent != null) ||
+    ((file.status === 'added' || file.bucket === 'untracked') && file.newContent != null) ||
+    (file.status === 'deleted' && file.oldContent != null)
+  );
+}
+
+function removeRedundantStagedRenameShells(statuses: FileStatus[]): FileStatus[] {
+  return statuses.filter((status) => {
+    if (status.bucket !== 'staged' || status.status !== 'renamed') return true;
+
+    return !statuses.some(
+      (other) =>
+        other !== status &&
+        other.path === status.path &&
+        other.oldPath === status.oldPath &&
+        other.bucket !== 'staged' &&
+        other.status === 'renamed' &&
+        ((other.additions ?? 0) > 0 || (other.deletions ?? 0) > 0),
+    );
+  });
 }
 
 function ImageDiff({ file }: { file: DiffFileData }) {
@@ -36,16 +148,16 @@ function ImageDiff({ file }: { file: DiffFileData }) {
       <div className="grid grid-cols-2 gap-3">
         <div className="image-diff-pane">
           <div className="image-diff-label">{file.status === 'added' || file.bucket === 'untracked' ? 'Original' : 'Before'}</div>
-          {file.oldImageDataUrl ? (
-            <img src={file.oldImageDataUrl} alt={`${file.path} before`} />
+          {file.oldImageUrl ? (
+            <img src={file.oldImageUrl} alt={`${file.path} before`} />
           ) : (
             <div className="image-diff-empty">{file.bucket === 'untracked' ? t('changes.untracked') : t('diff.binaryOmitted')}</div>
           )}
         </div>
         <div className="image-diff-pane">
           <div className="image-diff-label">After</div>
-          {file.newImageDataUrl ? (
-            <img src={file.newImageDataUrl} alt={`${file.path} after`} />
+          {file.newImageUrl ? (
+            <img src={file.newImageUrl} alt={`${file.path} after`} />
           ) : (
             <div className="image-diff-empty">{file.status === 'deleted' ? 'Deleted' : t('diff.binaryOmitted')}</div>
           )}
@@ -68,69 +180,11 @@ function DiffContent({
   renderAnnotation?: (annotation: DiffLineAnnotation<AnnotationMeta>) => React.ReactNode;
   selectedLines?: SelectedLineRange | null;
 }) {
-  // Pierre has an infinite-loop bug when the computed language is "text"
-  // (same guard as FileEditor). Render a plain <pre> patch instead.
-  const isPlainText = useMemo(() => getFiletypeFromFileName(file.path) === 'text', [file.path]);
+  const patch = useMemo(() => createSyntheticPatch(file), [file]);
 
-  const fileDiffMetadata = useMemo(() => {
-    if (isPlainText) return undefined;
-    if (file.oldContent == null && file.newContent == null) {
-      console.warn('[DiffContent] no oldContent/newContent, falling back to PatchDiff');
-      return undefined;
-    }
-    const result = processFile(file.patch, {
-      oldFile: {
-        name: file.oldPath ?? file.path,
-        contents: file.oldContent ?? '',
-      },
-      newFile: { name: file.path, contents: file.newContent ?? '' },
-    });
-    console.log('[DiffContent] processFile result:', {
-      isPartial: result?.isPartial,
-      hunks: result?.hunks.length,
-      hasResult: result != null,
-    });
-    return result;
-  }, [file.patch, file.path, file.oldPath, file.oldContent, file.newContent, isPlainText]);
-
-  if (isPlainText) {
-    // Show the new file content with line numbers, matching FileEditor's
-    // plain-text rendering style, since pierre crashes on language "text".
-    const content = file.newContent ?? file.oldContent ?? file.patch ?? '';
-    const lines = content.split('\n');
-    return (
-      <pre className="m-0 flex-1 overflow-auto p-4 font-mono text-[13px] text-text" style={{ lineHeight: 1.6, tabSize: 4 }}>
-        <table className="border-collapse">
-          <tbody>
-            {lines.map((line, i) => (
-              <tr key={i}>
-                <td className="select-none pr-4 text-right align-top text-subtle/50" style={{ minWidth: '3em' }}>
-                  {i + 1}
-                </td>
-                <td className="whitespace-pre-wrap break-all">{line || '\u00A0'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </pre>
-    );
-  }
-
-  if (fileDiffMetadata) {
-    return (
-      <FileDiff
-        fileDiff={fileDiffMetadata}
-        options={options}
-        lineAnnotations={lineAnnotations}
-        renderAnnotation={renderAnnotation}
-        selectedLines={selectedLines}
-        disableWorkerPool
-      />
-    );
-  }
   return (
     <PatchDiff
-      patch={file.patch}
+      patch={patch}
       options={options}
       lineAnnotations={lineAnnotations}
       renderAnnotation={renderAnnotation}
@@ -151,6 +205,7 @@ function DiffFileEntry({
   diffOptions,
   tab,
   workspace,
+  fillHeight,
   pending,
   setPending,
   fileComments,
@@ -160,6 +215,7 @@ function DiffFileEntry({
   diffOptions: FileDiffOptions<AnnotationMeta>;
   tab: DiffTab;
   workspace: Workspace;
+  fillHeight: boolean;
   pending: PendingComment | null;
   setPending: (p: PendingComment | null) => void;
   fileComments: DiffCommentItem[];
@@ -286,11 +342,22 @@ function DiffFileEntry({
       }
       return null;
     },
-    [isThisFilePending, pending, setPending, addDiffComment, workspace.id, file.path, file.bucket],
-  );
+	    [isThisFilePending, pending, setPending, addDiffComment, workspace.id, file.path, file.bucket],
+	  );
+
+  const isSyntheticAddition = file.status === 'renamed' && !hasPatchHunks(file.patch);
+  const entryClassName = [
+    'diff-file-entry',
+    fillHeight ? 'is-fill-height' : '',
+    file.status === 'added' || file.bucket === 'untracked' || isSyntheticAddition ? 'is-addition' : '',
+    file.status === 'deleted' ? 'is-deletion' : '',
+    'mb-3.5 w-full rounded-lg bg-surface-card',
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   return (
-    <article className="mb-3.5 w-full rounded-lg bg-surface-card">
+    <article className={entryClassName}>
       {!tab.activePath && (
         <header className="flex min-h-11 items-center gap-3 border-border border-b bg-panel-2 px-2.5 py-2">
           <div className="grid min-w-0 gap-0.5">
@@ -306,7 +373,7 @@ function DiffFileEntry({
         <ImageDiff file={file} />
       ) : file.isBinary ? (
         <div className="grid min-h-[90px] place-items-center text-muted">{t('diff.binaryOmitted')}</div>
-      ) : file.patch.trim() ? (
+      ) : hasTextualDiff(file) ? (
         <DiffContent
           file={file}
           options={options}
@@ -351,19 +418,39 @@ export function DiffViewer({ tab, workspace }: DiffViewerProps) {
     try {
       const nextStatuses = await window.forgepad.git.getStatus(workspace.worktreePath);
       setStatuses(nextStatuses);
-      const prioritized = tab.activePath ? nextStatuses.filter((status) => status.path === tab.activePath) : nextStatuses;
+      const visibleStatuses = removeRedundantStagedRenameShells(nextStatuses);
+      const prioritized = tab.activePath
+        ? visibleStatuses.filter((status) => {
+            const pathMatches = status.path === tab.activePath || status.oldPath === tab.activePath;
+            const bucketMatches = !tab.activeBucket || status.bucket === tab.activeBucket;
+            return pathMatches && bucketMatches;
+          })
+        : visibleStatuses;
       const files = await Promise.all(
-        prioritized.map((status) =>
-          window.forgepad.git.getFileDiff(workspace.worktreePath, status.path, status.bucket, status.status, status.oldPath),
-        ),
+        prioritized.map((status) => {
+          const relPath = tab.activePath && status.oldPath === tab.activePath ? tab.activePath : status.path;
+          const diffStatus = tab.activeStatus ?? status.status;
+          const oldPath = tab.activeOldPath ?? (relPath === status.oldPath ? undefined : status.oldPath);
+          return window.forgepad.git.getFileDiff(workspace.worktreePath, relPath, status.bucket, diffStatus, oldPath);
+        }),
       );
-      setDiffs(files);
+      const filesWithImageUrls = await Promise.all(
+        files.map(async (file) => {
+          if (!isImagePath(file.path) || file.status === 'deleted' || !window.forgepad.fs.fileUrl) return file;
+          try {
+            return { ...file, newImageUrl: await window.forgepad.fs.fileUrl(workspace.worktreePath, file.path) };
+          } catch {
+            return file;
+          }
+        }),
+      );
+      setDiffs(filesWithImageUrls);
     } catch (error) {
       addToast('error', error instanceof Error ? error.message : t('diff.failedLoadDiffs'));
     } finally {
       setLoading(false);
     }
-  }, [addToast, tab.activePath, workspace.worktreePath]);
+  }, [addToast, tab.activeBucket, tab.activeOldPath, tab.activePath, tab.activeStatus, workspace.worktreePath]);
 
   useEffect(() => {
     void load();
@@ -386,16 +473,19 @@ export function DiffViewer({ tab, workspace }: DiffViewerProps) {
     diffStyle: settings.diffStyle,
     diffIndicators: settings.diffIndicators,
     lineDiffType: settings.diffLineDiffType,
-    overflow: settings.diffOverflow,
+    // Split + scroll can leave one side visually blank on long renamed files.
+    overflow: 'wrap',
     disableBackground: settings.diffDisableBackground,
     expandUnchanged: false,
     disableFileHeader: true,
     enableLineSelection: true,
     lineHoverHighlight: 'both',
+    hunkSeparators: 'line-info',
+    unsafeCSS: diffViewerUnsafeCSS,
   };
 
   return (
-    <section className="absolute inset-0 flex min-h-0 min-w-0 flex-col bg-bg">
+    <section className="diff-panel absolute inset-0 flex min-h-0 min-w-0 flex-col bg-bg">
       <div className="flex min-h-12 items-center justify-between gap-3 border-border border-b bg-panel px-3 py-2">
         <div className="flex min-w-0 items-center gap-[7px] overflow-hidden text-ellipsis whitespace-nowrap font-[510] text-[13px]">
           {tab.activePath ? t('diff.changesTitle', { path: tab.activePath }) : t('diff.workspaceChanges')}
@@ -413,7 +503,7 @@ export function DiffViewer({ tab, workspace }: DiffViewerProps) {
       {!loading && diffs.length === 0 && statuses.length > 0 ? (
         <div className="grid min-h-[90px] place-items-center text-muted">{t('diff.selectFile')}</div>
       ) : null}
-      <div className="scrollbar-thin scroll-mask flex min-h-0 flex-1 overflow-auto">
+      <div className="diff-scroll-region scrollbar-thin scroll-mask flex min-h-0 flex-1 flex-col items-stretch overflow-auto">
         {diffs.map((file) => (
           <DiffFileEntry
             key={`${file.bucket}:${file.path}`}
@@ -421,6 +511,7 @@ export function DiffViewer({ tab, workspace }: DiffViewerProps) {
             diffOptions={diffOptions}
             tab={tab}
             workspace={workspace}
+            fillHeight={diffs.length === 1}
             pending={pending}
             setPending={setPending}
             fileComments={commentsByPath.get(file.path) ?? []}

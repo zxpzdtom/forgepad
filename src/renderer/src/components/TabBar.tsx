@@ -154,7 +154,7 @@ export function TabBar() {
                   onSelect={() => setActiveTab(tab.id)}
                   onClose={() => closeTab(tab.id)}
                   onContextMenu={(event) => handleContextMenu(event, tab)}
-                  className="min-w-[80px] max-w-[240px]"
+                  className="min-w-[64px] max-w-[220px]"
                   data-tab-id={tab.id}
                   suffix={isExternal ? <ExternalLink size={10} className="shrink-0 text-subtle" /> : undefined}
                 />

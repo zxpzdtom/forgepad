@@ -1,8 +1,9 @@
 import AppKit
 import WebKit
 
-final class BrowserWindowController: NSWindowController, WKNavigationDelegate {
+final class BrowserWindowController: NSWindowController, NSWindowDelegate, WKNavigationDelegate {
     private var webView: WKWebView!
+    var onClose: (() -> Void)?
 
     convenience init(url: URL, title: String?) {
         let window = NSWindow(
@@ -17,6 +18,7 @@ final class BrowserWindowController: NSWindowController, WKNavigationDelegate {
         window.isReleasedWhenClosed = false
         window.center()
         self.init(window: window)
+        window.delegate = self
         load(url: url)
     }
 
@@ -45,5 +47,13 @@ final class BrowserWindowController: NSWindowController, WKNavigationDelegate {
             context.duration = 0.08
             webView.animator().alphaValue = 1
         }
+    }
+
+    func windowWillClose(_ notification: Notification) {
+        webView?.navigationDelegate = nil
+        webView?.stopLoading()
+        window?.contentView = nil
+        onClose?()
+        onClose = nil
     }
 }

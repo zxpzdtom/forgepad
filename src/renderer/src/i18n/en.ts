@@ -405,6 +405,7 @@ const en = {
 
   // ── Changes Panel ──
   "changes.staged": "Staged",
+  "changes.changes": "Changes",
   "changes.untracked": "Untracked",
   "changes.workingTree": "Unstaged",
   "changes.selectBucket": "Select this section",
@@ -413,6 +414,9 @@ const en = {
   "changes.unstage": "Unstage",
   "changes.discardSelected": "Discard selected",
   "changes.refreshChanges": "Refresh changes",
+  "changes.viewMode": "Changes view mode",
+  "changes.treeView": "Tree view",
+  "changes.flatView": "Flat list",
   "changes.cleanWorkingTree": "No Git changes",
   "changes.commitMessage": "Commit message",
   "changes.commitStaged": "Commit Staged",
@@ -427,9 +431,9 @@ const en = {
   "changes.pullTitle": "Pull changes from remote",
   "changes.pushing": "Pushing…",
   "changes.pulling": "Pulling…",
-  "changes.generateAI": "AI Generate",
+  "changes.generateAI": "Generate",
   "changes.generating": "Generating…",
-  "changes.generateTitle": "Generate commit message with AI",
+  "changes.generateTitle": "Generate commit message from current changes",
 
   // ── Context Panel ──
   "context.askAgent": "Ask the agent what to do with the selected context",
@@ -535,6 +539,11 @@ const en = {
   "diff.failedLoadDiffs": "Failed to load diffs.",
 
   // ── Toast ──
+  "toast.info": "Notice",
+  "toast.success": "Success",
+  "toast.error": "Error",
+  "toast.copy": "Copy message",
+  "toast.copied": "Copied",
   "toast.dismiss": "Dismiss",
 
   // ── Rename Modal ──
