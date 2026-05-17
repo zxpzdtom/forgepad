@@ -25,7 +25,6 @@ import {
   ChevronUp,
   Copy,
   List,
-  Maximize2,
   MessageSquarePlus,
   Search,
   X,
@@ -67,16 +66,16 @@ type PendingCodeSelection = {
 };
 
 type AnnotationMeta = { kind: 'pending' } | { kind: 'comment'; comment: CodeSelectionItem };
-type VideoZoomMode = 'fit' | 'custom';
+type MediaZoomMode = 'fit' | 'custom';
 
 const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'ico', 'svg', 'avif']);
 const AUDIO_EXTENSIONS = new Set(['mp3', 'wav', 'ogg', 'flac', 'aac', 'm4a', 'wma']);
 const VIDEO_EXTENSIONS = new Set(['mp4', 'webm', 'mov', 'avi', 'mkv']);
 const TEXT_FILE_PREVIEW_LIMIT = 256 * 1024;
 const CODE_RENDER_LOADING_LINE_THRESHOLD = 800;
-const VIDEO_ZOOM_MIN = 0.25;
-const VIDEO_ZOOM_MAX = 3;
-const VIDEO_ZOOM_STEP = 0.25;
+const MEDIA_ZOOM_MIN = 0.25;
+const MEDIA_ZOOM_MAX = 3;
+const MEDIA_ZOOM_STEP = 0.25;
 const PIERRE_FILE_METRICS: VirtualFileMetrics = {
   hunkLineCount: 50,
   lineHeight: 20,
@@ -861,8 +860,8 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
   const [pendingSelection, setPendingSelection] = useState<PendingCodeSelection | null>(null);
   const [selectedRange, setSelectedRange] = useState<SelectedLineRange | null>(null);
   const [mediaUrl, setMediaUrl] = useState('');
-  const [videoZoom, setVideoZoom] = useState(1);
-  const [videoZoomMode, setVideoZoomMode] = useState<VideoZoomMode>('fit');
+  const [mediaZoom, setMediaZoom] = useState(1);
+  const [mediaZoomMode, setMediaZoomMode] = useState<MediaZoomMode>('fit');
   const resolvedTheme = useResolvedTheme();
   const addToast = useAppStore((state) => state.addToast);
   const addContextFiles = useAppStore((state) => state.addContextFiles);
@@ -1135,22 +1134,22 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
     addToast('error', 'Failed to load native file preview.');
   }, [addToast]);
 
-  const setCustomVideoZoom = useCallback((nextZoom: number) => {
-    setVideoZoom(Math.min(VIDEO_ZOOM_MAX, Math.max(VIDEO_ZOOM_MIN, nextZoom)));
-    setVideoZoomMode('custom');
+  const setCustomMediaZoom = useCallback((nextZoom: number) => {
+    setMediaZoom(Math.min(MEDIA_ZOOM_MAX, Math.max(MEDIA_ZOOM_MIN, nextZoom)));
+    setMediaZoomMode('custom');
   }, []);
 
-  const fitVideoToView = useCallback(() => {
-    setVideoZoom(1);
-    setVideoZoomMode('fit');
+  const fitMediaToView = useCallback(() => {
+    setMediaZoom(1);
+    setMediaZoomMode('fit');
   }, []);
 
   useEffect(() => {
     setMarkdownMode('rendered');
     setPendingSelection(null);
     setSelectedRange(null);
-    setVideoZoom(1);
-    setVideoZoomMode('fit');
+    setMediaZoom(1);
+    setMediaZoomMode('fit');
   }, [tab.relPath, tab.absPath]);
 
   useEffect(() => {
@@ -1503,37 +1502,29 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
           ) : null}
         </div>
         <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
-          {isVideo && showMediaPreview ? (
-            <div className="view-mode-toggle" aria-label="Video zoom controls">
+          {(isImage || isVideo) && showMediaPreview ? (
+            <div className="view-mode-toggle" aria-label="Media zoom controls">
               <button
                 className="view-mode-btn"
                 type="button"
                 title="Zoom out"
-                onClick={() => setCustomVideoZoom(videoZoom - VIDEO_ZOOM_STEP)}
+                onClick={() => setCustomMediaZoom(mediaZoom - MEDIA_ZOOM_STEP)}
               >
                 <ZoomOut size={14} />
               </button>
               <button
-                className={clsx('view-mode-btn', videoZoomMode === 'fit' && 'active')}
+                className={clsx('view-mode-btn min-w-[42px] px-1.5 text-[10px] tabular-nums', mediaZoomMode === 'fit' && 'active')}
                 type="button"
-                title="Fit to view"
-                onClick={fitVideoToView}
+                title={mediaZoomMode === 'fit' ? 'Fit to view' : `${Math.round(mediaZoom * 100)}%`}
+                onClick={fitMediaToView}
               >
-                <Maximize2 size={14} />
-              </button>
-              <button
-                className="view-mode-btn min-w-[42px] px-1.5 text-[10px] tabular-nums"
-                type="button"
-                title={videoZoomMode === 'fit' ? 'Fit to view' : `${Math.round(videoZoom * 100)}%`}
-                onClick={fitVideoToView}
-              >
-                {videoZoomMode === 'fit' ? 'Fit' : `${Math.round(videoZoom * 100)}%`}
+                {mediaZoomMode === 'fit' ? 'Fit' : `${Math.round(mediaZoom * 100)}%`}
               </button>
               <button
                 className="view-mode-btn"
                 type="button"
                 title="Zoom in"
-                onClick={() => setCustomVideoZoom(videoZoom + VIDEO_ZOOM_STEP)}
+                onClick={() => setCustomMediaZoom(mediaZoom + MEDIA_ZOOM_STEP)}
               >
                 <ZoomIn size={14} />
               </button>
@@ -1637,8 +1628,24 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
           <FilePreviewSkeleton />
         )
       ) : showMediaPreview && isImage && mediaUrl ? (
-        <div className="scrollbar-thin scroll-mask flex min-h-0 flex-1 items-center justify-center overflow-auto bg-surface-inset p-6">
-          <img className="max-h-full max-w-full rounded object-contain" src={mediaUrl} alt={tab.relPath} onError={handleMediaLoadError} />
+        <div
+          className={clsx(
+            'media-preview-scroll scrollbar-thin scroll-mask min-h-0 flex-1 overflow-auto bg-surface-inset p-4',
+            mediaZoomMode === 'fit' ? 'is-fit' : 'is-custom',
+          )}
+        >
+          <div
+            className="media-preview-stage"
+            style={
+              mediaZoomMode === 'custom'
+                ? ({
+                    '--media-preview-scale': mediaZoom,
+                  } as CSSProperties)
+                : undefined
+            }
+          >
+            <img className="media-preview-image" src={mediaUrl} alt={tab.relPath} onError={handleMediaLoadError} />
+          </div>
         </div>
       ) : showMediaPreview && isAudio && mediaUrl ? (
         <div className="flex min-h-0 flex-1 items-center justify-center bg-surface-inset p-8">
@@ -1647,23 +1654,23 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
       ) : showMediaPreview && isVideo && mediaUrl ? (
         <div
           className={clsx(
-            'video-preview-scroll scrollbar-thin scroll-mask min-h-0 flex-1 overflow-auto bg-surface-inset p-4',
-            videoZoomMode === 'fit' ? 'is-fit' : 'is-custom',
+            'media-preview-scroll scrollbar-thin scroll-mask min-h-0 flex-1 overflow-auto bg-surface-inset p-4',
+            mediaZoomMode === 'fit' ? 'is-fit' : 'is-custom',
           )}
         >
           <div
-            className="video-preview-stage"
+            className="media-preview-stage"
             style={
-              videoZoomMode === 'custom'
+              mediaZoomMode === 'custom'
                 ? ({
-                    '--video-preview-scale': videoZoom,
+                    '--media-preview-scale': mediaZoom,
                   } as CSSProperties)
                 : undefined
             }
           >
             <video
               controls
-              className="video-preview-player"
+              className="media-preview-video"
               src={mediaUrl}
               onError={handleMediaLoadError}
             />

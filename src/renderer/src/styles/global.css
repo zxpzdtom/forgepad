@@ -371,6 +371,7 @@ button,
 .code-viewer-scroll,
 .markdown-viewer-scroll,
 .image-preview-scroll,
+.media-preview-scroll,
 .video-preview-scroll,
 .context-preview pre,
 .scrollbar-thin {
@@ -378,15 +379,18 @@ button,
     scrollbar-color: gray transparent;
 }
 
+.media-preview-scroll.is-fit,
 .video-preview-scroll.is-fit {
     display: grid;
     place-items: center;
 }
 
+.media-preview-scroll.is-custom,
 .video-preview-scroll.is-custom {
     display: block;
 }
 
+.media-preview-stage,
 .video-preview-stage {
     display: grid;
     min-width: 100%;
@@ -394,25 +398,43 @@ button,
     place-items: center;
 }
 
-.video-preview-scroll.is-custom .video-preview-stage {
-    align-items: start;
-    justify-items: start;
+.media-preview-scroll.is-fit .media-preview-stage {
+    padding: 24px;
+    box-sizing: border-box;
 }
 
+.media-preview-image,
+.media-preview-video,
 .video-preview-player {
     display: block;
     border-radius: 7px;
+}
+
+.media-preview-image {
+    background: transparent;
+}
+
+.media-preview-video,
+.video-preview-player {
     background: black;
 }
 
+.media-preview-scroll.is-fit .media-preview-image,
+.media-preview-scroll.is-fit .media-preview-video,
 .video-preview-scroll.is-fit .video-preview-player {
-    max-width: 100%;
-    max-height: 100%;
+    max-width: calc(100% - 48px);
+    max-height: calc(100% - 48px);
 }
 
+.media-preview-scroll.is-custom .media-preview-image,
+.media-preview-scroll.is-custom .media-preview-video,
 .video-preview-scroll.is-custom .video-preview-player {
-    width: calc(100% * var(--video-preview-scale, 1));
+    width: calc(100% * var(--media-preview-scale, var(--video-preview-scale, 1)));
     max-width: none;
+}
+
+.media-preview-scroll.is-custom .media-preview-image {
+    height: auto;
 }
 
 /* Terminal */

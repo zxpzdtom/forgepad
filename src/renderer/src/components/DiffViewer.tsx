@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from '@renderer/i18n';
-import type { FileDiffOptions, SelectedLineRange } from '@pierre/diffs';
+import { parseDiffFromFile, Virtualizer as PierreVirtualizer, type FileDiffOptions, type FileDiffMetadata, type SelectedLineRange } from '@pierre/diffs';
 import type { DiffLineAnnotation } from '@pierre/diffs/react';
-import { PatchDiff } from '@pierre/diffs/react';
+import { FileDiff as PierreFileDiff, PatchDiff, VirtualizerContext } from '@pierre/diffs/react';
 import { useResolvedTheme } from '@renderer/app/theme-context';
 import { useLspTokenNavigation } from '@renderer/hooks/useLspTokenNavigation';
 import { useAppStore } from '@renderer/store/app-store';
@@ -109,6 +109,21 @@ function createSyntheticPatch(file: DiffFileData): string {
   return file.patch;
 }
 
+function createFullFileDiff(file: DiffFileData): FileDiffMetadata | null {
+  if (file.oldContent == null || file.newContent == null) return null;
+
+  return parseDiffFromFile(
+    {
+      name: file.oldPath ?? file.path,
+      contents: file.oldContent,
+    },
+    {
+      name: file.path,
+      contents: file.newContent,
+    },
+  );
+}
+
 function hasPatchHunks(patch: string): boolean {
   return /^@@\s/m.test(patch);
 }
@@ -178,17 +193,17 @@ function DiffContent({
   selectedLines?: SelectedLineRange | null;
 }) {
   const patch = useMemo(() => createSyntheticPatch(file), [file]);
+  const fullFileDiff = useMemo(() => createFullFileDiff(file), [file]);
 
-  return (
-    <PatchDiff
-      patch={patch}
-      options={options}
-      lineAnnotations={lineAnnotations}
-      renderAnnotation={renderAnnotation}
-      selectedLines={selectedLines}
-      disableWorkerPool
-    />
-  );
+  const sharedProps = {
+    options,
+    lineAnnotations,
+    renderAnnotation,
+    selectedLines,
+    disableWorkerPool: true,
+  };
+
+  return fullFileDiff ? <PierreFileDiff fileDiff={fullFileDiff} {...sharedProps} /> : <PatchDiff patch={patch} {...sharedProps} />;
 }
 
 function formatRange(range: SelectedLineRange): string {
@@ -387,6 +402,13 @@ function DiffFileEntry({
 
 export function DiffViewer({ tab, workspace }: DiffViewerProps) {
   const { t } = useTranslation();
+  const [virtualizer] = useState(
+    () =>
+      new PierreVirtualizer({
+        overscrollSize: 1200,
+        intersectionObserverMargin: 1200,
+      }),
+  );
   const [statuses, setStatuses] = useState<FileStatus[]>([]);
   const [diffs, setDiffs] = useState<DiffFileData[]>([]);
   const [loading, setLoading] = useState(false);
@@ -453,6 +475,17 @@ export function DiffViewer({ tab, workspace }: DiffViewerProps) {
     void load();
   }, [load]);
 
+  const setDiffScrollRegion = useCallback(
+    (node: HTMLDivElement | null) => {
+      if (node) {
+        virtualizer.setup(node);
+      } else {
+        virtualizer.cleanUp();
+      }
+    },
+    [virtualizer],
+  );
+
   // Escape key to dismiss pending comment
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -464,22 +497,31 @@ export function DiffViewer({ tab, workspace }: DiffViewerProps) {
     return () => window.removeEventListener('keydown', handleKeyDown, true);
   }, [pending]);
 
-  const diffOptions: FileDiffOptions<AnnotationMeta> = {
-    theme: resolvedTheme === 'dark' ? 'pierre-dark' : 'pierre-light',
-    themeType: resolvedTheme,
-    diffStyle: settings.diffStyle,
-    diffIndicators: settings.diffIndicators,
-    lineDiffType: settings.diffLineDiffType,
-    // Split + scroll can leave one side visually blank on long renamed files.
-    overflow: 'wrap',
-    disableBackground: settings.diffDisableBackground,
-    expandUnchanged: false,
-    disableFileHeader: true,
-    enableLineSelection: true,
-    lineHoverHighlight: 'both',
-    hunkSeparators: 'line-info',
-    unsafeCSS: diffViewerUnsafeCSS,
-  };
+  const diffOptions: FileDiffOptions<AnnotationMeta> = useMemo(
+    () => ({
+      theme: resolvedTheme === 'dark' ? 'pierre-dark' : 'pierre-light',
+      themeType: resolvedTheme,
+      diffStyle: settings.diffStyle,
+      diffIndicators: settings.diffIndicators,
+      lineDiffType: settings.diffLineDiffType,
+      // Split + scroll can leave one side visually blank on long renamed files.
+      overflow: 'wrap',
+      disableBackground: settings.diffDisableBackground,
+      expandUnchanged: false,
+      disableFileHeader: true,
+      enableLineSelection: true,
+      lineHoverHighlight: 'both',
+      hunkSeparators: 'line-info',
+      unsafeCSS: diffViewerUnsafeCSS,
+    }),
+    [
+      resolvedTheme,
+      settings.diffDisableBackground,
+      settings.diffIndicators,
+      settings.diffLineDiffType,
+      settings.diffStyle,
+    ],
+  );
 
   return (
     <section className="diff-panel absolute inset-0 flex min-h-0 min-w-0 flex-col bg-bg">
@@ -500,22 +542,24 @@ export function DiffViewer({ tab, workspace }: DiffViewerProps) {
       {!loading && diffs.length === 0 && statuses.length > 0 ? (
         <div className="grid min-h-[90px] place-items-center text-muted">{t('diff.selectFile')}</div>
       ) : null}
-      <div className="diff-scroll-region scrollbar-thin scroll-mask flex min-h-0 flex-1 flex-col items-stretch overflow-auto">
-        {diffs.map((file) => (
-          <DiffFileEntry
-            key={`${file.bucket}:${file.path}`}
-            file={file}
-            diffOptions={diffOptions}
-            tab={tab}
-            workspace={workspace}
-            fillHeight={diffs.length === 1}
-            pending={pending}
-            setPending={setPending}
-            fileComments={commentsByPath.get(file.path) ?? []}
-            addDiffComment={addDiffComment}
-          />
-        ))}
-      </div>
+      <VirtualizerContext.Provider value={virtualizer}>
+        <div ref={setDiffScrollRegion} className="diff-scroll-region scrollbar-thin scroll-mask flex min-h-0 flex-1 flex-col items-stretch overflow-auto">
+          {diffs.map((file) => (
+            <DiffFileEntry
+              key={`${file.bucket}:${file.path}`}
+              file={file}
+              diffOptions={diffOptions}
+              tab={tab}
+              workspace={workspace}
+              fillHeight={diffs.length === 1}
+              pending={pending}
+              setPending={setPending}
+              fileComments={commentsByPath.get(file.path) ?? []}
+              addDiffComment={addDiffComment}
+            />
+          ))}
+        </div>
+      </VirtualizerContext.Provider>
     </section>
   );
 }
