@@ -154,9 +154,11 @@ final class HostBridge: NSObject, WKScriptMessageHandler {
         case "shell.detectTerminals":
             return detectTerminals()
         case "shell.openWithIde":
-            try openWithApp(
+            try openWithIde(
                 path: requiredString(params, "fullPath"),
-                appName: appName(forIde: requiredString(params, "ideId"))
+                ideId: requiredString(params, "ideId"),
+                lineNumber: optionalPositiveInt(params, "lineNumber"),
+                projectPath: optionalString(params, "projectPath")
             )
             return NSNull()
         case "shell.openWithTerminal":
@@ -167,7 +169,12 @@ final class HostBridge: NSObject, WKScriptMessageHandler {
             return NSNull()
         case "shell.openInIde":
             let ide = detectIdes().first?["id"] as? String ?? "vscode"
-            try openWithApp(path: requiredString(params, "fullPath"), appName: appName(forIde: ide))
+            try openWithIde(
+                path: requiredString(params, "fullPath"),
+                ideId: ide,
+                lineNumber: optionalPositiveInt(params, "lineNumber"),
+                projectPath: optionalString(params, "projectPath")
+            )
             return NSNull()
         case "shell.openInTerminal":
             let terminal = detectTerminals().first?["id"] as? String ?? "terminal"
@@ -440,6 +447,8 @@ final class HostBridge: NSObject, WKScriptMessageHandler {
             ["id": "cursor", "label": "Cursor", "command": "cursor", "appName": "Cursor", "bundleId": "com.todesktop.230313mzl4w4u92"],
             ["id": "vscode", "label": "VS Code", "command": "code", "appName": "Visual Studio Code", "bundleId": "com.microsoft.VSCode"],
             ["id": "zed", "label": "Zed", "command": "zed", "appName": "Zed", "bundleId": "dev.zed.Zed"],
+            ["id": "windsurf", "label": "Windsurf", "command": "windsurf", "appName": "Windsurf", "bundleId": "com.exafunction.windsurf"],
+            ["id": "intellij", "label": "IntelliJ IDEA", "command": "idea", "appName": "IntelliJ IDEA", "bundleId": "com.jetbrains.intellij"],
             ["id": "xcode", "label": "Xcode", "command": "xed", "appName": "Xcode", "bundleId": "com.apple.dt.Xcode"],
         ]
         return candidates.filter { candidate in
@@ -479,6 +488,10 @@ final class HostBridge: NSObject, WKScriptMessageHandler {
             return "Cursor"
         case "zed":
             return "Zed"
+        case "windsurf":
+            return "Windsurf"
+        case "intellij":
+            return "IntelliJ IDEA"
         case "xcode":
             return "Xcode"
         default:
@@ -496,6 +509,113 @@ final class HostBridge: NSObject, WKScriptMessageHandler {
             return "Ghostty"
         default:
             return "Terminal"
+        }
+    }
+
+    private func openWithIde(path: String, ideId: String, lineNumber: Int?, projectPath: String? = nil) throws {
+        if ideId == "zed" {
+            try openWithZed(path: path, lineNumber: lineNumber, projectPath: projectPath)
+            return
+        }
+
+        let command = command(forIde: ideId)
+        if let command, commandExists(command) {
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+            let args = ideArguments(forIde: ideId, path: path, lineNumber: lineNumber, projectPath: projectPath).map(shellQuote).joined(separator: " ")
+            process.arguments = ["zsh", "-lc", "\(shellQuote(command)) \(args)"]
+            try process.run()
+            process.waitUntilExit()
+            if process.terminationStatus == 0 {
+                return
+            }
+        }
+        let appName = appName(forIde: ideId)
+        if let projectPath, projectPath != path {
+            try openWithApp(path: projectPath, appName: appName)
+        }
+        try openWithApp(path: path, appName: appName)
+    }
+
+    private func openWithZed(path: String, lineNumber: Int?, projectPath: String?) throws {
+        guard let command = zedCommand() else {
+            let appName = appName(forIde: "zed")
+            if let projectPath, projectPath != path {
+                try openWithApp(path: projectPath, appName: appName)
+            }
+            try openWithApp(path: path, appName: appName)
+            return
+        }
+
+        if let projectPath, projectPath != path {
+            try runShellCommand(command, args: [projectPath])
+            Thread.sleep(forTimeInterval: 0.2)
+            try runShellCommand(command, args: ["-a", zedFileArgument(path: path, lineNumber: lineNumber)])
+            return
+        }
+
+        try runShellCommand(command, args: [zedFileArgument(path: path, lineNumber: lineNumber)])
+    }
+
+    private func zedCommand() -> String? {
+        if commandExists("zed") {
+            return "zed"
+        }
+        if let appURL = applicationURL(bundleId: "dev.zed.Zed", appName: "Zed") {
+            let cliPath = appURL.appendingPathComponent("Contents/MacOS/cli").path
+            if FileManager.default.fileExists(atPath: cliPath) {
+                return cliPath
+            }
+        }
+        return nil
+    }
+
+    private func zedFileArgument(path: String, lineNumber: Int?) -> String {
+        guard let lineNumber else { return path }
+        return "\(path):\(lineNumber)"
+    }
+
+    private func runShellCommand(_ command: String, args: [String]) throws {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+        let quotedArgs = args.map(shellQuote).joined(separator: " ")
+        process.arguments = ["zsh", "-lc", "\(shellQuote(command)) \(quotedArgs)"]
+        try process.run()
+        process.waitUntilExit()
+    }
+
+    private func command(forIde id: String) -> String? {
+        switch id {
+        case "cursor":
+            return "cursor"
+        case "zed":
+            return "zed"
+        case "windsurf":
+            return "windsurf"
+        case "intellij":
+            return "idea"
+        case "xcode":
+            return "xed"
+        default:
+            return "code"
+        }
+    }
+
+    private func ideArguments(forIde id: String, path: String, lineNumber: Int?, projectPath: String?) -> [String] {
+        var args: [String] = []
+        if let projectPath, projectPath != path {
+            args.append(projectPath)
+        }
+        guard let lineNumber else { return args + [path] }
+        switch id {
+        case "cursor", "vscode", "windsurf":
+            return args + ["-g", "\(path):\(lineNumber)"]
+        case "intellij":
+            return args + ["--line", "\(lineNumber)", path]
+        case "xcode":
+            return args + ["-l", "\(lineNumber)", path]
+        default:
+            return args + ["\(path):\(lineNumber)"]
         }
     }
 
@@ -535,6 +655,21 @@ final class HostBridge: NSObject, WKScriptMessageHandler {
             throw HostBridgeError.missingParameter(key)
         }
         return value
+    }
+
+    private func optionalString(_ params: [String: Any], _ key: String) -> String? {
+        guard let value = params[key] as? String, !value.isEmpty else { return nil }
+        return value
+    }
+
+    private func optionalPositiveInt(_ params: [String: Any], _ key: String) -> Int? {
+        if let value = params[key] as? Int, value > 0 {
+            return value
+        }
+        if let value = params[key] as? Double, value > 0 {
+            return Int(value)
+        }
+        return nil
     }
 
     private func shellQuote(_ value: String) -> String {

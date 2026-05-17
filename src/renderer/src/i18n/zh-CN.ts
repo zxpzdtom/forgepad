@@ -458,6 +458,7 @@ const zhCN: Record<TranslationKeys, string> = {
   "tabMenu.close": "关闭",
   "tabMenu.closeOthers": "关闭其他",
   "tabMenu.closeToRight": "关闭右侧",
+  "tabMenu.closeToLeft": "关闭左侧",
   "tabMenu.closeAll": "关闭全部",
   "tabMenu.copyPath": "复制路径",
   "tabMenu.copyRelativePath": "复制相对路径",

@@ -30,10 +30,7 @@ const diffViewerUnsafeCSS = `
   }
 
   [data-unmodified-lines] {
-    display: inline-block;
-    min-width: max-content;
-    overflow: visible;
-    text-overflow: clip;
+    cursor: pointer;
     white-space: nowrap;
     font-variant-numeric: tabular-nums;
   }

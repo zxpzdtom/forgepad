@@ -27,6 +27,7 @@ import { useAgentLifecycle } from "@renderer/hooks/useAgentLifecycle";
 import { type ResolvedTheme, useTheme } from "@renderer/hooks/useTheme";
 import { I18nProvider, useTranslation } from "@renderer/i18n";
 import {
+  getDroppedFileEntries,
   getDroppedPaths,
   hasDraggableFiles,
   isInternalDrop,
@@ -38,6 +39,7 @@ import type {
   AgentSessionHistoryItem,
   PetPlayAction,
   ShortcutActionId,
+  Tab,
 } from "@shared/types";
 import { DEFAULT_SHORTCUTS } from "@shared/types";
 import {
@@ -125,6 +127,15 @@ function isTextEntryTarget(target: EventTarget | null): boolean {
   );
 }
 
+const OPEN_WITH_IDE_IDS = new Set(['zed', 'vscode', 'cursor', 'windsurf', 'intellij', 'xcode']);
+const OPEN_WITH_TERMINAL_IDS = new Set(['terminal', 'iterm', 'iterm2', 'ghostty', 'wezterm']);
+
+function fileTabOpenPath(tab: Extract<Tab, { type: 'file' }>, workspacePath: string) {
+  if (tab.absPath) return tab.absPath;
+  if (tab.externalUrl) return null;
+  return `${workspacePath}/${tab.relPath}`;
+}
+
 function BootScreen() {
   const { t } = useTranslation();
   const spinnerStyle = useAppStore((state) => state.settings.spinnerStyle);
@@ -189,7 +200,6 @@ function AppInner() {
   const tabs = useAppStore((state) => state.tabs);
   const agentSessionHistory = useAppStore((state) => state.agentSessionHistory);
   const activeWorkspaceId = useAppStore((state) => state.activeWorkspaceId);
-  const activeTabId = useAppStore((state) => state.activeTabId);
   const focusedColumn = useAppStore((state) => state.focusedColumn);
   const rightPanelOpen = useAppStore((state) => state.rightPanelOpen);
   const sidebarOpen = useAppStore((state) => state.sidebarOpen);
@@ -330,6 +340,62 @@ function AppInner() {
 
   useEffect(() => {
     // Build action handler map for configurable keyboard shortcuts
+    const getTabsForFocusedColumn = () => {
+      const state = useAppStore.getState();
+      const workspaceTabs = state.tabs.filter(
+        (tab) => tab.workspaceId === state.activeWorkspaceId,
+      );
+
+      if (focusedColumn === "agent") {
+        return workspaceTabs.filter(
+          (tab) => tab.type === "terminal" && tab.isAgent,
+        );
+      }
+      if (focusedColumn === "terminal") {
+        return workspaceTabs.filter(
+          (tab) => tab.type === "terminal" && !tab.isAgent,
+        );
+      }
+      if (focusedColumn === "file") {
+        return workspaceTabs.filter((tab) => tab.type !== "terminal");
+      }
+
+      return workspaceTabs;
+    };
+
+    const getActiveTabIdForFocusedColumn = () => {
+      const state = useAppStore.getState();
+      const columnTabs = getTabsForFocusedColumn();
+      const columnTabIds = new Set(columnTabs.map((tab) => tab.id));
+
+      if (
+        focusedColumn === "agent" &&
+        state.activeAgentTabId &&
+        columnTabIds.has(state.activeAgentTabId)
+      ) {
+        return state.activeAgentTabId;
+      }
+      if (
+        focusedColumn === "terminal" &&
+        state.activeShellTabId &&
+        columnTabIds.has(state.activeShellTabId)
+      ) {
+        return state.activeShellTabId;
+      }
+      if (
+        focusedColumn === "file" &&
+        state.activeFileTabId &&
+        columnTabIds.has(state.activeFileTabId)
+      ) {
+        return state.activeFileTabId;
+      }
+      if (state.activeTabId && columnTabIds.has(state.activeTabId)) {
+        return state.activeTabId;
+      }
+
+      return columnTabs[0]?.id ?? null;
+    };
+
     const handlers: Record<ShortcutActionId, () => void> = {
       quickSearch: () => setQuickSearchOpen(true),
       toggleSettings: () =>
@@ -337,42 +403,18 @@ function AppInner() {
           settingsOpen: !s.settingsOpen,
         })),
       cycleTabForward: () => {
-        const state = useAppStore.getState();
-        const wsTabs = state.tabs.filter(
-          (t) => t.workspaceId === state.activeWorkspaceId,
-        );
-        let columnTabs;
-        if (focusedColumn === "agent") {
-          columnTabs = wsTabs.filter((t) => t.type === "terminal");
-        } else if (focusedColumn === "file") {
-          columnTabs = wsTabs.filter((t) => t.type !== "terminal");
-        } else {
-          columnTabs = wsTabs;
-        }
+        const columnTabs = getTabsForFocusedColumn();
         if (columnTabs.length <= 1) return;
-        const currentIdx = columnTabs.findIndex(
-          (t) => t.id === state.activeTabId,
-        );
+        const currentTabId = getActiveTabIdForFocusedColumn();
+        const currentIdx = columnTabs.findIndex((t) => t.id === currentTabId);
         const nextIdx = (currentIdx + 1) % columnTabs.length;
         setActiveTab(columnTabs[nextIdx].id);
       },
       cycleTabBackward: () => {
-        const state = useAppStore.getState();
-        const wsTabs = state.tabs.filter(
-          (t) => t.workspaceId === state.activeWorkspaceId,
-        );
-        let columnTabs;
-        if (focusedColumn === "agent") {
-          columnTabs = wsTabs.filter((t) => t.type === "terminal");
-        } else if (focusedColumn === "file") {
-          columnTabs = wsTabs.filter((t) => t.type !== "terminal");
-        } else {
-          columnTabs = wsTabs;
-        }
+        const columnTabs = getTabsForFocusedColumn();
         if (columnTabs.length <= 1) return;
-        const currentIdx = columnTabs.findIndex(
-          (t) => t.id === state.activeTabId,
-        );
+        const currentTabId = getActiveTabIdForFocusedColumn();
+        const currentIdx = columnTabs.findIndex((t) => t.id === currentTabId);
         const nextIdx =
           (currentIdx - 1 + columnTabs.length) % columnTabs.length;
         setActiveTab(columnTabs[nextIdx].id);
@@ -388,8 +430,35 @@ function AppInner() {
       switchTab9: () => switchTabByIndex(8),
       newTerminal: () => void createTerminal(activeWorkspaceId ?? undefined),
       newAgent: () => void createAgentTerminal(activeWorkspaceId ?? undefined),
+      openWithDefault: () => {
+        const state = useAppStore.getState();
+        const workspace = state.workspaces.find((item) => item.id === state.activeWorkspaceId);
+        if (!workspace) return;
+
+        const openWithId = state.settings.defaultOpenWith;
+        let result: Promise<void> | null = null;
+        if (openWithId === "finder") {
+          result = window.forgepad.shell.openPath(workspace.worktreePath);
+        } else if (OPEN_WITH_TERMINAL_IDS.has(openWithId)) {
+          result = window.forgepad.shell.openWithTerminal(workspace.worktreePath, openWithId);
+        } else if (OPEN_WITH_IDE_IDS.has(openWithId)) {
+          const activeFileTab = state.tabs.find((tab) => tab.id === state.activeFileTabId && tab.type === "file");
+          const activeFilePath = activeFileTab ? fileTabOpenPath(activeFileTab, workspace.worktreePath) : null;
+          result = window.forgepad.shell.openWithIde(
+            activeFilePath ?? workspace.worktreePath,
+            openWithId,
+            activeFilePath ? (activeFileTab?.targetLine ?? activeFileTab?.lastLine) : undefined,
+            workspace.worktreePath,
+          );
+        }
+
+        result?.catch((error) => {
+          addToast("error", error instanceof Error ? error.message : t("topbar.failedToOpen"));
+        });
+      },
       closeTab: () => {
-        if (activeTabId) closeTab(activeTabId);
+        const tabId = getActiveTabIdForFocusedColumn();
+        if (tabId) closeTab(tabId);
       },
       toggleTerminal: () => void toggleTerminalPanel(),
       toggleSidebar: () => {
@@ -478,6 +547,14 @@ function AppInner() {
             t.isAgent,
         );
         if (idx < agentTabs.length) setActiveTab(agentTabs[idx].id);
+      } else if (focusedColumn === "terminal") {
+        const terminalTabs = state.tabs.filter(
+          (t) =>
+            t.workspaceId === state.activeWorkspaceId &&
+            t.type === "terminal" &&
+            !t.isAgent,
+        );
+        if (idx < terminalTabs.length) setActiveTab(terminalTabs[idx].id);
       } else if (focusedColumn === "file") {
         const fileTabs = state.tabs.filter(
           (t) =>
@@ -549,7 +626,6 @@ function AppInner() {
       window.removeEventListener("keydown", onKeyDown);
     };
   }, [
-    activeTabId,
     activeWorkspaceId,
     closeTab,
     createAgentTerminal,
@@ -942,8 +1018,9 @@ function AppInner() {
   };
 
   const handleWorkspaceDrop = (e: React.DragEvent) => {
-    const paths = getDroppedPaths(e);
-    if (paths.length === 0) return;
+    const entries = getDroppedFileEntries(e);
+    if (entries.length === 0) return;
+    const paths = entries.map((entry) => entry.path);
     e.preventDefault();
 
     const state = useAppStore.getState();
@@ -969,12 +1046,13 @@ function AppInner() {
 
     // External drop anywhere outside Agent/Terminal → open as file preview
     if (!activeWs) return;
-    for (const absPath of paths) {
+    for (const entry of entries) {
+      const absPath = entry.path;
       if (absPath.startsWith(activeWs.worktreePath + "/")) {
         const relPath = absPath.slice(activeWs.worktreePath.length + 1);
         state.openFileTab(activeWs.id, relPath);
       } else {
-        state.openExternalFileTab(activeWs.id, absPath);
+        state.openExternalFileTab(activeWs.id, absPath, entry.objectUrl, entry.mimeType);
       }
     }
   };

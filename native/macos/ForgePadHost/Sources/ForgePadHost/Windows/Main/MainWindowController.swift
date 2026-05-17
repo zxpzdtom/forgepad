@@ -2,12 +2,88 @@ import AppKit
 import WebKit
 
 final class ForgePadWebView: WKWebView {
+    private var lastNativeDropPaths: [String] = []
+
+    override init(frame: NSRect, configuration: WKWebViewConfiguration) {
+        super.init(frame: frame, configuration: configuration)
+        registerForDraggedTypes([.fileURL])
+    }
+
+    required init?(coder: NSCoder) {
+        super.init(coder: coder)
+        registerForDraggedTypes([.fileURL])
+    }
+
     override func willOpenMenu(_ menu: NSMenu, with event: NSEvent) {
         if #available(macOS 13.3, *), isInspectable {
             super.willOpenMenu(menu, with: event)
             return
         }
         menu.removeAllItems()
+    }
+
+    override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
+        publishNativeDropPaths(from: sender)
+        let operation = super.draggingEntered(sender)
+        return operation.isEmpty ? .copy : operation
+    }
+
+    override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation {
+        publishNativeDropPaths(from: sender)
+        let operation = super.draggingUpdated(sender)
+        return operation.isEmpty ? .copy : operation
+    }
+
+    override func draggingExited(_ sender: NSDraggingInfo?) {
+        super.draggingExited(sender)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
+            self?.clearNativeDropPaths()
+        }
+    }
+
+    override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
+        publishNativeDropPaths(from: sender)
+        let handled = super.performDragOperation(sender)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
+            self?.clearNativeDropPaths()
+        }
+        return handled
+    }
+
+    private func publishNativeDropPaths(from sender: NSDraggingInfo) {
+        let paths = nativeFilePaths(from: sender)
+        guard !paths.isEmpty, paths != lastNativeDropPaths else { return }
+        lastNativeDropPaths = paths
+        evaluateNativeDropScript(functionName: "__forgepadSetNativeFileDropPaths", paths: paths)
+    }
+
+    private func clearNativeDropPaths() {
+        guard !lastNativeDropPaths.isEmpty else { return }
+        lastNativeDropPaths.removeAll()
+        evaluateNativeDropScript(functionName: "__forgepadSetNativeFileDropPaths", paths: [])
+    }
+
+    private func nativeFilePaths(from sender: NSDraggingInfo) -> [String] {
+        let options: [NSPasteboard.ReadingOptionKey: Any] = [.urlReadingFileURLsOnly: true]
+        let objects = sender.draggingPasteboard.readObjects(forClasses: [NSURL.self], options: options)
+        return objects?.compactMap { object in
+            if let url = object as? URL {
+                return url.standardizedFileURL.path
+            }
+            if let url = object as? NSURL {
+                return (url as URL).standardizedFileURL.path
+            }
+            return nil
+        } ?? []
+    }
+
+    private func evaluateNativeDropScript(functionName: String, paths: [String]) {
+        guard
+            let data = try? JSONSerialization.data(withJSONObject: paths, options: []),
+            let json = String(data: data, encoding: .utf8)
+        else { return }
+
+        evaluateJavaScript("window.\(functionName)?.(\(json));", completionHandler: nil)
     }
 }
 

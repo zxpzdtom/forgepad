@@ -358,8 +358,7 @@ button,
 .column-tabbar,
 .right-panel,
 .sidebar-panel-content,
-.anchor-menu,
-.anchor-submenu {
+.anchor-menu {
     -webkit-user-select: none;
     user-select: none;
 }
@@ -372,10 +371,48 @@ button,
 .code-viewer-scroll,
 .markdown-viewer-scroll,
 .image-preview-scroll,
+.video-preview-scroll,
 .context-preview pre,
 .scrollbar-thin {
     scrollbar-width: thin;
     scrollbar-color: gray transparent;
+}
+
+.video-preview-scroll.is-fit {
+    display: grid;
+    place-items: center;
+}
+
+.video-preview-scroll.is-custom {
+    display: block;
+}
+
+.video-preview-stage {
+    display: grid;
+    min-width: 100%;
+    min-height: 100%;
+    place-items: center;
+}
+
+.video-preview-scroll.is-custom .video-preview-stage {
+    align-items: start;
+    justify-items: start;
+}
+
+.video-preview-player {
+    display: block;
+    border-radius: 7px;
+    background: black;
+}
+
+.video-preview-scroll.is-fit .video-preview-player {
+    max-width: 100%;
+    max-height: 100%;
+}
+
+.video-preview-scroll.is-custom .video-preview-player {
+    width: calc(100% * var(--video-preview-scale, 1));
+    max-width: none;
 }
 
 /* Terminal */
@@ -1319,6 +1356,12 @@ button,
         color 110ms ease;
 }
 
+.change-native-row.is-flat {
+    grid-template-columns: minmax(0, 1fr) max-content 15px 24px;
+    gap: 4px;
+    padding-left: 2px;
+}
+
 .change-native-row:hover {
     background: color-mix(in srgb, var(--text) 5%, transparent);
 }
@@ -1346,6 +1389,7 @@ button,
 
 .change-native-main {
     display: flex;
+    width: 100%;
     min-width: 0;
     height: 26px;
     align-items: center;
@@ -1401,15 +1445,17 @@ button,
 
 .change-flat-label {
     display: flex;
+    width: 100%;
     min-width: 0;
     align-items: baseline;
-    gap: 6px;
+    gap: 5px;
     font-size: 12.5px;
 }
 
 .change-flat-name {
-    flex: 0 0 auto;
-    max-width: min(190px, 58%);
+    flex: 0 1 auto;
+    min-width: 0;
+    max-width: calc(100% - 42px);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -1417,6 +1463,7 @@ button,
 }
 
 .change-flat-path {
+    flex: 1 1 auto;
     min-width: 0;
     overflow: hidden;
     color: var(--subtle);
@@ -1433,6 +1480,10 @@ button,
     font-size: 11px;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
+}
+
+.change-native-row.is-flat .change-row-stats.is-empty {
+    display: none;
 }
 
 .change-stat-add {
@@ -1925,28 +1976,6 @@ button,
 }
 
 .anchor-menu[hidden] {
-    display: none;
-    opacity: 0;
-}
-
-.anchor-submenu {
-    position: static !important;
-    z-index: 60;
-    min-width: 0;
-    margin: 2px 0 4px 22px !important;
-    border-radius: 8px;
-    border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
-    background: color-mix(in srgb, var(--panel-3) 55%, transparent);
-    padding: 4px;
-    box-shadow: none;
-    transition:
-        opacity 120ms ease,
-        display 120ms ease allow-discrete;
-    @starting-style {
-        opacity: 0;
-    }
-}
-.anchor-submenu[hidden] {
     display: none;
     opacity: 0;
 }
@@ -2933,7 +2962,6 @@ button,
 /* Large containers — crisp text, only the border gets the wobble.            */
 
 [data-sketchy] .anchor-menu,
-[data-sketchy] .anchor-submenu,
 [data-sketchy] .tooltip-bubble,
 [data-sketchy] .context-selection-snippet,
 [data-sketchy] .emoji-mart-popover {
@@ -2943,7 +2971,6 @@ button,
 }
 
 [data-sketchy] .anchor-menu::after,
-[data-sketchy] .anchor-submenu::after,
 [data-sketchy] .tooltip-bubble::after,
 [data-sketchy] .context-selection-snippet::after,
 [data-sketchy] .emoji-mart-popover::after {

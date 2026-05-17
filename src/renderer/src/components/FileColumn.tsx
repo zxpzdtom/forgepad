@@ -1,7 +1,7 @@
 import { Component, type ErrorInfo, lazy, type ReactNode, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from '@renderer/i18n';
 
-import { getDroppedPaths, hasDraggableFiles, isInternalDrop } from '@renderer/lib/drag-utils';
+import { getDroppedFileEntries, hasDraggableFiles, isInternalDrop } from '@renderer/lib/drag-utils';
 import { useAppStore } from '@renderer/store/app-store';
 import type { Workspace } from '@shared/types';
 
@@ -152,8 +152,8 @@ export function FileColumn() {
       // Internal drags (file tree) are not handled here
       if (isInternalDrop(e)) return;
 
-      const paths = getDroppedPaths(e);
-      if (paths.length === 0) return;
+      const entries = getDroppedFileEntries(e);
+      if (entries.length === 0) return;
 
       e.preventDefault();
       e.stopPropagation(); // prevent App-level fallback from also handling this
@@ -165,14 +165,15 @@ export function FileColumn() {
 
       // All external files open as file tabs regardless of whether they are
       // inside or outside the workspace.
-      for (const absPath of paths) {
+      for (const entry of entries) {
+        const absPath = entry.path;
         if (absPath.startsWith(activeWorkspace.worktreePath + '/')) {
           // Inside workspace → use relPath so the tab title and tooling work normally
           const relPath = absPath.slice(activeWorkspace.worktreePath.length + 1);
           openFileTab(activeWorkspace.id, relPath);
         } else {
           // Outside workspace → open as read-only external file tab
-          openExternalFileTab(activeWorkspace.id, absPath);
+          openExternalFileTab(activeWorkspace.id, absPath, entry.objectUrl, entry.mimeType);
         }
       }
     },

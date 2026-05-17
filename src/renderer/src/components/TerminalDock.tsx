@@ -32,6 +32,7 @@ export function TerminalDock() {
   const closeTab = useAppStore((state) => state.closeTab);
   const closeOtherTabs = useAppStore((state) => state.closeOtherTabs);
   const closeAllTabs = useAppStore((state) => state.closeAllTabs);
+  const closeTabsToLeft = useAppStore((state) => state.closeTabsToLeft);
   const closeTabsToRight = useAppStore((state) => state.closeTabsToRight);
   const createTerminal = useAppStore((state) => state.createTerminal);
   const setTerminalPanelOpen = useAppStore((state) => state.setTerminalPanelOpen);
@@ -126,7 +127,7 @@ export function TerminalDock() {
         'terminal-dock-shell flex size-full min-h-0 flex-col border-border border-t bg-surface-terminal',
         dropHighlight && 'drop-target-active',
       )}
-      onMouseDown={() => setFocusedColumn('agent')}
+      onMouseDown={() => setFocusedColumn('terminal')}
       onDragOver={handleDragOver}
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
@@ -197,6 +198,7 @@ export function TerminalDock() {
           onCloseTab={closeTab}
           onCloseOthers={closeOtherTabs}
           onCloseAll={closeAllTabs}
+          onCloseToLeft={closeTabsToLeft}
           onCloseToRight={closeTabsToRight}
           onRename={(id) => {
             const tab = terminalTabs.find((t) => t.id === id);

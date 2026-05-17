@@ -318,6 +318,7 @@ export function appIcon(appId: string, size = 15) {
     case 'ghostty':
       return <GhosttyIcon size={size} />;
     case 'terminal':
+    case 'wezterm':
       return <TerminalAppIcon size={size} />;
     default:
       return null;

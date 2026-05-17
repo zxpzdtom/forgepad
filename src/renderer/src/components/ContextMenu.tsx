@@ -124,39 +124,50 @@ export function ContextMenu({ sections, x, y, onClose }: ContextMenuProps) {
           return <div key={`d-${i}`} className="mx-1 my-1 h-px bg-border" />;
         }
 
-        if (item.disabled) return null;
-
-        actionIndex++;
-        const idx = actionIndex;
-        const isFocused = idx === focusIndex;
+        const idx = item.disabled ? -1 : ++actionIndex;
+        const isFocused = idx >= 0 && idx === focusIndex;
 
         return (
           <button
             key={item.label}
             type="button"
+            disabled={item.disabled}
             className={clsx(
-              'flex h-7 w-full items-center gap-[7px] rounded-[5px] px-[9px] text-left',
-              item.danger
-                ? isFocused
-                  ? 'bg-panel-3 text-danger'
-                  : 'bg-transparent text-danger hover:bg-panel-3'
-                : isFocused
-                  ? 'bg-panel-3 text-text'
-                  : 'bg-transparent text-text hover:bg-panel-3',
+              'flex h-7 w-full items-center gap-[7px] rounded-[5px] px-[9px] text-left disabled:cursor-not-allowed disabled:text-subtle/45',
+              item.disabled
+                ? 'bg-transparent'
+                : item.danger
+                  ? isFocused
+                    ? 'bg-panel-3 text-danger'
+                    : 'bg-transparent text-danger hover:bg-panel-3'
+                  : isFocused
+                    ? 'bg-panel-3 text-text'
+                    : 'bg-transparent text-text hover:bg-panel-3',
             )}
-            onClick={item.action}
-            onMouseEnter={() => setFocusIndex(idx)}
+            onClick={() => {
+              if (!item.disabled) item.action();
+            }}
+            onMouseEnter={() => {
+              if (!item.disabled) setFocusIndex(idx);
+            }}
             onMouseLeave={() => setFocusIndex(-1)}
           >
             {item.icon && (
               <span
-                className={clsx('flex size-4 shrink-0 items-center justify-center', item.danger ? 'text-danger' : 'text-subtle')}
+                className={clsx(
+                  'flex size-4 shrink-0 items-center justify-center',
+                  item.disabled ? 'text-subtle/45' : item.danger ? 'text-danger' : 'text-subtle',
+                )}
               >
                 {item.icon}
               </span>
             )}
             <span className="flex-1 text-[13px]">{item.label}</span>
-            {item.shortcut && <span className="shrink-0 text-[11px] text-subtle">{item.shortcut}</span>}
+            {item.shortcut && (
+              <span className={clsx('shrink-0 text-[11px]', item.disabled ? 'text-subtle/45' : 'text-subtle')}>
+                {item.shortcut}
+              </span>
+            )}
           </button>
         );
       })}

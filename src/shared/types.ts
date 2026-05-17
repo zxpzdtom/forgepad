@@ -35,8 +35,13 @@ export type Tab =
       unsaved?: boolean;
       /** Absolute path for files outside the workspace (read-only preview). */
       absPath?: string;
+      /** Transient object URL for files dropped from the OS when the WebView cannot expose an absolute path. */
+      externalUrl?: string;
+      externalMime?: string;
       /** 1-based line number to scroll to after opening (cleared after scroll). */
       targetLine?: number;
+      /** Last meaningful 1-based line for external editor handoff. */
+      lastLine?: number;
     }
   | {
       id: string;
@@ -1258,6 +1263,7 @@ export type ShortcutActionId =
   | 'switchTab9'
   | 'newTerminal'
   | 'newAgent'
+  | 'openWithDefault'
   | 'closeTab'
   | 'toggleTerminal'
   | 'toggleSidebar'
@@ -1314,6 +1320,7 @@ export const DEFAULT_SHORTCUTS: Record<ShortcutActionId, ShortcutCombo> = {
   switchTab9: combo('9', { meta: true }),
   newTerminal: combo('t', { meta: true }),
   newAgent: combo('t', { meta: true, shift: true }),
+  openWithDefault: combo('o', { meta: true }),
   closeTab: combo('w', { meta: true }),
   toggleTerminal: combo('j', { meta: true }),
   toggleSidebar: combo('b', { meta: true }),
@@ -1349,6 +1356,7 @@ export const SHORTCUT_DEFINITIONS: ShortcutDefinition[] = [
   { id: 'toggleSettings', label: 'Settings', category: 'navigation' },
   { id: 'newTerminal', label: 'New Terminal', category: 'other' },
   { id: 'newAgent', label: 'New Agent', category: 'other' },
+  { id: 'openWithDefault', label: 'Open With Default', category: 'other' },
   { id: 'closeTab', label: 'Close Tab', category: 'tabs' },
   { id: 'cycleTabForward', label: 'Next Tab', category: 'tabs' },
   { id: 'cycleTabBackward', label: 'Previous Tab', category: 'tabs' },

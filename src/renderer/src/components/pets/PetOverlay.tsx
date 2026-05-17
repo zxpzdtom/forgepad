@@ -439,6 +439,29 @@ function floatingPanelMotionLayout(settings: PetSettings | null, panel: { width:
   };
 }
 
+function estimatedQuestionPanelHeight(permission: PendingPermission): number {
+  const questions = permission.questions ?? [];
+  if (questions.length === 0) return 154;
+
+  return Math.max(
+    ...questions.map((question) => {
+      const questionLines = Math.max(1, Math.ceil(question.question.length / 42));
+      const optionsHeight = question.options.reduce((total, option) => {
+        const labelLines = Math.max(1, Math.ceil(option.label.length / 44));
+        const descriptionLines = option.description ? Math.max(1, Math.ceil(option.description.length / 50)) : 0;
+        const labelExtra = Math.max(0, labelLines - 1) * 16;
+        const descriptionHeight = descriptionLines > 0 ? 3 + descriptionLines * 13 : 0;
+        return total + Math.max(34, 34 + labelExtra + descriptionHeight);
+      }, 0);
+      const optionGaps = Math.max(0, question.options.length - 1) * 6;
+      const footerHeight = 40;
+      const headerHeight = 30;
+      const verticalPadding = 24;
+      return verticalPadding + headerHeight + questionLines * 18 + 10 + optionsHeight + optionGaps + footerHeight;
+    }),
+  );
+}
+
 function paddedMotionLayout(
   settings: PetSettings | null,
   padding: { left: number; top: number; right: number; bottom: number },
@@ -676,6 +699,7 @@ export function PetOverlay() {
   const isPermissionStatusRef = useRef(false);
   const isWanderingRef = useRef(false);
   const draggingRef = useRef(false);
+  const blockingPanelRef = useRef(false);
   const petSettingsRef = useRef<PetSettings | null>(null);
   const pendingPermissionRef = useRef<PendingPermission | null>(null);
   const agentStatusesRef = useRef<Record<string, AgentStatus>>({});
@@ -684,6 +708,7 @@ export function PetOverlay() {
   const stageRef = useRef<PetStageSnapshot | null>(null);
   const motionLayoutRef = useRef<MotionLayout>(normalMotionLayout(null));
   const motionRunIdRef = useRef(0);
+  const layoutRunIdRef = useRef(0);
   const positionRef = useRef<MotionPoint>({
     x: window.screenX,
     y: window.screenY,
@@ -705,6 +730,7 @@ export function PetOverlay() {
         !isPermissionStatusRef.current &&
         !pendingPermissionRef.current &&
         completionCardsRef.current.length === 0 &&
+        !blockingPanelRef.current &&
         !draggingRef.current,
     );
   }, []);
@@ -758,14 +784,16 @@ export function PetOverlay() {
     applyMotionLayout(normalMotionLayout(petSettingsRef.current));
   }, [applyMotionLayout]);
 
-  const cancelAutonomousMotion = useCallback(() => {
+  const cancelAutonomousMotion = useCallback((options?: { preserveLayout?: boolean }) => {
     motionRunIdRef.current += 1;
     isWanderingRef.current = false;
     setPortalEffect(null);
     setPropEffect(null);
     setPetHidden(false);
     clearAutonomousTimers();
-    resetMotionLayout();
+    if (!options?.preserveLayout && !blockingPanelRef.current) {
+      resetMotionLayout();
+    }
     restoreStatusAnimation();
   }, [clearAutonomousTimers, resetMotionLayout, restoreStatusAnimation]);
 
@@ -791,7 +819,7 @@ export function PetOverlay() {
         restoreStatusAnimation();
         scheduleNextRef.current(900);
       } else {
-        cancelAutonomousMotion();
+        cancelAutonomousMotion({ preserveLayout: primaryStatus === 'permission' });
         setAnimation(agentStatusToAnimation(primaryStatus));
         clearTimeout(idleTimer.current);
       }
@@ -1532,7 +1560,7 @@ export function PetOverlay() {
     return api.onSettingsChanged((settings) => {
       petSettingsRef.current = settings;
       setPetSettings(settings);
-      if (!isWanderingRef.current && !pendingPermissionRef.current) {
+      if (!isWanderingRef.current && !pendingPermissionRef.current && !blockingPanelRef.current) {
         const layout = normalMotionLayout(settings);
         motionLayoutRef.current = layout;
         setMotionLayout(layout);
@@ -1547,23 +1575,32 @@ export function PetOverlay() {
 
   useEffect(() => {
     pendingPermissionRef.current = pendingPermission;
-    if (pendingPermission) cancelAutonomousMotion();
+    if (pendingPermission) {
+      blockingPanelRef.current = true;
+      cancelAutonomousMotion({ preserveLayout: true });
+    }
   }, [cancelAutonomousMotion, pendingPermission]);
 
   useEffect(() => {
     completionCardsRef.current = completionCards;
-    if (completionCards.length > 0) cancelAutonomousMotion();
+    if (completionCards.length > 0) {
+      blockingPanelRef.current = true;
+      cancelAutonomousMotion({ preserveLayout: true });
+    }
   }, [cancelAutonomousMotion, completionCards]);
 
   useEffect(() => {
     draggingRef.current = dragging;
-    if (dragging) cancelAutonomousMotion();
+    if (dragging) cancelAutonomousMotion({ preserveLayout: true });
     if (!dragging && isAutonomousAllowed()) scheduleNextRef.current(900);
   }, [cancelAutonomousMotion, dragging, isAutonomousAllowed]);
 
   useEffect(() => {
     isPermissionStatusRef.current = isPermissionStatus;
-    if (isPermissionStatus) cancelAutonomousMotion();
+    if (isPermissionStatus) {
+      blockingPanelRef.current = true;
+      cancelAutonomousMotion({ preserveLayout: true });
+    }
   }, [cancelAutonomousMotion, isPermissionStatus]);
 
   useEffect(() => {
@@ -1634,6 +1671,7 @@ export function PetOverlay() {
     if (!api?.onPermissionRequest) return;
     return api.onPermissionRequest((data) => {
       if (!data.toolName) {
+        blockingPanelRef.current = false;
         pendingPermissionRef.current = null;
         setPendingPermission(null);
         const nextStatuses = {
@@ -1651,6 +1689,7 @@ export function PetOverlay() {
         }
         return;
       }
+      blockingPanelRef.current = true;
       pendingPermissionRef.current = data;
       setPendingPermission(data);
       const nextStatuses = {
@@ -1661,19 +1700,21 @@ export function PetOverlay() {
       setAgentStatuses(nextStatuses);
       agentStatusRef.current = 'permission';
       setIsPermissionStatus(true);
-      cancelAutonomousMotion();
+      cancelAutonomousMotion({ preserveLayout: true });
     });
   }, [cancelAutonomousMotion, restoreStatusAnimation]);
 
   const handleApprove = useCallback(() => {
     if (!pendingPermission) return;
     window.forgepadPet?.sendPermissionDecision(pendingPermission.ptyId, 'allow');
+    blockingPanelRef.current = false;
     setPendingPermission(null);
   }, [pendingPermission]);
 
   const handleAllowAlways = useCallback(() => {
     if (!pendingPermission) return;
     window.forgepadPet?.sendPermissionDecision(pendingPermission.ptyId, 'allowAlways');
+    blockingPanelRef.current = false;
     setPendingPermission(null);
   }, [pendingPermission]);
 
@@ -1681,6 +1722,7 @@ export function PetOverlay() {
     (answers: Record<string, string>) => {
       if (!pendingPermission) return;
       window.forgepadPet?.sendPermissionDecision(pendingPermission.ptyId, 'answer', answers);
+      blockingPanelRef.current = false;
       setPendingPermission(null);
     },
     [pendingPermission],
@@ -1689,6 +1731,7 @@ export function PetOverlay() {
   const handleDeny = useCallback(() => {
     if (!pendingPermission) return;
     window.forgepadPet?.sendPermissionDecision(pendingPermission.ptyId, 'deny');
+    blockingPanelRef.current = false;
     setPendingPermission(null);
   }, [pendingPermission]);
 
@@ -1816,6 +1859,7 @@ export function PetOverlay() {
   );
 
   const handlePointerEnter = useCallback(() => {
+    if (blockingPanelRef.current) return;
     clearTimeout(hoverTimerRef.current);
     clearTimeout(petHoverLeaveTimer.current);
     setPetSpriteHovered(true);
@@ -1829,6 +1873,7 @@ export function PetOverlay() {
   }, [canPlayInteractiveAction, resetIdleTimer]);
 
   const handlePointerLeave = useCallback(() => {
+    if (blockingPanelRef.current) return;
     clearTimeout(hoverTimerRef.current);
     // Small delay so moving from sprite → working-agents panel doesn't flicker
     petHoverLeaveTimer.current = setTimeout(() => setPetSpriteHovered(false), 120);
@@ -1845,8 +1890,26 @@ export function PetOverlay() {
       title: agentMessages[ptyId]?.userPrompt || `Agent ${ptyId.slice(-4)}`,
       userPrompt: agentMessages[ptyId]?.userPrompt,
     }));
-  const showHoverPanel = petSpriteHovered && !showApproval && !showCompletion && workingAgents.length > 0;
+  const showHoverPanel = petSpriteHovered && !dragging && !showApproval && !showCompletion && workingAgents.length > 0;
   const floatingPanelKind = showApproval ? 'approval' : showCompletion ? 'completion' : showHoverPanel ? 'working' : null;
+
+  useEffect(() => {
+    const hasBlockingPanel = showApproval || showCompletion;
+    blockingPanelRef.current = hasBlockingPanel;
+    if (!hasBlockingPanel) return;
+
+    motionRunIdRef.current += 1;
+    isWanderingRef.current = false;
+    clearAutonomousTimers();
+    clearTimeout(hoverTimerRef.current);
+    clearTimeout(petHoverLeaveTimer.current);
+    setPortalEffect(null);
+    setPropEffect(null);
+    setPetHidden(false);
+    setPetSpriteHovered(false);
+    setDragging(false);
+    restoreStatusAnimation();
+  }, [clearAutonomousTimers, restoreStatusAnimation, showApproval, showCompletion]);
 
   const dismissCompletionCard = useCallback((cardId: string) => {
     setCompletionCards((cards) => cards.filter((card) => card.id !== cardId));
@@ -1907,11 +1970,8 @@ export function PetOverlay() {
 
     if (floatingPanelKind) {
       const isQuestion = pendingPermission?.questions && pendingPermission.questions.length > 0;
-      const optionCount = isQuestion ? (pendingPermission.questions![0].options.length ?? 0) : 0;
-      const hasDescription = isQuestion && pendingPermission.questions![0].options.some((o) => o.description);
 
-      const optionItemH = hasDescription ? 62 : 42;
-      const approvalPopupH = isQuestion ? 142 + optionCount * optionItemH : 154;
+      const approvalPopupH = isQuestion && pendingPermission ? estimatedQuestionPanelHeight(pendingPermission) : 154;
       const completionPopupH = 172 + (completionHovered ? Math.min(workingAgents.length, 6) * 32 + 34 : 0);
       const hoverPopupH = 46 + Math.min(workingAgents.length, 6) * 32 + (workingAgents.length > 6 ? 20 : 0) + 10;
 
@@ -1920,17 +1980,26 @@ export function PetOverlay() {
         : showCompletion
           ? { width: 360, height: completionPopupH }
           : { width: 320, height: hoverPopupH };
-      const panel = floatingPanelSize ?? estimatedPanel;
+      const panel = floatingPanelSize
+        ? {
+            width: Math.max(floatingPanelSize.width, estimatedPanel.width),
+            height: Math.max(floatingPanelSize.height, estimatedPanel.height),
+          }
+        : estimatedPanel;
       const layout = floatingPanelMotionLayout(petSettings, panel);
+      const layoutRunId = ++layoutRunIdRef.current;
 
       let disposed = false;
       readStage()
         .then((stage) => {
-          if (disposed) return;
+          if (disposed || layoutRunId !== layoutRunIdRef.current) return;
           positionRef.current = clampPositionForLayout(stage, positionRef.current, layout);
           applyMotionLayout(layout);
         })
-        .catch(() => applyMotionLayout(layout));
+        .catch(() => {
+          if (disposed || layoutRunId !== layoutRunIdRef.current) return;
+          applyMotionLayout(layout);
+        });
       prevShowApproval.current = true;
       return () => {
         disposed = true;

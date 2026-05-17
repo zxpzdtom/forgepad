@@ -81,7 +81,7 @@ type AppState = {
   toasts: Toast[];
   hydrated: boolean;
   workspaceLoadingIds: Set<string>;
-  focusedColumn: 'sidebar' | 'agent' | 'file' | 'rightPanel';
+  focusedColumn: 'sidebar' | 'agent' | 'file' | 'terminal' | 'rightPanel';
   branchStats: Record<
     string,
     {
@@ -136,10 +136,11 @@ type AppState = {
   closeTab: (tabId: string) => void;
   closeOtherTabs: (tabId: string) => void;
   closeAllTabs: (workspaceId: string, type: 'terminal' | 'file') => void;
+  closeTabsToLeft: (tabId: string) => void;
   closeTabsToRight: (tabId: string) => void;
   setActiveTab: (tabId: string | null) => void;
   openFileTab: (workspaceId: string, relPath: string, lineNumber?: number) => void;
-  openExternalFileTab: (workspaceId: string, absPath: string) => void;
+  openExternalFileTab: (workspaceId: string, absPath: string, externalUrl?: string, externalMime?: string) => void;
   openDiffTab: (
     workspaceId: string,
     activePath?: string,
@@ -266,6 +267,14 @@ function tabTitle(tab: Tab): string {
   return 'Tab';
 }
 
+function releaseExternalUrls(tabs: Tab[]): void {
+  for (const tab of tabs) {
+    if (tab.type === 'file' && tab.externalUrl) {
+      URL.revokeObjectURL(tab.externalUrl);
+    }
+  }
+}
+
 function agentLabelForCommand(command: string, presets: AgentPreset[]): string {
   const normalized = command.trim().split(/\s+/)[0];
   const preset = presets.find((item) => item.command.trim().split(/\s+/)[0] === normalized);
@@ -311,7 +320,7 @@ function serializeForSave(state: AppState): PersistedAppState {
     workspaces: state.workspaces,
     tasks: state.tasks,
     tabs: state.tabs
-      .filter((tab) => tab.type === 'browser' || tab.type !== 'terminal')
+      .filter((tab) => (tab.type === 'browser' || tab.type !== 'terminal') && !(tab.type === 'file' && tab.externalUrl))
       .map((tab) => (tab.type === 'file' ? { ...tab, targetLine: undefined } : tab)),
     agentSessionHistory,
     activeWorkspaceId: state.activeWorkspaceId,
@@ -346,6 +355,13 @@ function closeTerminalTabs(tabs: Tab[]): void {
   for (const tab of tabs) {
     if (tab.type === 'terminal') window.forgepad.pty.destroy(tab.ptyId);
   }
+}
+
+function isSameClosableTabGroup(candidate: Tab, anchor: Tab): boolean {
+  if (candidate.workspaceId !== anchor.workspaceId) return false;
+  if (anchor.type !== 'terminal') return candidate.type !== 'terminal';
+  if (candidate.type !== 'terminal') return false;
+  return candidate.isAgent === anchor.isAgent;
 }
 
 export function resolveShortcuts(settings: AppSettings): Record<ShortcutActionId, ShortcutCombo> {
@@ -1192,6 +1208,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   closeTab: (tabId) => {
     const tab = get().tabs.find((item) => item.id === tabId);
     if (tab?.type === 'terminal') window.forgepad.pty.destroy(tab.ptyId);
+    if (tab) releaseExternalUrls([tab]);
     set((state) => {
       const chooseNeighbor = (items: Tab[]) => {
         const index = items.findIndex((item) => item.id === tabId);
@@ -1273,10 +1290,11 @@ export const useAppStore = create<AppState>((set, get) => ({
     const state = get();
     const tab = state.tabs.find((t) => t.id === tabId);
     if (!tab) return;
-    const toClose = state.tabs.filter((t) => t.workspaceId === tab.workspaceId && t.id !== tabId && t.type === tab.type);
+    const toClose = state.tabs.filter((t) => t.id !== tabId && isSameClosableTabGroup(t, tab));
     for (const t of toClose) {
       if (t.type === 'terminal') window.forgepad.pty.destroy(t.ptyId);
     }
+    releaseExternalUrls(toClose);
     set((s) => {
       const closeIds = new Set(toClose.map((t) => t.id));
       const tabs = s.tabs.filter((t) => !closeIds.has(t.id));
@@ -1295,10 +1313,11 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   closeAllTabs: (workspaceId, type) => {
     const state = get();
-    const toClose = state.tabs.filter((t) => t.workspaceId === workspaceId && t.type === type);
+    const toClose = state.tabs.filter((t) => t.workspaceId === workspaceId && (type === 'terminal' ? t.type === 'terminal' : t.type !== 'terminal'));
     for (const t of toClose) {
       if (t.type === 'terminal') window.forgepad.pty.destroy(t.ptyId);
     }
+    releaseExternalUrls(toClose);
     set((s) => {
       const closeIds = new Set(toClose.map((t) => t.id));
       const tabs = s.tabs.filter((t) => !closeIds.has(t.id));
@@ -1325,10 +1344,42 @@ export const useAppStore = create<AppState>((set, get) => ({
     const wsTabs = state.tabs.filter((t) => t.workspaceId === tab.workspaceId);
     const idx = wsTabs.findIndex((t) => t.id === tabId);
     if (idx === -1) return;
-    const toClose = wsTabs.slice(idx + 1).filter((t) => t.type === tab.type);
+    const toClose = wsTabs.slice(idx + 1).filter((t) => isSameClosableTabGroup(t, tab));
     for (const t of toClose) {
       if (t.type === 'terminal') window.forgepad.pty.destroy(t.ptyId);
     }
+    releaseExternalUrls(toClose);
+    set((s) => {
+      const closeIds = new Set(toClose.map((t) => t.id));
+      const tabs = s.tabs.filter((t) => !closeIds.has(t.id));
+      const patch: Partial<AppState> = { tabs };
+      const wasActiveClosed = closeIds.has(s.activeTabId ?? '');
+      if (wasActiveClosed) {
+        patch.activeTabId = tabId;
+        if (tab.type === 'terminal' && tab.isAgent) {
+          patch.activeAgentTabId = tabId;
+        } else if (tab.type === 'terminal') {
+          patch.activeShellTabId = tabId;
+        } else {
+          patch.activeFileTabId = tabId;
+        }
+      }
+      return patch;
+    });
+  },
+
+  closeTabsToLeft: (tabId) => {
+    const state = get();
+    const tab = state.tabs.find((t) => t.id === tabId);
+    if (!tab) return;
+    const wsTabs = state.tabs.filter((t) => t.workspaceId === tab.workspaceId);
+    const idx = wsTabs.findIndex((t) => t.id === tabId);
+    if (idx === -1) return;
+    const toClose = wsTabs.slice(0, idx).filter((t) => isSameClosableTabGroup(t, tab));
+    for (const t of toClose) {
+      if (t.type === 'terminal') window.forgepad.pty.destroy(t.ptyId);
+    }
+    releaseExternalUrls(toClose);
     set((s) => {
       const closeIds = new Set(toClose.map((t) => t.id));
       const tabs = s.tabs.filter((t) => !closeIds.has(t.id));
@@ -1353,7 +1404,9 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (existing) {
       if (lineNumber) {
         set({
-          tabs: get().tabs.map((t) => (t.id === existing.id && t.type === 'file' ? { ...t, targetLine: lineNumber } : t)),
+          tabs: get().tabs.map((t) =>
+            t.id === existing.id && t.type === 'file' ? { ...t, targetLine: lineNumber, lastLine: lineNumber } : t,
+          ),
         });
       }
       get().setActiveTab(existing.id);
@@ -1365,11 +1418,17 @@ export const useAppStore = create<AppState>((set, get) => ({
       type: 'file',
       relPath,
       targetLine: lineNumber,
+      lastLine: lineNumber,
     });
   },
 
-  openExternalFileTab: (workspaceId, absPath) => {
-    const existing = get().tabs.find((tab) => tab.workspaceId === workspaceId && tab.type === 'file' && tab.absPath === absPath);
+  openExternalFileTab: (workspaceId, absPath, externalUrl, externalMime) => {
+    const existing = get().tabs.find(
+      (tab) =>
+        tab.workspaceId === workspaceId &&
+        tab.type === 'file' &&
+        ((externalUrl && tab.externalUrl === externalUrl) || (!externalUrl && tab.absPath === absPath)),
+    );
     if (existing) {
       get().setActiveTab(existing.id);
       return;
@@ -1380,7 +1439,9 @@ export const useAppStore = create<AppState>((set, get) => ({
       workspaceId,
       type: 'file',
       relPath: fileName,
-      absPath,
+      absPath: absPath.startsWith('/') || /^[A-Za-z]:[\\/]/.test(absPath) ? absPath : undefined,
+      externalUrl,
+      externalMime,
     });
   },
 
@@ -2060,6 +2121,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
       const removedTabs = state.tabs.filter((tab) => removedWorkspaceIds.has(tab.workspaceId));
       closeTerminalTabs(removedTabs);
+      releaseExternalUrls(removedTabs);
 
       // Collect ptyIds from removed tabs for cleanup
       const removedPtyIds = new Set(removedTabs.filter((t) => t.type === 'terminal').map((t) => t.ptyId));
@@ -2110,6 +2172,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       const removedWorkspaceIds = new Set([workspaceId]);
       const removedTabs = state.tabs.filter((tab) => tab.workspaceId === workspaceId);
       closeTerminalTabs(removedTabs);
+      releaseExternalUrls(removedTabs);
 
       // Collect ptyIds from removed tabs for cleanup
       const removedPtyIds = new Set(removedTabs.filter((t) => t.type === 'terminal').map((t) => t.ptyId));

@@ -16,6 +16,7 @@ type TabContextMenuProps = {
   onCloseTab: (id: string) => void;
   onCloseOthers: (id: string) => void;
   onCloseAll: (workspaceId: string, type: 'terminal' | 'file') => void;
+  onCloseToLeft: (id: string) => void;
   onCloseToRight: (id: string) => void;
   onRename?: (id: string) => void;
 };
@@ -29,10 +30,12 @@ export function TabContextMenu({
   onCloseTab,
   onCloseOthers,
   onCloseAll,
+  onCloseToLeft,
   onCloseToRight,
   onRename,
 }: TabContextMenuProps) {
   const { t } = useTranslation();
+  const tabs = useAppStore((s) => s.tabs);
   const keyboardShortcuts = useAppStore((s) => s.settings.keyboardShortcuts);
   const addToast = useAppStore((s) => s.addToast);
   const shortcuts = { ...DEFAULT_SHORTCUTS, ...(keyboardShortcuts ?? {}) };
@@ -40,9 +43,20 @@ export function TabContextMenu({
   const sc = (id: keyof typeof shortcuts) => comboToDisplay(shortcuts[id]);
 
   const isFileType = tab.type === 'file';
+  const isFilePaneType = tab.type !== 'terminal';
   const isTerminalType = tab.type === 'terminal';
   const isExternal = isFileType && Boolean(tab.absPath);
   const fullPath = isExternal ? tab.absPath! : workspacePath && isFileType ? `${workspacePath}/${tab.relPath}` : null;
+  const sameClosableGroup = (item: Tab) => {
+    if (item.workspaceId !== tab.workspaceId) return false;
+    if (isFilePaneType) return item.type !== 'terminal';
+    if (item.type !== 'terminal') return false;
+    return item.isAgent === tab.isAgent;
+  };
+  const workspaceTabs = tabs.filter((item) => item.workspaceId === tab.workspaceId);
+  const tabIndex = workspaceTabs.findIndex((item) => item.id === tab.id);
+  const hasTabsToLeft = tabIndex > 0 && workspaceTabs.slice(0, tabIndex).some(sameClosableGroup);
+  const hasTabsToRight = tabIndex >= 0 && workspaceTabs.slice(tabIndex + 1).some(sameClosableGroup);
 
   const sections: ContextMenuSection[] = [];
 
@@ -75,8 +89,17 @@ export function TabContextMenu({
     },
     {
       label: t('tabMenu.closeToRight'),
+      disabled: !hasTabsToRight,
       action: () => {
         onCloseToRight(tab.id);
+        onClose();
+      },
+    },
+    {
+      label: t('tabMenu.closeToLeft'),
+      disabled: !hasTabsToLeft,
+      action: () => {
+        onCloseToLeft(tab.id);
         onClose();
       },
     },

@@ -23,15 +23,14 @@ import {
   Check,
   ChevronDown,
   ChevronUp,
-  Code,
   Copy,
-  FileVideo,
-  Image,
   List,
+  Maximize2,
   MessageSquarePlus,
-  Music,
   Search,
   X,
+  ZoomIn,
+  ZoomOut,
 } from 'lucide-react';
 import { FileIcon } from './FileIcon';
 
@@ -68,13 +67,16 @@ type PendingCodeSelection = {
 };
 
 type AnnotationMeta = { kind: 'pending' } | { kind: 'comment'; comment: CodeSelectionItem };
+type VideoZoomMode = 'fit' | 'custom';
 
 const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'ico', 'svg', 'avif']);
 const AUDIO_EXTENSIONS = new Set(['mp3', 'wav', 'ogg', 'flac', 'aac', 'm4a', 'wma']);
 const VIDEO_EXTENSIONS = new Set(['mp4', 'webm', 'mov', 'avi', 'mkv']);
-const RAW_MEDIA_PREVIEW_LIMIT = 256 * 1024;
 const TEXT_FILE_PREVIEW_LIMIT = 256 * 1024;
 const CODE_RENDER_LOADING_LINE_THRESHOLD = 800;
+const VIDEO_ZOOM_MIN = 0.25;
+const VIDEO_ZOOM_MAX = 3;
+const VIDEO_ZOOM_STEP = 0.25;
 const PIERRE_FILE_METRICS: VirtualFileMetrics = {
   hunkLineCount: 50,
   lineHeight: 20,
@@ -104,6 +106,7 @@ function isPdfFile(relPath: string): boolean {
 }
 
 function readMediaUrl(tab: FileTab, workspace: Workspace): Promise<string> {
+  if (tab.externalUrl) return Promise.resolve(tab.externalUrl);
   if (tab.absPath) {
     if (!window.forgepad.fs.absFileUrl) return Promise.reject(new Error('Native file URL support is unavailable.'));
     return window.forgepad.fs.absFileUrl(tab.absPath);
@@ -121,6 +124,28 @@ function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${Math.ceil(bytes / 1024)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function imageMimeForPath(path: string): string {
+  switch (getExt(path)) {
+    case 'jpg':
+    case 'jpeg':
+      return 'image/jpeg';
+    case 'gif':
+      return 'image/gif';
+    case 'webp':
+      return 'image/webp';
+    case 'svg':
+      return 'image/svg+xml';
+    case 'avif':
+      return 'image/avif';
+    case 'bmp':
+      return 'image/bmp';
+    case 'ico':
+      return 'image/x-icon';
+    default:
+      return 'image/png';
+  }
 }
 
 // --- Slug generation for heading anchors ---
@@ -644,28 +669,43 @@ function scrollRangeIntoContainer(range: Range, container: HTMLElement) {
   const target = rect.width || rect.height ? rect : fallback;
   if (!target) return;
 
-  // When the Range lives inside a Shadow DOM (e.g. @pierre/diffs), the real
-  // scrollable element is the <pre> inside the shadow root, not the outer
-  // container we were given.  Walk up from the range's ancestor to find the
-  // nearest scrollable element.
-  const scrollTarget = findScrollableAncestor(range.startContainer, container);
+  // Ranges inside @pierre/diffs can live in nested shadow DOM scroll layers:
+  // the vertical scroller and horizontal scroller are not always the same node.
+  const verticalTarget = findScrollableAncestor(range.startContainer, container, 'y');
+  const horizontalTarget = findScrollableAncestor(range.startContainer, container, 'x');
 
-  const containerRect = scrollTarget.getBoundingClientRect();
-  scrollTarget.scrollTo({
-    top: scrollTarget.scrollTop + target.top - containerRect.top - scrollTarget.clientHeight / 2,
-    left: scrollTarget.scrollLeft + target.left - containerRect.left - Math.min(80, scrollTarget.clientWidth / 4),
+  const verticalRect = verticalTarget.getBoundingClientRect();
+  verticalTarget.scrollTo({
+    top: verticalTarget.scrollTop + target.top - verticalRect.top - verticalTarget.clientHeight / 2,
     behavior: 'auto',
   });
+
+  const horizontalRect = horizontalTarget.getBoundingClientRect();
+  let nextLeft = horizontalTarget.scrollLeft;
+  const horizontalPadding = 24;
+  if (target.left < horizontalRect.left + horizontalPadding) {
+    nextLeft += target.left - horizontalRect.left - horizontalPadding;
+  } else if (target.right > horizontalRect.right - horizontalPadding) {
+    nextLeft += target.right - horizontalRect.right + horizontalPadding;
+  }
+
+  if (nextLeft !== horizontalTarget.scrollLeft) {
+    horizontalTarget.scrollTo({
+      left: nextLeft,
+      behavior: 'auto',
+    });
+  }
 }
 
 /** Walk up from `node` to find the nearest scrollable ancestor, stopping at
  *  `boundary`.  Falls back to `boundary` itself. */
-function findScrollableAncestor(node: Node, boundary: HTMLElement): HTMLElement {
+function findScrollableAncestor(node: Node, boundary: HTMLElement, axis: 'x' | 'y'): HTMLElement {
   let current: Node | null = node;
   while (current && current !== boundary) {
     if (current instanceof HTMLElement) {
       const { overflowY, overflowX } = getComputedStyle(current);
-      if (overflowY === 'auto' || overflowY === 'scroll' || overflowX === 'auto' || overflowX === 'scroll') {
+      const overflow = axis === 'y' ? overflowY : overflowX;
+      if (overflow === 'auto' || overflow === 'scroll') {
         return current;
       }
     }
@@ -821,8 +861,8 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
   const [pendingSelection, setPendingSelection] = useState<PendingCodeSelection | null>(null);
   const [selectedRange, setSelectedRange] = useState<SelectedLineRange | null>(null);
   const [mediaUrl, setMediaUrl] = useState('');
-  const [rawMediaText, setRawMediaText] = useState('');
-  const [mediaViewMode, setMediaViewMode] = useState<'preview' | 'raw'>('preview');
+  const [videoZoom, setVideoZoom] = useState(1);
+  const [videoZoomMode, setVideoZoomMode] = useState<VideoZoomMode>('fit');
   const resolvedTheme = useResolvedTheme();
   const addToast = useAppStore((state) => state.addToast);
   const addContextFiles = useAppStore((state) => state.addContextFiles);
@@ -831,7 +871,7 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
   const editorFontSize = useAppStore((state) => state.settings.editorFontSize);
   const clearTabTargetLine = useAppStore((state) => state.clearTabTargetLine);
   /** True when this tab was opened from outside the workspace (read-only, no context actions). */
-  const isExternal = Boolean(tab.absPath);
+  const isExternal = Boolean(tab.absPath || tab.externalUrl);
   const { onTokenClick, onTokenEnter, onTokenLeave } = useLspTokenNavigation(
     workspace.worktreePath,
     tab.relPath,
@@ -850,7 +890,7 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
   // biome-ignore lint/correctness/useExhaustiveDependencies: intentional recreation on content change
   const mdHeadingComponents = useMemo(() => createHeadingComponents(), [markdownText]);
   const showRenderedMarkdown = markdownFile && markdownMode === 'rendered';
-  const showMediaPreview = isMediaFile && mediaViewMode === 'preview';
+  const showMediaPreview = isMediaFile;
   // showCodeViewer is computed later but we need it for search; mirror the logic here.
   const showCodeViewer = !loading && !showMediaPreview && !showRenderedMarkdown && fileText;
   const searchable = showRenderedMarkdown || !!showCodeViewer;
@@ -1040,7 +1080,6 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
     setPendingSelection(null);
     setSelectedRange(null);
     setMediaUrl('');
-    setRawMediaText('');
 
     if (isMediaFile) {
       readMediaUrl(tab, workspace)
@@ -1059,9 +1098,20 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
       };
     }
 
-    const textPromise = tab.absPath
-      ? window.forgepad.fs.readAbsFilePreview(tab.absPath, TEXT_FILE_PREVIEW_LIMIT)
-      : window.forgepad.fs.readFilePreview(workspace.worktreePath, tab.relPath, TEXT_FILE_PREVIEW_LIMIT);
+    const textPromise = tab.externalUrl
+      ? fetch(tab.externalUrl).then(async (response) => {
+          const content = (await response.text()).slice(0, TEXT_FILE_PREVIEW_LIMIT);
+          return {
+            content,
+            lineCount: content.split('\n').length,
+            totalBytes: Number(response.headers.get('content-length') ?? content.length),
+            previewBytes: content.length,
+            truncated: content.length >= TEXT_FILE_PREVIEW_LIMIT,
+          };
+        })
+      : tab.absPath
+        ? window.forgepad.fs.readAbsFilePreview(tab.absPath, TEXT_FILE_PREVIEW_LIMIT)
+        : window.forgepad.fs.readFilePreview(workspace.worktreePath, tab.relPath, TEXT_FILE_PREVIEW_LIMIT);
     textPromise
       .then((preview) => {
         if (disposed) return;
@@ -1079,43 +1129,29 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
     return () => {
       disposed = true;
     };
-  }, [addToast, tab.relPath, tab.absPath, workspace.worktreePath, isMediaFile]);
-
-  useEffect(() => {
-    if (!isMediaFile || mediaViewMode !== 'raw' || rawMediaText || fileText) return;
-
-    let disposed = false;
-    const rawPromise = tab.absPath
-      ? window.forgepad.fs.readAbsFilePreview(tab.absPath, RAW_MEDIA_PREVIEW_LIMIT)
-      : window.forgepad.fs.readFilePreview(workspace.worktreePath, tab.relPath, RAW_MEDIA_PREVIEW_LIMIT);
-
-    rawPromise
-      .then((preview) => {
-        if (disposed) return;
-        const rawText = preview.truncated
-          ? `${preview.content}\n\n... truncated ${Math.max(0, preview.totalBytes - preview.previewBytes)} bytes`
-          : preview.content;
-        setRawMediaText(rawText);
-        setFileText(rawText);
-        setLineCount(rawText.split('\n').length);
-      })
-      .catch((error) => addToast('error', error instanceof Error ? error.message : 'Failed to load raw preview.'));
-
-    return () => {
-      disposed = true;
-    };
-  }, [addToast, fileText, isMediaFile, rawMediaText, mediaViewMode, tab.absPath, tab.relPath, workspace.worktreePath]);
+  }, [addToast, tab.relPath, tab.absPath, tab.externalUrl, workspace.worktreePath, isMediaFile]);
 
   const handleMediaLoadError = useCallback(() => {
     addToast('error', 'Failed to load native file preview.');
   }, [addToast]);
 
+  const setCustomVideoZoom = useCallback((nextZoom: number) => {
+    setVideoZoom(Math.min(VIDEO_ZOOM_MAX, Math.max(VIDEO_ZOOM_MIN, nextZoom)));
+    setVideoZoomMode('custom');
+  }, []);
+
+  const fitVideoToView = useCallback(() => {
+    setVideoZoom(1);
+    setVideoZoomMode('fit');
+  }, []);
+
   useEffect(() => {
     setMarkdownMode('rendered');
     setPendingSelection(null);
     setSelectedRange(null);
-    setMediaViewMode('preview');
-  }, []);
+    setVideoZoom(1);
+    setVideoZoomMode('fit');
+  }, [tab.relPath, tab.absPath]);
 
   useEffect(() => {
     if (showRenderedMarkdown) {
@@ -1323,11 +1359,25 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
   }, [closeSearch, goToMatch, openSearch, searchOpen, pendingSelection]);
 
   const [copied, setCopied] = useState(false);
+  const markCopied = useCallback(() => {
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  }, []);
+
   const copyContent = async () => {
     try {
-      await navigator.clipboard.writeText(fileText);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
+      if (isImage && mediaUrl && navigator.clipboard.write && typeof ClipboardItem !== 'undefined') {
+        const response = await fetch(mediaUrl);
+        const sourceBlob = await response.blob();
+        const mime = sourceBlob.type || tab.externalMime || imageMimeForPath(tab.relPath);
+        await navigator.clipboard.write([new ClipboardItem({ [mime]: sourceBlob })]);
+        markCopied();
+        return;
+      }
+
+      const fallbackText = fileText || tab.absPath || tab.relPath;
+      await navigator.clipboard.writeText(fallbackText);
+      markCopied();
     } catch {
       addToast('error', 'Failed to copy');
     }
@@ -1453,27 +1503,39 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
           ) : null}
         </div>
         <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
-          {isImage || isAudio || isVideo ? (
-            <div className="view-mode-toggle" role="radiogroup" aria-label="Media view">
+          {isVideo && showMediaPreview ? (
+            <div className="view-mode-toggle" aria-label="Video zoom controls">
               <button
-                className={clsx('view-mode-btn', mediaViewMode === 'preview' && 'active')}
+                className="view-mode-btn"
                 type="button"
-                role="radio"
-                aria-checked={mediaViewMode === 'preview'}
-                title="Preview"
-                onClick={() => setMediaViewMode('preview')}
+                title="Zoom out"
+                onClick={() => setCustomVideoZoom(videoZoom - VIDEO_ZOOM_STEP)}
               >
-                {isAudio ? <Music size={14} /> : isVideo ? <FileVideo size={14} /> : <Image size={14} />}
+                <ZoomOut size={14} />
               </button>
               <button
-                className={clsx('view-mode-btn', mediaViewMode === 'raw' && 'active')}
+                className={clsx('view-mode-btn', videoZoomMode === 'fit' && 'active')}
                 type="button"
-                role="radio"
-                aria-checked={mediaViewMode === 'raw'}
-                title="Raw"
-                onClick={() => setMediaViewMode('raw')}
+                title="Fit to view"
+                onClick={fitVideoToView}
               >
-                <Code size={14} />
+                <Maximize2 size={14} />
+              </button>
+              <button
+                className="view-mode-btn min-w-[42px] px-1.5 text-[10px] tabular-nums"
+                type="button"
+                title={videoZoomMode === 'fit' ? 'Fit to view' : `${Math.round(videoZoom * 100)}%`}
+                onClick={fitVideoToView}
+              >
+                {videoZoomMode === 'fit' ? 'Fit' : `${Math.round(videoZoom * 100)}%`}
+              </button>
+              <button
+                className="view-mode-btn"
+                type="button"
+                title="Zoom in"
+                onClick={() => setCustomVideoZoom(videoZoom + VIDEO_ZOOM_STEP)}
+              >
+                <ZoomIn size={14} />
               </button>
             </div>
           ) : null}
@@ -1583,8 +1645,29 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
           <audio controls className="w-full max-w-2xl" src={mediaUrl} onError={handleMediaLoadError} />
         </div>
       ) : showMediaPreview && isVideo && mediaUrl ? (
-        <div className="flex min-h-0 flex-1 items-center justify-center bg-surface-inset p-4">
-          <video controls className="max-h-full max-w-full rounded" src={mediaUrl} onError={handleMediaLoadError} />
+        <div
+          className={clsx(
+            'video-preview-scroll scrollbar-thin scroll-mask min-h-0 flex-1 overflow-auto bg-surface-inset p-4',
+            videoZoomMode === 'fit' ? 'is-fit' : 'is-custom',
+          )}
+        >
+          <div
+            className="video-preview-stage"
+            style={
+              videoZoomMode === 'custom'
+                ? ({
+                    '--video-preview-scale': videoZoom,
+                  } as CSSProperties)
+                : undefined
+            }
+          >
+            <video
+              controls
+              className="video-preview-player"
+              src={mediaUrl}
+              onError={handleMediaLoadError}
+            />
+          </div>
         </div>
       ) : showMediaPreview && isPdf && mediaUrl ? (
         <iframe

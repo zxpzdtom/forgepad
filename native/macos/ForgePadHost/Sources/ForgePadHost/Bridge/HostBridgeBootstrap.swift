@@ -54,6 +54,7 @@ enum HostBridgeBootstrap {
       let nextId = 1;
       const pending = new Map();
       const listeners = new Map();
+      const nativeDropPaths = [];
       const noopUnsubscribe = () => {};
       const noopPromise = () => Promise.resolve(null);
       const noopVoidPromise = () => Promise.resolve();
@@ -80,6 +81,18 @@ enum HostBridgeBootstrap {
         if (!callbacks) return;
         for (const callback of callbacks) callback(event.payload);
       };
+
+      window.__forgepadSetNativeFileDropPaths = (paths) => {
+        nativeDropPaths.splice(0, nativeDropPaths.length, ...((Array.isArray(paths) ? paths : []).filter((path) => typeof path === "string" && path.length > 0)));
+      };
+
+      function getNativeDroppedPath(file) {
+        const name = file?.name;
+        if (!name) return "";
+        const index = nativeDropPaths.findIndex((path) => path.split(/[\\\\/]/).pop() === name);
+        if (index < 0) return "";
+        return nativeDropPaths.splice(index, 1)[0] || "";
+      }
 
       function on(name, callback) {
         const callbacks = listeners.get(name) || new Set();
@@ -160,7 +173,7 @@ enum HostBridgeBootstrap {
           openInTerminal: (fullPath) => invoke("shell.openInTerminal", { fullPath }),
           showItemInFolder: (fullPath) => invoke("shell.showItemInFolder", { fullPath }),
           detectIdes: () => invoke("shell.detectIdes"),
-          openWithIde: (fullPath, ideId) => invoke("shell.openWithIde", { fullPath, ideId }),
+          openWithIde: (fullPath, ideId, lineNumber, projectPath) => invoke("shell.openWithIde", { fullPath, ideId, lineNumber, projectPath }),
           detectTerminals: () => invoke("shell.detectTerminals"),
           openWithTerminal: (fullPath, terminalId) => invoke("shell.openWithTerminal", { fullPath, terminalId })
         },
@@ -178,7 +191,7 @@ enum HostBridgeBootstrap {
           startWindowDrag: () => { invoke("app.startWindowDrag"); }
         },
         native: {},
-        nativeFiles: { getPath: (file) => file.name },
+        nativeFiles: { getPath: (file) => getNativeDroppedPath(file) || file.name },
         browser: {
           openWindow: (url, title) => invoke("browser.openWindow", { url, title })
         },

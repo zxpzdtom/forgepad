@@ -1,10 +1,11 @@
-import { type CSSProperties, type MouseEvent as ReactMouseEvent, type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
+import { type CSSProperties, type MouseEvent as ReactMouseEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from '@renderer/i18n';
+import { comboToDisplay } from '@renderer/lib/shortcut-utils';
 import { useAppStore } from '@renderer/store/app-store';
+import { DEFAULT_SHORTCUTS, type Tab } from '@shared/types';
 import {
   Check,
   ChevronDown,
-  ChevronRight,
   Code2,
   Folder,
   Globe,
@@ -46,115 +47,86 @@ function resolveIcon(id: string, size: number): ReactNode {
   return ideIcon(id, size) ?? appIcon(id, size) ?? <Code2 size={size} />;
 }
 
+const FALLBACK_OPEN_WITH_LABELS: Record<string, string> = {
+  cursor: 'Cursor',
+  finder: 'Finder',
+  ghostty: 'Ghostty',
+  intellij: 'IntelliJ IDEA',
+  iterm: 'iTerm',
+  iterm2: 'iTerm',
+  terminal: 'Terminal',
+  vscode: 'VS Code',
+  wezterm: 'WezTerm',
+  windsurf: 'Windsurf',
+  xcode: 'Xcode',
+  zed: 'Zed',
+};
+
+type OpenWithOption = {
+  id: string;
+  label: string;
+  icon: ReactNode;
+};
+
+const MAIN_IDE_OPTIONS: Array<Omit<OpenWithOption, 'icon'>> = [
+  { id: 'zed', label: 'Zed' },
+  { id: 'vscode', label: 'VS Code' },
+  { id: 'cursor', label: 'Cursor' },
+  { id: 'windsurf', label: 'Windsurf' },
+  { id: 'intellij', label: 'IntelliJ IDEA' },
+];
+
+const MAIN_TERMINAL_OPTIONS: Array<Omit<OpenWithOption, 'icon'>> = [
+  { id: 'terminal', label: 'Terminal' },
+  { id: 'iterm', label: 'iTerm2' },
+  { id: 'ghostty', label: 'Ghostty' },
+];
+
+function uniqueOpenWithOptions(options: OpenWithOption[]) {
+  const seen = new Set<string>();
+  return options.filter((option) => {
+    if (seen.has(option.id)) return false;
+    seen.add(option.id);
+    return true;
+  });
+}
+
 /* ── Shared menu-item button ── */
 
 function MenuItem({
   icon,
   label,
   selected,
+  shortcut,
   onClick,
 }: {
   icon: ReactNode;
   label: string;
   selected: boolean;
+  shortcut?: string;
   onClick: () => void;
 }) {
   return (
     <button
+      aria-current={selected ? 'true' : undefined}
       className={clsx(
         'flex h-8 w-full items-center gap-2.5 rounded-md px-2 text-left text-[13px] text-text transition-colors hover:bg-panel-3',
-        selected && 'bg-panel-3/60',
+        selected && 'bg-panel-3/70',
       )}
       type="button"
       onClick={onClick}
     >
       <span className="grid size-4 shrink-0 place-items-center">{icon}</span>
-      <span className="min-w-0 flex-1">{label}</span>
-      <span className="grid size-4 shrink-0 place-items-center text-accent">{selected && <Check size={13} />}</span>
+      <span className="min-w-0 flex-1 truncate">{label}</span>
+      {shortcut && (
+        <kbd
+          className="shrink-0 rounded border border-border/70 bg-panel-3 px-1.5 py-0.5 font-medium text-[10px] text-subtle leading-none"
+          aria-label="Command O"
+        >
+          {shortcut}
+        </kbd>
+      )}
     </button>
-  );
-}
-
-/* ── Submenu (shared for IDE / Terminal) ── */
-
-function Submenu({
-  parentLabel,
-  parentIcon,
-  items,
-  selectedId,
-  onSelect,
-  anchorName,
-}: {
-  parentLabel: string;
-  parentIcon: ReactNode;
-  items: { id: string; label: string }[];
-  selectedId: string | null;
-  onSelect: (id: string) => void;
-  anchorName: string;
-}) {
-  const { t } = useTranslation();
-  const [open, setOpen] = useState(false);
-  const closeTimer = useRef<ReturnType<typeof setTimeout>>();
-
-  const handleEnter = () => {
-    clearTimeout(closeTimer.current);
-    setOpen(true);
-  };
-  const handleLeave = () => {
-    closeTimer.current = setTimeout(() => setOpen(false), 150);
-  };
-
-  useEffect(() => () => clearTimeout(closeTimer.current), []);
-
-  const isChildSelected = selectedId !== null && items.some((i) => i.id === selectedId);
-
-  return (
-    <div className="relative" onMouseEnter={handleEnter} onMouseLeave={handleLeave}>
-      {/* Parent row */}
-      <div
-        className={clsx(
-          'flex h-8 w-full cursor-default items-center gap-2.5 rounded-md px-2 text-[13px] text-text transition-colors hover:bg-panel-3',
-          isChildSelected && 'bg-panel-3/60',
-        )}
-        style={{ anchorName } as CSSProperties}
-      >
-        <span className="grid size-4 shrink-0 place-items-center">{parentIcon}</span>
-        <span className="min-w-0 flex-1">{parentLabel}</span>
-        <span className="grid size-4 shrink-0 place-items-center text-accent">{isChildSelected && <Check size={13} />}</span>
-        <ChevronRight size={13} className="shrink-0 text-subtle" />
-      </div>
-
-      {/* Submenu popover */}
-      <div
-        className="anchor-submenu"
-        style={
-          {
-            positionAnchor: anchorName,
-            top: 'anchor(top)',
-            left: 'anchor(right)',
-            marginLeft: '4px',
-            positionTryFallbacks: 'flip-inline',
-          } as CSSProperties
-        }
-        hidden={!open}
-        onMouseEnter={handleEnter}
-        onMouseLeave={handleLeave}
-      >
-        {items.length > 0 ? (
-          items.map((item) => (
-            <MenuItem
-              key={item.id}
-              icon={resolveIcon(item.id, ICON_SIZE)}
-              label={item.label}
-              selected={item.id === selectedId}
-              onClick={() => onSelect(item.id)}
-            />
-          ))
-        ) : (
-          <div className="px-3 py-2 text-subtle text-xs">{t('topbar.noneDetected')}</div>
-        )}
-      </div>
-    </div>
   );
 }
 
@@ -165,9 +137,15 @@ type TopBarProps = {
 };
 
 /** IDE ids that map to a known category */
-const IDE_IDS = new Set(['zed', 'vscode', 'cursor', 'windsurf', 'intellij']);
+const IDE_IDS = new Set(['zed', 'vscode', 'cursor', 'windsurf', 'intellij', 'xcode']);
 /** Terminal ids */
-const TERMINAL_IDS = new Set(['terminal', 'iterm', 'iterm2', 'ghostty']);
+const TERMINAL_IDS = new Set(['terminal', 'iterm', 'iterm2', 'ghostty', 'wezterm']);
+
+function fileTabOpenPath(tab: Extract<Tab, { type: 'file' }>, workspacePath: string) {
+  if (tab.absPath) return tab.absPath;
+  if (tab.externalUrl) return null;
+  return `${workspacePath}/${tab.relPath}`;
+}
 
 export function TopBar({ onOpenSearch }: TopBarProps) {
   const { t } = useTranslation();
@@ -178,7 +156,9 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
   const sidebarOpen = useAppStore((state) => state.sidebarOpen);
   const rightPanelOpen = useAppStore((state) => state.rightPanelOpen);
   const activeWorkspaceId = useAppStore((state) => state.activeWorkspaceId);
+  const activeFileTabId = useAppStore((state) => state.activeFileTabId);
   const workspaces = useAppStore((state) => state.workspaces);
+  const tabs = useAppStore((state) => state.tabs);
   const projects = useAppStore((state) => state.projects);
   const defaultOpenWith = useAppStore((state) => state.settings.defaultOpenWith);
   const updateSettings = useAppStore((state) => state.updateSettings);
@@ -203,6 +183,7 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
 
   const activeWorkspace = workspaces.find((workspace) => workspace.id === activeWorkspaceId);
   const activeProject = activeWorkspace ? projects.find((p) => p.id === activeWorkspace.projectId) : undefined;
+  const activeFileTab = tabs.find((tab) => tab.id === activeFileTabId && tab.type === 'file');
 
   // ── Run button state ──
   const [runMenuOpen, setRunMenuOpen] = useState(false);
@@ -394,18 +375,64 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
   const selectedIsIde = IDE_IDS.has(defaultOpenWith);
   const selectedIsTerminal = TERMINAL_IDS.has(defaultOpenWith);
 
-  // Resolve the icon for the selected IDE / Terminal within the submenu parent row
-  const ideParentIcon = selectedIsIde ? resolveIcon(defaultOpenWith, ICON_SIZE) : resolveIcon('vscode', ICON_SIZE); // default icon: VSCode
-  const terminalParentIcon = selectedIsTerminal ? resolveIcon(defaultOpenWith, ICON_SIZE) : resolveIcon('terminal', ICON_SIZE); // default icon: Terminal.app
-
   // Main button icon: always the selected item's icon
   const selectedIcon = resolveIcon(defaultOpenWith, ICON_SIZE);
+  const openWithShortcut = comboToDisplay(settings.keyboardShortcuts?.openWithDefault ?? DEFAULT_SHORTCUTS.openWithDefault);
+
+  const ideOpenWithOptions = useMemo(() => {
+    const detected = ides.map((ide) => ({
+      id: ide.id,
+      label: ide.label,
+      icon: resolveIcon(ide.id, ICON_SIZE),
+    }));
+    const options = [
+      ...MAIN_IDE_OPTIONS.map((option) => ({
+        ...option,
+        icon: resolveIcon(option.id, ICON_SIZE),
+      })),
+      ...detected,
+    ];
+    if (selectedIsIde && !options.some((option) => option.id === defaultOpenWith)) {
+      options.unshift({
+        id: defaultOpenWith,
+        label: FALLBACK_OPEN_WITH_LABELS[defaultOpenWith] ?? defaultOpenWith,
+        icon: resolveIcon(defaultOpenWith, ICON_SIZE),
+      });
+    }
+    return uniqueOpenWithOptions(options);
+  }, [defaultOpenWith, ides, selectedIsIde]);
+
+  const terminalOpenWithOptions = useMemo(() => {
+    const detected = terminals.map((terminal) => ({
+      id: terminal.id,
+      label: terminal.label,
+      icon: resolveIcon(terminal.id, ICON_SIZE),
+    }));
+    const options = [
+      ...MAIN_TERMINAL_OPTIONS.map((option) => ({
+        ...option,
+        icon: resolveIcon(option.id, ICON_SIZE),
+      })),
+      ...detected,
+    ];
+    if (selectedIsTerminal && !options.some((option) => option.id === defaultOpenWith)) {
+      options.unshift({
+        id: defaultOpenWith,
+        label: FALLBACK_OPEN_WITH_LABELS[defaultOpenWith] ?? defaultOpenWith,
+        icon: resolveIcon(defaultOpenWith, ICON_SIZE),
+      });
+    }
+    return uniqueOpenWithOptions(options);
+  }, [defaultOpenWith, selectedIsTerminal, terminals]);
 
   // Resolve action for selected option
-  const resolveAction = useCallback((id: string): ((path: string) => Promise<void>) | null => {
+  const resolveAction = useCallback((id: string): ((path: string, lineNumber?: number, projectPath?: string) => Promise<void>) | null => {
     if (id === 'finder') return window.forgepad.shell.openPath;
     if (TERMINAL_IDS.has(id)) return (path: string) => window.forgepad.shell.openWithTerminal(path, id);
-    if (IDE_IDS.has(id)) return (path: string) => window.forgepad.shell.openWithIde(path, id);
+    if (IDE_IDS.has(id)) {
+      return (path: string, lineNumber?: number, projectPath?: string) =>
+        window.forgepad.shell.openWithIde(path, id, lineNumber, projectPath);
+    }
     // Legacy fallback
     if (id === 'terminal') return window.forgepad.shell.openInTerminal;
     return null;
@@ -415,8 +442,12 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
     if (!activeWorkspace) return;
     const action = resolveAction(defaultOpenWith);
     if (!action) return;
+    const isIde = IDE_IDS.has(defaultOpenWith);
+    const activeFilePath = isIde && activeFileTab ? fileTabOpenPath(activeFileTab, activeWorkspace.worktreePath) : null;
+    const openPath = activeFilePath ?? activeWorkspace.worktreePath;
+    const lineNumber = activeFilePath ? (activeFileTab?.targetLine ?? activeFileTab?.lastLine) : undefined;
     try {
-      await action(activeWorkspace.worktreePath);
+      await action(openPath, lineNumber, isIde ? activeWorkspace.worktreePath : undefined);
     } catch (error) {
       addToast('error', error instanceof Error ? error.message : t('topbar.failedToOpen'));
     }
@@ -656,6 +687,7 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
                 top: 'anchor(bottom)',
                 right: 'anchor(right)',
                 marginTop: '7px',
+                minWidth: '236px',
                 positionTryFallbacks: 'flip-block',
               } as CSSProperties
             }
@@ -668,28 +700,43 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
               icon={appIcon('finder', ICON_SIZE) ?? <Folder size={ICON_SIZE} />}
               label={t('topbar.finder')}
               selected={defaultOpenWith === 'finder'}
+              shortcut={defaultOpenWith === 'finder' ? openWithShortcut : undefined}
               onClick={() => handleSelect('finder')}
             />
 
-            {/* IDE submenu */}
-            <Submenu
-              parentLabel={t('topbar.ide')}
-              parentIcon={ideParentIcon}
-              items={ides}
-              selectedId={selectedIsIde ? defaultOpenWith : null}
-              onSelect={handleSelect}
-              anchorName="--ide-submenu-anchor"
-            />
+            <div className="mx-2 my-1 border-border/60 border-t" />
+            <div className="px-2 py-1 text-[11px] text-subtle">{t('topbar.ide')}</div>
+            {ideOpenWithOptions.length > 0 ? (
+              ideOpenWithOptions.map((item) => (
+                <MenuItem
+                  key={item.id}
+                  icon={item.icon}
+                  label={item.label}
+                  selected={defaultOpenWith === item.id}
+                  shortcut={defaultOpenWith === item.id ? openWithShortcut : undefined}
+                  onClick={() => handleSelect(item.id)}
+                />
+              ))
+            ) : (
+              <div className="px-2 py-1.5 text-[12px] text-subtle/60">{t('topbar.noneDetected')}</div>
+            )}
 
-            {/* Terminal submenu */}
-            <Submenu
-              parentLabel={t('topbar.terminal')}
-              parentIcon={terminalParentIcon}
-              items={terminals}
-              selectedId={selectedIsTerminal ? defaultOpenWith : null}
-              onSelect={handleSelect}
-              anchorName="--terminal-submenu-anchor"
-            />
+            <div className="mx-2 my-1 border-border/60 border-t" />
+            <div className="px-2 py-1 text-[11px] text-subtle">{t('topbar.terminal')}</div>
+            {terminalOpenWithOptions.length > 0 ? (
+              terminalOpenWithOptions.map((item) => (
+                <MenuItem
+                  key={item.id}
+                  icon={item.icon}
+                  label={item.label}
+                  selected={defaultOpenWith === item.id}
+                  shortcut={defaultOpenWith === item.id ? openWithShortcut : undefined}
+                  onClick={() => handleSelect(item.id)}
+                />
+              ))
+            ) : (
+              <div className="px-2 py-1.5 text-[12px] text-subtle/60">{t('topbar.noneDetected')}</div>
+            )}
           </div>
         </div>
 

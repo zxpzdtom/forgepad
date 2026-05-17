@@ -56,9 +56,11 @@ export function AgentTabBar() {
   const agentStatuses = useAppStore((state) => state.agentStatuses);
   const exitedPtyIds = useAppStore((state) => state.exitedPtyIds);
   const setActiveTab = useAppStore((state) => state.setActiveTab);
+  const setFocusedColumn = useAppStore((state) => state.setFocusedColumn);
   const closeTab = useAppStore((state) => state.closeTab);
   const closeOtherTabs = useAppStore((state) => state.closeOtherTabs);
   const closeAllTabs = useAppStore((state) => state.closeAllTabs);
+  const closeTabsToLeft = useAppStore((state) => state.closeTabsToLeft);
   const closeTabsToRight = useAppStore((state) => state.closeTabsToRight);
   const createAgentTerminal = useAppStore((state) => state.createAgentTerminal);
   const reorderTabs = useAppStore((state) => state.reorderTabs);
@@ -100,7 +102,7 @@ export function AgentTabBar() {
   if (agentTabs.length === 0) return null;
 
   return (
-    <div className="column-tabbar flex h-9 shrink-0 items-center gap-1 border-border border-b bg-bg px-2">
+    <div className="column-tabbar flex h-9 shrink-0 items-center gap-1 border-border border-b bg-bg px-2" onMouseDown={() => setFocusedColumn('agent')}>
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={tabIds} strategy={horizontalListSortingStrategy}>
           <div
@@ -152,6 +154,7 @@ export function AgentTabBar() {
           onCloseTab={closeTab}
           onCloseOthers={closeOtherTabs}
           onCloseAll={closeAllTabs}
+          onCloseToLeft={closeTabsToLeft}
           onCloseToRight={closeTabsToRight}
           onRename={(id) => {
             const tab = agentTabs.find((t) => t.id === id);

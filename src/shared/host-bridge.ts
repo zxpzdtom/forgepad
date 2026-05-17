@@ -174,7 +174,7 @@ export type HostBridgeApi = {
     openInTerminal: (fullPath: string) => Promise<void>;
     showItemInFolder: (fullPath: string) => Promise<void>;
     detectIdes: () => Promise<NativeIde[]>;
-    openWithIde: (fullPath: string, ideId: string) => Promise<void>;
+    openWithIde: (fullPath: string, ideId: string, lineNumber?: number, projectPath?: string) => Promise<void>;
     detectTerminals: () => Promise<NativeTerminal[]>;
     openWithTerminal: (fullPath: string, terminalId: string) => Promise<void>;
   };

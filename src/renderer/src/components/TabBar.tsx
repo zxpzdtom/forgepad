@@ -3,7 +3,7 @@ import { closestCenter, DndContext, type DragEndEvent, PointerSensor, useSensor,
 import { restrictToHorizontalAxis, restrictToParentElement } from '@dnd-kit/modifiers';
 import { horizontalListSortingStrategy, SortableContext } from '@dnd-kit/sortable';
 import { useHorizontalScroll } from '@renderer/hooks/useHorizontalScroll';
-import { getDroppedPaths, hasDraggableFiles, isInternalDrop } from '@renderer/lib/drag-utils';
+import { getDroppedFileEntries, hasDraggableFiles, isInternalDrop } from '@renderer/lib/drag-utils';
 import { getTabTitle, useAppStore } from '@renderer/store/app-store';
 import type { Tab } from '@shared/types';
 import { Bot, ClipboardList, ExternalLink, GitCompare, Globe, TerminalSquare } from 'lucide-react';
@@ -28,9 +28,11 @@ export function TabBar() {
   const activeFileTabId = useAppStore((state) => state.activeFileTabId);
   const workspaces = useAppStore((state) => state.workspaces);
   const setActiveTab = useAppStore((state) => state.setActiveTab);
+  const setFocusedColumn = useAppStore((state) => state.setFocusedColumn);
   const closeTab = useAppStore((state) => state.closeTab);
   const closeOtherTabs = useAppStore((state) => state.closeOtherTabs);
   const closeAllTabs = useAppStore((state) => state.closeAllTabs);
+  const closeTabsToLeft = useAppStore((state) => state.closeTabsToLeft);
   const closeTabsToRight = useAppStore((state) => state.closeTabsToRight);
   const reorderTabs = useAppStore((state) => state.reorderTabs);
   const openFileTab = useAppStore((state) => state.openFileTab);
@@ -95,8 +97,8 @@ export function TabBar() {
     (e: React.DragEvent) => {
       if (isInternalDrop(e)) return;
 
-      const paths = getDroppedPaths(e);
-      if (paths.length === 0) return;
+      const entries = getDroppedFileEntries(e);
+      if (entries.length === 0) return;
 
       e.preventDefault();
       e.stopPropagation();
@@ -104,12 +106,13 @@ export function TabBar() {
 
       if (!activeWorkspace) return;
 
-      for (const absPath of paths) {
+      for (const entry of entries) {
+        const absPath = entry.path;
         if (absPath.startsWith(activeWorkspace.worktreePath + '/')) {
           const relPath = absPath.slice(activeWorkspace.worktreePath.length + 1);
           openFileTab(activeWorkspace.id, relPath);
         } else {
-          openExternalFileTab(activeWorkspace.id, absPath);
+          openExternalFileTab(activeWorkspace.id, absPath, entry.objectUrl, entry.mimeType);
         }
       }
     },
@@ -127,6 +130,7 @@ export function TabBar() {
       onDragEnter={handleFileDragEnter}
       onDragLeave={handleFileDragLeave}
       onDrop={handleFileDrop}
+      onMouseDown={() => setFocusedColumn('file')}
     >
       <DndContext
         sensors={sensors}
@@ -173,6 +177,7 @@ export function TabBar() {
           onCloseTab={closeTab}
           onCloseOthers={closeOtherTabs}
           onCloseAll={closeAllTabs}
+          onCloseToLeft={closeTabsToLeft}
           onCloseToRight={closeTabsToRight}
         />
       )}

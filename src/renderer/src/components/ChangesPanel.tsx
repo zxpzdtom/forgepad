@@ -90,6 +90,12 @@ function splitDisplayPath(path: string): { name: string; directory: string } {
   };
 }
 
+function compactDirectoryPath(directory: string): string {
+  const parts = directory.split('/').filter(Boolean);
+  if (parts.length <= 2) return directory;
+  return `.../${parts.slice(-2).join('/')}`;
+}
+
 function buildChangeTree(files: FileStatus[], splitStagedRenamePaths: Set<string>): ChangeTreeNode[] {
   const root: ChangeTreeNode = { name: '', path: '', kind: 'directory', children: [] };
   for (const file of files) {
@@ -177,7 +183,7 @@ function ChangeStatusBadge({ status }: { status: GitStatusKind }) {
 
 function ChangeStats({ additions, deletions }: { additions: number; deletions: number }) {
   if (additions <= 0 && deletions <= 0) {
-    return <span className="change-row-stats" />;
+    return <span className="change-row-stats is-empty" />;
   }
   return (
     <span className="change-row-stats">
@@ -304,18 +310,19 @@ function ChangeFileRow({
   const path = displayPath(file, splitStagedRenamePaths);
   const pathParts = splitDisplayPath(path);
   const status = displayStatus(file, splitStagedRenamePaths);
-  const rowClassName = `change-native-row is-file${path === activePath ? ' is-active' : ''}${status === 'deleted' ? ' is-deleted' : ''}`;
+  const rowClassName = `change-native-row is-file is-flat${path === activePath ? ' is-active' : ''}${
+    status === 'deleted' ? ' is-deleted' : ''
+  }`;
 
   return (
     <div className={rowClassName} style={{ '--change-depth': 0 } as CSSProperties}>
       <button className="change-native-main" type="button" onClick={() => onOpenDiff(file, path, status)}>
-        <span className="change-native-chevron" />
         <span className="change-native-icon">
           <FileIcon filePath={file.path} size={15} />
         </span>
         <span className="change-flat-label" title={file.oldPath ? `${file.oldPath} -> ${file.path}` : file.path}>
           <span className="change-flat-name">{pathParts.name}</span>
-          {pathParts.directory ? <span className="change-flat-path">{pathParts.directory}</span> : null}
+          {pathParts.directory ? <span className="change-flat-path">{compactDirectoryPath(pathParts.directory)}</span> : null}
         </span>
       </button>
       <ChangeStats additions={stats.additions} deletions={stats.deletions} />

@@ -487,6 +487,7 @@ const en = {
   "tabMenu.close": "Close",
   "tabMenu.closeOthers": "Close Others",
   "tabMenu.closeToRight": "Close to Right",
+  "tabMenu.closeToLeft": "Close to Left",
   "tabMenu.closeAll": "Close All",
   "tabMenu.copyPath": "Copy Path",
   "tabMenu.copyRelativePath": "Copy Relative Path",
