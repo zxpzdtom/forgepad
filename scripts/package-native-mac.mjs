@@ -12,6 +12,7 @@ const appRoot = join(bundleRoot, `${appName}.app`);
 const contents = join(appRoot, "Contents");
 const macOS = join(contents, "MacOS");
 const resources = join(contents, "Resources");
+const defaultAppIconPng = join(root, "src", "renderer", "public", "app-icons", "graphite.png");
 const hostAppBinary = join(macOS, "ForgePadHost");
 const bundledCoreBinary = join(resources, "forgepad-core-daemon");
 const codesignIdentity = process.env.FORGEPAD_CODESIGN_IDENTITY?.trim() || "-";
@@ -58,6 +59,35 @@ function codesign(target, { entitlements = false } = {}) {
 function verifyCodesign(target) {
   if (skipCodesign) return;
   run("codesign", ["--verify", "--deep", "--strict", "--verbose=4", target]);
+}
+
+function generateIcnsFromPng(sourcePng, destinationIcns) {
+  if (!existsSync(sourcePng)) return false;
+
+  const iconset = join(bundleRoot, "AppIcon.iconset");
+  rmSync(iconset, { recursive: true, force: true });
+  mkdirSync(iconset, { recursive: true });
+
+  const sizes = [
+    [16, "icon_16x16.png"],
+    [32, "icon_16x16@2x.png"],
+    [32, "icon_32x32.png"],
+    [64, "icon_32x32@2x.png"],
+    [128, "icon_128x128.png"],
+    [256, "icon_128x128@2x.png"],
+    [256, "icon_256x256.png"],
+    [512, "icon_256x256@2x.png"],
+    [512, "icon_512x512.png"],
+    [1024, "icon_512x512@2x.png"],
+  ];
+
+  for (const [size, fileName] of sizes) {
+    run("sips", ["-z", String(size), String(size), sourcePng, "--out", join(iconset, fileName)]);
+  }
+
+  run("iconutil", ["-c", "icns", iconset, "-o", destinationIcns]);
+  rmSync(iconset, { recursive: true, force: true });
+  return true;
 }
 
 function notarizeApp() {
@@ -130,6 +160,8 @@ chmodSync(bundledCoreBinary, 0o755);
 const iconPath = join(root, "build", "icon.icns");
 if (existsSync(iconPath)) {
   copyFileOrDir(iconPath, join(resources, "AppIcon.icns"));
+} else if (!generateIcnsFromPng(defaultAppIconPng, join(resources, "AppIcon.icns"))) {
+  console.warn(`\nNo app icon found at ${iconPath} or ${defaultAppIconPng}; packaged app will use the system default icon.`);
 }
 
 writeFileSync(
@@ -148,6 +180,8 @@ writeFileSync(
   <string>${bundleIdentifier}</string>
   <key>CFBundleInfoDictionaryVersion</key>
   <string>6.0</string>
+  <key>CFBundleDisplayName</key>
+  <string>ForgePad</string>
   <key>CFBundleName</key>
   <string>ForgePad</string>
   <key>CFBundlePackageType</key>

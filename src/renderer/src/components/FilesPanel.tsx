@@ -82,6 +82,13 @@ type TreeData = {
   gitStatus: GitStatusEntry[];
 };
 
+const EMPTY_TREE_DATA: TreeData = {
+  paths: [],
+  filePaths: new Set(),
+  gitStatus: [],
+};
+const fileTreeCache = new Map<string, TreeData>();
+
 function walk(nodes: FileNode[], rootPath: string, result: TreeData) {
   for (const node of nodes) {
     const rel = node.path.startsWith(rootPath)
@@ -151,11 +158,7 @@ export function FilesPanel() {
   const resolvedTheme = useResolvedTheme();
   const treeThemeStyle = TREE_THEMES[resolvedTheme];
   const workspace = useActiveWorkspace();
-  const [treeData, setTreeData] = useState<TreeData>({
-    paths: [],
-    filePaths: new Set(),
-    gitStatus: [],
-  });
+  const [treeData, setTreeData] = useState<TreeData>(() => (workspace ? (fileTreeCache.get(workspace.worktreePath) ?? EMPTY_TREE_DATA) : EMPTY_TREE_DATA));
   const [selectedPaths, setSelectedPaths] = useState<string[]>([]);
   const [manualContextMenu, setManualContextMenu] = useState<{
     item: FileTreeContextMenuItem;
@@ -296,21 +299,35 @@ export function FilesPanel() {
   }, [openFileRelPaths, model, treeData.filePaths]);
 
   const worktreePath = workspace?.worktreePath;
+  const loadRequestIdRef = useRef(0);
+
+  useEffect(() => {
+    loadRequestIdRef.current += 1;
+    setTreeData(worktreePath ? (fileTreeCache.get(worktreePath) ?? EMPTY_TREE_DATA) : EMPTY_TREE_DATA);
+    setLoading(false);
+  }, [worktreePath]);
 
   const load = useCallback(
     async (silent?: boolean) => {
       if (!worktreePath) return;
-      if (!silent) setLoading(true);
+      const requestId = ++loadRequestIdRef.current;
+      const cached = fileTreeCache.get(worktreePath);
+      if (cached) setTreeData(cached);
+      if (!silent && !cached) setLoading(true);
       try {
         const nodes = await window.forgepad.fs.getTreeWithStatus(worktreePath);
-        setTreeData(treeDataFromNodes(nodes, worktreePath));
+        if (requestId !== loadRequestIdRef.current) return;
+        const nextTreeData = treeDataFromNodes(nodes, worktreePath);
+        fileTreeCache.set(worktreePath, nextTreeData);
+        setTreeData(nextTreeData);
       } catch (error) {
+        if (requestId !== loadRequestIdRef.current) return;
         addToast('error', error instanceof Error ? error.message : t('files.failedLoadTree'));
       } finally {
-        if (!silent) setLoading(false);
+        if (requestId === loadRequestIdRef.current) setLoading(false);
       }
     },
-    [addToast, worktreePath],
+    [addToast, t, worktreePath],
   );
 
   // Initial load — show spinner

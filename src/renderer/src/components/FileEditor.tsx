@@ -1,5 +1,8 @@
 import {
+  type CSSProperties,
   lazy,
+  type MutableRefObject,
+  type ReactNode,
   Suspense,
   useCallback,
   useEffect,
@@ -7,9 +10,6 @@ import {
   useMemo,
   useRef,
   useState,
-  type CSSProperties,
-  type MutableRefObject,
-  type ReactNode,
 } from 'react';
 import type { SelectedLineRange } from '@pierre/diffs';
 import { getFiletypeFromFileName, Virtualizer as PierreVirtualizer } from '@pierre/diffs';
@@ -19,25 +19,12 @@ import { useResolvedTheme } from '@renderer/app/theme-context';
 import { useLspTokenNavigation } from '@renderer/hooks/useLspTokenNavigation';
 import { useAppStore } from '@renderer/store/app-store';
 import type { CodeSelectionItem, FilePreviewResult, Tab, Workspace } from '@shared/types';
-import {
-  Check,
-  ChevronDown,
-  ChevronUp,
-  Copy,
-  List,
-  MessageSquarePlus,
-  Search,
-  X,
-  ZoomIn,
-  ZoomOut,
-} from 'lucide-react';
+import clsx from 'clsx';
+import { Check, ChevronDown, ChevronUp, Copy, List, MessageSquarePlus, Search, X, ZoomIn, ZoomOut } from 'lucide-react';
+
 import { FileIcon } from './FileIcon';
 
-import clsx from 'clsx';
-
-const MarkdownPreview = lazy(() =>
-  import('./MarkdownPreview').then((module) => ({ default: module.MarkdownPreview })),
-);
+const MarkdownPreview = lazy(() => import('./MarkdownPreview').then((module) => ({ default: module.MarkdownPreview })));
 
 type FileTab = Extract<Tab, { type: 'file' }>;
 
@@ -73,6 +60,9 @@ const AUDIO_EXTENSIONS = new Set(['mp3', 'wav', 'ogg', 'flac', 'aac', 'm4a', 'wm
 const VIDEO_EXTENSIONS = new Set(['mp4', 'webm', 'mov', 'avi', 'mkv']);
 const TEXT_FILE_PREVIEW_LIMIT = 256 * 1024;
 const CODE_RENDER_LOADING_LINE_THRESHOLD = 800;
+const CODE_RENDER_PENDING_TIMEOUT_MS = 2500;
+const FILE_PREVIEW_LOAD_TIMEOUT_MS = 10_000;
+const FILE_PREVIEW_CACHE_LIMIT = 80;
 const MEDIA_ZOOM_MIN = 0.25;
 const MEDIA_ZOOM_MAX = 3;
 const MEDIA_ZOOM_STEP = 0.25;
@@ -83,6 +73,73 @@ const PIERRE_FILE_METRICS: VirtualFileMetrics = {
   hunkSeparatorHeight: 32,
   fileGap: 0,
 };
+
+type TextPreviewCacheEntry = {
+  fileText: string;
+  lineCount: number;
+  textPreview: FilePreviewResult;
+};
+
+const textPreviewCache = new Map<string, TextPreviewCacheEntry>();
+const mediaUrlCache = new Map<string, string>();
+
+function rememberCacheEntry<K, V>(cache: Map<K, V>, key: K, value: V, limit = FILE_PREVIEW_CACHE_LIMIT) {
+  if (cache.has(key)) cache.delete(key);
+  cache.set(key, value);
+  while (cache.size > limit) {
+    const oldestKey = cache.keys().next().value;
+    if (oldestKey === undefined) break;
+    cache.delete(oldestKey);
+  }
+}
+
+function filePreviewCacheKey({
+  absPath,
+  externalUrl,
+  relPath,
+  workspaceId,
+  worktreePath,
+}: {
+  absPath?: string;
+  externalUrl?: string;
+  relPath: string;
+  workspaceId: string;
+  worktreePath: string;
+}): string {
+  if (externalUrl) return `external:${externalUrl}`;
+  if (absPath) return `abs:${absPath}`;
+  return `workspace:${workspaceId}:${worktreePath}:${relPath}`;
+}
+
+function readMediaUrlFromSource({
+  absPath,
+  externalUrl,
+  relPath,
+  worktreePath,
+}: {
+  absPath?: string;
+  externalUrl?: string;
+  relPath: string;
+  worktreePath: string;
+}): Promise<string> {
+  if (externalUrl) return Promise.resolve(externalUrl);
+  if (absPath) {
+    if (!window.forgepad.fs.absFileUrl) return Promise.reject(new Error('Native file URL support is unavailable.'));
+    return window.forgepad.fs.absFileUrl(absPath);
+  }
+  if (!window.forgepad.fs.fileUrl) return Promise.reject(new Error('Native file URL support is unavailable.'));
+  return window.forgepad.fs.fileUrl(worktreePath, relPath);
+}
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs / 1000}s.`)), timeoutMs);
+  });
+  return Promise.race([promise, timeout]).finally(() => {
+    if (timer) clearTimeout(timer);
+  });
+}
 
 function getExt(relPath: string): string {
   return relPath.split('.').pop()?.toLowerCase() ?? '';
@@ -102,16 +159,6 @@ function isVideoFile(relPath: string): boolean {
 
 function isPdfFile(relPath: string): boolean {
   return getExt(relPath) === 'pdf';
-}
-
-function readMediaUrl(tab: FileTab, workspace: Workspace): Promise<string> {
-  if (tab.externalUrl) return Promise.resolve(tab.externalUrl);
-  if (tab.absPath) {
-    if (!window.forgepad.fs.absFileUrl) return Promise.reject(new Error('Native file URL support is unavailable.'));
-    return window.forgepad.fs.absFileUrl(tab.absPath);
-  }
-  if (!window.forgepad.fs.fileUrl) return Promise.reject(new Error('Native file URL support is unavailable.'));
-  return window.forgepad.fs.fileUrl(workspace.worktreePath, tab.relPath);
 }
 
 function isMarkdownPath(path: string): boolean {
@@ -172,7 +219,10 @@ function extractText(children: React.ReactNode): string {
 // --- Custom heading components that add id for anchor links ---
 
 /** Create a set of heading components (h1–h6) that add id attributes based on text content. */
-function createHeadingComponents(): Record<string, React.ComponentType<React.HTMLAttributes<HTMLHeadingElement> & { node?: unknown }>> {
+function createHeadingComponents(): Record<
+  string,
+  React.ComponentType<React.HTMLAttributes<HTMLHeadingElement> & { node?: unknown }>
+> {
   // Per-render slug counters for deduplication (reset each time Streamdown re-renders the tree)
   const counters = new Map<string, number>();
 
@@ -776,14 +826,17 @@ function FilePreviewSkeleton() {
 
 function ImagePreviewSkeleton() {
   return (
-    <div className="scrollbar-thin scroll-mask flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-surface-inset p-6" aria-busy="true">
+    <div
+      className="scrollbar-thin scroll-mask flex min-h-0 flex-1 items-center justify-center overflow-hidden bg-surface-inset p-6"
+      aria-busy="true"
+    >
       <div className="relative aspect-[4/3] w-full max-w-2xl overflow-hidden rounded-lg border border-border/60 bg-panel shadow-sm">
         <SkeletonBlock className="absolute inset-0 rounded-none bg-muted/10" />
         <div className="absolute inset-x-8 bottom-8 grid gap-3">
           <SkeletonBlock className="h-4 w-2/5 bg-bg/60" />
           <SkeletonBlock className="h-3 w-3/5 bg-bg/45" />
         </div>
-        <div className="absolute right-8 top-8 h-16 w-16 rounded-full bg-bg/45" />
+        <div className="absolute top-8 right-8 h-16 w-16 rounded-full bg-bg/45" />
       </div>
     </div>
   );
@@ -791,7 +844,10 @@ function ImagePreviewSkeleton() {
 
 function InlineFileRenderSkeleton() {
   return (
-    <div className="pointer-events-none sticky top-0 z-10 border-border border-b bg-bg/92 px-4 py-2 backdrop-blur" aria-busy="true">
+    <div
+      className="pointer-events-none sticky top-0 z-10 border-border border-b bg-bg/92 px-4 py-2 backdrop-blur"
+      aria-busy="true"
+    >
       <div className="grid grid-cols-[3rem_minmax(0,1fr)] items-center gap-4">
         <SkeletonBlock className="ml-auto h-3 w-6 bg-muted/10" />
         <SkeletonBlock className="h-3 w-1/2" />
@@ -876,6 +932,17 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
     tab.relPath,
     workspace.id,
     'file',
+  );
+  const cacheKey = useMemo(
+    () =>
+      filePreviewCacheKey({
+        absPath: tab.absPath,
+        externalUrl: tab.externalUrl,
+        relPath: tab.relPath,
+        workspaceId: workspace.id,
+        worktreePath: workspace.worktreePath,
+      }),
+    [tab.absPath, tab.externalUrl, tab.relPath, workspace.id, workspace.worktreePath],
   );
   const markdownFile = useMemo(() => isMarkdownPath(tab.relPath), [tab.relPath]);
   const isImage = useMemo(() => isImageFile(tab.relPath), [tab.relPath]);
@@ -1064,28 +1131,69 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
     setCodeRenderPending(true);
     setDeferCodeMount(true);
     const frame = requestAnimationFrame(() => setDeferCodeMount(false));
-    return () => cancelAnimationFrame(frame);
+    const timeout = setTimeout(() => setCodeRenderPending(false), CODE_RENDER_PENDING_TIMEOUT_MS);
+    return () => {
+      cancelAnimationFrame(frame);
+      clearTimeout(timeout);
+    };
   }, [fileText, lineCount, loading, showMediaPreview, showRenderedMarkdown, useLightweightCodeViewer]);
 
   // --- Load file ---
   useEffect(() => {
     let disposed = false;
-    setLoading(true);
+    const requestCacheKey = cacheKey;
+    const cachedText = textPreviewCache.get(requestCacheKey);
+    const cachedMediaUrl = mediaUrlCache.get(requestCacheKey);
+
     setCodeRenderPending(false);
     setDeferCodeMount(false);
-    setFileText('');
-    setTextPreview(null);
     setSearchRanges([]);
     setPendingSelection(null);
     setSelectedRange(null);
-    setMediaUrl('');
 
     if (isMediaFile) {
-      readMediaUrl(tab, workspace)
+      setFileText('');
+      setTextPreview(null);
+      setLineCount(0);
+      setMediaUrl(cachedMediaUrl ?? '');
+      setLoading(!cachedMediaUrl);
+    } else {
+      setMediaUrl('');
+      if (cachedText) {
+        setTextPreview(cachedText.textPreview);
+        setFileText(cachedText.fileText);
+        setLineCount(cachedText.lineCount);
+        setLoading(false);
+      } else {
+        setLoading(true);
+        setFileText('');
+        setTextPreview(null);
+        setLineCount(0);
+      }
+    }
+
+    if (isMediaFile) {
+      withTimeout(
+        readMediaUrlFromSource({
+          absPath: tab.absPath,
+          externalUrl: tab.externalUrl,
+          relPath: tab.relPath,
+          worktreePath: workspace.worktreePath,
+        }),
+        FILE_PREVIEW_LOAD_TIMEOUT_MS,
+        'Media preview load',
+      )
         .then((url) => {
-          if (!disposed) setMediaUrl(url);
+          rememberCacheEntry(mediaUrlCache, requestCacheKey, url);
+          if (!disposed) {
+            setMediaUrl(url);
+          }
         })
-        .catch((error) => addToast('error', error instanceof Error ? error.message : 'Failed to load file preview.'))
+        .catch((error) => {
+          if (!disposed && !cachedMediaUrl) {
+            addToast('error', error instanceof Error ? error.message : 'Failed to load file preview.');
+          }
+        })
         .finally(() => {
           if (!disposed) setLoading(false);
         });
@@ -1111,15 +1219,23 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
       : tab.absPath
         ? window.forgepad.fs.readAbsFilePreview(tab.absPath, TEXT_FILE_PREVIEW_LIMIT)
         : window.forgepad.fs.readFilePreview(workspace.worktreePath, tab.relPath, TEXT_FILE_PREVIEW_LIMIT);
-    textPromise
+    withTimeout(textPromise, FILE_PREVIEW_LOAD_TIMEOUT_MS, 'File preview load')
       .then((preview) => {
+        const nextEntry = {
+          textPreview: preview,
+          fileText: preview.content,
+          lineCount: preview.lineCount ?? preview.content.split('\n').length,
+        };
+        rememberCacheEntry(textPreviewCache, requestCacheKey, nextEntry);
         if (disposed) return;
-        setTextPreview(preview);
-        setFileText(preview.content);
-        setLineCount(preview.lineCount ?? preview.content.split('\n').length);
+        setTextPreview(nextEntry.textPreview);
+        setFileText(nextEntry.fileText);
+        setLineCount(nextEntry.lineCount);
       })
       .catch((error) => {
-        addToast('error', error instanceof Error ? error.message : 'Failed to load file.');
+        if (!disposed && !cachedText) {
+          addToast('error', error instanceof Error ? error.message : 'Failed to load file.');
+        }
       })
       .finally(() => {
         if (!disposed) setLoading(false);
@@ -1128,7 +1244,7 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
     return () => {
       disposed = true;
     };
-  }, [addToast, tab.relPath, tab.absPath, tab.externalUrl, workspace.worktreePath, isMediaFile]);
+  }, [addToast, cacheKey, tab.absPath, tab.externalUrl, tab.relPath, workspace.worktreePath, isMediaFile]);
 
   const handleMediaLoadError = useCallback(() => {
     addToast('error', 'Failed to load native file preview.');
@@ -1496,7 +1612,10 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
           {tab.relPath}
           {!isMediaFile && <span className="text-muted">{lineCount} lines</span>}
           {textPreview?.truncated ? (
-            <span className="text-muted" title={`Showing ${formatBytes(textPreview.previewBytes)} of ${formatBytes(textPreview.totalBytes)}`}>
+            <span
+              className="text-muted"
+              title={`Showing ${formatBytes(textPreview.previewBytes)} of ${formatBytes(textPreview.totalBytes)}`}
+            >
               preview truncated
             </span>
           ) : null}
@@ -1513,7 +1632,10 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
                 <ZoomOut size={14} />
               </button>
               <button
-                className={clsx('view-mode-btn min-w-[42px] px-1.5 text-[10px] tabular-nums', mediaZoomMode === 'fit' && 'active')}
+                className={clsx(
+                  'view-mode-btn min-w-[42px] px-1.5 text-[10px] tabular-nums',
+                  mediaZoomMode === 'fit' && 'active',
+                )}
                 type="button"
                 title={mediaZoomMode === 'fit' ? 'Fit to view' : `${Math.round(mediaZoom * 100)}%`}
                 onClick={fitMediaToView}
@@ -1668,12 +1790,7 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
                 : undefined
             }
           >
-            <video
-              controls
-              className="media-preview-video"
-              src={mediaUrl}
-              onError={handleMediaLoadError}
-            />
+            <video controls className="media-preview-video" src={mediaUrl} onError={handleMediaLoadError} />
           </div>
         </div>
       ) : showMediaPreview && isPdf && mediaUrl ? (
@@ -1708,7 +1825,10 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
           ) : null}
         </div>
       ) : useLightweightCodeViewer ? (
-        <div ref={codeViewerRef} className="code-viewer-scroll scrollbar-thin scroll-mask flex min-h-0 flex-1 flex-col overflow-auto bg-bg">
+        <div
+          ref={codeViewerRef}
+          className="code-viewer-scroll scrollbar-thin scroll-mask flex min-h-0 flex-1 flex-col overflow-auto bg-bg"
+        >
           <pre
             className="pierre-plain-text m-0 flex-1 overflow-auto p-4 font-mono text-text"
             style={{

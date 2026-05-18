@@ -18,7 +18,6 @@ import { QuickSearch } from "@renderer/components/QuickSearch";
 import { RightPanel } from "@renderer/components/RightPanel";
 import { SketchyFilters } from "@renderer/components/SketchyFilters";
 import { Sidebar } from "@renderer/components/Sidebar";
-import { Spinner } from "@renderer/components/Spinner";
 import { TabBar } from "@renderer/components/TabBar";
 import { TerminalDock } from "@renderer/components/TerminalDock";
 import { ToastStack } from "@renderer/components/ToastStack";
@@ -138,7 +137,6 @@ function fileTabOpenPath(tab: Extract<Tab, { type: 'file' }>, workspacePath: str
 
 function BootScreen() {
   const { t } = useTranslation();
-  const spinnerStyle = useAppStore((state) => state.settings.spinnerStyle);
   return (
     <div className="boot-screen flex size-full flex-col items-center justify-center overflow-hidden bg-bg p-8 text-center">
       <div className="boot-orbit" aria-hidden="true">
@@ -147,10 +145,6 @@ function BootScreen() {
         <span />
       </div>
       <div className="mt-5 font-semibold text-[22px] text-text">{t("app.name")}</div>
-      <div className="mt-2 flex items-center gap-2 text-muted text-sm">
-        <Spinner name={spinnerStyle} size={16} dotSize={2} />
-        <span>{t("app.loading")}</span>
-      </div>
     </div>
   );
 }
@@ -646,6 +640,7 @@ function AppInner() {
 
   useEffect(() => {
     if (!activeWorkspace) return;
+    if (!activeWorkspace.worktreePath) return;
 
     let disposed = false;
     let watchId: string | null = null;

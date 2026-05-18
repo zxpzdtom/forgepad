@@ -169,6 +169,7 @@ enum HostBridgeBootstrap {
         shell: {
           openPath: (fullPath) => invoke("shell.openPath", { fullPath }),
           openExternal: (url) => invoke("shell.openExternal", { url }),
+          saveFile: (request) => invoke("shell.saveFile", request || {}),
           openInIde: (fullPath) => invoke("shell.openInIde", { fullPath }),
           openInTerminal: (fullPath) => invoke("shell.openInTerminal", { fullPath }),
           showItemInFolder: (fullPath) => invoke("shell.showItemInFolder", { fullPath }),

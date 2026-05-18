@@ -78,6 +78,12 @@ export type ExtensionTabCreateRequest = {
   active: boolean;
 };
 
+export type SaveFileRequest = {
+  suggestedName: string;
+  contentBase64: string;
+  mimeType?: string;
+};
+
 export type HostBridgeApi = {
   app: {
     openProject: () => Promise<OpenProjectResult | null>;
@@ -170,6 +176,7 @@ export type HostBridgeApi = {
   shell: {
     openPath: (fullPath: string) => Promise<void>;
     openExternal: (url: string) => Promise<void>;
+    saveFile?: (request: SaveFileRequest) => Promise<void>;
     openInIde: (fullPath: string) => Promise<void>;
     openInTerminal: (fullPath: string) => Promise<void>;
     showItemInFolder: (fullPath: string) => Promise<void>;

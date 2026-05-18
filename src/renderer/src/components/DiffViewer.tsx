@@ -1,10 +1,16 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useTranslation } from '@renderer/i18n';
-import { parseDiffFromFile, Virtualizer as PierreVirtualizer, type FileDiffOptions, type FileDiffMetadata, type SelectedLineRange } from '@pierre/diffs';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  type FileDiffMetadata,
+  type FileDiffOptions,
+  Virtualizer as PierreVirtualizer,
+  parseDiffFromFile,
+  type SelectedLineRange,
+} from '@pierre/diffs';
 import type { DiffLineAnnotation } from '@pierre/diffs/react';
-import { FileDiff as PierreFileDiff, PatchDiff, VirtualizerContext } from '@pierre/diffs/react';
+import { PatchDiff, FileDiff as PierreFileDiff, VirtualizerContext } from '@pierre/diffs/react';
 import { useResolvedTheme } from '@renderer/app/theme-context';
 import { useLspTokenNavigation } from '@renderer/hooks/useLspTokenNavigation';
+import { useTranslation } from '@renderer/i18n';
 import { useAppStore } from '@renderer/store/app-store';
 import type { DiffCommentItem, DiffFileData, FileStatus, Tab, Workspace } from '@shared/types';
 import { MessageSquarePlus, RefreshCw } from 'lucide-react';
@@ -23,6 +29,14 @@ type PendingComment = {
 };
 
 type AnnotationMeta = { kind: 'pending' } | { kind: 'comment'; comment: DiffCommentItem };
+
+const diffViewCache = new Map<
+  string,
+  {
+    statuses: FileStatus[];
+    diffs: DiffFileData[];
+  }
+>();
 
 const diffViewerUnsafeCSS = `
   :host {
@@ -163,7 +177,9 @@ function ImageDiff({ file }: { file: DiffFileData }) {
           {file.oldImageUrl ? (
             <img src={file.oldImageUrl} alt={`${file.path} before`} />
           ) : (
-            <div className="image-diff-empty">{file.bucket === 'untracked' ? t('changes.untracked') : t('diff.binaryOmitted')}</div>
+            <div className="image-diff-empty">
+              {file.bucket === 'untracked' ? t('changes.untracked') : t('diff.binaryOmitted')}
+            </div>
           )}
         </div>
         <div className="image-diff-pane">
@@ -200,10 +216,13 @@ function DiffContent({
     lineAnnotations,
     renderAnnotation,
     selectedLines,
-    disableWorkerPool: true,
   };
 
-  return fullFileDiff ? <PierreFileDiff fileDiff={fullFileDiff} {...sharedProps} /> : <PatchDiff patch={patch} {...sharedProps} />;
+  return fullFileDiff ? (
+    <PierreFileDiff fileDiff={fullFileDiff} {...sharedProps} />
+  ) : (
+    <PatchDiff patch={patch} {...sharedProps} />
+  );
 }
 
 function formatRange(range: SelectedLineRange): string {
@@ -354,8 +373,8 @@ function DiffFileEntry({
       }
       return null;
     },
-	    [isThisFilePending, pending, setPending, addDiffComment, workspace.id, file.path, file.bucket],
-	  );
+    [isThisFilePending, pending, setPending, addDiffComment, workspace.id, file.path, file.bucket, t],
+  );
 
   const isSyntheticAddition = file.status === 'renamed' && !hasPatchHunks(file.patch);
   const entryClassName = [
@@ -419,6 +438,12 @@ export function DiffViewer({ tab, workspace }: DiffViewerProps) {
   const addToast = useAppStore((state) => state.addToast);
   const addDiffComment = useAppStore((state) => state.addDiffComment);
   const contextItems = useAppStore((state) => state.contextItems);
+  const loadRequestIdRef = useRef(0);
+  const diffsRef = useRef<DiffFileData[]>([]);
+
+  useEffect(() => {
+    diffsRef.current = diffs;
+  }, [diffs]);
 
   const commentsByPath = useMemo(() => {
     const map = new Map<string, DiffCommentItem[]>();
@@ -431,11 +456,31 @@ export function DiffViewer({ tab, workspace }: DiffViewerProps) {
     return map;
   }, [contextItems, workspace.id]);
 
+  const cacheKey = useMemo(
+    () =>
+      [
+        workspace.id,
+        workspace.worktreePath,
+        tab.activePath ?? '',
+        tab.activeBucket ?? '',
+        tab.activeStatus ?? '',
+        tab.activeOldPath ?? '',
+      ].join('\n'),
+    [tab.activeBucket, tab.activeOldPath, tab.activePath, tab.activeStatus, workspace.id, workspace.worktreePath],
+  );
+
   const load = useCallback(async () => {
-    setLoading(true);
+    const requestId = ++loadRequestIdRef.current;
+    const cached = diffViewCache.get(cacheKey);
+    if (cached) {
+      setStatuses(cached.statuses);
+      setDiffs(cached.diffs);
+    }
+    setLoading(!cached && diffsRef.current.length === 0);
     setPending(null);
     try {
       const nextStatuses = await window.forgepad.git.getStatus(workspace.worktreePath);
+      if (requestId !== loadRequestIdRef.current) return;
       setStatuses(nextStatuses);
       const visibleStatuses = removeRedundantStagedRenameShells(nextStatuses);
       const prioritized = tab.activePath
@@ -463,13 +508,19 @@ export function DiffViewer({ tab, workspace }: DiffViewerProps) {
           }
         }),
       );
+      if (requestId !== loadRequestIdRef.current) return;
+      diffViewCache.set(cacheKey, {
+        statuses: nextStatuses,
+        diffs: filesWithImageUrls,
+      });
       setDiffs(filesWithImageUrls);
     } catch (error) {
+      if (requestId !== loadRequestIdRef.current) return;
       addToast('error', error instanceof Error ? error.message : t('diff.failedLoadDiffs'));
     } finally {
-      setLoading(false);
+      if (requestId === loadRequestIdRef.current) setLoading(false);
     }
-  }, [addToast, tab.activeBucket, tab.activeOldPath, tab.activePath, tab.activeStatus, workspace.worktreePath]);
+  }, [addToast, cacheKey, tab.activeBucket, tab.activeOldPath, tab.activePath, tab.activeStatus, workspace.worktreePath, t]);
 
   useEffect(() => {
     void load();
@@ -514,13 +565,7 @@ export function DiffViewer({ tab, workspace }: DiffViewerProps) {
       hunkSeparators: 'line-info',
       unsafeCSS: diffViewerUnsafeCSS,
     }),
-    [
-      resolvedTheme,
-      settings.diffDisableBackground,
-      settings.diffIndicators,
-      settings.diffLineDiffType,
-      settings.diffStyle,
-    ],
+    [resolvedTheme, settings.diffDisableBackground, settings.diffIndicators, settings.diffLineDiffType, settings.diffStyle],
   );
 
   return (
@@ -543,7 +588,10 @@ export function DiffViewer({ tab, workspace }: DiffViewerProps) {
         <div className="grid min-h-[90px] place-items-center text-muted">{t('diff.selectFile')}</div>
       ) : null}
       <VirtualizerContext.Provider value={virtualizer}>
-        <div ref={setDiffScrollRegion} className="diff-scroll-region scrollbar-thin scroll-mask flex min-h-0 flex-1 flex-col items-stretch overflow-auto">
+        <div
+          ref={setDiffScrollRegion}
+          className="diff-scroll-region scrollbar-thin scroll-mask flex min-h-0 flex-1 flex-col items-stretch overflow-auto"
+        >
           {diffs.map((file) => (
             <DiffFileEntry
               key={`${file.bucket}:${file.path}`}

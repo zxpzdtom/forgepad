@@ -768,7 +768,7 @@ export function PetOverlay() {
   }, []);
 
   const clampPositionForLayout = useCallback((stage: PetStageSnapshot, point: MotionPoint, layout: MotionLayout) => {
-    const area = stage.workArea;
+    const area = nearestDisplay(stage, point);
     const minX = area.x + layout.spriteOffsetX + EDGE_MARGIN;
     const maxX = area.x + area.width - layout.width + layout.spriteOffsetX - EDGE_MARGIN;
     const minY = area.y + layout.spriteOffsetY + EDGE_MARGIN;

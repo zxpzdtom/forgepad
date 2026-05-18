@@ -241,6 +241,15 @@ pub fn collect_status(path: &Path) -> CoreResult<Vec<FileStatus>> {
     Ok(statuses)
 }
 
+fn sum_status_change_stats(statuses: &[FileStatus]) -> (i64, i64) {
+    statuses.iter().fold((0, 0), |(additions, deletions), status| {
+        (
+            additions + status.additions.unwrap_or(0),
+            deletions + status.deletions.unwrap_or(0),
+        )
+    })
+}
+
 pub fn branch_stats(path: &Path) -> BranchStats {
     let rev = command_output(
         "git",
@@ -252,20 +261,8 @@ pub fn branch_stats(path: &Path) -> BranchStats {
         .split_whitespace()
         .filter_map(|s| s.parse().ok())
         .collect();
-    let diff =
-        command_output("git", &["diff", "--shortstat", "HEAD"], Some(path)).unwrap_or_default();
-    let additions = diff
-        .split(',')
-        .find(|s| s.contains("insertion"))
-        .and_then(|s| s.split_whitespace().next())
-        .and_then(|s| s.parse().ok())
-        .unwrap_or(0);
-    let deletions = diff
-        .split(',')
-        .find(|s| s.contains("deletion"))
-        .and_then(|s| s.split_whitespace().next())
-        .and_then(|s| s.parse().ok())
-        .unwrap_or(0);
+    let statuses = collect_status(path).unwrap_or_default();
+    let (additions, deletions) = sum_status_change_stats(&statuses);
 
     BranchStats {
         ahead: *nums.get(1).unwrap_or(&0),
@@ -330,11 +327,13 @@ pub fn remote_branches(repo_path: &Path) -> CoreResult<Vec<String>> {
 }
 
 pub fn pr_info(worktree_path: &Path) -> CoreResult<Option<PullRequestInfo>> {
-    let out = match command_output(
-        "gh",
-        &["pr", "view", "--json", "number,url,mergedAt,state"],
-        Some(worktree_path),
-    ) {
+    let args = vec![
+        "pr".to_string(),
+        "view".to_string(),
+        "--json".to_string(),
+        "number,url,mergedAt,state".to_string(),
+    ];
+    let out = match run_agent_command(worktree_path, "gh", &args, Duration::from_secs(5)) {
         Ok(out) => out,
         Err(_) => return Ok(None),
     };
@@ -587,12 +586,22 @@ pub fn add_worktree(
     worktree_base_dir: Option<&str>,
 ) -> CoreResult<WorktreeAddResult> {
     let base = worktree_base_dir
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
         .map(PathBuf::from)
         .unwrap_or_else(|| repo_path.parent().unwrap_or(repo_path).to_path_buf());
     let name = branch.replace('/', "-");
     let worktree_path = base.join(&name).to_string_lossy().to_string();
+    let remote_ref = format!("refs/remotes/origin/{branch}");
+    let remote_exists = track_remote
+        && command_status(
+            "git",
+            &["show-ref", "--verify", "--quiet", &remote_ref],
+            Some(repo_path),
+        )
+        .is_ok();
 
-    if track_remote {
+    if remote_exists {
         command_status(
             "git",
             &[
@@ -608,7 +617,7 @@ pub fn add_worktree(
     } else {
         command_status(
             "git",
-            &["worktree", "add", &worktree_path, branch],
+            &["worktree", "add", "-b", branch, &worktree_path],
             Some(repo_path),
         )?;
     }
@@ -709,5 +718,33 @@ mod tests {
             parse_numstat_line("4\t2\told.ts => new.ts"),
             Some(("new.ts".into(), 4, 2))
         );
+    }
+
+    #[test]
+    fn sum_status_change_stats_matches_changes_panel_aggregation() {
+        let statuses = vec![
+            FileStatus {
+                path: "src/app.ts".into(),
+                old_path: None,
+                status: "modified".into(),
+                bucket: "unstaged".into(),
+                staged: false,
+                conflict_kind: None,
+                additions: Some(12),
+                deletions: Some(3),
+            },
+            FileStatus {
+                path: "src/new.ts".into(),
+                old_path: None,
+                status: "untracked".into(),
+                bucket: "untracked".into(),
+                staged: false,
+                conflict_kind: None,
+                additions: Some(8),
+                deletions: Some(0),
+            },
+        ];
+
+        assert_eq!(sum_status_change_stats(&statuses), (20, 3));
     }
 }

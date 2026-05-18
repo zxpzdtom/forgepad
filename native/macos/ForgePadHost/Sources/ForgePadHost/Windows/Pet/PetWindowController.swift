@@ -205,8 +205,8 @@ final class PetWindowController: NSWindowController, WKNavigationDelegate, WKScr
     private func moveWindowToBrowserTopLeft(x: Double, y: Double) {
         guard let window else { return }
         let screen = screenForBrowserPoint(x: x, y: y) ?? window.screen ?? NSScreen.main
-        let screenTop = screen?.frame.maxY ?? window.frame.maxY
-        let appKitY = screenTop - y - window.frame.height
+        let desktopTop = virtualDesktopFrame().maxY
+        let appKitY = desktopTop - y - window.frame.height
         let nextFrame = clampedFrame(
             NSRect(x: x, y: appKitY, width: window.frame.width, height: window.frame.height),
             on: screen
@@ -242,13 +242,19 @@ final class PetWindowController: NSWindowController, WKNavigationDelegate, WKScr
     }
 
     private func browserRect(_ rect: NSRect, on screen: NSScreen?) -> NSRect {
-        guard let screen else { return rect }
+        guard screen != nil else { return rect }
         return NSRect(
             x: rect.origin.x,
-            y: screen.frame.maxY - rect.maxY,
+            y: virtualDesktopFrame().maxY - rect.maxY,
             width: rect.width,
             height: rect.height
         )
+    }
+
+    private func virtualDesktopFrame() -> NSRect {
+        NSScreen.screens.reduce(NSRect.null) { partial, screen in
+            partial.union(screen.frame)
+        }
     }
 
     private func screenForAppKitRect(_ rect: NSRect) -> NSScreen? {

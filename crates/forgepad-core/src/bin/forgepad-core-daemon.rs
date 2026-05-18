@@ -58,7 +58,6 @@ struct DiffPreviewCacheKey {
 struct WorkspaceSnapshot {
     tree: Vec<files::FileNode>,
     files: Vec<String>,
-    statuses: Vec<git::FileStatus>,
     fs_fingerprint: u64,
     git_fingerprint: u64,
 }
@@ -351,7 +350,7 @@ fn dispatch(
         }
         "git.status" => {
             let worktree_path = string_param(&params, "worktreePath")?;
-            serde_json::to_value(workspace_snapshot(&worktree_path)?.statuses)
+            serde_json::to_value(git::collect_status(Path::new(&worktree_path))?)
                 .map_err(|e| e.to_string())
         }
         "git.branchStats" => {
@@ -615,7 +614,7 @@ struct FsWatchManager {
 }
 
 struct FsWatchRegistration {
-    _watcher: RecommendedWatcher,
+    _watchers: Vec<RecommendedWatcher>,
     stop: Arc<AtomicBool>,
     worker: Option<thread::JoinHandle<()>>,
 }
@@ -634,6 +633,7 @@ impl FsWatchManager {
         let canonical_root = std::fs::canonicalize(&root).unwrap_or(root);
         let (tx, rx) = mpsc::channel::<Vec<PathBuf>>();
         let watch_root = canonical_root.clone();
+        let watch_tx = tx.clone();
         let mut watcher =
             notify::recommended_watcher(move |event: Result<notify::Event, notify::Error>| {
                 match event {
@@ -643,7 +643,7 @@ impl FsWatchManager {
                             .into_iter()
                             .filter(|path| !should_skip(path))
                             .collect::<Vec<_>>();
-                        let _ = tx.send(if paths.is_empty() {
+                        let _ = watch_tx.send(if paths.is_empty() {
                             vec![watch_root.clone()]
                         } else {
                             paths
@@ -651,7 +651,7 @@ impl FsWatchManager {
                     }
                     Ok(_) => {}
                     Err(_) => {
-                        let _ = tx.send(vec![watch_root.clone()]);
+                        let _ = watch_tx.send(vec![watch_root.clone()]);
                     }
                 }
             })
@@ -659,6 +659,37 @@ impl FsWatchManager {
         watcher
             .watch(&canonical_root, RecursiveMode::Recursive)
             .map_err(|error| error.to_string())?;
+        let mut watchers = vec![watcher];
+
+        if let Some(git_state_dir) = git_state_dir_to_watch(&canonical_root) {
+            let git_watch_root = canonical_root.clone();
+            let git_tx = tx.clone();
+            if let Ok(mut git_watcher) =
+                notify::recommended_watcher(move |event: Result<notify::Event, notify::Error>| {
+                    match event {
+                        Ok(event) if should_emit_fs_event(&event.kind) || event.need_rescan() => {
+                            let paths = event.paths.into_iter().collect::<Vec<_>>();
+                            let _ = git_tx.send(if paths.is_empty() {
+                                vec![git_watch_root.clone()]
+                            } else {
+                                paths
+                            });
+                        }
+                        Ok(_) => {}
+                        Err(_) => {
+                            let _ = git_tx.send(vec![git_watch_root.clone()]);
+                        }
+                    }
+                })
+            {
+                if git_watcher
+                    .watch(&git_state_dir, RecursiveMode::Recursive)
+                    .is_ok()
+                {
+                    watchers.push(git_watcher);
+                }
+            }
+        }
 
         let stop = Arc::new(AtomicBool::new(false));
         let output = Arc::clone(&self.output);
@@ -696,7 +727,7 @@ impl FsWatchManager {
             .insert(
                 id.clone(),
                 FsWatchRegistration {
-                    _watcher: watcher,
+                    _watchers: watchers,
                     stop: worker_stop,
                     worker: Some(worker),
                 },
@@ -748,6 +779,14 @@ fn should_skip(path: &Path) -> bool {
         name,
         ".git" | "node_modules" | "target" | "dist" | ".next" | ".turbo" | ".cache" | "build"
     )
+}
+
+fn git_state_dir_to_watch(worktree_path: &Path) -> Option<PathBuf> {
+    let git_dir = git_dir_for_worktree(worktree_path);
+    if !git_dir.is_dir() {
+        return None;
+    }
+    Some(git_dir)
 }
 
 fn workspace_cache_key(path: &Path) -> String {
@@ -807,7 +846,6 @@ fn build_workspace_snapshot(
     Ok(WorkspaceSnapshot {
         tree,
         files,
-        statuses,
         fs_fingerprint,
         git_fingerprint,
     })

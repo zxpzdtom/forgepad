@@ -508,6 +508,8 @@ function ChangesSectionTree({
 export function ChangesPanel() {
   const { t } = useTranslation();
   const workspace = useActiveWorkspace();
+  const workspaceId = workspace?.id;
+  const worktreePath = workspace?.worktreePath;
   const [statuses, setStatuses] = useState<FileStatus[]>([]);
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [commitMessage, setCommitMessage] = useState('');
@@ -518,6 +520,7 @@ export function ChangesPanel() {
   const addToast = useAppStore((state) => state.addToast);
   const openDiffTab = useAppStore((state) => state.openDiffTab);
   const triggerGitRefresh = useAppStore((state) => state.triggerGitRefresh);
+  const updateBranchChangeStats = useAppStore((state) => state.updateBranchChangeStats);
   const gitRefreshEpoch = useAppStore((state) => state.gitRefreshEpoch);
   const spinnerStyle = useAppStore((state) => state.settings.spinnerStyle);
   const commitPromptTemplate = useAppStore((state) => state.settings.commitPromptTemplate);
@@ -527,45 +530,57 @@ export function ChangesPanel() {
   const activeDiffTab = useAppStore((state) => state.tabs.find((tab) => tab.workspaceId === activeWorkspaceId && tab.type === 'diff'));
 
   const prevSignature = useRef('');
+  const loadedWorkspaceIdRef = useRef<string | null>(null);
+  const loadRequestIdRef = useRef(0);
+  const statusCacheRef = useRef<Map<string, FileStatus[]>>(new Map());
   const commitTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   const load = useCallback(
     async (silent?: boolean) => {
-      if (!workspace) return;
-      if (!silent) setLoading(true);
+      if (!workspaceId || !worktreePath) return;
+      const requestId = ++loadRequestIdRef.current;
+      const showBlockingLoading = !silent && loadedWorkspaceIdRef.current !== workspaceId;
+      if (showBlockingLoading) setLoading(true);
       try {
-        const next = await window.forgepad.git.getStatus(workspace.worktreePath);
+        const next = await window.forgepad.git.getStatus(worktreePath);
+        if (requestId !== loadRequestIdRef.current) return;
         const sig = next.map((s) => statusKey(s)).join(',');
         setStatuses(next);
+        statusCacheRef.current.set(workspaceId, next);
+        loadedWorkspaceIdRef.current = workspaceId;
+        updateBranchChangeStats(workspaceId, next);
         setSelectedKeys((current) => new Set([...current].filter((key) => next.some((status) => statusKey(status) === key))));
         if (sig !== prevSignature.current) {
           prevSignature.current = sig;
         }
       } catch (error) {
+        if (requestId !== loadRequestIdRef.current) return;
         addToast('error', error instanceof Error ? error.message : t('changes.failedLoadStatus'));
       } finally {
-        if (!silent) setLoading(false);
+        if (requestId === loadRequestIdRef.current) setLoading(false);
       }
     },
-    [addToast, workspace, triggerGitRefresh, t],
+    [addToast, workspaceId, worktreePath, updateBranchChangeStats, t],
   );
+
+  useEffect(() => {
+    loadRequestIdRef.current += 1;
+    prevSignature.current = '';
+    const cached = workspaceId ? statusCacheRef.current.get(workspaceId) : undefined;
+    loadedWorkspaceIdRef.current = cached && workspaceId ? workspaceId : null;
+    setStatuses(cached ?? []);
+    setSelectedKeys(new Set());
+    setLoading(false);
+  }, [workspaceId]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
   useEffect(() => {
-    if (!workspace || gitRefreshEpoch === 0) return;
+    if (!workspaceId || gitRefreshEpoch === 0) return;
     void load(true);
-  }, [gitRefreshEpoch, load, workspace]);
-
-  useEffect(() => {
-    if (!workspace) return;
-    const timer = setInterval(() => {
-      void load(true);
-    }, 4000);
-    return () => clearInterval(timer);
-  }, [workspace, load]);
+  }, [gitRefreshEpoch, load, workspaceId]);
 
   const selected = useMemo(() => statuses.filter((status) => selectedKeys.has(statusKey(status))), [selectedKeys, statuses]);
   const selectedStageable = useMemo(

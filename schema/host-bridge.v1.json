@@ -329,6 +329,15 @@
       "result": "void",
       "nativeOwner": true
     },
+    "shell.saveFile": {
+      "params": {
+        "suggestedName": "string",
+        "contentBase64": "string",
+        "mimeType": "string?"
+      },
+      "result": "void",
+      "nativeOwner": true
+    },
     "shell.showItemInFolder": {
       "params": {
         "fullPath": "string"

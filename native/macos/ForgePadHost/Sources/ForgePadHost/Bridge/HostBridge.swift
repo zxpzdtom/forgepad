@@ -92,6 +92,7 @@ final class HostBridge: NSObject, WKScriptMessageHandler {
             window?.performZoom(nil)
             return NSNull()
         case "app.setIcon":
+            try setAppIcon(variant: requiredString(params, "variant"))
             return NSNull()
         case "dialog.confirm":
             return await confirm(
@@ -138,6 +139,13 @@ final class HostBridge: NSObject, WKScriptMessageHandler {
             if let url = params["url"] as? String, let parsed = URL(string: url) {
                 NSWorkspace.shared.open(parsed)
             }
+            return NSNull()
+        case "shell.saveFile":
+            try await saveFile(
+                suggestedName: requiredString(params, "suggestedName"),
+                contentBase64: requiredString(params, "contentBase64"),
+                mimeType: params["mimeType"] as? String
+            )
             return NSNull()
         case "shell.openPath":
             if let fullPath = params["fullPath"] as? String {
@@ -195,6 +203,63 @@ final class HostBridge: NSObject, WKScriptMessageHandler {
         }
     }
 
+    @MainActor
+    private func setAppIcon(variant: String) throws {
+        let allowedVariants = Set(["graphite", "aurora", "ember", "frost", "violet"])
+        guard allowedVariants.contains(variant) else {
+            throw NSError(
+                domain: "ForgePadHost",
+                code: 400,
+                userInfo: [NSLocalizedDescriptionKey: "Unknown app icon variant: \(variant)"]
+            )
+        }
+
+        guard let iconURL = appIconURL(for: variant),
+              let image = NSImage(contentsOf: iconURL)
+        else {
+            throw NSError(
+                domain: "ForgePadHost",
+                code: 404,
+                userInfo: [NSLocalizedDescriptionKey: "App icon asset not found: \(variant)"]
+            )
+        }
+
+        NSApplication.shared.applicationIconImage = image
+        NSApplication.shared.dockTile.display()
+    }
+
+    private func appIconURL(for variant: String) -> URL? {
+        let relativePath = "app-icons/\(variant).png"
+        var candidates: [URL] = []
+
+        if let resourceURL = Bundle.main.resourceURL {
+            candidates.append(resourceURL.appendingPathComponent("renderer").appendingPathComponent(relativePath))
+        }
+
+        candidates.append(
+            URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+                .appendingPathComponent("../../../src/renderer/public")
+                .appendingPathComponent(relativePath)
+                .standardizedFileURL
+        )
+
+        let packageDirectory = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent() // Bridge
+            .deletingLastPathComponent() // ForgePadHost
+            .deletingLastPathComponent() // Sources
+            .deletingLastPathComponent() // ForgePadHost package
+        candidates.append(
+            packageDirectory
+                .deletingLastPathComponent() // macos
+                .deletingLastPathComponent() // native
+                .deletingLastPathComponent() // repo root
+                .appendingPathComponent("src/renderer/public")
+                .appendingPathComponent(relativePath)
+        )
+
+        return candidates.first { FileManager.default.fileExists(atPath: $0.path) }
+    }
+
     private func confirm(title: String?, message: String?, confirmLabel: String?, cancelLabel: String?) async -> Bool {
         let alert = NSAlert()
         alert.alertStyle = .warning
@@ -250,6 +315,28 @@ final class HostBridge: NSObject, WKScriptMessageHandler {
         panel.begin { response in
             completion(response == .OK ? panel.url?.path : nil)
         }
+    }
+
+    private func saveFile(suggestedName: String, contentBase64: String, mimeType: String?) async throws {
+        guard let data = Data(base64Encoded: contentBase64) else {
+            throw HostBridgeError.invalidInput("contentBase64")
+        }
+
+        let panel = NSSavePanel()
+        panel.nameFieldStringValue = suggestedName.isEmpty ? "download" : suggestedName
+        if let mimeType,
+           let type = UTType(mimeType: mimeType) {
+            panel.allowedContentTypes = [type]
+        }
+
+        let destination = await withCheckedContinuation { continuation in
+            panel.begin { response in
+                continuation.resume(returning: response == .OK ? panel.url : nil)
+            }
+        }
+
+        guard let destination else { return }
+        try data.write(to: destination, options: .atomic)
     }
 
     private func pickNotificationAudio() async -> [String: Any]? {
@@ -691,6 +778,7 @@ final class HostBridge: NSObject, WKScriptMessageHandler {
 
 private enum HostBridgeError: Error {
     case missingParameter(String)
+    case invalidInput(String)
     case invalidPath(String)
     case unknownCommand(String)
 }

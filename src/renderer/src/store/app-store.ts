@@ -52,6 +52,47 @@ type Toast = {
   message: string;
 };
 
+type BranchStatsValue = {
+  ahead: number;
+  behind: number;
+  additions: number;
+  deletions: number;
+  prNumber?: number | null;
+  prUrl?: string | null;
+  prMerged?: boolean | null;
+  updatedAt?: number;
+};
+
+type PrInfoValue = { number: number; url: string; merged: boolean };
+
+const PR_INFO_CACHE_TTL_MS = 60_000;
+const prInfoCache = new Map<string, { value: PrInfoValue | null; expiresAt: number }>();
+const prInfoInflight = new Map<string, Promise<PrInfoValue | null>>();
+
+function prInfoCacheKey(workspace: Workspace): string {
+  return `${workspace.worktreePath}\n${workspace.branch}`;
+}
+
+async function getCachedPrInfo(workspace: Workspace): Promise<PrInfoValue | null> {
+  const key = prInfoCacheKey(workspace);
+  const cached = prInfoCache.get(key);
+  if (cached && cached.expiresAt > Date.now()) return cached.value;
+
+  const inflight = prInfoInflight.get(key);
+  if (inflight) return inflight;
+
+  const request = window.forgepad.git
+    .getPrInfo(workspace.worktreePath)
+    .catch(() => null)
+    .then((value) => {
+      prInfoCache.set(key, { value, expiresAt: Date.now() + PR_INFO_CACHE_TTL_MS });
+      prInfoInflight.delete(key);
+      return value;
+    });
+  prInfoInflight.set(key, request);
+  return request;
+}
+
 type AppState = {
   panels: WorkspacePanel[];
   activePanelId: string | null;
@@ -67,6 +108,8 @@ type AppState = {
   activeFileTabId: string | null;
   /** Per-workspace last-selected agent tab – survives workspace switching */
   workspaceActiveAgentTabIds: Record<string, string>;
+  /** Per-workspace last-selected file/editor tab – survives workspace switching */
+  workspaceActiveFileTabIds: Record<string, string>;
   /** File path to reveal in the file tree (set when clicking a file tab). */
   revealFileInTree: { relPath: string; epoch: number } | null;
   rightPanelMode: RightPanelMode;
@@ -82,18 +125,7 @@ type AppState = {
   hydrated: boolean;
   workspaceLoadingIds: Set<string>;
   focusedColumn: 'sidebar' | 'agent' | 'file' | 'terminal' | 'rightPanel';
-  branchStats: Record<
-    string,
-    {
-      ahead: number;
-      behind: number;
-      additions: number;
-      deletions: number;
-      prNumber?: number | null;
-      prUrl?: string | null;
-      prMerged?: boolean | null;
-    }
-  >;
+  branchStats: Record<string, BranchStatsValue>;
   gitRefreshEpoch: number;
   /** Agent lifecycle statuses keyed by ptyId */
   agentStatuses: Record<string, AgentStatus>;
@@ -203,6 +235,8 @@ type AppState = {
   restoreAgentSessions: () => Promise<void>;
   setFocusedColumn: (column: AppState['focusedColumn']) => void;
   refreshBranchStats: (workspaceId?: string) => Promise<void>;
+  refreshPrInfo: (workspaceId: string) => Promise<void>;
+  updateBranchChangeStats: (workspaceId: string, statuses: FileStatus[]) => void;
   reorderProjects: (activeId: string, overId: string) => void;
   navigatePanel: (direction: 'prev' | 'next') => void;
   setActivePanel: (panelId: string) => void;
@@ -287,6 +321,10 @@ function serializeForSave(state: AppState): PersistedAppState {
   if (state.activeWorkspaceId && state.activeAgentTabId) {
     workspaceActiveAgentTabIds[state.activeWorkspaceId] = state.activeAgentTabId;
   }
+  const workspaceActiveFileTabIds = { ...state.workspaceActiveFileTabIds };
+  if (state.activeWorkspaceId && state.activeFileTabId) {
+    workspaceActiveFileTabIds[state.activeWorkspaceId] = state.activeFileTabId;
+  }
 
   const savedAgentSessions = state.tabs
     .filter(
@@ -326,6 +364,8 @@ function serializeForSave(state: AppState): PersistedAppState {
     activeWorkspaceId: state.activeWorkspaceId,
     activeTabId: state.tabs.find((tab) => tab.id === state.activeTabId)?.type === 'terminal' ? null : state.activeTabId,
     workspaceActiveAgentTabIds,
+    workspaceActiveFileTabIds,
+    branchStats: state.branchStats,
     rightPanelMode: state.rightPanelMode,
     rightPanelOpen: state.rightPanelOpen,
     sidebarOpen: state.sidebarOpen,
@@ -392,6 +432,7 @@ function activeIdsAfterRemoval(
 
   // Try to restore the remembered agent tab for this workspace first
   const rememberedAgentTabId = activeWorkspaceId ? state.workspaceActiveAgentTabIds[activeWorkspaceId] : undefined;
+  const rememberedFileTabId = activeWorkspaceId ? state.workspaceActiveFileTabIds[activeWorkspaceId] : undefined;
 
   const activeAgentTabId =
     // 1. Check the remembered per-workspace agent tab
@@ -408,9 +449,11 @@ function activeIdsAfterRemoval(
       ? state.activeShellTabId
       : (shellTabs.at(-1)?.id ?? null);
   const activeFileTabId =
-    state.activeFileTabId && fileTabs.some((tab) => tab.id === state.activeFileTabId)
-      ? state.activeFileTabId
-      : (fileTabs.at(-1)?.id ?? null);
+    rememberedFileTabId && fileTabs.some((tab) => tab.id === rememberedFileTabId)
+      ? rememberedFileTabId
+      : state.activeFileTabId && fileTabs.some((tab) => tab.id === state.activeFileTabId)
+        ? state.activeFileTabId
+        : (fileTabs.at(-1)?.id ?? null);
   const activeTabId =
     state.activeTabId && workspaceTabs.some((tab) => tab.id === state.activeTabId)
       ? state.activeTabId
@@ -429,6 +472,9 @@ function activeIdsAfterRemoval(
 const agentWorkingTimers = new Map<string, ReturnType<typeof setTimeout>>();
 /** Per-pty timeout handles for cancel-detection (user pressed ESC / Ctrl+C). */
 const agentCancelTimers = new Map<string, ReturnType<typeof setTimeout>>();
+/** Per-pty timeout handles for clearing completion-only review animation. */
+const agentReviewTimers = new Map<string, ReturnType<typeof setTimeout>>();
+const REVIEW_STATUS_AUTO_CLEAR_MS = 8_000;
 
 export const useAppStore = create<AppState>((set, get) => ({
   panels: [],
@@ -444,6 +490,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   activeShellTabId: null,
   activeFileTabId: null,
   workspaceActiveAgentTabIds: {},
+  workspaceActiveFileTabIds: {},
   revealFileInTree: null,
   rightPanelMode: 'files',
   rightPanelOpen: true,
@@ -510,13 +557,18 @@ export const useAppStore = create<AppState>((set, get) => ({
       agentWorkingTimers.delete(ptyId);
     }
 
+    const reviewTimer = agentReviewTimers.get(ptyId);
+    if (reviewTimer) {
+      clearTimeout(reviewTimer);
+      agentReviewTimers.delete(ptyId);
+    }
+
     set((state) => {
       const currentStatus = state.agentStatuses[ptyId];
 
       // Protect actionable states: don't let "working" / "idle" events
-      // overwrite "permission" or "review" — the user hasn't acknowledged
-      // them yet.  Only a new "permission" can upgrade "review", and only
-      // explicit user focus / setActiveTab clears these states.
+      // overwrite "permission". Review is allowed to be short-lived so the
+      // pet can return to default after the completion cue has been shown.
       // (Inspired by CodeIsland's isWaiting guard.)
       const isWaiting = currentStatus === 'permission';
       let effectiveStatus = status;
@@ -547,6 +599,20 @@ export const useAppStore = create<AppState>((set, get) => ({
 
       return patch;
     });
+
+    if (status === 'review' && get().agentStatuses[ptyId] === 'review') {
+      agentReviewTimers.set(
+        ptyId,
+        setTimeout(() => {
+          agentReviewTimers.delete(ptyId);
+          if (get().agentStatuses[ptyId] === 'review') {
+            set((state) => ({
+              agentStatuses: { ...state.agentStatuses, [ptyId]: 'idle' },
+            }));
+          }
+        }, REVIEW_STATUS_AUTO_CLEAR_MS),
+      );
+    }
   },
   setPendingPermission: (permission) => {
     set({ pendingPermission: permission });
@@ -560,6 +626,11 @@ export const useAppStore = create<AppState>((set, get) => ({
     }));
   },
   setAgentCompletion: (ptyId, aiMessage) => {
+    const reviewTimer = agentReviewTimers.get(ptyId);
+    if (reviewTimer) {
+      clearTimeout(reviewTimer);
+      agentReviewTimers.delete(ptyId);
+    }
     set((state) => {
       const userPrompt = state.agentMessages[ptyId]?.userPrompt ?? '';
       const card: import('@shared/types').CompletionCard = {
@@ -574,6 +645,10 @@ export const useAppStore = create<AppState>((set, get) => ({
           ...state.agentMessages,
           [ptyId]: { ...state.agentMessages[ptyId], aiResponse: aiMessage },
         },
+        agentStatuses:
+          state.agentStatuses[ptyId] === 'review'
+            ? { ...state.agentStatuses, [ptyId]: 'idle' }
+            : state.agentStatuses,
         completionCards: [...state.completionCards, card],
       };
     });
@@ -593,6 +668,11 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (ct) {
       clearTimeout(ct);
       agentCancelTimers.delete(ptyId);
+    }
+    const rt = agentReviewTimers.get(ptyId);
+    if (rt) {
+      clearTimeout(rt);
+      agentReviewTimers.delete(ptyId);
     }
     set((state) => {
       if (!state.agentStatuses[ptyId]) return state;
@@ -634,6 +714,11 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (ct) {
       clearTimeout(ct);
       agentCancelTimers.delete(ptyId);
+    }
+    const rt = agentReviewTimers.get(ptyId);
+    if (rt) {
+      clearTimeout(rt);
+      agentReviewTimers.delete(ptyId);
     }
     set((state) => {
       const exitedPtyIds = new Set(state.exitedPtyIds);
@@ -812,6 +897,10 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (item.type === 'task') return tasks.some((task) => task.id === item.taskId);
       return true;
     });
+    const workspaceIdSet = new Set(workspaces.map((workspace) => workspace.id));
+    const branchStats = Object.fromEntries(
+      Object.entries(state?.branchStats ?? {}).filter(([workspaceId]) => workspaceIdSet.has(workspaceId)),
+    );
     // Restore per-workspace agent tab map, filtering out stale tab IDs
     const tabIdSet = new Set(tabs.map((tab) => tab.id));
     const workspaceActiveAgentTabIds: Record<string, string> = {};
@@ -822,14 +911,34 @@ export const useAppStore = create<AppState>((set, get) => ({
         }
       }
     }
+    const workspaceActiveFileTabIds: Record<string, string> = {};
+    if (state?.workspaceActiveFileTabIds) {
+      for (const [wsId, tabId] of Object.entries(state.workspaceActiveFileTabIds)) {
+        if (tabIdSet.has(tabId)) {
+          workspaceActiveFileTabIds[wsId] = tabId;
+        }
+      }
+    }
 
     // Derive per-type active tab IDs from restored tabs
     const wsTabs = tabs.filter((tab) => tab.workspaceId === activeWorkspaceId);
-    const restoredActiveTabId = tabs.some((tab) => tab.id === state?.activeTabId) ? (state?.activeTabId ?? null) : null;
+    const restoredActiveTab = tabs.find((tab) => tab.id === state?.activeTabId);
+    const restoredActiveTabId = restoredActiveTab?.id ?? null;
     const restoredAgentTabs = wsTabs.filter((t) => t.type === 'terminal' && t.isAgent);
     const restoredShellTabs = wsTabs.filter((t) => t.type === 'terminal' && !t.isAgent);
     const restoredFileTabs = wsTabs.filter((t) => t.type !== 'terminal');
     const rememberedAgentTabId = activeWorkspaceId ? workspaceActiveAgentTabIds[activeWorkspaceId] : undefined;
+    const rememberedFileTabId = activeWorkspaceId ? workspaceActiveFileTabIds[activeWorkspaceId] : undefined;
+    const restoredActiveFileTabId =
+      restoredActiveTab && restoredActiveTab.workspaceId === activeWorkspaceId && restoredActiveTab.type !== 'terminal'
+        ? restoredActiveTab.id
+        : undefined;
+    const activeFileTabId =
+      rememberedFileTabId && restoredFileTabs.some((t) => t.id === rememberedFileTabId)
+        ? rememberedFileTabId
+        : restoredActiveFileTabId && restoredFileTabs.some((t) => t.id === restoredActiveFileTabId)
+          ? restoredActiveFileTabId
+          : restoredFileTabs.at(-1)?.id ?? null;
 
     set({
       panels: migratedPanels,
@@ -840,12 +949,13 @@ export const useAppStore = create<AppState>((set, get) => ({
       tabs,
       agentSessionHistory,
       activeWorkspaceId,
-      activeTabId: restoredActiveTabId,
+      activeTabId: wsTabs.some((tab) => tab.id === restoredActiveTabId) ? restoredActiveTabId : activeFileTabId,
       activeAgentTabId:
         (rememberedAgentTabId && restoredAgentTabs.some((t) => t.id === rememberedAgentTabId) ? rememberedAgentTabId : null) ?? null,
       activeShellTabId: restoredShellTabs.at(-1)?.id ?? null,
-      activeFileTabId: restoredFileTabs.at(-1)?.id ?? null,
+      activeFileTabId,
       workspaceActiveAgentTabIds,
+      workspaceActiveFileTabIds,
       rightPanelMode: state?.rightPanelMode ?? 'files',
       rightPanelOpen: state?.rightPanelOpen ?? true,
       sidebarOpen: state?.sidebarOpen ?? true,
@@ -853,6 +963,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       contextItems,
       composerText: state?.composerText ?? '',
       settings,
+      branchStats,
       browserHistory: state?.browserHistory ?? [],
       projectActiveRunIndex: state?.projectActiveRunIndex ?? {},
       hydrated: true,
@@ -862,7 +973,6 @@ export const useAppStore = create<AppState>((set, get) => ({
     // value so the host can explicitly show or hide its separate pet window.
     window.forgepad.pet.sendSettings(settings.pets);
 
-    get().refreshBranchStats();
     // Discover worktrees on disk that aren't tracked yet
     get().syncWorktreesFromDisk();
     // Refresh branch names in case they changed since last session
@@ -1025,6 +1135,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   createTerminal: async (workspaceId, initialCommand) => {
     const workspace = findWorkspace(get(), workspaceId);
     if (!workspace) return null;
+    if (!workspace.worktreePath) return null;
     try {
       const ptyId = await window.forgepad.pty.create(
         workspace.worktreePath,
@@ -1201,6 +1312,10 @@ export const useAppStore = create<AppState>((set, get) => ({
         patch.activeShellTabId = tab.id;
       } else {
         patch.activeFileTabId = tab.id;
+        patch.workspaceActiveFileTabIds = {
+          ...state.workspaceActiveFileTabIds,
+          [tab.workspaceId]: tab.id,
+        };
       }
       return patch;
     }),
@@ -1237,7 +1352,11 @@ export const useAppStore = create<AppState>((set, get) => ({
         patch.activeShellTabId = chooseNeighbor(originalShellTabs);
       }
       if (tab && tab.type !== 'terminal' && state.activeFileTabId === tabId) {
-        patch.activeFileTabId = chooseNeighbor(originalFileTabs);
+        const nextFileTabId = chooseNeighbor(originalFileTabs);
+        patch.activeFileTabId = nextFileTabId;
+        patch.workspaceActiveFileTabIds = nextFileTabId
+          ? { ...state.workspaceActiveFileTabIds, [tab.workspaceId]: nextFileTabId }
+          : Object.fromEntries(Object.entries(state.workspaceActiveFileTabIds).filter(([workspaceId]) => workspaceId !== tab.workspaceId));
       }
       // Clean up PTY-related state for closed terminal tabs
       if (tab?.type === 'terminal') {
@@ -1275,6 +1394,10 @@ export const useAppStore = create<AppState>((set, get) => ({
         patch.activeShellTabId = tabId;
       } else {
         patch.activeFileTabId = tabId;
+        patch.workspaceActiveFileTabIds = {
+          ...state.workspaceActiveFileTabIds,
+          [tab.workspaceId]: tabId!,
+        };
         // Signal file tree to reveal the file when it's a file tab
         if (tab?.type === 'file') {
           patch.revealFileInTree = {
@@ -1305,6 +1428,10 @@ export const useAppStore = create<AppState>((set, get) => ({
         patch.activeShellTabId = tabId;
       } else {
         patch.activeFileTabId = tabId;
+        patch.workspaceActiveFileTabIds = {
+          ...s.workspaceActiveFileTabIds,
+          [tab.workspaceId]: tabId,
+        };
       }
       patch.activeTabId = tabId;
       return patch;
@@ -1329,7 +1456,11 @@ export const useAppStore = create<AppState>((set, get) => ({
         patch.activeShellTabId = remainingShells.at(-1)?.id ?? null;
       } else {
         const remaining = tabs.filter((t) => t.workspaceId === workspaceId && t.type !== 'terminal');
-        patch.activeFileTabId = remaining.at(-1)?.id ?? null;
+        const nextFileTabId = remaining.at(-1)?.id ?? null;
+        patch.activeFileTabId = nextFileTabId;
+        patch.workspaceActiveFileTabIds = nextFileTabId
+          ? { ...s.workspaceActiveFileTabIds, [workspaceId]: nextFileTabId }
+          : Object.fromEntries(Object.entries(s.workspaceActiveFileTabIds).filter(([id]) => id !== workspaceId));
       }
       const wsTabs = tabs.filter((t) => t.workspaceId === workspaceId);
       patch.activeTabId = wsTabs.at(-1)?.id ?? null;
@@ -1362,6 +1493,10 @@ export const useAppStore = create<AppState>((set, get) => ({
           patch.activeShellTabId = tabId;
         } else {
           patch.activeFileTabId = tabId;
+          patch.workspaceActiveFileTabIds = {
+            ...s.workspaceActiveFileTabIds,
+            [tab.workspaceId]: tabId,
+          };
         }
       }
       return patch;
@@ -1393,6 +1528,10 @@ export const useAppStore = create<AppState>((set, get) => ({
           patch.activeShellTabId = tabId;
         } else {
           patch.activeFileTabId = tabId;
+          patch.workspaceActiveFileTabIds = {
+            ...s.workspaceActiveFileTabIds,
+            [tab.workspaceId]: tabId,
+          };
         }
       }
       return patch;
@@ -1877,11 +2016,15 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (!workspace) return;
     try {
       const branch = await window.forgepad.git.getCurrentBranch(workspace.worktreePath);
+      const branchChanged = branch !== workspace.branch;
       set((state) => {
         return {
           workspaces: state.workspaces.map((item) => (item.id === workspaceId ? { ...item, branch } : item)),
         };
       });
+      if (branchChanged) {
+        void get().refreshBranchStats(workspaceId);
+      }
     } catch {
       // Ignore branch lookup failures here. Worktree creation uses
       // workspaceLoadingIds; routine branch refreshes should stay visually quiet.
@@ -2144,6 +2287,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       // Clean workspaceActiveAgentTabIds
       const nextWsAgentTabs = { ...state.workspaceActiveAgentTabIds };
       for (const id of removedWorkspaceIds) delete nextWsAgentTabs[id];
+      const nextWsFileTabs = { ...state.workspaceActiveFileTabIds };
+      for (const id of removedWorkspaceIds) delete nextWsFileTabs[id];
 
       // Clean projectActiveRunIndex
       const { [projectId]: _, ...nextProjectActiveRunIndex } = state.projectActiveRunIndex;
@@ -2159,6 +2304,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         agentStatuses: nextAgentStatuses,
         agentMessages: nextAgentMessages,
         workspaceActiveAgentTabIds: nextWsAgentTabs,
+        workspaceActiveFileTabIds: nextWsFileTabs,
         projectActiveRunIndex: nextProjectActiveRunIndex,
         ...activeIdsAfterRemoval(state, tabs, workspaces),
       };
@@ -2198,6 +2344,7 @@ export const useAppStore = create<AppState>((set, get) => ({
 
       // Clean workspaceActiveAgentTabIds
       const { [workspaceId]: _, ...nextWsAgentTabs } = state.workspaceActiveAgentTabIds;
+      const { [workspaceId]: _fileTab, ...nextWsFileTabs } = state.workspaceActiveFileTabIds;
 
       return {
         projects,
@@ -2212,6 +2359,7 @@ export const useAppStore = create<AppState>((set, get) => ({
         agentStatuses: nextAgentStatuses,
         agentMessages: nextAgentMessages,
         workspaceActiveAgentTabIds: nextWsAgentTabs,
+        workspaceActiveFileTabIds: nextWsFileTabs,
         ...activeIdsAfterRemoval(state, tabs, workspaces),
       };
     }),
@@ -2242,6 +2390,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     if (!project) return;
 
     const workspaceId = id();
+    const previousActiveWorkspaceId = get().activeWorkspaceId;
 
     // 先插入占位 workspace，让侧边栏立即显示 loading 项
     const optimisticWorkspace: Workspace = {
@@ -2283,7 +2432,7 @@ export const useAppStore = create<AppState>((set, get) => ({
       // 失败时回滚，移除占位项
       set((state) => ({
         workspaces: state.workspaces.filter((w) => w.id !== workspaceId),
-        activeWorkspaceId: null,
+        activeWorkspaceId: previousActiveWorkspaceId,
       }));
       get().addToast('error', `Failed to create worktree: ${error instanceof Error ? error.message : String(error)}`);
     } finally {
@@ -2352,38 +2501,90 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   refreshBranchStats: async (workspaceId) => {
     const state = get();
-    const targets = workspaceId ? state.workspaces.filter((w) => w.id === workspaceId) : state.workspaces;
-    const updates: Record<
-      string,
-      {
-        ahead: number;
-        behind: number;
-        additions: number;
-        deletions: number;
-        prNumber?: number | null;
-        prUrl?: string | null;
-        prMerged?: boolean | null;
-      }
-    > = {};
+    const targets = (workspaceId ? state.workspaces.filter((w) => w.id === workspaceId) : state.workspaces).filter(
+      (w) => Boolean(w.worktreePath),
+    );
     await Promise.all(
       targets.map(async (w) => {
         try {
-          const [stats, prInfo] = await Promise.all([
-            window.forgepad.git.getBranchStats(w.worktreePath),
-            window.forgepad.git.getPrInfo(w.worktreePath).catch(() => null),
-          ]);
-          updates[w.id] = {
-            ...stats,
-            prNumber: prInfo?.number ?? null,
-            prUrl: prInfo?.url ?? null,
-            prMerged: prInfo?.merged ?? null,
-          };
+          const stats = await window.forgepad.git.getBranchStats(w.worktreePath);
+          set((current) => ({
+            branchStats: {
+              ...current.branchStats,
+              [w.id]: {
+                ...stats,
+                prNumber: current.branchStats[w.id]?.prNumber ?? null,
+                prUrl: current.branchStats[w.id]?.prUrl ?? null,
+                prMerged: current.branchStats[w.id]?.prMerged ?? null,
+                updatedAt: now(),
+              },
+            },
+          }));
         } catch {
-          updates[w.id] = { ahead: 0, behind: 0, additions: 0, deletions: 0 };
+          set((current) => ({
+            branchStats: {
+              ...current.branchStats,
+              [w.id]: {
+                ahead: 0,
+                behind: 0,
+                additions: 0,
+                deletions: 0,
+                prNumber: current.branchStats[w.id]?.prNumber ?? null,
+                prUrl: current.branchStats[w.id]?.prUrl ?? null,
+                prMerged: current.branchStats[w.id]?.prMerged ?? null,
+                updatedAt: now(),
+              },
+            },
+          }));
         }
+
+        void get().refreshPrInfo(w.id);
       }),
     );
-    set((s) => ({ branchStats: { ...s.branchStats, ...updates } }));
+  },
+
+  refreshPrInfo: async (workspaceId) => {
+    const workspace = get().workspaces.find((item) => item.id === workspaceId);
+    if (!workspace) return;
+    const key = prInfoCacheKey(workspace);
+    const prInfo = await getCachedPrInfo(workspace);
+    const latest = get().workspaces.find((item) => item.id === workspaceId);
+    if (!latest || prInfoCacheKey(latest) !== key) return;
+    set((current) => ({
+      branchStats: {
+        ...current.branchStats,
+        [workspaceId]: {
+          ahead: current.branchStats[workspaceId]?.ahead ?? 0,
+          behind: current.branchStats[workspaceId]?.behind ?? 0,
+          additions: current.branchStats[workspaceId]?.additions ?? 0,
+          deletions: current.branchStats[workspaceId]?.deletions ?? 0,
+          prNumber: prInfo?.number ?? null,
+          prUrl: prInfo?.url ?? null,
+          prMerged: prInfo?.merged ?? null,
+          updatedAt: now(),
+        },
+      },
+    }));
+  },
+
+  updateBranchChangeStats: (workspaceId, statuses) => {
+    const additions = statuses.reduce((sum, status) => sum + (status.additions ?? 0), 0);
+    const deletions = statuses.reduce((sum, status) => sum + (status.deletions ?? 0), 0);
+    set((state) => ({
+      branchStats: {
+        ...state.branchStats,
+        [workspaceId]: {
+          ahead: state.branchStats[workspaceId]?.ahead ?? 0,
+          behind: state.branchStats[workspaceId]?.behind ?? 0,
+          prNumber: state.branchStats[workspaceId]?.prNumber ?? null,
+          prUrl: state.branchStats[workspaceId]?.prUrl ?? null,
+          prMerged: state.branchStats[workspaceId]?.prMerged ?? null,
+          additions,
+          deletions,
+          updatedAt: now(),
+        },
+      },
+    }));
   },
 
   // ── Browser tab actions ──────────────────────────────────────────────────

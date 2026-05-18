@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { downloadFile } from '@renderer/lib/download-file';
 import { useAppStore } from '@renderer/store/app-store';
 import { code as streamdownCode } from '@streamdown/code';
 import { createMermaidPlugin } from '@streamdown/mermaid';
@@ -22,7 +23,7 @@ const streamdownPluginsDark = { code: streamdownCode, mermaid: mermaidDark };
 const streamdownPluginsLight = { code: streamdownCode, mermaid: mermaidLight };
 
 const markdownAllowedTags: AllowedTags = {
-  a: ['href', 'title', 'target', 'rel'],
+  a: ['href', 'title', 'target', 'rel', 'download'],
   h1: ['align', 'id'],
   h2: ['align', 'id'],
   h3: ['align', 'id'],
@@ -73,6 +74,73 @@ function splitPathFromSuffix(path: string): string {
   return path.split(/[?#]/, 1)[0];
 }
 
+function fallbackDownloadName(url: string): string {
+  try {
+    const parsed = new URL(url, window.location.href);
+    const name = parsed.pathname.split('/').filter(Boolean).pop();
+    return name ? decodeURIComponent(name) : 'download';
+  } catch {
+    return 'download';
+  }
+}
+
+const CODE_DOWNLOAD_EXTENSIONS: Record<string, string> = {
+  bash: 'sh',
+  css: 'css',
+  html: 'html',
+  javascript: 'js',
+  js: 'js',
+  json: 'json',
+  jsx: 'jsx',
+  markdown: 'md',
+  md: 'md',
+  python: 'py',
+  py: 'py',
+  rust: 'rs',
+  rs: 'rs',
+  shell: 'sh',
+  sh: 'sh',
+  ts: 'ts',
+  tsx: 'tsx',
+  typescript: 'ts',
+  yaml: 'yaml',
+  yml: 'yml',
+};
+
+function codeDownloadName(language: string): string {
+  const normalized = language.trim().toLowerCase();
+  return `file.${CODE_DOWNLOAD_EXTENSIONS[normalized] ?? 'txt'}`;
+}
+
+function tableCells(row: HTMLTableRowElement): string[] {
+  return Array.from(row.cells).map((cell) => cell.textContent?.trim() ?? '');
+}
+
+function escapeCsvCell(value: string): string {
+  return /[",\n\r]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value;
+}
+
+function escapeMarkdownCell(value: string): string {
+  return value.replace(/\\/g, '\\\\').replace(/\|/g, '\\|').replace(/\n/g, '<br>');
+}
+
+function tableToCsv(table: HTMLTableElement): string {
+  return Array.from(table.rows)
+    .map((row) => tableCells(row).map(escapeCsvCell).join(','))
+    .join('\n');
+}
+
+function tableToMarkdown(table: HTMLTableElement): string {
+  const rows = Array.from(table.rows).map(tableCells);
+  if (rows.length === 0) return '';
+
+  const columnCount = Math.max(...rows.map((row) => row.length));
+  const normalizedRows = rows.map((row) => Array.from({ length: columnCount }, (_, index) => row[index] ?? ''));
+  const [header, ...body] = normalizedRows;
+  const separator = Array.from({ length: columnCount }, () => '---');
+  return [header, separator, ...body].map((row) => `| ${row.map(escapeMarkdownCell).join(' | ')} |`).join('\n');
+}
+
 type MarkdownImageProps = React.ImgHTMLAttributes<HTMLImageElement> & {
   node?: unknown;
 };
@@ -81,12 +149,31 @@ type MarkdownAnchorProps = React.AnchorHTMLAttributes<HTMLAnchorElement> & {
   node?: unknown;
 };
 
-async function resolveLocalMarkdownImageUrl(
-  src: string,
+async function downloadMarkdownHref(
+  href: string,
+  download: React.AnchorHTMLAttributes<HTMLAnchorElement>['download'],
   workspacePath: string,
   markdownPath: string,
   markdownAbsPath?: string,
 ) {
+  const downloadName = typeof download === 'string' && download ? download : fallbackDownloadName(href);
+  let resolvedHref = href;
+  if (!isRemoteOrEmbeddedUrl(href)) {
+    const pathWithoutSuffix = splitPathFromSuffix(href);
+    resolvedHref = markdownAbsPath
+      ? ((await window.forgepad.fs.absFileUrl?.(resolveAbsMarkdownImagePath(pathWithoutSuffix, markdownAbsPath))) ?? href)
+      : ((await window.forgepad.fs.fileUrl?.(
+          workspacePath,
+          splitPathFromSuffix(resolveMarkdownImagePath(pathWithoutSuffix, markdownPath)),
+        )) ?? href);
+  }
+
+  const response = await fetch(resolvedHref);
+  const blob = await response.blob();
+  await downloadFile({ blob, suggestedName: downloadName });
+}
+
+async function resolveLocalMarkdownImageUrl(src: string, workspacePath: string, markdownPath: string, markdownAbsPath?: string) {
   if (!src || isRemoteOrEmbeddedUrl(src)) return src;
   const [pathWithoutSuffix] = src.split(/[?#]/, 1);
   if (markdownAbsPath && window.forgepad.fs.absFileUrl) {
@@ -127,13 +214,15 @@ async function rewriteLocalMarkdownImageSources(
   );
 
   if (replacements.size === 0) return markdownText;
-  return markdownText.replace(/!\[([^\]]*)]\(([^)\s]+)((?:\s+"[^"]*")?)\)/g, (full, alt, src, title) => {
-    const replacement = replacements.get(src);
-    return replacement ? `![${alt}](${replacement}${title})` : full;
-  }).replace(/(<img\b[^>]*\bsrc=)(["'])(.*?)\2/gi, (full, prefix, quote, src) => {
-    const replacement = replacements.get(src);
-    return replacement ? `${prefix}${quote}${replacement}${quote}` : full;
-  });
+  return markdownText
+    .replace(/!\[([^\]]*)]\(([^)\s]+)((?:\s+"[^"]*")?)\)/g, (full, alt, src, title) => {
+      const replacement = replacements.get(src);
+      return replacement ? `![${alt}](${replacement}${title})` : full;
+    })
+    .replace(/(<img\b[^>]*\bsrc=)(["'])(.*?)\2/gi, (full, prefix, quote, src) => {
+      const replacement = replacements.get(src);
+      return replacement ? `${prefix}${quote}${replacement}${quote}` : full;
+    });
 }
 
 function createMarkdownImageComponent(workspacePath: string, markdownPath: string, markdownAbsPath?: string) {
@@ -147,11 +236,13 @@ function createMarkdownImageComponent(workspacePath: string, markdownPath: strin
 
       if (!rawSrc || isRemoteOrEmbeddedUrl(rawSrc)) return;
 
-      resolveLocalMarkdownImageUrl(rawSrc, workspacePath, markdownPath, markdownAbsPath).then((url) => {
-        if (!disposed) setResolvedSrc(url);
-      }).catch(() => {
-        if (!disposed) setResolvedSrc(rawSrc);
-      });
+      resolveLocalMarkdownImageUrl(rawSrc, workspacePath, markdownPath, markdownAbsPath)
+        .then((url) => {
+          if (!disposed) setResolvedSrc(url);
+        })
+        .catch(() => {
+          if (!disposed) setResolvedSrc(rawSrc);
+        });
 
       return () => {
         disposed = true;
@@ -171,12 +262,13 @@ function createMarkdownImageComponent(workspacePath: string, markdownPath: strin
 
 function createMarkdownAnchorComponent(
   workspaceId: string,
+  workspacePath: string,
   markdownPath: string,
   openFileTab: (workspaceId: string, relPath: string) => void,
   openExternalFileTab: (workspaceId: string, absPath: string) => void,
   markdownAbsPath?: string,
 ) {
-  const MarkdownAnchor = ({ node: _, href, onClick, children, ...props }: MarkdownAnchorProps) => {
+  const MarkdownAnchor = ({ node: _, download, href, onClick, children, ...props }: MarkdownAnchorProps) => {
     const rawHref = typeof href === 'string' ? href : '';
 
     const handleClick = (event: React.MouseEvent<HTMLAnchorElement>) => {
@@ -186,6 +278,13 @@ function createMarkdownAnchorComponent(
       if (rawHref.startsWith('#')) return;
 
       event.preventDefault();
+
+      if (download !== undefined && download !== false) {
+        downloadMarkdownHref(rawHref, download, workspacePath, markdownPath, markdownAbsPath).catch((error) => {
+          console.error('Failed to save markdown download', error);
+        });
+        return;
+      }
 
       if (isRemoteOrEmbeddedUrl(rawHref)) {
         void window.forgepad.shell.openExternal(rawHref);
@@ -202,7 +301,7 @@ function createMarkdownAnchorComponent(
     };
 
     return (
-      <a {...props} href={rawHref} onClick={handleClick}>
+      <a {...props} download={download} href={rawHref} onClick={handleClick}>
         {children}
       </a>
     );
@@ -223,7 +322,57 @@ export function MarkdownPreview({
 }: MarkdownPreviewProps) {
   const openFileTab = useAppStore((state) => state.openFileTab);
   const openExternalFileTab = useAppStore((state) => state.openExternalFileTab);
+  const rootRef = useRef<HTMLDivElement>(null);
   const [renderMarkdownText, setRenderMarkdownText] = useState(markdownText);
+
+  useEffect(() => {
+    const handleStreamdownDownloadClick = (event: MouseEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+
+      const button = target.closest<HTMLButtonElement>('button');
+      if (!button) return;
+
+      const root = rootRef.current;
+      const inPreview = root?.contains(button) ?? false;
+      const inTableFullscreen = button.closest('[data-streamdown="table-fullscreen"]') !== null;
+      if (!inPreview && !inTableFullscreen) return;
+
+      const codeButton = button.closest<HTMLButtonElement>('[data-streamdown="code-block-download-button"]');
+      if (codeButton) {
+        const block = codeButton.closest<HTMLElement>('[data-streamdown="code-block"]');
+        const codeElement = block?.querySelector<HTMLElement>('[data-streamdown="code-block-body"] code');
+        const code = codeElement?.textContent ?? '';
+        const language = block?.dataset.language ?? '';
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        void downloadFile({
+          blob: new Blob([code], { type: 'text/plain' }),
+          suggestedName: codeDownloadName(language),
+        });
+        return;
+      }
+
+      const title = button.getAttribute('title') ?? '';
+      const tableFormat = title.includes('Markdown') ? 'markdown' : title.includes('CSV') ? 'csv' : null;
+      if (tableFormat) {
+        const wrapper = button.closest<HTMLElement>('[data-streamdown="table-wrapper"], [data-streamdown="table-fullscreen"]');
+        const table = wrapper?.querySelector<HTMLTableElement>('table');
+        if (!table) return;
+
+        const content = tableFormat === 'markdown' ? tableToMarkdown(table) : tableToCsv(table);
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        void downloadFile({
+          blob: new Blob([content], { type: tableFormat === 'markdown' ? 'text/markdown' : 'text/csv' }),
+          suggestedName: tableFormat === 'markdown' ? 'table.md' : 'table.csv',
+        });
+      }
+    };
+
+    document.addEventListener('click', handleStreamdownDownloadClick, true);
+    return () => document.removeEventListener('click', handleStreamdownDownloadClick, true);
+  }, []);
 
   useEffect(() => {
     let disposed = false;
@@ -239,20 +388,22 @@ export function MarkdownPreview({
   const previewComponents = useMemo<Components>(
     () => ({
       ...components,
-      a: createMarkdownAnchorComponent(workspaceId, markdownPath, openFileTab, openExternalFileTab, absPath),
+      a: createMarkdownAnchorComponent(workspaceId, workspacePath, markdownPath, openFileTab, openExternalFileTab, absPath),
       img: createMarkdownImageComponent(workspacePath, markdownPath, absPath),
     }),
     [absPath, components, markdownPath, openExternalFileTab, openFileTab, workspaceId, workspacePath],
   );
 
   return (
-    <Streamdown
-      allowedTags={markdownAllowedTags}
-      components={previewComponents}
-      linkSafety={{ enabled: false }}
-      plugins={theme === 'dark' ? streamdownPluginsDark : streamdownPluginsLight}
-    >
-      {renderMarkdownText}
-    </Streamdown>
+    <div ref={rootRef} style={{ display: 'contents' }}>
+      <Streamdown
+        allowedTags={markdownAllowedTags}
+        components={previewComponents}
+        linkSafety={{ enabled: false }}
+        plugins={theme === 'dark' ? streamdownPluginsDark : streamdownPluginsLight}
+      >
+        {renderMarkdownText}
+      </Streamdown>
+    </div>
   );
 }

@@ -1,5 +1,20 @@
 import { type KeyboardEvent, memo, type ReactNode, useEffect, useMemo, useState } from 'react';
-import { closestCenter, DndContext, type DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import {
+  type CollisionDetection,
+  closestCenter,
+  DndContext,
+  type DragEndEvent,
+  type DragOverEvent,
+  DragOverlay,
+  type DragStartEvent,
+  MeasuringStrategy,
+  PointerSensor,
+  pointerWithin,
+  useDroppable,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
+import { snapCenterToCursor } from '@dnd-kit/modifiers';
 import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import data from '@emoji-mart/data';
@@ -10,14 +25,13 @@ import { confirmNative } from '@renderer/lib/native-dialog';
 import { useAppStore } from '@renderer/store/app-store';
 import type { AgentStatus } from '@shared/agent-lifecycle';
 import type { Project, WorkspacePanel } from '@shared/types';
+import clsx from 'clsx';
 import { FolderOpen, FolderPlus, Plus } from 'lucide-react';
 
 import { ContextMenu, type ContextMenuSection } from './ContextMenu';
 import { NewWorktreeDialog } from './NewWorktreeDialog';
 import { Spinner } from './Spinner';
 import { Tooltip } from './Tooltip';
-
-import clsx from 'clsx';
 
 type SidebarWorkspace = {
   id: string;
@@ -26,6 +40,36 @@ type SidebarWorkspace = {
   worktreePath: string;
   createdAt: number;
   isRoot: boolean;
+};
+
+type SidebarDragKind = 'project' | 'workspace';
+
+type SidebarDragState = {
+  id: string;
+  kind: SidebarDragKind;
+  width: number;
+} | null;
+
+const PROJECT_LIST_END_DROP_ID = 'sidebar-projects:end';
+
+function getWorkspaceEndDropId(projectId: string) {
+  return `sidebar-workspaces:end:${projectId}`;
+}
+
+function getProjectIdFromWorkspaceEndDropId(id: string) {
+  return id.startsWith('sidebar-workspaces:end:') ? id.slice('sidebar-workspaces:end:'.length) : null;
+}
+
+const sidebarCollisionDetection: CollisionDetection = (args) => {
+  const pointerIntersections = pointerWithin(args);
+  if (pointerIntersections.length > 1) {
+    const specificIntersections = pointerIntersections.filter((item) => {
+      const id = String(item.id);
+      return id !== PROJECT_LIST_END_DROP_ID && !getProjectIdFromWorkspaceEndDropId(id);
+    });
+    if (specificIntersections.length > 0) return specificIntersections;
+  }
+  return pointerIntersections.length > 0 ? pointerIntersections : closestCenter(args);
 };
 
 /* ── Inline SVG icons ─────────────────────────────────────────── */
@@ -323,6 +367,7 @@ function SortableProjectGroup({
   onToggle,
   onAddWorktree,
   onContextMenu,
+  disableTransform = false,
 }: {
   projectId: string;
   name: string;
@@ -332,19 +377,19 @@ function SortableProjectGroup({
   onToggle: () => void;
   onAddWorktree: () => void;
   onContextMenu: (e: React.MouseEvent) => void;
+  disableTransform?: boolean;
 }) {
   const { t } = useTranslation();
+  const visibleCollapsed = isCollapsed;
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: projectId,
     data: { type: 'project' },
   });
 
   const style = {
-    transform: CSS.Transform.toString(transform),
+    transform: disableTransform ? undefined : CSS.Transform.toString(transform),
     transition: transition ?? 'transform 180ms cubic-bezier(0.2, 0, 0, 1)',
-    opacity: isDragging ? 0.74 : 1,
-    zIndex: isDragging ? 20 : undefined,
-    willChange: 'transform',
+    willChange: disableTransform ? undefined : 'transform',
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
@@ -359,9 +404,9 @@ function SortableProjectGroup({
       ref={setNodeRef}
       style={style}
       className={clsx(
-        'group/sidebar-project flex min-w-0 flex-col rounded-lg',
+        'group/sidebar-project flex min-w-0 flex-col rounded-lg transition-[background-color,box-shadow,opacity] duration-150',
         hasActive && 'bg-panel/60',
-        isDragging && 'shadow-[0_16px_34px_rgba(0,0,0,0.28)] ring-1 ring-accent/25',
+        isDragging && 'opacity-35',
       )}
     >
       <div
@@ -389,13 +434,74 @@ function SortableProjectGroup({
           <AddIcon />
         </button>
         <ArrowDownIcon
-          className={clsx(
-            'shrink-0 text-subtle transition-transform duration-200 ease-[ease]',
-            isCollapsed && '-rotate-90',
-          )}
+          className={clsx('shrink-0 text-subtle transition-transform duration-200 ease-[ease]', visibleCollapsed && '-rotate-90')}
         />
       </div>
       {children}
+    </div>
+  );
+}
+
+function SidebarDropPlaceholder({ kind }: { kind: SidebarDragKind }) {
+  return (
+    <div
+      className={clsx(
+        'sidebar-drop-placeholder my-1 overflow-hidden rounded-md border border-accent/35 border-dashed bg-accent/[0.08] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] ring-1 ring-accent/10',
+        kind === 'project' ? 'h-8 [--sidebar-drop-height:2rem]' : 'h-[48px] [--sidebar-drop-height:48px]',
+      )}
+    >
+      {kind === 'project' ? (
+        <div className="flex h-full items-center gap-1.5 px-1.5">
+          <span className="size-5 shrink-0 rounded bg-accent/15 ring-1 ring-accent/20" />
+          <span className="h-2.5 w-[52%] rounded-full bg-accent/18" />
+          <span className="ml-auto size-4 rounded bg-accent/10" />
+        </div>
+      ) : (
+        <div className="flex h-full items-start gap-2 px-2 py-1.5">
+          <span className="mt-[2px] size-[14px] shrink-0 rounded bg-accent/15 ring-1 ring-accent/20" />
+          <span className="flex min-w-0 flex-1 flex-col gap-1.5 pt-[2px]">
+            <span className="h-2.5 w-[58%] rounded-full bg-accent/18" />
+            <span className="h-2 w-[34%] rounded-full bg-accent/12" />
+          </span>
+          <span className="mt-5 h-2 w-6 rounded-full bg-accent/10" />
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ProjectDragPreview({ name, width }: { name: string; width: number }) {
+  return (
+    <div
+      className="pointer-events-none flex h-8 items-center gap-1.5 rounded-md bg-panel-2 px-1.5 text-text shadow-[0_14px_26px_rgba(0,0,0,0.28)] ring-1 ring-accent/25"
+      style={{ width }}
+    >
+      <ProjectAvatar name={name} />
+      <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap font-[510] text-[13px]">{name}</span>
+      <ArrowDownIcon className="shrink-0 text-subtle" />
+    </div>
+  );
+}
+
+function WorkspaceDragPreview({ workspace, width }: { workspace: SidebarWorkspace; width: number }) {
+  const { t } = useTranslation();
+
+  return (
+    <div
+      className="pointer-events-none flex min-w-0 items-start gap-2 rounded-md bg-panel-2 px-2 py-1.5 text-left shadow-[0_14px_26px_rgba(0,0,0,0.28)] ring-1 ring-accent/25"
+      style={{ width }}
+    >
+      <div className="mt-[2px] flex size-[14px] shrink-0 items-center justify-center">
+        <GitBranchIcon className="text-subtle" />
+      </div>
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap font-[510] font-mono text-[13px] text-text">
+          {workspace.branch || t('sidebar.detached')}
+        </span>
+        <span className="min-w-0 overflow-hidden text-ellipsis whitespace-nowrap text-[11px] text-subtle">
+          {formatRelativeTime(workspace.createdAt, t)}
+        </span>
+      </div>
     </div>
   );
 }
@@ -408,6 +514,7 @@ function SortableWorkspaceRow({
   onClick,
   onDelete,
   onContextMenu,
+  disableTransform = false,
 }: {
   workspace: SidebarWorkspace;
   globalIndex: number;
@@ -416,10 +523,12 @@ function SortableWorkspaceRow({
   onClick: () => void;
   onDelete?: () => void;
   onContextMenu?: (e: React.MouseEvent) => void;
+  disableTransform?: boolean;
 }) {
   const { t } = useTranslation();
   const spinnerStyle = useAppStore((state) => state.settings.spinnerStyle);
   const branchStats = useAppStore((state) => state.branchStats[workspace.id]);
+  const refreshPrInfo = useAppStore((state) => state.refreshPrInfo);
   const stats = branchStats ?? {
     ahead: 0,
     behind: 0,
@@ -427,11 +536,15 @@ function SortableWorkspaceRow({
     deletions: 0,
   };
   const hasDiffStats = stats.additions > 0 || stats.deletions > 0;
-  const hasRemoteStats = stats.ahead > 0 || stats.behind > 0;
   const prNumber = branchStats?.prNumber ?? null;
   const prUrl = branchStats?.prUrl ?? null;
   const prMerged = branchStats?.prMerged ?? false;
   const agentStatus = useWorkspaceAgentStatus(workspace.id);
+
+  useEffect(() => {
+    if (isLoading || prNumber) return;
+    void refreshPrInfo(workspace.id);
+  }, [isLoading, prNumber, refreshPrInfo, workspace.branch, workspace.id]);
 
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: workspace.id,
@@ -439,11 +552,9 @@ function SortableWorkspaceRow({
   });
 
   const style = {
-    transform: CSS.Transform.toString(transform),
+    transform: disableTransform ? undefined : CSS.Transform.toString(transform),
     transition: transition ?? 'transform 180ms cubic-bezier(0.2, 0, 0, 1)',
-    opacity: isDragging ? 0.68 : 1,
-    zIndex: isDragging ? 30 : undefined,
-    willChange: 'transform',
+    willChange: disableTransform ? undefined : 'transform',
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
@@ -458,10 +569,10 @@ function SortableWorkspaceRow({
       ref={setNodeRef}
       style={style}
       className={clsx(
-        'group/sidebar-workspace relative flex w-full min-w-0 select-none items-start gap-2 rounded-md px-2 py-1.5 text-left transition-colors duration-150',
+        'group/sidebar-workspace relative flex w-full min-w-0 select-none items-start gap-2 rounded-md px-2 py-1.5 text-left transition-[background-color,box-shadow,opacity] duration-150',
         isLoading ? 'cursor-default opacity-60' : 'cursor-grab active:cursor-grabbing',
         !isLoading && !isActive && 'hover:bg-panel-2',
-        isDragging && 'bg-panel-2 ring-1 ring-accent/20',
+        isDragging && 'opacity-35',
       )}
       role="button"
       tabIndex={isLoading ? -1 : 0}
@@ -500,6 +611,7 @@ function SortableWorkspaceRow({
               tabIndex={0}
               className={clsx(
                 'shrink-0 rounded-[3px] px-[5px] py-px font-[560] font-mono text-[9px] leading-[16px] transition-colors',
+                prUrl && 'cursor-pointer',
                 prMerged ? 'bg-[#22c55e]/10 text-[#22c55e] hover:bg-[#22c55e]/20' : 'bg-subtle/10 text-subtle hover:bg-subtle/20',
               )}
               title={prUrl ? `Open MR #${prNumber}` : `MR #${prNumber}`}
@@ -517,22 +629,15 @@ function SortableWorkspaceRow({
               #{prNumber}
             </span>
           )}
-          {!isLoading && hasDiffStats && (
-            <span className="flex shrink-0 items-center gap-1 font-mono text-[10px]">
-              {stats.additions > 0 && <span className="text-text-addition">+{stats.additions}</span>}
-              {stats.deletions > 0 && <span className="text-text-deletion">−{stats.deletions}</span>}
-            </span>
-          )}
         </div>
         <div className="flex min-w-0 items-center gap-2">
           <span className="min-w-0 flex-1 overflow-hidden text-ellipsis whitespace-nowrap text-[11px] text-subtle">
             {isLoading ? 'Creating…' : formatRelativeTime(workspace.createdAt, t)}
           </span>
-          {!isLoading && hasRemoteStats && (
-            <span className="shrink-0 font-mono text-[10px] text-subtle">
-              {stats.ahead > 0 ? `↑${stats.ahead}` : ''}
-              {stats.ahead > 0 && stats.behind > 0 ? ' ' : ''}
-              {stats.behind > 0 ? `↓${stats.behind}` : ''}
+          {!isLoading && hasDiffStats && (
+            <span className="flex shrink-0 items-center gap-1 font-mono text-[10px] tabular-nums" title="Local changes">
+              {stats.additions > 0 && <span className="text-text-addition">+{stats.additions}</span>}
+              {stats.deletions > 0 && <span className="text-text-deletion">-{stats.deletions}</span>}
             </span>
           )}
           {!isLoading && globalIndex < 9 && (
@@ -561,7 +666,39 @@ function SidebarSkeleton() {
       </div>
     </div>
   );
-} /* ── Project context menu ──────────────────────────────────────── */
+}
+
+function ProjectListDropArea({ children }: { children: ReactNode }) {
+  return <div className="flex min-h-full flex-col">{children}</div>;
+}
+
+function ProjectEndDropArea({ children }: { children: ReactNode }) {
+  const { setNodeRef } = useDroppable({
+    id: PROJECT_LIST_END_DROP_ID,
+    data: { type: 'project-end' },
+  });
+
+  return (
+    <div ref={setNodeRef} className="min-h-2">
+      {children}
+    </div>
+  );
+}
+
+function WorkspaceEndDropArea({ projectId, children }: { projectId: string; children: ReactNode }) {
+  const { setNodeRef } = useDroppable({
+    id: getWorkspaceEndDropId(projectId),
+    data: { type: 'workspace-end', projectId },
+  });
+
+  return (
+    <div ref={setNodeRef} className="min-h-2">
+      {children}
+    </div>
+  );
+}
+
+/* ── Project context menu ──────────────────────────────────────── */
 
 function ProjectContextMenu({
   project,
@@ -1232,6 +1369,9 @@ export function Sidebar() {
     workspaceId: string;
     branch: string;
   } | null>(null);
+  const [dragState, setDragState] = useState<SidebarDragState>(null);
+  const [overDropId, setOverDropId] = useState<string | null>(null);
+  const isProjectSortActive = dragState?.kind === 'project';
 
   const allProjects = useAppStore((state) => state.projects);
   const panels = useAppStore((state) => state.panels);
@@ -1314,8 +1454,70 @@ export function Sidebar() {
     });
   };
 
+  const activeDragProject = useMemo(
+    () => (dragState?.kind === 'project' ? projects.find((project) => project.id === dragState.id) : undefined),
+    [dragState, projects],
+  );
+  const activeDragWorkspace = useMemo(
+    () => (dragState?.kind === 'workspace' ? workspaces.find((workspace) => workspace.id === dragState.id) : undefined),
+    [dragState, workspaces],
+  );
+
+  const overProjectId = useMemo(() => {
+    if (!overDropId) return null;
+    if (overDropId === PROJECT_LIST_END_DROP_ID) return projects.at(-1)?.id ?? null;
+    const overProject = projects.find((project) => project.id === overDropId);
+    return overProject?.id ?? null;
+  }, [overDropId, projects]);
+
+  const projectPlaceholderPosition = useMemo(() => {
+    if (dragState?.kind !== 'project' || !overProjectId || dragState.id === overProjectId) return null;
+    const activeIndex = projects.findIndex((project) => project.id === dragState.id);
+    const overIndex = projects.findIndex((project) => project.id === overProjectId);
+    if (activeIndex === -1 || overIndex === -1) return null;
+    return activeIndex < overIndex || overDropId === PROJECT_LIST_END_DROP_ID ? 'after' : 'before';
+  }, [dragState, overDropId, overProjectId, projects]);
+
+  const overWorkspaceEndProjectId = overDropId ? getProjectIdFromWorkspaceEndDropId(overDropId) : null;
+
+  const workspacePlaceholderPosition = useMemo(() => {
+    if (dragState?.kind !== 'workspace' || !activeDragWorkspace || !overDropId) return null;
+    const overEndProjectId = getProjectIdFromWorkspaceEndDropId(overDropId);
+    if (overEndProjectId) {
+      return overEndProjectId === activeDragWorkspace.projectId ? { id: overDropId, position: 'after' as const } : null;
+    }
+    const projectWorkspaces = workspaces.filter((workspace) => workspace.projectId === activeDragWorkspace.projectId);
+    const activeIndex = projectWorkspaces.findIndex((workspace) => workspace.id === dragState.id);
+    const overIndex = projectWorkspaces.findIndex((workspace) => workspace.id === overDropId);
+    if (activeIndex === -1 || overIndex === -1 || activeIndex === overIndex) return null;
+    return {
+      id: overDropId,
+      position: activeIndex < overIndex ? ('after' as const) : ('before' as const),
+    };
+  }, [activeDragWorkspace, dragState, overDropId, workspaces]);
+
+  const handleDndDragStart = (event: DragStartEvent) => {
+    const kind = event.active.data.current?.type === 'workspace' ? 'workspace' : 'project';
+    const rect = event.active.rect.current.initial;
+    setDragState({
+      id: String(event.active.id),
+      kind,
+      width: rect?.width ?? 220,
+    });
+  };
+
+  const handleDndDragOver = (event: DragOverEvent) => {
+    setOverDropId(event.over ? String(event.over.id) : null);
+  };
+
+  const clearDndState = () => {
+    setDragState(null);
+    setOverDropId(null);
+  };
+
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
+    clearDndState();
     if (!over || active.id === over.id) return;
 
     const activeId = String(active.id);
@@ -1323,9 +1525,12 @@ export function Sidebar() {
 
     const activeProject = projects.find((project) => project.id === activeId);
     if (activeProject) {
-      const overProject =
-        projects.find((project) => project.id === overId) ??
-        projects.find((project) => project.id === workspaces.find((workspace) => workspace.id === overId)?.projectId);
+      if (overId === PROJECT_LIST_END_DROP_ID) {
+        const lastProject = projects.at(-1);
+        if (lastProject && activeProject.id !== lastProject.id) reorderProjects(activeProject.id, lastProject.id);
+        return;
+      }
+      const overProject = projects.find((project) => project.id === overId);
       if (overProject && activeProject.id !== overProject.id) {
         reorderProjects(activeProject.id, overProject.id);
       }
@@ -1333,6 +1538,12 @@ export function Sidebar() {
     }
 
     const activeWs = workspaces.find((w) => w.id === activeId);
+    const overWorkspaceEndProject = getProjectIdFromWorkspaceEndDropId(overId);
+    if (activeWs && overWorkspaceEndProject === activeWs.projectId) {
+      const lastWorkspace = workspaces.filter((workspace) => workspace.projectId === activeWs.projectId).at(-1);
+      if (lastWorkspace && activeWs.id !== lastWorkspace.id) reorderWorkspaces(activeWs.projectId, activeId, lastWorkspace.id);
+      return;
+    }
     const overWs = workspaces.find((w) => w.id === overId);
     if (activeWs && overWs && activeWs.projectId === overWs.projectId) {
       reorderWorkspaces(activeWs.projectId, activeId, overId);
@@ -1369,83 +1580,144 @@ export function Sidebar() {
             <span>{t('sidebar.openProject')}</span>
           </button>
         ) : (
-          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-            <SortableContext items={projectIds} strategy={verticalListSortingStrategy}>
-              {projects.map((project, projectIdx) => {
-                const projectWorkspaces = workspaces.filter((w) => w.projectId === project.id);
-                const isCollapsed = collapsedProjects.has(project.id);
-                const hasActive = projectWorkspaces.some((w) => w.id === activeWorkspaceId);
-                const wsIds = projectWorkspaces.map((w) => w.id);
+          <DndContext
+            sensors={sensors}
+            collisionDetection={sidebarCollisionDetection}
+            measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
+            onDragStart={handleDndDragStart}
+            onDragOver={handleDndDragOver}
+            onDragEnd={handleDragEnd}
+            onDragCancel={clearDndState}
+          >
+            <ProjectListDropArea>
+              <SortableContext items={projectIds} strategy={verticalListSortingStrategy}>
+                {projects.map((project, projectIdx) => {
+                  const projectWorkspaces = workspaces.filter((w) => w.projectId === project.id);
+                  const isCollapsed = collapsedProjects.has(project.id);
+                  const displayCollapsed = isCollapsed || isProjectSortActive;
+                  const hasActive = projectWorkspaces.some((w) => w.id === activeWorkspaceId);
+                  const wsIds = projectWorkspaces.map((w) => w.id);
+                  const showProjectPlaceholder =
+                    dragState?.kind === 'project' &&
+                    overDropId !== PROJECT_LIST_END_DROP_ID &&
+                    overProjectId === project.id &&
+                    projectPlaceholderPosition !== null &&
+                    dragState.id !== project.id;
 
-                return (
-                  <div className={projectIdx > 0 ? 'mt-2 border-border border-t pt-2' : ''} key={project.id}>
-                    <SortableProjectGroup
-                      projectId={project.id}
-                      name={project.name}
-                      isCollapsed={isCollapsed}
-                      hasActive={hasActive}
-                      onToggle={() => toggleProject(project.id)}
-                      onAddWorktree={() =>
-                        setWorktreeDialog({
-                          projectId: project.id,
-                          projectName: project.name,
-                          repoPath: project.repoPath,
-                        })
-                      }
-                      onContextMenu={(e) => {
-                        e.preventDefault();
-                        setContextMenu({
-                          project,
-                          x: e.clientX,
-                          y: e.clientY,
-                        });
-                      }}
-                    >
-                      <div
-          className={clsx(
-            'grid transition-[grid-template-rows] duration-180 ease-[cubic-bezier(0.2,0,0,1)]',
-            isCollapsed ? 'grid-rows-[0fr]' : 'grid-rows-[1fr]',
-          )}
+                  return (
+                    <div className={projectIdx > 0 ? 'mt-2 border-border border-t pt-2' : ''} key={project.id}>
+                      {showProjectPlaceholder && projectPlaceholderPosition === 'before' && (
+                        <SidebarDropPlaceholder kind="project" />
+                      )}
+                      <SortableProjectGroup
+                        projectId={project.id}
+                        name={project.name}
+                        isCollapsed={displayCollapsed}
+                        hasActive={hasActive}
+                        onToggle={() => toggleProject(project.id)}
+                        onAddWorktree={() =>
+                          setWorktreeDialog({
+                            projectId: project.id,
+                            projectName: project.name,
+                            repoPath: project.repoPath,
+                          })
+                        }
+                        onContextMenu={(e) => {
+                          e.preventDefault();
+                          setContextMenu({
+                            project,
+                            x: e.clientX,
+                            y: e.clientY,
+                          });
+                        }}
+                        disableTransform={Boolean(dragState)}
                       >
-                        <div className="overflow-hidden">
-                          <SortableContext items={wsIds} strategy={verticalListSortingStrategy}>
-                            <div className="flex flex-col pb-1">
-                              {projectWorkspaces.map((workspace) => (
-                                <SortableWorkspaceRow
-                                  key={workspace.id}
-                                  workspace={workspace}
-                                  globalIndex={workspaceIndexMap.get(workspace.id) ?? 0}
-                                  isActive={workspace.id === activeWorkspaceId}
-                                  isLoading={workspaceLoadingIds.has(workspace.id)}
-                                  onClick={() => setActiveWorkspace(workspace.id)}
-                                  onDelete={
-                                    workspace.isRoot
-                                      ? undefined
-                                      : () =>
-                                          setDeleteDialog({
-                                            workspaceId: workspace.id,
-                                            branch: workspace.branch,
-                                          })
-                                  }
-                                  onContextMenu={(e) => {
-                                    e.preventDefault();
-                                    setWorkspaceContextMenu({
-                                      workspace,
-                                      x: e.clientX,
-                                      y: e.clientY,
-                                    });
-                                  }}
-                                />
-                              ))}
-                            </div>
-                          </SortableContext>
+                        <div
+                          className={clsx(
+                            'grid transition-[grid-template-rows] duration-180 ease-[cubic-bezier(0.2,0,0,1)]',
+                            displayCollapsed ? 'grid-rows-[0fr]' : 'grid-rows-[1fr]',
+                          )}
+                        >
+                          <div className="overflow-hidden">
+                            <SortableContext items={wsIds} strategy={verticalListSortingStrategy}>
+                              <div className="flex flex-col pb-1">
+                                {projectWorkspaces.map((workspace) => {
+                                  const showWorkspacePlaceholder =
+                                    dragState?.kind === 'workspace' &&
+                                    workspacePlaceholderPosition?.id === workspace.id &&
+                                    activeDragWorkspace?.projectId === workspace.projectId;
+
+                                  return (
+                                    <div key={workspace.id}>
+                                      {showWorkspacePlaceholder && workspacePlaceholderPosition?.position === 'before' && (
+                                        <SidebarDropPlaceholder kind="workspace" />
+                                      )}
+                                      <SortableWorkspaceRow
+                                        workspace={workspace}
+                                        globalIndex={workspaceIndexMap.get(workspace.id) ?? 0}
+                                        isActive={workspace.id === activeWorkspaceId}
+                                        isLoading={workspaceLoadingIds.has(workspace.id)}
+                                        disableTransform={Boolean(dragState)}
+                                        onClick={() => setActiveWorkspace(workspace.id)}
+                                        onDelete={
+                                          workspace.isRoot
+                                            ? undefined
+                                            : () =>
+                                                setDeleteDialog({
+                                                  workspaceId: workspace.id,
+                                                  branch: workspace.branch,
+                                                })
+                                        }
+                                        onContextMenu={(e) => {
+                                          e.preventDefault();
+                                          setWorkspaceContextMenu({
+                                            workspace,
+                                            x: e.clientX,
+                                            y: e.clientY,
+                                          });
+                                        }}
+                                      />
+                                      {showWorkspacePlaceholder && workspacePlaceholderPosition?.position === 'after' && (
+                                        <SidebarDropPlaceholder kind="workspace" />
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                                <WorkspaceEndDropArea projectId={project.id}>
+                                  {dragState?.kind === 'workspace' &&
+                                    overWorkspaceEndProjectId === project.id &&
+                                    activeDragWorkspace?.projectId === project.id &&
+                                    activeDragWorkspace.id !== projectWorkspaces.at(-1)?.id &&
+                                    workspacePlaceholderPosition?.id === getWorkspaceEndDropId(project.id) && (
+                                      <SidebarDropPlaceholder kind="workspace" />
+                                    )}
+                                </WorkspaceEndDropArea>
+                              </div>
+                            </SortableContext>
+                          </div>
                         </div>
-                      </div>
-                    </SortableProjectGroup>
-                  </div>
-                );
-              })}
-            </SortableContext>
+                      </SortableProjectGroup>
+                      {showProjectPlaceholder && projectPlaceholderPosition === 'after' && (
+                        <SidebarDropPlaceholder kind="project" />
+                      )}
+                    </div>
+                  );
+                })}
+                <ProjectEndDropArea>
+                  {dragState?.kind === 'project' &&
+                    overDropId === PROJECT_LIST_END_DROP_ID &&
+                    activeDragProject?.id !== projects.at(-1)?.id && <SidebarDropPlaceholder kind="project" />}
+                </ProjectEndDropArea>
+              </SortableContext>
+            </ProjectListDropArea>
+            <DragOverlay dropAnimation={null} modifiers={[snapCenterToCursor]}>
+              {dragState && activeDragProject ? (
+                <ProjectDragPreview name={activeDragProject.name} width={dragState.width} />
+              ) : null}
+              {dragState && activeDragWorkspace ? (
+                <WorkspaceDragPreview workspace={activeDragWorkspace} width={dragState.width} />
+              ) : null}
+            </DragOverlay>
           </DndContext>
         )}
       </div>

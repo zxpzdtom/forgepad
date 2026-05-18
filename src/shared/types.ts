@@ -265,6 +265,22 @@ export type PersistedAppState = {
   activeTabId: string | null;
   /** Per-workspace last-selected agent tab id, so switching workspaces remembers the agent tab */
   workspaceActiveAgentTabIds?: Record<string, string>;
+  /** Per-workspace last-selected file/editor tab id, so switching workspaces remembers the editor tab */
+  workspaceActiveFileTabIds?: Record<string, string>;
+  /** Per-workspace cached sidebar git badges, restored before live git refresh finishes */
+  branchStats?: Record<
+    string,
+    {
+      ahead: number;
+      behind: number;
+      additions: number;
+      deletions: number;
+      prNumber?: number | null;
+      prUrl?: string | null;
+      prMerged?: boolean | null;
+      updatedAt?: number;
+    }
+  >;
   rightPanelMode: RightPanelMode;
   rightPanelOpen: boolean;
   sidebarOpen: boolean;

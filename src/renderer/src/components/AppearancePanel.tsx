@@ -1,10 +1,10 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { useAppStore } from '@renderer/store/app-store';
 import { useTranslation } from '@renderer/i18n';
+import { downloadFile } from '@renderer/lib/download-file';
+import { useAppStore } from '@renderer/store/app-store';
 import { BUILTIN_THEMES, THEME_SCHEMA_VERSION, type AppIconVariant, type ThemeDefinition, type ThemeTokens } from '@shared/types';
-import { Check, Download, ExternalLink, Pencil, Upload, X } from 'lucide-react';
-
 import clsx from 'clsx';
+import { Check, Download, ExternalLink, Pencil, Upload, X } from 'lucide-react';
 
 /* ─── Theme validation ─── */
 
@@ -325,9 +325,9 @@ function AppIconCard({
       onClick={onSelect}
     >
       <img
-        src={`app-icons/${id}.png`}
+        src={`${import.meta.env.BASE_URL}app-icons/${id}.png`}
         alt=""
-        className="size-13 shrink-0 rounded-[14px]"
+        className="h-[52px] w-[52px] shrink-0 rounded-[14px]"
         draggable={false}
       />
       <span className="min-w-0 flex-1">
@@ -489,12 +489,7 @@ export function AppearancePanel() {
     const blob = new Blob([JSON.stringify(base, null, 2)], {
       type: 'application/json',
     });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${base.id}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+    void downloadFile({ blob, suggestedName: `${base.id}.json` });
   }, [allThemes, themeId]);
 
   /* ── Export active theme ── */
@@ -504,12 +499,7 @@ export function AppearancePanel() {
     const blob = new Blob([JSON.stringify(active, null, 2)], {
       type: 'application/json',
     });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${active.id}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
+    void downloadFile({ blob, suggestedName: `${active.id}.json` });
   }, [allThemes, themeId]);
 
   return (
