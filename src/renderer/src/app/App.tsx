@@ -33,6 +33,7 @@ import {
 } from "@renderer/lib/drag-utils";
 import { eventMatchesCombo } from "@renderer/lib/shortcut-utils";
 import { useAppStore } from "@renderer/store/app-store";
+import { StartComposer } from "@renderer/app/StartComposer";
 import { ThemeContext } from "@renderer/app/theme-context";
 import type {
   AgentSessionHistoryItem,
@@ -55,8 +56,6 @@ import {
   Bot,
   FolderOpen,
   GitBranch,
-  Sparkles,
-  TerminalSquare,
 } from "lucide-react";
 
 const SettingsPanel = lazy(() =>
@@ -328,6 +327,18 @@ function AppInner() {
     if (!hydrated) return;
     window.forgepad.pet.sendSettings(petSettings);
   }, [hydrated, petSettings]);
+
+  // Sync hook-relevant settings to the Rust daemon on startup
+  useEffect(() => {
+    if (!hydrated) return;
+    const { autoGenerateTabTitle, tabTitlePromptTemplate, renameOnFirstMessageOnly } =
+      useAppStore.getState().settings;
+    window.forgepad.agent.updateSettings({
+      autoGenerateTabTitle,
+      tabTitlePromptTemplate,
+      renameOnFirstMessageOnly,
+    });
+  }, [hydrated]);
 
   useEffect(() => {
     let saveTimer: number | undefined;
@@ -877,30 +888,12 @@ function AppInner() {
               ) : null}
             </div>
             <p className="m-0 max-w-[620px] text-muted text-sm leading-relaxed">
-              {activeWorkspace ? "选择一个 Agent 开始，或者从下面恢复最近的会话历史。" : t("app.emptyState.pickProject")}
+              {activeWorkspace ? "输入任务描述，选择一个 Agent 开始新的会话。" : t("app.emptyState.pickProject")}
             </p>
           </div>
 
           {activeWorkspace ? (
-            <div className="start-composer rounded-lg border border-border bg-panel/70 shadow-[0_18px_60px_rgba(0,0,0,0.18)] backdrop-blur">
-              <div className="min-h-[110px] p-5 text-[17px] text-subtle">描述一项任务，ForgePad 会派出代理并行尝试...</div>
-              <div className="flex items-center justify-between gap-3 border-border border-t p-3">
-                <button className="secondary-button h-8" type="button" onClick={() => createAgentTerminal(activeWorkspace.id)}>
-                  <Bot size={15} />
-                  {t("app.emptyState.newAgent")}
-                </button>
-                <div className="flex gap-2">
-                  <button className="secondary-button h-8" type="button" onClick={() => createTerminal(activeWorkspace.id)}>
-                    <TerminalSquare size={15} />
-                    {t("app.emptyState.terminal")}
-                  </button>
-                  <button className="primary-button h-8" type="button" onClick={() => createAgentTerminal(activeWorkspace.id)}>
-                    <Sparkles size={15} />
-                    开始会话
-                  </button>
-                </div>
-              </div>
-            </div>
+            <StartComposer workspaceId={activeWorkspace.id} />
           ) : null}
 
           {activeWorkspaceSessions.length > 0 ? (

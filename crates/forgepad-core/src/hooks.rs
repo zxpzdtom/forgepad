@@ -169,6 +169,7 @@ fn handle_stream(
             &mut stream,
             &pty_id,
             &request.body,
+            pending,
             renamed_pty_ids,
             on_event,
         ),
@@ -319,9 +320,19 @@ fn handle_stop(
     stream: &mut TcpStream,
     pty_id: &str,
     body: &str,
+    pending: Arc<Mutex<HashMap<String, mpsc::Sender<PermissionDecision>>>>,
     renamed_pty_ids: Arc<Mutex<HashSet<String>>>,
     on_event: EventHandler,
 ) -> Result<(), String> {
+    // Clear any pending permission for this session immediately so the UI
+    // dismisses the popup rather than waiting for the 120s timeout.
+    if let Some(sender) = pending.lock().unwrap().remove(pty_id) {
+        let _ = sender.send(PermissionDecision {
+            decision: "deny".to_string(),
+            answers: None,
+        });
+    }
+
     let ai_message = parse_first_string(
         body,
         &[

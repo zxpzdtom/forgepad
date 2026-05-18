@@ -160,6 +160,7 @@ enum HostBridgeBootstrap {
         context: { createBundle: (input) => invoke("context.createBundle", { input }) },
         agent: {
           externalSessions: (workspaceId, worktreePath) => invoke("agent.externalSessions", { workspaceId, worktreePath }),
+          updateSettings: (settings) => invoke("agent.settingsUpdate", { settings }),
           onStatusUpdate: (callback) => on("agent:status-update", callback),
           onFocusTab: (callback) => on("agent:focus-tab", callback),
           onRenameTab: (callback) => on("agent:rename-tab", callback),

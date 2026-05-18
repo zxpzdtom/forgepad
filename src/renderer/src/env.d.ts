@@ -8,6 +8,7 @@ type ForgePadPetApi = {
   focusAgent?: (ptyId?: string) => void;
   getStage?: () => Promise<PetStageSnapshot>;
   moveWindow?: (x: number, y: number) => void;
+  setWindowLayout?: (x: number, y: number, width: number, height: number) => void;
   onAgentStatusUpdate?: (callback: (update: AgentStatusUpdate) => void) => () => void;
   onCommand?: (callback: (command: PetCommand) => void) => () => void;
   onCompletion?: (callback: (data: AgentCompletionData) => void) => () => void;

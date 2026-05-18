@@ -78,6 +78,11 @@ final class PetWindowController: NSWindowController, WKNavigationDelegate, WKScr
             emit(name: "agentStatusUpdate", payload: payload)
         case "agent.permissionRequest":
             emit(name: "permissionRequest", payload: payload)
+        case "agent.permissionClear":
+            if let payloadDict = payload as? [String: Any],
+               let ptyId = payloadDict["ptyId"] as? String {
+                emit(name: "permissionRequest", payload: ["ptyId": ptyId])
+            }
         case "agent.userPrompt":
             emit(name: "userPrompt", payload: payload)
         case "agent.completion":
@@ -157,6 +162,13 @@ final class PetWindowController: NSWindowController, WKNavigationDelegate, WKScr
         case "moveWindow":
             guard let x = body["x"] as? Double, let y = body["y"] as? Double else { return }
             moveWindowToBrowserTopLeft(x: x, y: y)
+        case "setWindowLayout":
+            guard let x = body["x"] as? Double,
+                  let y = body["y"] as? Double,
+                  let width = body["width"] as? Double,
+                  let height = body["height"] as? Double
+            else { return }
+            setWindowLayoutFromBrowserTopLeft(x: x, y: y, width: width, height: height)
         case "resizeWindow":
             guard let width = body["width"] as? Double, let height = body["height"] as? Double else { return }
             if let window {
@@ -179,6 +191,18 @@ final class PetWindowController: NSWindowController, WKNavigationDelegate, WKScr
         default:
             break
         }
+    }
+
+    private func setWindowLayoutFromBrowserTopLeft(x: Double, y: Double, width: Double, height: Double) {
+        guard let window else { return }
+        let screen = screenForBrowserPoint(x: x, y: y) ?? window.screen ?? NSScreen.main
+        let desktopTop = virtualDesktopFrame().maxY
+        let appKitY = desktopTop - y - height
+        let nextFrame = clampedFrame(
+            NSRect(x: x, y: appKitY, width: width, height: height),
+            on: screen
+        )
+        window.setFrame(nextFrame, display: true)
     }
 
     private func stageSnapshot() -> [String: Any] {
@@ -329,6 +353,7 @@ final class PetWindowController: NSWindowController, WKNavigationDelegate, WKScr
       };
       window.forgepadPet = {
         moveWindow: (x, y) => post({ command: "moveWindow", x, y }),
+        setWindowLayout: (x, y, width, height) => post({ command: "setWindowLayout", x, y, width, height }),
         resizeWindow: (width, height) => post({ command: "resizeWindow", width, height }),
         getStage: () => request("getStage"),
         focusAgent: (ptyId) => post({ command: "focusAgent", ptyId }),

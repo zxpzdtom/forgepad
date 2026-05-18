@@ -169,6 +169,7 @@ export type HostBridgeApi = {
   };
   agent: {
     externalSessions?: (workspaceId: string, worktreePath: string) => Promise<AgentSessionHistoryItem[]>;
+    updateSettings: (settings: Record<string, unknown>) => Promise<void>;
     onStatusUpdate: (callback: (update: AgentStatusUpdate) => void) => Unsubscribe;
     onFocusTab: (callback: (ptyId: string) => void) => Unsubscribe;
     onRenameTab: (callback: (data: { ptyId: string; title: string }) => void) => Unsubscribe;

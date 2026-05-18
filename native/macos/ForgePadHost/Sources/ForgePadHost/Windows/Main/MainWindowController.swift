@@ -443,6 +443,9 @@ final class MainWindowController: NSWindowController, WKNavigationDelegate {
         case "agent.completion":
             emit(name: "agent:completion", payload: event["payload"] ?? NSNull())
             return
+        case "agent.renameTab":
+            emit(name: "agent:rename-tab", payload: event["payload"] ?? NSNull())
+            return
         default:
             break
         }

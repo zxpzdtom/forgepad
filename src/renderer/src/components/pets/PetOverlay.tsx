@@ -760,11 +760,14 @@ export function PetOverlay() {
   const applyMotionLayout = useCallback((layout: MotionLayout) => {
     motionLayoutRef.current = layout;
     setMotionLayout(layout);
+    const x = Math.round(positionRef.current.x - layout.spriteOffsetX);
+    const y = Math.round(positionRef.current.y - layout.spriteOffsetY);
+    if (window.forgepadPet?.setWindowLayout) {
+      window.forgepadPet.setWindowLayout(x, y, Math.round(layout.width), Math.round(layout.height));
+      return;
+    }
     window.forgepadPet?.resizeWindow(Math.round(layout.width), Math.round(layout.height));
-    window.forgepadPet?.moveWindow(
-      Math.round(positionRef.current.x - layout.spriteOffsetX),
-      Math.round(positionRef.current.y - layout.spriteOffsetY),
-    );
+    window.forgepadPet?.moveWindow(x, y);
   }, []);
 
   const clampPositionForLayout = useCallback((stage: PetStageSnapshot, point: MotionPoint, layout: MotionLayout) => {
@@ -1965,7 +1968,7 @@ export function PetOverlay() {
     return () => observer.disconnect();
   }, [floatingPanelKind, pendingPermission, currentCompletionCard?.id, completionHovered, workingAgents.length]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!petSettings) return;
 
     if (floatingPanelKind) {
@@ -1990,6 +1993,7 @@ export function PetOverlay() {
       const layoutRunId = ++layoutRunIdRef.current;
 
       let disposed = false;
+      applyMotionLayout(layout);
       readStage()
         .then((stage) => {
           if (disposed || layoutRunId !== layoutRunIdRef.current) return;
@@ -2034,8 +2038,8 @@ export function PetOverlay() {
     <div
       style={{
         position: 'relative',
-        width: '100vw',
-        height: '100vh',
+        width: `${motionLayout.width}px`,
+        height: `${motionLayout.height}px`,
         overflow: 'visible',
       }}
     >

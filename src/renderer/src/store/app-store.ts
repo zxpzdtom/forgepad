@@ -2009,6 +2009,18 @@ export const useAppStore = create<AppState>((set, get) => ({
       if (partial.pets) {
         window.forgepad.pet.sendSettings(next.pets);
       }
+      // Sync hook-relevant settings to the Rust daemon
+      if (
+        'autoGenerateTabTitle' in partial ||
+        'tabTitlePromptTemplate' in partial ||
+        'renameOnFirstMessageOnly' in partial
+      ) {
+        window.forgepad.agent.updateSettings({
+          autoGenerateTabTitle: next.autoGenerateTabTitle,
+          tabTitlePromptTemplate: next.tabTitlePromptTemplate,
+          renameOnFirstMessageOnly: next.renameOnFirstMessageOnly,
+        });
+      }
       return { settings: next };
     }),
 
