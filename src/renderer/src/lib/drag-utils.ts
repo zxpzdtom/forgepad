@@ -9,6 +9,12 @@ function isAbsolutePath(path: string): boolean {
   return path.startsWith('/') || /^[A-Za-z]:[\\/]/.test(path);
 }
 
+export function setForgepadPathDragData(dataTransfer: DataTransfer, path: string): void {
+  dataTransfer.setData('text/plain', path);
+  dataTransfer.setData('application/x-forgepad-path', path);
+  dataTransfer.effectAllowed = 'copy';
+}
+
 /**
  * Returns true if the drag event contains any droppable file paths —
  * either an internal forgepad path token or one or more external OS files.

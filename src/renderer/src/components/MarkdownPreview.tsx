@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { downloadFile } from '@renderer/lib/download-file';
 import { useAppStore } from '@renderer/store/app-store';
 import { code as streamdownCode } from '@streamdown/code';
-import { createMermaidPlugin } from '@streamdown/mermaid';
 import type { AllowedTags, Components } from 'streamdown';
 import { Streamdown } from 'streamdown';
 import 'streamdown/styles.css';
@@ -17,10 +16,13 @@ type MarkdownPreviewProps = {
   absPath?: string;
 };
 
-const mermaidDark = createMermaidPlugin({ config: { theme: 'dark' } });
-const mermaidLight = createMermaidPlugin({ config: { theme: 'default' } });
-const streamdownPluginsDark = { code: streamdownCode, mermaid: mermaidDark };
-const streamdownPluginsLight = { code: streamdownCode, mermaid: mermaidLight };
+type StreamdownPlugins = NonNullable<React.ComponentProps<typeof Streamdown>['plugins']>;
+
+const streamdownBasePlugins = { code: streamdownCode } satisfies StreamdownPlugins;
+
+function containsMermaid(markdownText: string): boolean {
+  return /^```mermaid\b/im.test(markdownText) || /<pre[^>]+class=["'][^"']*\bmermaid\b/i.test(markdownText);
+}
 
 const markdownAllowedTags: AllowedTags = {
   a: ['href', 'title', 'target', 'rel', 'download'],
@@ -324,6 +326,8 @@ export function MarkdownPreview({
   const openExternalFileTab = useAppStore((state) => state.openExternalFileTab);
   const rootRef = useRef<HTMLDivElement>(null);
   const [renderMarkdownText, setRenderMarkdownText] = useState(markdownText);
+  const needsMermaid = containsMermaid(renderMarkdownText);
+  const [mermaidPlugin, setMermaidPlugin] = useState<StreamdownPlugins['mermaid'] | null>(null);
 
   useEffect(() => {
     const handleStreamdownDownloadClick = (event: MouseEvent) => {
@@ -385,6 +389,25 @@ export function MarkdownPreview({
     };
   }, [absPath, markdownPath, markdownText, workspacePath]);
 
+  useEffect(() => {
+    if (!needsMermaid) {
+      setMermaidPlugin(null);
+      return;
+    }
+
+    let disposed = false;
+    import('@streamdown/mermaid')
+      .then(({ createMermaidPlugin }) => {
+        if (!disposed) setMermaidPlugin(createMermaidPlugin({ config: { theme: theme === 'dark' ? 'dark' : 'default' } }));
+      })
+      .catch(() => {
+        if (!disposed) setMermaidPlugin(null);
+      });
+    return () => {
+      disposed = true;
+    };
+  }, [needsMermaid, theme]);
+
   const previewComponents = useMemo<Components>(
     () => ({
       ...components,
@@ -393,6 +416,10 @@ export function MarkdownPreview({
     }),
     [absPath, components, markdownPath, openExternalFileTab, openFileTab, workspaceId, workspacePath],
   );
+  const plugins = useMemo<StreamdownPlugins>(
+    () => (needsMermaid && mermaidPlugin ? { ...streamdownBasePlugins, mermaid: mermaidPlugin } : streamdownBasePlugins),
+    [mermaidPlugin, needsMermaid],
+  );
 
   return (
     <div ref={rootRef} style={{ display: 'contents' }}>
@@ -400,7 +427,7 @@ export function MarkdownPreview({
         allowedTags={markdownAllowedTags}
         components={previewComponents}
         linkSafety={{ enabled: false }}
-        plugins={theme === 'dark' ? streamdownPluginsDark : streamdownPluginsLight}
+        plugins={plugins}
       >
         {renderMarkdownText}
       </Streamdown>

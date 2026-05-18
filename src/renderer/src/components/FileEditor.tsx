@@ -17,6 +17,7 @@ import type { FileOptions, LineAnnotation, VirtualFileMetrics } from '@pierre/di
 import { File as PierreFile, VirtualizerContext } from '@pierre/diffs/react';
 import { useResolvedTheme } from '@renderer/app/theme-context';
 import { useLspTokenNavigation } from '@renderer/hooks/useLspTokenNavigation';
+import { setForgepadPathDragData } from '@renderer/lib/drag-utils';
 import { useAppStore } from '@renderer/store/app-store';
 import type { CodeSelectionItem, FilePreviewResult, Tab, Workspace } from '@shared/types';
 import clsx from 'clsx';
@@ -24,7 +25,11 @@ import { Check, ChevronDown, ChevronUp, Copy, List, MessageSquarePlus, Search, X
 
 import { FileIcon } from './FileIcon';
 
-const MarkdownPreview = lazy(() => import('./MarkdownPreview').then((module) => ({ default: module.MarkdownPreview })));
+const loadMarkdownPreview = () => import('./MarkdownPreview');
+export const preloadMarkdownPreview = () => {
+  void loadMarkdownPreview();
+};
+const MarkdownPreview = lazy(() => loadMarkdownPreview().then((module) => ({ default: module.MarkdownPreview })));
 
 type FileTab = Extract<Tab, { type: 'file' }>;
 
@@ -32,6 +37,8 @@ type FileEditorProps = {
   tab: FileTab;
   workspace: Workspace;
 };
+
+type PreloadFilePreviewInput = FileEditorProps;
 
 type MarkdownMode = 'rendered' | 'raw';
 
@@ -61,7 +68,7 @@ const VIDEO_EXTENSIONS = new Set(['mp4', 'webm', 'mov', 'avi', 'mkv']);
 const TEXT_FILE_PREVIEW_LIMIT = 256 * 1024;
 const CODE_RENDER_LOADING_LINE_THRESHOLD = 800;
 const CODE_RENDER_PENDING_TIMEOUT_MS = 2500;
-const FILE_PREVIEW_LOAD_TIMEOUT_MS = 10_000;
+const FILE_PREVIEW_LOAD_TIMEOUT_MS = 30_000;
 const FILE_PREVIEW_CACHE_LIMIT = 80;
 const MEDIA_ZOOM_MIN = 0.25;
 const MEDIA_ZOOM_MAX = 3;
@@ -82,6 +89,8 @@ type TextPreviewCacheEntry = {
 
 const textPreviewCache = new Map<string, TextPreviewCacheEntry>();
 const mediaUrlCache = new Map<string, string>();
+const textPreviewInflight = new Map<string, Promise<TextPreviewCacheEntry>>();
+const mediaUrlInflight = new Map<string, Promise<string>>();
 
 function rememberCacheEntry<K, V>(cache: Map<K, V>, key: K, value: V, limit = FILE_PREVIEW_CACHE_LIMIT) {
   if (cache.has(key)) cache.delete(key);
@@ -131,6 +140,33 @@ function readMediaUrlFromSource({
   return window.forgepad.fs.fileUrl(worktreePath, relPath);
 }
 
+function readTextPreviewFromSource({
+  absPath,
+  externalUrl,
+  relPath,
+  worktreePath,
+}: {
+  absPath?: string;
+  externalUrl?: string;
+  relPath: string;
+  worktreePath: string;
+}): Promise<FilePreviewResult> {
+  if (externalUrl) {
+    return fetch(externalUrl).then(async (response) => {
+      const content = (await response.text()).slice(0, TEXT_FILE_PREVIEW_LIMIT);
+      return {
+        content,
+        lineCount: content.split('\n').length,
+        totalBytes: Number(response.headers.get('content-length') ?? content.length),
+        previewBytes: content.length,
+        truncated: content.length >= TEXT_FILE_PREVIEW_LIMIT,
+      };
+    });
+  }
+  if (absPath) return window.forgepad.fs.readAbsFilePreview(absPath, TEXT_FILE_PREVIEW_LIMIT);
+  return window.forgepad.fs.readFilePreview(worktreePath, relPath, TEXT_FILE_PREVIEW_LIMIT);
+}
+
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<never>((_, reject) => {
@@ -159,6 +195,10 @@ function isVideoFile(relPath: string): boolean {
 
 function isPdfFile(relPath: string): boolean {
   return getExt(relPath) === 'pdf';
+}
+
+function isMediaPath(path: string): boolean {
+  return isImageFile(path) || isAudioFile(path) || isVideoFile(path) || isPdfFile(path);
 }
 
 function isMarkdownPath(path: string): boolean {
@@ -192,6 +232,71 @@ function imageMimeForPath(path: string): string {
     default:
       return 'image/png';
   }
+}
+
+export function preloadFilePreview({ tab, workspace }: PreloadFilePreviewInput): Promise<void> {
+  const requestCacheKey = filePreviewCacheKey({
+    absPath: tab.absPath,
+    externalUrl: tab.externalUrl,
+    relPath: tab.relPath,
+    workspaceId: workspace.id,
+    worktreePath: workspace.worktreePath,
+  });
+
+  if (isMediaPath(tab.relPath)) {
+    if (mediaUrlCache.has(requestCacheKey)) return Promise.resolve();
+    let inflight = mediaUrlInflight.get(requestCacheKey);
+    if (!inflight) {
+      inflight = withTimeout(
+        readMediaUrlFromSource({
+          absPath: tab.absPath,
+          externalUrl: tab.externalUrl,
+          relPath: tab.relPath,
+          worktreePath: workspace.worktreePath,
+        }),
+        FILE_PREVIEW_LOAD_TIMEOUT_MS,
+        'Media preview load',
+      )
+        .then((url) => {
+          rememberCacheEntry(mediaUrlCache, requestCacheKey, url);
+          return url;
+        })
+        .finally(() => {
+          mediaUrlInflight.delete(requestCacheKey);
+        });
+      mediaUrlInflight.set(requestCacheKey, inflight);
+    }
+    return inflight.then(() => undefined);
+  }
+
+  if (textPreviewCache.has(requestCacheKey)) return Promise.resolve();
+  let inflight = textPreviewInflight.get(requestCacheKey);
+  if (!inflight) {
+    inflight = withTimeout(
+        readTextPreviewFromSource({
+          absPath: tab.absPath,
+          externalUrl: tab.externalUrl,
+          relPath: tab.relPath,
+          worktreePath: workspace.worktreePath,
+      }),
+      FILE_PREVIEW_LOAD_TIMEOUT_MS,
+      'File preview load',
+    )
+      .then((preview) => {
+        const nextEntry = {
+          textPreview: preview,
+          fileText: preview.content,
+          lineCount: preview.lineCount ?? preview.content.split('\n').length,
+        };
+        rememberCacheEntry(textPreviewCache, requestCacheKey, nextEntry);
+        return nextEntry;
+      })
+      .finally(() => {
+        textPreviewInflight.delete(requestCacheKey);
+      });
+    textPreviewInflight.set(requestCacheKey, inflight);
+  }
+  return inflight.then(() => undefined);
 }
 
 // --- Slug generation for heading anchors ---
@@ -927,6 +1032,7 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
   const clearTabTargetLine = useAppStore((state) => state.clearTabTargetLine);
   /** True when this tab was opened from outside the workspace (read-only, no context actions). */
   const isExternal = Boolean(tab.absPath || tab.externalUrl);
+  const draggablePath = tab.absPath ?? (!tab.externalUrl ? tab.relPath : undefined);
   const { onTokenClick, onTokenEnter, onTokenLeave } = useLspTokenNavigation(
     workspace.worktreePath,
     tab.relPath,
@@ -984,7 +1090,7 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
   const [activeTocId, setActiveTocId] = useState('');
   const [tocOpen, setTocOpen] = useState(true);
 
-  // Extract TOC items from rendered DOM via MutationObserver
+  // Extract TOC items after the preview paints so markdown render is not blocked by outline work.
   useEffect(() => {
     if (!showRenderedMarkdown) {
       setTocItems([]);
@@ -1009,15 +1115,36 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
       setTocItems(items);
     }
 
-    // Initial extraction (after Streamdown has rendered)
-    const raf = requestAnimationFrame(extractToc);
+    let idleId: number | null = null;
+    let timeoutId: number | null = null;
+    let rafId: number | null = null;
+    let scheduled = false;
 
-    // Re-extract on DOM changes (e.g. streaming updates)
-    const observer = new MutationObserver(extractToc);
+    const scheduleExtractToc = () => {
+      if (scheduled) return;
+      scheduled = true;
+      rafId = requestAnimationFrame(() => {
+        const run = () => {
+          scheduled = false;
+          extractToc();
+        };
+        if ('requestIdleCallback' in window) {
+          idleId = window.requestIdleCallback(run, { timeout: 500 });
+        } else {
+          timeoutId = window.setTimeout(run, 120);
+        }
+      });
+    };
+
+    scheduleExtractToc();
+
+    const observer = new MutationObserver(scheduleExtractToc);
     observer.observe(container, { childList: true, subtree: true });
 
     return () => {
-      cancelAnimationFrame(raf);
+      if (rafId !== null) cancelAnimationFrame(rafId);
+      if (idleId !== null) window.cancelIdleCallback(idleId);
+      if (timeoutId !== null) window.clearTimeout(timeoutId);
       observer.disconnect();
     };
   }, [showRenderedMarkdown, markdownText]);
@@ -1173,21 +1300,10 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
     }
 
     if (isMediaFile) {
-      withTimeout(
-        readMediaUrlFromSource({
-          absPath: tab.absPath,
-          externalUrl: tab.externalUrl,
-          relPath: tab.relPath,
-          worktreePath: workspace.worktreePath,
-        }),
-        FILE_PREVIEW_LOAD_TIMEOUT_MS,
-        'Media preview load',
-      )
-        .then((url) => {
-          rememberCacheEntry(mediaUrlCache, requestCacheKey, url);
-          if (!disposed) {
-            setMediaUrl(url);
-          }
+      preloadFilePreview({ tab, workspace })
+        .then(() => {
+          const nextUrl = mediaUrlCache.get(requestCacheKey);
+          if (!disposed && nextUrl) setMediaUrl(nextUrl);
         })
         .catch((error) => {
           if (!disposed && !cachedMediaUrl) {
@@ -1197,36 +1313,15 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
         .finally(() => {
           if (!disposed) setLoading(false);
         });
-    }
-
-    if (isMediaFile) {
       return () => {
         disposed = true;
       };
     }
 
-    const textPromise = tab.externalUrl
-      ? fetch(tab.externalUrl).then(async (response) => {
-          const content = (await response.text()).slice(0, TEXT_FILE_PREVIEW_LIMIT);
-          return {
-            content,
-            lineCount: content.split('\n').length,
-            totalBytes: Number(response.headers.get('content-length') ?? content.length),
-            previewBytes: content.length,
-            truncated: content.length >= TEXT_FILE_PREVIEW_LIMIT,
-          };
-        })
-      : tab.absPath
-        ? window.forgepad.fs.readAbsFilePreview(tab.absPath, TEXT_FILE_PREVIEW_LIMIT)
-        : window.forgepad.fs.readFilePreview(workspace.worktreePath, tab.relPath, TEXT_FILE_PREVIEW_LIMIT);
-    withTimeout(textPromise, FILE_PREVIEW_LOAD_TIMEOUT_MS, 'File preview load')
-      .then((preview) => {
-        const nextEntry = {
-          textPreview: preview,
-          fileText: preview.content,
-          lineCount: preview.lineCount ?? preview.content.split('\n').length,
-        };
-        rememberCacheEntry(textPreviewCache, requestCacheKey, nextEntry);
+    preloadFilePreview({ tab, workspace })
+      .then(() => {
+        const nextEntry = textPreviewCache.get(requestCacheKey);
+        if (!nextEntry) return;
         if (disposed) return;
         setTextPreview(nextEntry.textPreview);
         setFileText(nextEntry.fileText);
@@ -1605,8 +1700,16 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
       {/* Toolbar */}
       <div className="flex min-h-[42px] items-center justify-between gap-3 border-border border-b bg-panel px-3">
         <div
-          className="flex min-w-0 items-center gap-[7px] overflow-hidden text-ellipsis whitespace-nowrap font-[510] text-[13px]"
-          title={tab.relPath}
+          className={clsx(
+            'flex min-w-0 items-center gap-[7px] overflow-hidden text-ellipsis whitespace-nowrap font-[510] text-[13px]',
+            draggablePath && 'cursor-grab active:cursor-grabbing',
+          )}
+          title={tab.absPath ?? tab.relPath}
+          draggable={Boolean(draggablePath)}
+          onDragStart={(event) => {
+            if (!draggablePath) return;
+            setForgepadPathDragData(event.dataTransfer, draggablePath);
+          }}
         >
           <FileIcon filePath={tab.relPath} size={14} />
           {tab.relPath}

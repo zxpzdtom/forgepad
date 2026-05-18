@@ -980,6 +980,7 @@ export function ChangesPanel({ mode = 'changes' }: { mode?: ChangesPanelTab }) {
 
   const prevSignature = useRef('');
   const loadedWorkspaceIdRef = useRef<string | null>(null);
+  const loadedCommitWorkspaceIdRef = useRef<string | null>(null);
   const loadRequestIdRef = useRef(0);
   const statusCacheRef = useRef<Map<string, FileStatus[]>>(new Map());
   const commitTextareaRef = useRef<HTMLTextAreaElement>(null);
@@ -989,21 +990,28 @@ export function ChangesPanel({ mode = 'changes' }: { mode?: ChangesPanelTab }) {
     async (silent?: boolean) => {
       if (!workspaceId || !worktreePath) return;
       const requestId = ++loadRequestIdRef.current;
-      const showBlockingLoading = !silent && loadedWorkspaceIdRef.current !== workspaceId;
+      const hasCachedData =
+        mode === 'changes' ? loadedWorkspaceIdRef.current === workspaceId : loadedCommitWorkspaceIdRef.current === workspaceId;
+      const showBlockingLoading = !silent && !hasCachedData;
       if (showBlockingLoading) setLoading(true);
       try {
-        const next = await window.forgepad.git.getStatus(worktreePath);
-        const nextCommitHistory = await window.forgepad.git.getCommitHistory(worktreePath, COMMIT_HISTORY_LIMIT).catch(() => []);
-        if (requestId !== loadRequestIdRef.current) return;
-        const sig = next.map((s) => statusKey(s)).join(',');
-        setStatuses(next);
-        setCommitHistory(nextCommitHistory);
-        statusCacheRef.current.set(workspaceId, next);
-        loadedWorkspaceIdRef.current = workspaceId;
-        updateBranchChangeStats(workspaceId, next);
-        setSelectedKeys((current) => new Set([...current].filter((key) => next.some((status) => statusKey(status) === key))));
-        if (sig !== prevSignature.current) {
-          prevSignature.current = sig;
+        if (mode === 'commits') {
+          const nextCommitHistory = await window.forgepad.git.getCommitHistory(worktreePath, COMMIT_HISTORY_LIMIT);
+          if (requestId !== loadRequestIdRef.current) return;
+          setCommitHistory(nextCommitHistory);
+          loadedCommitWorkspaceIdRef.current = workspaceId;
+        } else {
+          const next = await window.forgepad.git.getStatus(worktreePath);
+          if (requestId !== loadRequestIdRef.current) return;
+          const sig = next.map((s) => statusKey(s)).join(',');
+          setStatuses(next);
+          statusCacheRef.current.set(workspaceId, next);
+          loadedWorkspaceIdRef.current = workspaceId;
+          updateBranchChangeStats(workspaceId, next);
+          setSelectedKeys((current) => new Set([...current].filter((key) => next.some((status) => statusKey(status) === key))));
+          if (sig !== prevSignature.current) {
+            prevSignature.current = sig;
+          }
         }
       } catch (error) {
         if (requestId !== loadRequestIdRef.current) return;
@@ -1012,7 +1020,7 @@ export function ChangesPanel({ mode = 'changes' }: { mode?: ChangesPanelTab }) {
         if (requestId === loadRequestIdRef.current) setLoading(false);
       }
     },
-    [addToast, workspaceId, worktreePath, updateBranchChangeStats, t],
+    [addToast, mode, workspaceId, worktreePath, updateBranchChangeStats, t],
   );
 
   useEffect(() => {
@@ -1020,6 +1028,7 @@ export function ChangesPanel({ mode = 'changes' }: { mode?: ChangesPanelTab }) {
     prevSignature.current = '';
     const cached = workspaceId ? statusCacheRef.current.get(workspaceId) : undefined;
     loadedWorkspaceIdRef.current = cached && workspaceId ? workspaceId : null;
+    loadedCommitWorkspaceIdRef.current = null;
     setStatuses(cached ?? []);
     setCommitHistory([]);
     setSelectedKeys(new Set());
@@ -1182,7 +1191,7 @@ export function ChangesPanel({ mode = 'changes' }: { mode?: ChangesPanelTab }) {
   }
 
   const sectionOrder: ChangeSection[] = ['staged', 'changes'];
-  const showInitialLoading = loading && statuses.length === 0;
+  const showInitialLoading = loading && (mode === 'changes' ? statuses.length === 0 : commitHistory.length === 0);
   return (
     <section className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-hidden py-2.5 pl-2.5">
       <div className="flex min-h-8 items-center gap-2 pr-2.5">

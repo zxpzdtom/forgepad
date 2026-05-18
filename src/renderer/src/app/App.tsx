@@ -36,9 +36,11 @@ import { useAppStore } from "@renderer/store/app-store";
 import { ThemeContext } from "@renderer/app/theme-context";
 import type {
   AgentSessionHistoryItem,
+  PersistedAppState,
   PetPlayAction,
   ShortcutActionId,
   Tab,
+  Workspace,
 } from "@shared/types";
 import { DEFAULT_SHORTCUTS } from "@shared/types";
 import {
@@ -62,6 +64,59 @@ const SettingsPanel = lazy(() =>
     default: module.SettingsPanel,
   })),
 );
+
+const STARTUP_FILE_PREVIEW_BYTES = 256 * 1024;
+
+function isMarkdownPreviewPath(path: string): boolean {
+  const lower = path.toLowerCase();
+  return lower.endsWith(".md") || lower.endsWith(".markdown");
+}
+
+function findPersistedActiveFile(
+  state: Partial<PersistedAppState> | null,
+): { tab: Extract<Tab, { type: "file" }>; workspace: Workspace } | null {
+  const workspaces = state?.workspaces ?? [];
+  const tabs = state?.tabs ?? [];
+  const activeWorkspaceId =
+    state?.activeWorkspaceId && workspaces.some((workspace) => workspace.id === state.activeWorkspaceId)
+      ? state.activeWorkspaceId
+      : (workspaces[0]?.id ?? null);
+  if (!activeWorkspaceId) return null;
+
+  const workspace = workspaces.find((item) => item.id === activeWorkspaceId);
+  if (!workspace) return null;
+
+  const fileTabs = tabs.filter(
+    (tab): tab is Extract<Tab, { type: "file" }> => tab.workspaceId === activeWorkspaceId && tab.type === "file",
+  );
+  const rememberedId = state?.workspaceActiveFileTabIds?.[activeWorkspaceId];
+  const activeTab = tabs.find((tab) => tab.id === state?.activeTabId);
+  const restoredActiveFileId =
+    activeTab?.workspaceId === activeWorkspaceId && activeTab.type === "file" ? activeTab.id : undefined;
+  const activeFileTab =
+    fileTabs.find((tab) => tab.id === rememberedId) ??
+    fileTabs.find((tab) => tab.id === restoredActiveFileId) ??
+    fileTabs.at(-1);
+
+  return activeFileTab ? { tab: activeFileTab, workspace } : null;
+}
+
+function prewarmPersistedActiveFile(state: Partial<PersistedAppState> | null): void {
+  const active = findPersistedActiveFile(state);
+  if (!active || active.tab.externalUrl) return;
+
+  if (active.tab.absPath) {
+    void window.forgepad.fs.readAbsFilePreview(active.tab.absPath, STARTUP_FILE_PREVIEW_BYTES).catch(() => {});
+  } else {
+    void window.forgepad.fs
+      .readFilePreview(active.workspace.worktreePath, active.tab.relPath, STARTUP_FILE_PREVIEW_BYTES)
+      .catch(() => {});
+  }
+
+  if (isMarkdownPreviewPath(active.tab.relPath)) {
+    void import("@renderer/components/FileEditor").then((module) => module.preloadMarkdownPreview?.());
+  }
+}
 
 const pierreWorkerPoolOptions: WorkerPoolOptions = {
   poolSize: Math.max(2, Math.min(4, navigator.hardwareConcurrency || 2)),
@@ -247,7 +302,10 @@ function AppInner() {
     window.forgepad.state
       .load()
       .then((state) => {
-        if (!disposed) useAppStore.getState().hydrate(state);
+        if (!disposed) {
+          prewarmPersistedActiveFile(state);
+          useAppStore.getState().hydrate(state);
+        }
       })
       .catch((error) => {
         useAppStore.getState().hydrate(null);

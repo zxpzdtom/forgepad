@@ -3,6 +3,7 @@ import type { FileTreeContextMenuItem, GitStatusEntry } from '@pierre/trees';
 import { useTranslation } from '@renderer/i18n';
 import { FileTree, useFileTree, useFileTreeSelection } from '@pierre/trees/react';
 import { TREE_THEMES } from '@renderer/lib/file-tree-theme';
+import { setForgepadPathDragData } from '@renderer/lib/drag-utils';
 import { useResolvedTheme } from '@renderer/app/theme-context';
 import { useAppStore } from '@renderer/store/app-store';
 import type { FileNode, Tab, Workspace } from '@shared/types';
@@ -550,9 +551,7 @@ export function FilesPanel() {
         e.preventDefault();
         return;
       }
-      e.dataTransfer.setData('text/plain', path);
-      e.dataTransfer.setData('application/x-forgepad-path', path);
-      e.dataTransfer.effectAllowed = 'copy';
+      setForgepadPathDragData(e.dataTransfer, path);
     };
 
     // (4) Cleanup: remove draggable from the row

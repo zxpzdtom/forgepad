@@ -45,7 +45,8 @@ const NativeBrowserTab = ({ tab }: { tab: Extract<import('@shared/types').Tab, {
 
 const BrowserTab = NativeBrowserTab;
 const DiffViewer = lazy(() => import('./DiffViewer').then((module) => ({ default: module.DiffViewer })));
-const FileEditor = lazy(() => import('./FileEditor').then((module) => ({ default: module.FileEditor })));
+const loadFileEditor = () => import('./FileEditor');
+const FileEditor = lazy(() => loadFileEditor().then((module) => ({ default: module.FileEditor })));
 
 /** Error boundary so a crashing BrowserTab doesn't take down the whole column */
 class BrowserErrorBoundary extends Component<
@@ -114,10 +115,45 @@ export function FileColumn() {
 
   const columnActiveId = activeFileTabId ?? fileTabs[0]?.id;
   const activeFileTab = fileTabs.find((t) => t.id === columnActiveId);
+  const [mountedFileTabIds, setMountedFileTabIds] = useState<Set<string>>(() => new Set());
+  const visibleFileTabIds = new Set(mountedFileTabIds);
+  if (activeFileTab) visibleFileTabIds.add(activeFileTab.id);
 
   const activeWorkspace = workspaces.find((w) => w.id === activeWorkspaceId) as Workspace | undefined;
 
   const handleMouseDown = () => setFocusedColumn('file');
+
+  useEffect(() => {
+    const activeId = activeFileTab?.id;
+    const liveFileTabIds = new Set(fileTabs.map((tab) => tab.id));
+    setMountedFileTabIds((current) => {
+      let changed = false;
+      const next = new Set<string>();
+      for (const id of current) {
+        if (liveFileTabIds.has(id)) {
+          next.add(id);
+        } else {
+          changed = true;
+        }
+      }
+      if (activeId && !next.has(activeId)) {
+        next.add(activeId);
+        changed = true;
+      }
+      return changed ? next : current;
+    });
+  }, [activeFileTab?.id, fileTabs]);
+
+  useEffect(() => {
+    if (activeFileTab?.type !== 'file' || !activeWorkspace) return;
+    void loadFileEditor().then((module) => {
+      void module.preloadFilePreview?.({ tab: activeFileTab, workspace: activeWorkspace });
+      const lowerPath = activeFileTab.relPath.toLowerCase();
+      if (lowerPath.endsWith('.md') || lowerPath.endsWith('.markdown')) {
+        module.preloadMarkdownPreview?.();
+      }
+    });
+  }, [activeFileTab, activeWorkspace]);
 
   // ── External file drop: open files as tabs ────────────────────────────
   const dragCounterRef = useRef(0);
@@ -210,10 +246,11 @@ export function FileColumn() {
             </div>
           );
         })}
-        {/* Keep opened file/diff/context tabs mounted so switching tabs preserves loaded content and scroll state. */}
+        {/* Keep visited file/diff/context tabs mounted so switching tabs preserves loaded content and scroll state. */}
         {activeWorkspace &&
           fileTabs.map((tab) => {
             if (tab.type === 'browser') return null; // already rendered above
+            if (!visibleFileTabIds.has(tab.id)) return null;
             const isActive = tab.id === activeFileTab?.id;
             const paneStyle = {
               visibility: isActive ? 'visible' : 'hidden',

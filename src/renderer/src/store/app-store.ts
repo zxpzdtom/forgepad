@@ -975,12 +975,15 @@ export const useAppStore = create<AppState>((set, get) => ({
     // value so the host can explicitly show or hide its separate pet window.
     window.forgepad.pet.sendSettings(settings.pets);
 
-    // Discover worktrees on disk that aren't tracked yet
-    get().syncWorktreesFromDisk();
-    // Refresh branch names in case they changed since last session
-    for (const w of get().workspaces) {
-      get().refreshBranch(w.id);
-    }
+    window.setTimeout(() => {
+      // Keep startup preview responsive: the core daemon handles requests
+      // sequentially, so background worktree/git refreshes should not jump
+      // ahead of the restored active file preview.
+      get().syncWorktreesFromDisk();
+      for (const w of get().workspaces) {
+        get().refreshBranch(w.id);
+      }
+    }, 900);
   },
 
   toPersistedState: () => serializeForSave(get()),
