@@ -1,6 +1,7 @@
 import type { AgentStatusUpdate } from "./agent-lifecycle";
 import type {
   AgentCompletionData,
+  AgentSessionHistoryItem,
   AgentUserPromptData,
   ContextBundleResult,
   CreateBundleInput,
@@ -167,6 +168,7 @@ export type HostBridgeApi = {
     createBundle: (input: CreateBundleInput) => Promise<ContextBundleResult>;
   };
   agent: {
+    externalSessions?: (workspaceId: string, worktreePath: string) => Promise<AgentSessionHistoryItem[]>;
     onStatusUpdate: (callback: (update: AgentStatusUpdate) => void) => Unsubscribe;
     onFocusTab: (callback: (ptyId: string) => void) => Unsubscribe;
     onRenameTab: (callback: (data: { ptyId: string; title: string }) => void) => Unsubscribe;

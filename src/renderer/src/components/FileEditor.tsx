@@ -1823,6 +1823,9 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
           <Search size={14} className="text-muted" />
           <input
             ref={searchInputRef}
+            autoCapitalize="off"
+            autoCorrect="off"
+            spellCheck={false}
             value={searchQuery}
             placeholder="Search file"
             onChange={(event) => {

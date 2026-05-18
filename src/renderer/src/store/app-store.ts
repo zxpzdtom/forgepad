@@ -164,6 +164,7 @@ type AppState = {
   createTerminal: (workspaceId?: string, initialCommand?: string) => Promise<string | null>;
   createAgentTerminal: (workspaceId?: string, commandOverride?: string, presetId?: string) => Promise<string | null>;
   resumeAgentSession: (session: AgentSessionHistoryItem) => Promise<string | null>;
+  importExternalAgentSessions: (workspaceId: string) => Promise<void>;
   addTab: (tab: Tab) => void;
   closeTab: (tabId: string) => void;
   closeOtherTabs: (tabId: string) => void;
@@ -1284,6 +1285,36 @@ export const useAppStore = create<AppState>((set, get) => ({
     } catch (error) {
       get().addToast('error', error instanceof Error ? error.message : `Failed to restore ${session.title}.`);
       return null;
+    }
+  },
+
+  importExternalAgentSessions: async (workspaceId) => {
+    const workspace = findWorkspace(get(), workspaceId);
+    const externalSessions = window.forgepad.agent.externalSessions;
+    if (!workspace || !externalSessions) return;
+
+    try {
+      const sessions = await externalSessions(workspace.id, workspace.worktreePath);
+      if (sessions.length === 0) return;
+      set((state) => {
+        const merged = [...sessions, ...state.agentSessionHistory].reduce<AgentSessionHistoryItem[]>((items, item) => {
+          if (
+            items.some(
+              (existing) =>
+                existing.workspaceId === item.workspaceId &&
+                existing.agentPresetId === item.agentPresetId &&
+                existing.sessionId === item.sessionId,
+            )
+          ) {
+            return items;
+          }
+          return [...items, item];
+        }, []);
+        merged.sort((a, b) => b.updatedAt - a.updatedAt);
+        return { agentSessionHistory: merged };
+      });
+    } catch (error) {
+      get().addToast('error', error instanceof Error ? error.message : 'Failed to import agent session history.');
     }
   },
 

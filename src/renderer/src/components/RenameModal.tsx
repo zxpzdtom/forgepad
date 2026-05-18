@@ -27,6 +27,7 @@ export function RenameModal({ value, onChange, onConfirm, onCancel }: RenameModa
         <p className="font-[510] text-sm text-text">Rename Tab</p>
         <input
           ref={inputRef}
+          autoCapitalize="off"
           className="h-8 rounded-md border border-border bg-bg px-2.5 text-sm text-text outline-none focus:border-accent"
           value={value}
           onChange={(e) => onChange(e.currentTarget.value)}

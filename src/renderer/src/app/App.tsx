@@ -257,6 +257,7 @@ function AppInner() {
   const createTerminal = useAppStore((state) => state.createTerminal);
   const createAgentTerminal = useAppStore((state) => state.createAgentTerminal);
   const resumeAgentSession = useAppStore((state) => state.resumeAgentSession);
+  const importExternalAgentSessions = useAppStore((state) => state.importExternalAgentSessions);
   const createBrowserTab = useAppStore((state) => state.createBrowserTab);
   const defaultBrowserHomepage = useAppStore(
     (state) => state.settings.defaultBrowserHomepage,
@@ -737,6 +738,11 @@ function AppInner() {
       if (watchId) window.forgepad.fs.unwatchWorkspace(watchId);
     };
   }, [activeWorkspace, addToast, triggerGitRefresh]);
+
+  useEffect(() => {
+    if (!hydrated || !activeWorkspace) return;
+    void importExternalAgentSessions(activeWorkspace.id);
+  }, [activeWorkspace, hydrated, importExternalAgentSessions]);
 
   const workspaceTabs = tabs.filter(
     (tab) => tab.workspaceId === activeWorkspaceId,

@@ -724,7 +724,31 @@ pub fn add_worktree(
         .map(PathBuf::from)
         .unwrap_or_else(|| repo_path.parent().unwrap_or(repo_path).to_path_buf());
     let name = branch.replace('/', "-");
-    let worktree_path = base.join(&name).to_string_lossy().to_string();
+    let worktree_path_buf = base.join(&name);
+
+    // If the target path already exists, try cleaning up stale worktree first,
+    // then append a numeric suffix to avoid collision.
+    let worktree_path_buf = if worktree_path_buf.exists() {
+        // Attempt to prune stale worktrees that may reference this path
+        let _ = command_status("git", &["worktree", "prune"], Some(repo_path));
+        if worktree_path_buf.exists() {
+            // Path still exists — find an available suffixed path
+            let mut i = 2u32;
+            loop {
+                let candidate = base.join(format!("{name}-{i}"));
+                if !candidate.exists() {
+                    break candidate;
+                }
+                i += 1;
+            }
+        } else {
+            worktree_path_buf
+        }
+    } else {
+        worktree_path_buf
+    };
+
+    let worktree_path = worktree_path_buf.to_string_lossy().to_string();
     let remote_ref = format!("refs/remotes/origin/{branch}");
     let remote_exists = track_remote
         && command_status(
@@ -734,7 +758,21 @@ pub fn add_worktree(
         )
         .is_ok();
 
-    if remote_exists {
+    let local_ref = format!("refs/heads/{branch}");
+    let local_branch_exists = command_status(
+        "git",
+        &["show-ref", "--verify", "--quiet", &local_ref],
+        Some(repo_path),
+    )
+    .is_ok();
+
+    if local_branch_exists {
+        command_status(
+            "git",
+            &["worktree", "add", &worktree_path, branch],
+            Some(repo_path),
+        )?;
+    } else if remote_exists {
         command_status(
             "git",
             &[

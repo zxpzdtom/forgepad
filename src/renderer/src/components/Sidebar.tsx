@@ -1004,6 +1004,7 @@ function NewPanelDialog({ onClose, onCreate }: { onClose: () => void; onCreate: 
               <input
                 id="panel-name"
                 type="text"
+                autoCapitalize="off"
                 className="h-8 rounded-md border border-border bg-surface-input px-2.5 text-[13px] text-text placeholder:text-subtle focus:border-accent focus:outline-none"
                 placeholder={t('sidebar.newPanel.namePlaceholder')}
                 value={name}
@@ -1114,6 +1115,7 @@ function EditPanelDialog({ panel, onClose }: { panel: WorkspacePanel; onClose: (
               <input
                 id="edit-panel-name"
                 type="text"
+                autoCapitalize="off"
                 className="h-8 rounded-md border border-border bg-surface-input px-2.5 text-[13px] text-text placeholder:text-subtle focus:border-accent focus:outline-none"
                 placeholder={t('sidebar.newPanel.namePlaceholder')}
                 value={name}

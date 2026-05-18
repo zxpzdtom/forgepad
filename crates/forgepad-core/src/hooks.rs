@@ -1,7 +1,8 @@
 use std::collections::{HashMap, HashSet};
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
-use std::sync::{mpsc, Arc, Mutex};
+use std::process::{Command, Stdio};
+use std::sync::{mpsc, Arc, Mutex, OnceLock};
 use std::thread;
 use std::time::Duration;
 
@@ -260,6 +261,50 @@ fn handle_user_prompt_submit(
 
     if rename_on_first_message_only {
         renamed_pty_ids.lock().unwrap().insert(pty_id.to_string());
+    }
+
+    // If AI title generation is enabled, spawn a background thread to generate
+    // a better title asynchronously and broadcast an update when ready.
+    let (auto_generate, template) = {
+        let s = settings.lock().unwrap();
+        (s.auto_generate_tab_title, s.tab_title_prompt_template.clone())
+    };
+    if auto_generate && !template.is_empty() {
+        let pty_id_owned = pty_id.to_string();
+        let source_owned = source.to_string();
+        let prompt_owned = prompt.clone();
+        let quick_title_clone = quick_title.clone();
+        let on_event_clone = Arc::clone(&on_event);
+
+        thread::spawn(move || {
+            let full_prompt = if template.contains("{prompt}") {
+                template.replace("{prompt}", &prompt_owned)
+            } else {
+                format!("{}\n\n{}", template, prompt_owned)
+            };
+
+            let user_path = resolve_user_path();
+            let result = if source_owned == "codex" {
+                generate_title_with_codex(&full_prompt, &user_path)
+            } else {
+                generate_title_with_claude(&full_prompt, &user_path)
+            };
+
+            if let Some(ai_title) = result {
+                let final_title = if ai_title.chars().count() > 15 {
+                    format!("{}…", ai_title.chars().take(15).collect::<String>())
+                } else {
+                    ai_title
+                };
+                // Only update if the AI title differs from the quick truncated title
+                if final_title != quick_title_clone {
+                    on_event_clone(json!({
+                        "type": "agent.renameTab",
+                        "payload": { "ptyId": pty_id_owned, "title": final_title }
+                    }));
+                }
+            }
+        });
     }
 
     write_response(
@@ -548,6 +593,164 @@ fn truncate_title(prompt: &str) -> String {
         }
     }
     format!("{truncated}…")
+}
+
+// ---------------------------------------------------------------------------
+// AI title generation helpers
+// ---------------------------------------------------------------------------
+
+const FALLBACK_PATH: &str = "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin";
+
+/// Resolve the user's real login shell PATH.
+/// macOS GUI apps inherit launchd's minimal PATH which doesn't include
+/// homebrew, nvm, volta, or user-installed CLI tools like `claude`.
+fn resolve_user_path() -> String {
+    static CACHED: OnceLock<String> = OnceLock::new();
+
+    CACHED
+        .get_or_init(|| {
+            let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/zsh".to_string());
+            Command::new(&shell)
+                .args(["-ilc", "echo ___PATH___:$PATH"])
+                .stdout(Stdio::piped())
+                .stderr(Stdio::null())
+                .output()
+                .ok()
+                .and_then(|output| {
+                    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+                    stdout
+                        .lines()
+                        .find_map(|line| line.strip_prefix("___PATH___:"))
+                        .map(|path| path.trim().to_string())
+                })
+                .unwrap_or_else(|| {
+                    std::env::var("PATH")
+                        .map(|p| format!("{p}:{FALLBACK_PATH}"))
+                        .unwrap_or_else(|_| FALLBACK_PATH.to_string())
+                })
+        })
+        .clone()
+}
+
+fn generate_title_with_claude(full_prompt: &str, user_path: &str) -> Option<String> {
+    let output = Command::new("claude")
+        .args(["-p", "--no-session-persistence", full_prompt])
+        .env("PATH", user_path)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .output()
+        .ok()?;
+
+    if !output.status.success() {
+        return None;
+    }
+
+    let title = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if title.is_empty() {
+        None
+    } else {
+        Some(title)
+    }
+}
+
+fn generate_title_with_codex(full_prompt: &str, user_path: &str) -> Option<String> {
+    let tmp_dir = std::env::temp_dir().join(format!(
+        "forgepad-title-{}",
+        std::process::id()
+    ));
+    let _ = std::fs::create_dir_all(&tmp_dir);
+    let output_path = tmp_dir.join("title.txt");
+
+    let result = (|| -> Option<String> {
+        let mut child = Command::new("codex")
+            .args([
+                "exec",
+                "--ephemeral",
+                "--skip-git-repo-check",
+                "--sandbox",
+                "read-only",
+                "--disable",
+                "hooks",
+                "--output-last-message",
+                output_path.to_str()?,
+                "-",
+            ])
+            .env("PATH", user_path)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .ok()?;
+
+        // Write prompt to stdin
+        if let Some(mut stdin) = child.stdin.take() {
+            use std::io::Write as _;
+            let _ = stdin.write_all(full_prompt.as_bytes());
+            // Drop stdin to signal EOF
+        }
+
+        let output = child.wait_with_output().ok()?;
+
+        // Try reading from output file first
+        let file_title = std::fs::read_to_string(&output_path)
+            .ok()
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty());
+
+        if file_title.is_some() {
+            return file_title;
+        }
+
+        // Fallback: extract from stdout/stderr
+        let combined = format!(
+            "{}\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+        extract_codex_title_from_output(&combined)
+    })();
+
+    // Cleanup temp dir
+    let _ = std::fs::remove_dir_all(&tmp_dir);
+    result
+}
+
+fn extract_codex_title_from_output(output: &str) -> Option<String> {
+    let lines: Vec<&str> = output
+        .lines()
+        .map(str::trim)
+        .filter(|line| !line.is_empty())
+        .collect();
+
+    for line in lines.iter().rev() {
+        // Skip noise lines
+        if line.len() > 40
+            || *line == "codex"
+            || *line == "tokens used"
+            || *line == "user"
+            || line.starts_with("deprecated:")
+            || line.starts_with("Enable it with")
+            || line.starts_with('<')
+            || line.contains("<html")
+            || line.starts_with("OpenAI Codex")
+            || line.starts_with("--------")
+            || line.starts_with("workdir:")
+            || line.starts_with("model:")
+            || line.starts_with("provider:")
+            || line.starts_with("approval:")
+            || line.starts_with("sandbox:")
+            || line.starts_with("reasoning ")
+            || line.starts_with("session id:")
+        {
+            continue;
+        }
+        // Skip lines that are only digits (possibly with commas)
+        if line.chars().all(|c| c.is_ascii_digit() || c == ',') {
+            continue;
+        }
+        return Some(line.to_string());
+    }
+    None
 }
 
 fn status_for_event(event_type: &str) -> Option<&'static str> {

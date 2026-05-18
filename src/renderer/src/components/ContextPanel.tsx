@@ -82,6 +82,9 @@ export function ContextPanel() {
             <option value="custom">Custom</option>
           </select>
           <input
+            autoCapitalize="off"
+            autoCorrect="off"
+            spellCheck={false}
             value={settings.defaultAgentCommand}
             onChange={(event) => updateSettings({ defaultAgentCommand: event.currentTarget.value })}
             placeholder="codex"

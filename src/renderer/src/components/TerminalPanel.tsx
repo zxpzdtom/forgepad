@@ -919,6 +919,9 @@ export function TerminalPanel({ tab, workspace, active }: TerminalPanelProps) {
           <Search size={14} className="text-muted" />
           <input
             ref={searchInputRef}
+            autoCapitalize="off"
+            autoCorrect="off"
+            spellCheck={false}
             value={searchQuery}
             placeholder="Search terminal"
             onChange={(event) => setSearchQuery(event.currentTarget.value)}

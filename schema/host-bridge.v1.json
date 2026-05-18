@@ -91,6 +91,14 @@
       "result": "void",
       "nativeOwner": true
     },
+    "agent.externalSessions": {
+      "params": {
+        "workspaceId": "string",
+        "worktreePath": "string"
+      },
+      "result": "AgentSessionHistoryItem[]",
+      "coreOwner": "rust"
+    },
     "state.load": {
       "params": {},
       "result": "PersistedAppState?"

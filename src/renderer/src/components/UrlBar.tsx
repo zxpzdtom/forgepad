@@ -139,6 +139,8 @@ export function UrlBar({ value, onChange, onNavigate, history = [] }: UrlBarProp
         <input
           ref={inputRef}
           type="text"
+          autoCapitalize="off"
+          autoCorrect="off"
           value={value}
           onChange={(e) => {
             onChange(e.target.value);

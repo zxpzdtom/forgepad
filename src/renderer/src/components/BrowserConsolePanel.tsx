@@ -177,6 +177,8 @@ function ConsoleInput({ onExecute }: { onExecute: (script: string) => void }) {
       <input
         ref={inputRef}
         type="text"
+        autoCapitalize="off"
+        autoCorrect="off"
         value={value}
         onChange={(e) => {
           historyIdxRef.current = -1;
@@ -339,6 +341,9 @@ export function BrowserConsolePanel({ entries, onClear, onSendToAgent, onExecute
           </svg>
           <input
             type="text"
+            autoCapitalize="off"
+            autoCorrect="off"
+            spellCheck={false}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={t('browserConsole.filterPlaceholder')}

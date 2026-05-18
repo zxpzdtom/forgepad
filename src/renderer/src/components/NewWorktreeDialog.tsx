@@ -84,6 +84,9 @@ export function NewWorktreeDialog({
               <input
                 ref={inputRef}
                 type="text"
+                autoCapitalize="off"
+                autoCorrect="off"
+                spellCheck={false}
                 className="h-8 flex-1 rounded-md border border-border bg-panel-3 px-2.5 text-[13px] text-text outline-none focus:border-accent"
                 placeholder="e.g. swift-fox"
                 value={branch}

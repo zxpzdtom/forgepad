@@ -450,6 +450,9 @@ export function QuickSearch({ open, onClose }: QuickSearchProps) {
           <Search size={18} className="text-muted" />
           <input
             ref={inputRef}
+            autoCapitalize="off"
+            autoCorrect="off"
+            spellCheck={false}
             className="min-w-0 flex-1 bg-transparent text-[15px] text-text outline-none placeholder:text-subtle"
             value={query}
             placeholder="Search workspaces, tabs, and agents"

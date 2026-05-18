@@ -8,7 +8,7 @@ use std::sync::{Arc, Mutex, OnceLock};
 use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use forgepad_core::{app, context, files, git, hooks, lsp, pets, pty, state};
+use forgepad_core::{agent_history, app, context, files, git, hooks, lsp, pets, pty, state};
 use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -471,6 +471,15 @@ fn dispatch(
                 prompt_template,
                 agent_command,
             )?))
+        }
+        "agent.externalSessions" => {
+            let workspace_id = string_param(&params, "workspaceId")?;
+            let worktree_path = string_param(&params, "worktreePath")?;
+            serde_json::to_value(agent_history::list_external_sessions(
+                &workspace_id,
+                &worktree_path,
+            )?)
+            .map_err(|e| e.to_string())
         }
         "fs.treeWithStatus" => {
             let worktree_path = string_param(&params, "worktreePath")?;
