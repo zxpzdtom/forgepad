@@ -311,6 +311,30 @@ function setupClickToMoveCursor(
   return () => terminal.element?.removeEventListener('mouseup', handleMouseUp);
 }
 
+function macTerminalEditSequence(event: KeyboardEvent): string | null {
+  if (event.type !== 'keydown') return null;
+  if (event.shiftKey || event.ctrlKey) return null;
+
+  const key = event.key.toLowerCase();
+
+  if (event.metaKey && !event.altKey) {
+    if (key === 'arrowleft' || key === 'home') return '\x01'; // Ctrl+A
+    if (key === 'arrowright' || key === 'end') return '\x05'; // Ctrl+E
+    if (key === 'backspace') return '\x15'; // Ctrl+U
+    if (key === 'delete') return '\x0b'; // Ctrl+K
+    return null;
+  }
+
+  if (event.altKey && !event.metaKey) {
+    if (key === 'arrowleft') return '\x1bb'; // Esc+b
+    if (key === 'arrowright') return '\x1bf'; // Esc+f
+    if (key === 'backspace') return '\x1b\x7f'; // Esc+Backspace
+    if (key === 'delete') return '\x1bd'; // Esc+d
+  }
+
+  return null;
+}
+
 const TERMINAL_THEMES: Record<'dark' | 'light', ITheme> = {
   dark: {
     background: '#0d0f13',
@@ -605,12 +629,31 @@ export function TerminalPanel({ tab, workspace, active }: TerminalPanelProps) {
       createFilePathLinkProvider(terminal, workspace.id, workspace.worktreePath),
     );
 
+    const writeUserInputToPty = (data: string) => {
+      window.forgepad.pty.write(tab.ptyId, data);
+      if (tab.isAgent) {
+        useAppStore.getState().notifyAgentInput(tab.ptyId);
+      }
+    };
+
     // Let Cmd/Ctrl shortcuts bubble to the window so app-level
     // keybindings still work while the terminal is focused.
     // Uses the live shortcuts ref so user-customised bindings are respected
     // without needing to recreate the terminal instance.
     terminal.attachCustomKeyEventHandler((event) => {
       if (event.type !== 'keydown') return true;
+
+      // macOS native terminal editing gestures are not automatically translated
+      // by the WebView. Map them to readline/zle sequences while ordinary shell
+      // control keys (Ctrl+U/K/W/A/E, etc.) continue to pass through normally.
+      if (terminal.buffer.active === terminal.buffer.normal) {
+        const editSequence = macTerminalEditSequence(event);
+        if (editSequence) {
+          writeUserInputToPty(editSequence);
+          return false;
+        }
+      }
+
       if (!event.metaKey && !event.ctrlKey) return true;
 
       // Cmd/Ctrl+F — open terminal-local search. The SearchAddon only provides
@@ -701,13 +744,10 @@ export function TerminalPanel({ tab, workspace, active }: TerminalPanelProps) {
     window.setTimeout(() => fitAndResize(true), 0);
 
     const dataDisposable = terminal.onData((data) => {
-      window.forgepad.pty.write(tab.ptyId, data);
-      // When the user types into an agent terminal, notify the store so
-      // it can start a cancel-detection timer (handles ESC / Ctrl+C
-      // interrupts where the Stop hook may not fire).
-      if (tab.isAgent) {
-        useAppStore.getState().notifyAgentInput(tab.ptyId);
-      }
+      // When the user types into an agent terminal, notify the store so it can
+      // start a cancel-detection timer (handles ESC / Ctrl+C interrupts where
+      // the Stop hook may not fire).
+      writeUserInputToPty(data);
     });
 
     // Click-to-move-cursor: clicking on the prompt line sends arrow-key sequences.

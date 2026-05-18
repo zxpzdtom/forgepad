@@ -406,18 +406,23 @@ const en = {
   // ── Changes Panel ──
   "changes.staged": "Staged",
   "changes.changes": "Changes",
+  "changes.committed": "Committed ({count})",
   "changes.untracked": "Untracked",
   "changes.workingTree": "Unstaged",
   "changes.selectBucket": "Select this section",
   "changes.deselectBucket": "Deselect this section",
   "changes.stage": "Stage",
   "changes.unstage": "Unstage",
+  "changes.stageItem": "Stage this item",
+  "changes.unstageItem": "Unstage this item",
+  "changes.discardItem": "Discard changes",
   "changes.discardSelected": "Discard selected",
   "changes.refreshChanges": "Refresh changes",
   "changes.viewMode": "Changes view mode",
   "changes.treeView": "Tree view",
   "changes.flatView": "Flat list",
   "changes.cleanWorkingTree": "No Git changes",
+  "changes.noCommits": "No commits",
   "changes.commitMessage": "Commit message",
   "changes.commitStaged": "Commit Staged",
   "changes.discardConfirm": "Discard selected changes? This cannot be undone.",
@@ -477,6 +482,7 @@ const en = {
   // ── Right Panel ──
   "rightPanel.files": "Files",
   "rightPanel.changes": "Changes",
+  "rightPanel.commits": "Commits",
   "rightPanel.context": "Context",
 
   // ── Tab Bar ──

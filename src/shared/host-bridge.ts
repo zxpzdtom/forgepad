@@ -11,6 +11,7 @@ import type {
   FilePreviewResult,
   FileStatus,
   GitBucket,
+  GitCommitSummary,
   GitStatusKind,
   ImportPetResult,
   LspLocation,
@@ -100,10 +101,18 @@ export type HostBridgeApi = {
     getCurrentBranch: (worktreePath: string) => Promise<string>;
     getBranchStats: (worktreePath: string) => Promise<BranchStats>;
     getStatus: (worktreePath: string) => Promise<FileStatus[]>;
+    getCommitHistory: (worktreePath: string, limit?: number) => Promise<GitCommitSummary[]>;
     getFileDiff: (
       worktreePath: string,
       relPath: string,
       bucket: GitBucket,
+      status: GitStatusKind,
+      oldPath?: string,
+    ) => Promise<unknown>;
+    getCommitFileDiff: (
+      worktreePath: string,
+      commitHash: string,
+      relPath: string,
       status: GitStatusKind,
       oldPath?: string,
     ) => Promise<unknown>;

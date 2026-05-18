@@ -122,11 +122,30 @@
       "result": "FileStatus[]",
       "coreOwner": "rust"
     },
+    "git.commitHistory": {
+      "params": {
+        "worktreePath": "string",
+        "limit": "number?"
+      },
+      "result": "GitCommitSummary[]",
+      "coreOwner": "rust"
+    },
     "git.fileDiff": {
       "params": {
         "worktreePath": "string",
         "relPath": "string",
         "bucket": "GitBucket",
+        "status": "GitStatusKind",
+        "oldPath": "string?"
+      },
+      "result": "string",
+      "coreOwner": "rust"
+    },
+    "git.commitFileDiff": {
+      "params": {
+        "worktreePath": "string",
+        "commitHash": "string",
+        "relPath": "string",
         "status": "GitStatusKind",
         "oldPath": "string?"
       },

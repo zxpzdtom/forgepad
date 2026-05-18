@@ -377,18 +377,23 @@ const zhCN: Record<TranslationKeys, string> = {
   // ── Changes Panel ──
   "changes.staged": "已暂存",
   "changes.changes": "变更",
+  "changes.committed": "已提交 ({count})",
   "changes.untracked": "未追踪",
   "changes.workingTree": "未暂存",
   "changes.selectBucket": "选择此分类",
   "changes.deselectBucket": "取消选择此分类",
   "changes.stage": "暂存",
   "changes.unstage": "取消暂存",
+  "changes.stageItem": "暂存此项",
+  "changes.unstageItem": "取消暂存此项",
+  "changes.discardItem": "撤销修改",
   "changes.discardSelected": "丢弃选中",
   "changes.refreshChanges": "刷新变更",
   "changes.viewMode": "变更显示模式",
   "changes.treeView": "树状视图",
   "changes.flatView": "平铺列表",
   "changes.cleanWorkingTree": "没有 Git 变更",
+  "changes.noCommits": "没有提交记录",
   "changes.commitMessage": "提交信息",
   "changes.commitStaged": "提交暂存",
   "changes.discardConfirm": "丢弃选中的变更？此操作无法撤销。",
@@ -448,6 +453,7 @@ const zhCN: Record<TranslationKeys, string> = {
   // ── Right Panel ──
   "rightPanel.files": "文件",
   "rightPanel.changes": "变更",
+  "rightPanel.commits": "提交",
   "rightPanel.context": "上下文",
 
   // ── Tab Bar ──

@@ -1364,6 +1364,7 @@ button,
 
 .change-native-row {
     --change-indent: calc(var(--change-depth, 0) * 15px);
+    position: relative;
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(28px, auto) 15px 24px;
     min-height: 26px;
@@ -1502,6 +1503,7 @@ button,
     font-size: 11px;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
+    transition: opacity 90ms ease;
 }
 
 .change-native-row.is-flat .change-row-stats.is-empty {
@@ -1531,6 +1533,7 @@ button,
         Monaco,
         Consolas,
         monospace;
+    transition: opacity 90ms ease;
 }
 
 .change-status-box.status-added,
@@ -1554,6 +1557,65 @@ button,
     color: var(--text-warning-status);
 }
 
+.change-row-actions {
+    position: absolute;
+    top: 2px;
+    right: 27px;
+    z-index: 2;
+    display: inline-flex;
+    width: 48px;
+    justify-content: flex-end;
+    gap: 2px;
+    opacity: 0;
+    pointer-events: none;
+    transition:
+        opacity 90ms ease,
+        transform 110ms ease;
+    transform: translateX(2px);
+}
+
+.change-native-row:hover .change-row-actions,
+.change-native-row:focus-within .change-row-actions {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateX(0);
+}
+
+.change-native-row.has-actions:hover .change-row-stats,
+.change-native-row.has-actions:hover .change-status-box,
+.change-native-row.has-actions:focus-within .change-row-stats,
+.change-native-row.has-actions:focus-within .change-status-box {
+    opacity: 0;
+}
+
+.change-row-action {
+    display: grid;
+    width: 22px;
+    height: 22px;
+    place-items: center;
+    border-radius: 5px;
+    color: var(--muted);
+    background: transparent;
+    transition:
+        background-color 100ms ease,
+        color 100ms ease,
+        transform 100ms ease;
+}
+
+.change-row-action:hover {
+    color: var(--accent);
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+.change-row-action.is-danger:hover {
+    color: var(--danger);
+    background: color-mix(in srgb, var(--danger) 12%, transparent);
+}
+
+.change-row-action:active {
+    transform: scale(0.94);
+}
+
 .change-native-check {
     display: grid;
     width: 24px;
@@ -1562,6 +1624,45 @@ button,
     padding: 0;
     background: transparent;
     position: relative;
+}
+
+.commit-history-group {
+    display: grid;
+    gap: 1px;
+}
+
+.commit-history-row {
+    width: 100%;
+    grid-template-columns: 16px minmax(0, 1fr) minmax(42px, auto);
+    padding-left: 3px;
+    text-align: left;
+}
+
+.commit-history-subject {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--text);
+    font-size: 12.5px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.commit-file-row {
+    grid-template-columns: minmax(0, 1fr) minmax(36px, auto) 15px;
+}
+
+.commit-file-row .change-native-main {
+    min-width: 0;
+}
+
+.commit-file-label .change-flat-name {
+    flex: 0 1 auto;
+    max-width: none;
+}
+
+.commit-file-label .change-flat-path {
+    flex: 0 999 34%;
+    min-width: 0;
 }
 
 .change-native-check::before {

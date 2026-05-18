@@ -2,7 +2,7 @@ export type GitStatusKind = 'modified' | 'added' | 'deleted' | 'renamed' | 'untr
 
 export type GitBucket = 'staged' | 'unstaged' | 'untracked';
 
-export type RightPanelMode = 'files' | 'changes' | 'context';
+export type RightPanelMode = 'files' | 'changes' | 'commits' | 'context';
 
 export type FilePreviewResult = {
   content: string;
@@ -51,6 +51,8 @@ export type Tab =
       activeBucket?: GitBucket;
       activeStatus?: GitStatusKind;
       activeOldPath?: string;
+      commitHash?: string;
+      commitSubject?: string;
     }
   | {
       id: string;
@@ -167,6 +169,24 @@ export type FileStatus = {
   deletions?: number;
 };
 
+export type GitCommitFileSummary = {
+  path: string;
+  oldPath?: string;
+  status: Exclude<GitStatusKind, 'untracked'>;
+  additions: number;
+  deletions: number;
+};
+
+export type GitCommitSummary = {
+  hash: string;
+  shortHash: string;
+  subject: string;
+  timestamp: number;
+  additions: number;
+  deletions: number;
+  files: GitCommitFileSummary[];
+};
+
 export type DiffFileData = {
   path: string;
   oldPath?: string;
@@ -179,6 +199,7 @@ export type DiffFileData = {
   newImageUrl?: string;
   status: GitStatusKind;
   bucket: GitBucket;
+  commitHash?: string;
   isBinary: boolean;
 };
 

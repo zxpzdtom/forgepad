@@ -465,8 +465,9 @@ export function DiffViewer({ tab, workspace }: DiffViewerProps) {
         tab.activeBucket ?? '',
         tab.activeStatus ?? '',
         tab.activeOldPath ?? '',
+        tab.commitHash ?? '',
       ].join('\n'),
-    [tab.activeBucket, tab.activeOldPath, tab.activePath, tab.activeStatus, workspace.id, workspace.worktreePath],
+    [tab.activeBucket, tab.activeOldPath, tab.activePath, tab.activeStatus, tab.commitHash, workspace.id, workspace.worktreePath],
   );
 
   const load = useCallback(async () => {
@@ -479,6 +480,24 @@ export function DiffViewer({ tab, workspace }: DiffViewerProps) {
     setLoading(!cached && diffsRef.current.length === 0);
     setPending(null);
     try {
+      if (tab.commitHash && tab.activePath && tab.activeStatus) {
+        const file = await window.forgepad.git.getCommitFileDiff(
+          workspace.worktreePath,
+          tab.commitHash,
+          tab.activePath,
+          tab.activeStatus,
+          tab.activeOldPath,
+        );
+        if (requestId !== loadRequestIdRef.current) return;
+        diffViewCache.set(cacheKey, {
+          statuses: [],
+          diffs: [file as DiffFileData],
+        });
+        setStatuses([]);
+        setDiffs([file as DiffFileData]);
+        return;
+      }
+
       const nextStatuses = await window.forgepad.git.getStatus(workspace.worktreePath);
       if (requestId !== loadRequestIdRef.current) return;
       setStatuses(nextStatuses);
@@ -520,7 +539,7 @@ export function DiffViewer({ tab, workspace }: DiffViewerProps) {
     } finally {
       if (requestId === loadRequestIdRef.current) setLoading(false);
     }
-  }, [addToast, cacheKey, tab.activeBucket, tab.activeOldPath, tab.activePath, tab.activeStatus, workspace.worktreePath, t]);
+  }, [addToast, cacheKey, tab.activeBucket, tab.activeOldPath, tab.activePath, tab.activeStatus, tab.commitHash, workspace.worktreePath, t]);
 
   useEffect(() => {
     void load();
@@ -572,7 +591,11 @@ export function DiffViewer({ tab, workspace }: DiffViewerProps) {
     <section className="diff-panel absolute inset-0 flex min-h-0 min-w-0 flex-col bg-bg">
       <div className="flex min-h-12 items-center justify-between gap-3 border-border border-b bg-panel px-3 py-2">
         <div className="flex min-w-0 items-center gap-[7px] overflow-hidden text-ellipsis whitespace-nowrap font-[510] text-[13px]">
-          {tab.activePath ? t('diff.changesTitle', { path: tab.activePath }) : t('diff.workspaceChanges')}
+          {tab.commitHash && tab.activePath
+            ? `${tab.commitSubject ?? tab.commitHash.slice(0, 7)} · ${tab.activePath}`
+            : tab.activePath
+              ? t('diff.changesTitle', { path: tab.activePath })
+              : t('diff.workspaceChanges')}
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
           <button className="icon-button" type="button" title={t('diff.refresh')} onClick={load}>
@@ -581,10 +604,10 @@ export function DiffViewer({ tab, workspace }: DiffViewerProps) {
         </div>
       </div>
       {loading ? <div className="grid min-h-[90px] place-items-center text-muted">{t('diff.loadingDiffs')}</div> : null}
-      {!loading && statuses.length === 0 ? (
+      {!loading && !tab.commitHash && statuses.length === 0 ? (
         <div className="grid min-h-[90px] place-items-center text-muted">{t('diff.noGitChanges')}</div>
       ) : null}
-      {!loading && diffs.length === 0 && statuses.length > 0 ? (
+      {!loading && diffs.length === 0 && (tab.commitHash || statuses.length > 0) ? (
         <div className="grid min-h-[90px] place-items-center text-muted">{t('diff.selectFile')}</div>
       ) : null}
       <VirtualizerContext.Provider value={virtualizer}>

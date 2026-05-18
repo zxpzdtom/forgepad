@@ -179,6 +179,8 @@ type AppState = {
     activeBucket?: GitBucket,
     activeStatus?: GitStatusKind,
     activeOldPath?: string,
+    commitHash?: string,
+    commitSubject?: string,
   ) => void;
   openContextPreviewTab: (workspaceId?: string) => void;
   setRightPanelMode: (mode: RightPanelMode) => void;
@@ -1584,20 +1586,20 @@ export const useAppStore = create<AppState>((set, get) => ({
     });
   },
 
-  openDiffTab: (workspaceId, activePath, activeBucket, activeStatus, activeOldPath) => {
+  openDiffTab: (workspaceId, activePath, activeBucket, activeStatus, activeOldPath, commitHash, commitSubject) => {
     const existing = get().tabs.find((tab) => tab.workspaceId === workspaceId && tab.type === 'diff');
     if (existing) {
       set({
         tabs: get().tabs.map((tab) =>
           tab.id === existing.id && tab.type === 'diff'
-            ? { ...tab, activePath, activeBucket, activeStatus, activeOldPath }
+            ? { ...tab, activePath, activeBucket, activeStatus, activeOldPath, commitHash, commitSubject }
             : tab,
         ),
       });
       get().setActiveTab(existing.id);
       return;
     }
-    get().addTab({ id: id(), workspaceId, type: 'diff', activePath, activeBucket, activeStatus, activeOldPath });
+    get().addTab({ id: id(), workspaceId, type: 'diff', activePath, activeBucket, activeStatus, activeOldPath, commitHash, commitSubject });
   },
 
   openContextPreviewTab: (workspaceId) => {

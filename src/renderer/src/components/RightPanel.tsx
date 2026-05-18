@@ -2,7 +2,7 @@ import { lazy, Suspense } from 'react';
 import { useTranslation } from '@renderer/i18n';
 import { useAppStore } from '@renderer/store/app-store';
 import type { RightPanelMode } from '@shared/types';
-import { Files, GitCompare, SendHorizontal } from 'lucide-react';
+import { Files, GitCommitHorizontal, GitCompare, SendHorizontal } from 'lucide-react';
 
 import clsx from 'clsx';
 
@@ -17,6 +17,7 @@ const modes: Array<{
 }> = [
   { mode: 'files', labelKey: 'rightPanel.files', icon: Files },
   { mode: 'changes', labelKey: 'rightPanel.changes', icon: GitCompare },
+  { mode: 'commits', labelKey: 'rightPanel.commits', icon: GitCommitHorizontal },
   { mode: 'context', labelKey: 'rightPanel.context', icon: SendHorizontal },
 ];
 
@@ -58,7 +59,8 @@ export function RightPanel() {
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <Suspense fallback={null}>
           {mode === 'files' ? <FilesPanel /> : null}
-          {mode === 'changes' ? <ChangesPanel /> : null}
+          {mode === 'changes' ? <ChangesPanel mode="changes" /> : null}
+          {mode === 'commits' ? <ChangesPanel mode="commits" /> : null}
           {mode === 'context' ? <ContextPanel /> : null}
         </Suspense>
       </div>

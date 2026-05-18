@@ -40,6 +40,29 @@ pub struct BranchStats {
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct CommitFileSummary {
+    pub path: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub old_path: Option<String>,
+    pub status: String,
+    pub additions: i64,
+    pub deletions: i64,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CommitSummary {
+    pub hash: String,
+    pub short_hash: String,
+    pub subject: String,
+    pub timestamp: i64,
+    pub additions: i64,
+    pub deletions: i64,
+    pub files: Vec<CommitFileSummary>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PullRequestInfo {
     pub number: i64,
     pub url: String,
@@ -169,6 +192,22 @@ fn parse_numstat_line(line: &str) -> Option<(String, i64, i64)> {
     Some((file_path, additions, deletions))
 }
 
+fn parse_commit_numstat_line(line: &str) -> Option<(String, i64, i64)> {
+    let mut parts = line.split('\t');
+    let additions = parse_git_count(parts.next()?)?;
+    let deletions = parse_git_count(parts.next()?)?;
+    let file_path = normalize_numstat_path(parts.last()?);
+    Some((file_path, additions, deletions))
+}
+
+fn parse_git_count(value: &str) -> Option<i64> {
+    if value == "-" {
+        Some(0)
+    } else {
+        value.parse::<i64>().ok()
+    }
+}
+
 fn normalize_numstat_path(path: &str) -> String {
     let Some((before_arrow, after_arrow)) = path.split_once(" => ") else {
         return path.to_string();
@@ -242,12 +281,14 @@ pub fn collect_status(path: &Path) -> CoreResult<Vec<FileStatus>> {
 }
 
 fn sum_status_change_stats(statuses: &[FileStatus]) -> (i64, i64) {
-    statuses.iter().fold((0, 0), |(additions, deletions), status| {
-        (
-            additions + status.additions.unwrap_or(0),
-            deletions + status.deletions.unwrap_or(0),
-        )
-    })
+    statuses
+        .iter()
+        .fold((0, 0), |(additions, deletions), status| {
+            (
+                additions + status.additions.unwrap_or(0),
+                deletions + status.deletions.unwrap_or(0),
+            )
+        })
 }
 
 pub fn branch_stats(path: &Path) -> BranchStats {
@@ -270,6 +311,98 @@ pub fn branch_stats(path: &Path) -> BranchStats {
         additions,
         deletions,
     }
+}
+
+pub fn commit_history(path: &Path, limit: usize) -> CoreResult<Vec<CommitSummary>> {
+    let capped_limit = limit.clamp(1, 50).to_string();
+    let out = command_output(
+        "git",
+        &[
+            "log",
+            "--date=unix",
+            &format!("--max-count={capped_limit}"),
+            "--pretty=format:%H%x1f%h%x1f%ct%x1f%s",
+        ],
+        Some(path),
+    )?;
+
+    out.lines()
+        .filter_map(parse_commit_header)
+        .map(|(hash, short_hash, timestamp, subject)| {
+            let files = commit_files(path, &hash)?;
+            let (additions, deletions) =
+                files.iter().fold((0, 0), |(additions, deletions), file| {
+                    (additions + file.additions, deletions + file.deletions)
+                });
+            Ok(CommitSummary {
+                hash,
+                short_hash,
+                subject,
+                timestamp,
+                additions,
+                deletions,
+                files,
+            })
+        })
+        .collect()
+}
+
+fn parse_commit_header(line: &str) -> Option<(String, String, i64, String)> {
+    let mut parts = line.splitn(4, '\x1f');
+    let hash = parts.next()?.to_string();
+    let short_hash = parts.next()?.to_string();
+    let timestamp = parts.next()?.parse::<i64>().ok()?;
+    let subject = parts.next()?.to_string();
+    Some((hash, short_hash, timestamp, subject))
+}
+
+fn commit_files(path: &Path, hash: &str) -> CoreResult<Vec<CommitFileSummary>> {
+    let numstat_out = command_output(
+        "git",
+        &["show", "--format=", "--numstat", "--find-renames", hash],
+        Some(path),
+    )?;
+    let stats: HashMap<String, (i64, i64)> = numstat_out
+        .lines()
+        .filter_map(parse_commit_numstat_line)
+        .map(|(file_path, additions, deletions)| (file_path, (additions, deletions)))
+        .collect();
+
+    let names_out = command_output(
+        "git",
+        &["show", "--format=", "--name-status", "--find-renames", hash],
+        Some(path),
+    )?;
+
+    let files = names_out
+        .lines()
+        .filter_map(|line| parse_commit_name_status_line(line, &stats))
+        .collect();
+    Ok(files)
+}
+
+fn parse_commit_name_status_line(
+    line: &str,
+    stats: &HashMap<String, (i64, i64)>,
+) -> Option<CommitFileSummary> {
+    let mut parts = line.split('\t');
+    let code = parts.next()?;
+    let first_path = parts.next()?;
+    let (old_path, path) = if code.starts_with('R') || code.starts_with('C') {
+        let new_path = parts.next()?.to_string();
+        (Some(first_path.to_string()), new_path)
+    } else {
+        (None, first_path.to_string())
+    };
+    let status = status_kind(&format!("{} ", code.chars().next()?));
+    let (additions, deletions) = stats.get(&path).copied().unwrap_or((0, 0));
+    Some(CommitFileSummary {
+        path,
+        old_path,
+        status,
+        additions,
+        deletions,
+    })
 }
 
 pub fn stage(worktree_path: &Path, paths: &[String]) -> CoreResult<()> {

@@ -353,6 +353,16 @@ fn dispatch(
             serde_json::to_value(git::collect_status(Path::new(&worktree_path))?)
                 .map_err(|e| e.to_string())
         }
+        "git.commitHistory" => {
+            let worktree_path = string_param(&params, "worktreePath")?;
+            let limit = params
+                .get("limit")
+                .and_then(Value::as_u64)
+                .map(|value| value as usize)
+                .unwrap_or(14);
+            serde_json::to_value(git::commit_history(Path::new(&worktree_path), limit)?)
+                .map_err(|e| e.to_string())
+        }
         "git.branchStats" => {
             let worktree_path = string_param(&params, "worktreePath")?;
             serde_json::to_value(git::branch_stats(Path::new(&worktree_path)))
@@ -364,6 +374,7 @@ fn dispatch(
                 .map_err(|e| e.to_string())
         }
         "git.fileDiff" => git_file_diff(params),
+        "git.commitFileDiff" => git_commit_file_diff(params),
         "git.stage" => {
             let worktree_path = string_param(&params, "worktreePath")?;
             git::stage(
@@ -1047,7 +1058,12 @@ fn git_file_diff(params: Value) -> Result<Value, String> {
     let new_content = if is_binary {
         None
     } else if bucket == "staged" {
-        forgepad_core::command::command_output("git", &["show", &format!(":{rel_path}")], Some(path)).ok()
+        forgepad_core::command::command_output(
+            "git",
+            &["show", &format!(":{rel_path}")],
+            Some(path),
+        )
+        .ok()
     } else {
         std::fs::read_to_string(&file_path).ok()
     };
@@ -1089,6 +1105,77 @@ fn git_file_diff(params: Value) -> Result<Value, String> {
         .map_err(|error| error.to_string())?
         .insert_diff_preview(cache_key, diff.clone());
     Ok(diff)
+}
+
+fn git_commit_file_diff(params: Value) -> Result<Value, String> {
+    let worktree_path = string_param(&params, "worktreePath")?;
+    let commit_hash = string_param(&params, "commitHash")?;
+    let rel_path = string_param(&params, "relPath")?;
+    let status = string_param(&params, "status")?;
+    let old_path = params
+        .get("oldPath")
+        .and_then(Value::as_str)
+        .map(str::to_string);
+    let path = Path::new(&worktree_path);
+
+    let mut pathspecs = Vec::new();
+    if let Some(old_path) = old_path.as_deref() {
+        pathspecs.push(old_path);
+    }
+    pathspecs.push(rel_path.as_str());
+
+    let mut patch_args = vec!["show", "--format=", "--find-renames", &commit_hash, "--"];
+    patch_args.extend(pathspecs.iter().copied());
+    let patch =
+        forgepad_core::command::command_output("git", &patch_args, Some(path)).unwrap_or_default();
+
+    let mut numstat_args = vec![
+        "show",
+        "--format=",
+        "--numstat",
+        "--find-renames",
+        &commit_hash,
+        "--",
+    ];
+    numstat_args.extend(pathspecs.iter().copied());
+    let is_binary = forgepad_core::command::command_output("git", &numstat_args, Some(path))
+        .map(|out| out.split_whitespace().take(2).any(|part| part == "-"))
+        .unwrap_or(false);
+
+    let new_content = if is_binary || status == "deleted" {
+        None
+    } else {
+        forgepad_core::command::command_output(
+            "git",
+            &["show", &format!("{commit_hash}:{rel_path}")],
+            Some(path),
+        )
+        .ok()
+    };
+
+    let old_content = if is_binary || status == "added" {
+        None
+    } else {
+        let parent_spec_path = old_path.as_deref().unwrap_or(&rel_path);
+        forgepad_core::command::command_output(
+            "git",
+            &["show", &format!("{commit_hash}^:{parent_spec_path}")],
+            Some(path),
+        )
+        .ok()
+    };
+
+    Ok(json!({
+        "path": rel_path,
+        "oldPath": old_path,
+        "patch": patch,
+        "oldContent": old_content,
+        "newContent": new_content,
+        "status": status,
+        "bucket": "staged",
+        "commitHash": commit_hash,
+        "isBinary": is_binary
+    }))
 }
 
 fn string_param(params: &Value, key: &str) -> Result<String, String> {
