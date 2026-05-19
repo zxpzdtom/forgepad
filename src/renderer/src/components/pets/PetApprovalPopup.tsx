@@ -59,12 +59,14 @@ export function PetApprovalPopup({
     return () => clearTimeout(timer);
   }, []);
 
-  // Reset question index when permission changes
+  // Reset question index when permission changes.
+  // We track by the permission object reference (not just ptyId) so that
+  // consecutive questions from the same agent session correctly reset state.
   useEffect(() => {
     setCurrentQuestionIndex(0);
     setCollectedAnswers({});
     setMultiSelected(new Set());
-  }, [permission.ptyId]);
+  }, [permission]);
 
   const handleAllow = useCallback(
     (e: React.MouseEvent) => {

@@ -41,11 +41,126 @@ fn list_external_sessions_from_home(
     worktree_path: &str,
 ) -> Vec<ExternalAgentSession> {
     let mut sessions = Vec::new();
+    sessions.extend(claude_sessions(home, workspace_id, worktree_path));
     sessions.extend(codex_sessions(home, workspace_id, worktree_path));
     sessions.extend(gemini_sessions(home, workspace_id, worktree_path));
     sessions.sort_by(|a, b| b.updated_at.cmp(&a.updated_at));
     sessions.truncate(MAX_EXTERNAL_SESSIONS);
     sessions
+}
+
+fn claude_sessions(
+    home: &Path,
+    workspace_id: &str,
+    worktree_path: &str,
+) -> Vec<ExternalAgentSession> {
+    // Claude Code encodes the worktree path by replacing '/' with '-'.
+    // e.g. /Users/tom/code/forgepad -> -Users-tom-code-forgepad
+    let encoded_path = worktree_path.replace('/', "-");
+    let project_dir = home.join(".claude").join("projects").join(&encoded_path);
+    let Ok(entries) = fs::read_dir(&project_dir) else {
+        return Vec::new();
+    };
+
+    entries
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .filter(|path| path.extension().and_then(|ext| ext.to_str()) == Some("jsonl"))
+        .filter_map(|path| claude_session_from_jsonl(workspace_id, &path))
+        .collect()
+}
+
+fn claude_session_from_jsonl(workspace_id: &str, path: &Path) -> Option<ExternalAgentSession> {
+    let session_id = path.file_stem()?.to_str()?.to_string();
+    if session_id.trim().is_empty() {
+        return None;
+    }
+
+    let raw = fs::read_to_string(path).ok()?;
+    let lines: Vec<&str> = raw.lines().collect();
+
+    // Find title by scanning lines in reverse (last occurrence wins).
+    // Priority: custom-title > ai-title > first user message content.
+    let mut custom_title: Option<String> = None;
+    let mut ai_title: Option<String> = None;
+
+    for line in lines.iter().rev() {
+        let Ok(value) = serde_json::from_str::<Value>(line) else {
+            continue;
+        };
+        match value.get("type").and_then(Value::as_str) {
+            Some("custom-title") if custom_title.is_none() => {
+                if let Some(t) = value.get("customTitle").and_then(Value::as_str) {
+                    if !t.trim().is_empty() {
+                        custom_title = Some(truncate_title(t));
+                    }
+                }
+            }
+            Some("ai-title") if ai_title.is_none() => {
+                if let Some(t) = value.get("aiTitle").and_then(Value::as_str) {
+                    if !t.trim().is_empty() {
+                        ai_title = Some(truncate_title(t));
+                    }
+                }
+            }
+            _ => {}
+        }
+        // Stop early if we found the highest-priority title.
+        if custom_title.is_some() {
+            break;
+        }
+    }
+
+    let title = custom_title.or(ai_title);
+
+    // Fallback: extract first user message text as title.
+    let final_title = title.unwrap_or_else(|| {
+        for line in &lines {
+            let Ok(value) = serde_json::from_str::<Value>(line) else {
+                continue;
+            };
+            if value.get("type").and_then(Value::as_str) != Some("user") {
+                continue;
+            }
+            if let Some(content) = value.get("message").and_then(|m| m.get("content")) {
+                let text = match content {
+                    Value::String(s) => Some(s.clone()),
+                    Value::Array(arr) => arr.iter().find_map(|item| {
+                        if item.get("type").and_then(Value::as_str) == Some("text") {
+                            item.get("text").and_then(Value::as_str).map(String::from)
+                        } else {
+                            None
+                        }
+                    }),
+                    _ => None,
+                };
+                if let Some(t) = text {
+                    if !t.trim().is_empty() {
+                        return truncate_title(&t);
+                    }
+                }
+            }
+        }
+        "Claude session".to_string()
+    });
+
+    let updated_at = path
+        .metadata()
+        .ok()
+        .and_then(|metadata| metadata.modified().ok())
+        .and_then(|time| time.duration_since(UNIX_EPOCH).ok())
+        .map(|duration| duration.as_millis() as i64)
+        .unwrap_or(0);
+
+    Some(ExternalAgentSession {
+        id: format!("{workspace_id}:claude:{session_id}"),
+        workspace_id: workspace_id.to_string(),
+        title: final_title,
+        session_id,
+        agent_preset_id: "claude".to_string(),
+        agent_command: "claude".to_string(),
+        updated_at,
+    })
 }
 
 fn codex_sessions(
@@ -478,6 +593,80 @@ mod tests {
         assert_eq!(sessions[0].agent_preset_id, "gemini");
         assert_eq!(sessions[0].session_id, "gemini-1");
         assert_eq!(sessions[0].title, "Refactor renderer sessions");
+    }
+
+    #[test]
+    fn imports_claude_sessions_from_projects_dir() {
+        let temp = tempfile::tempdir().unwrap();
+        // Simulate worktree path /tmp/project -> encoded as -tmp-project
+        let project_dir = temp
+            .path()
+            .join(".claude")
+            .join("projects")
+            .join("-tmp-project");
+        fs::create_dir_all(&project_dir).unwrap();
+
+        let session_file = project_dir.join("abc-123-def.jsonl");
+        let content = [
+            r#"{"type":"user","message":{"content":[{"type":"text","text":"Fix the login bug in auth module"}]},"sessionId":"abc-123-def","timestamp":"2026-05-18T10:00:00Z"}"#,
+            r#"{"type":"assistant","message":{"content":[{"type":"text","text":"I'll help fix that."}]}}"#,
+            r#"{"type":"ai-title","aiTitle":"Fix login bug","sessionId":"abc-123-def"}"#,
+        ]
+        .join("\n");
+        fs::write(&session_file, content).unwrap();
+
+        let sessions =
+            list_external_sessions_from_home(temp.path(), "workspace-1", "/tmp/project");
+        assert_eq!(sessions.len(), 1);
+        assert_eq!(sessions[0].agent_preset_id, "claude");
+        assert_eq!(sessions[0].session_id, "abc-123-def");
+        assert_eq!(sessions[0].title, "Fix login bug");
+    }
+
+    #[test]
+    fn claude_session_custom_title_wins_over_ai_title() {
+        let temp = tempfile::tempdir().unwrap();
+        let project_dir = temp
+            .path()
+            .join(".claude")
+            .join("projects")
+            .join("-tmp-project");
+        fs::create_dir_all(&project_dir).unwrap();
+
+        let session_file = project_dir.join("session-456.jsonl");
+        let content = [
+            r#"{"type":"user","message":{"content":"Hello"},"sessionId":"session-456"}"#,
+            r#"{"type":"ai-title","aiTitle":"AI generated title","sessionId":"session-456"}"#,
+            r#"{"type":"custom-title","customTitle":"My custom title","sessionId":"session-456"}"#,
+        ]
+        .join("\n");
+        fs::write(&session_file, content).unwrap();
+
+        let sessions =
+            list_external_sessions_from_home(temp.path(), "workspace-1", "/tmp/project");
+        assert_eq!(sessions.len(), 1);
+        assert_eq!(sessions[0].title, "My custom title");
+    }
+
+    #[test]
+    fn claude_session_falls_back_to_first_user_message() {
+        let temp = tempfile::tempdir().unwrap();
+        let project_dir = temp
+            .path()
+            .join(".claude")
+            .join("projects")
+            .join("-tmp-project");
+        fs::create_dir_all(&project_dir).unwrap();
+
+        let session_file = project_dir.join("no-title-session.jsonl");
+        let content =
+            r#"{"type":"user","message":{"content":"Refactor the database layer"},"sessionId":"no-title-session"}"#;
+        fs::write(&session_file, content).unwrap();
+
+        let sessions =
+            list_external_sessions_from_home(temp.path(), "workspace-1", "/tmp/project");
+        assert_eq!(sessions.len(), 1);
+        assert_eq!(sessions[0].title, "Refactor the database layer");
     }
 
     #[test]

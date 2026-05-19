@@ -61,6 +61,18 @@ pub struct CommitSummary {
     pub files: Vec<CommitFileSummary>,
 }
 
+/// Lightweight commit metadata without per-file details (phase 1 of two-phase loading).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CommitMeta {
+    pub hash: String,
+    pub short_hash: String,
+    pub subject: String,
+    pub timestamp: i64,
+    pub additions: i64,
+    pub deletions: i64,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PullRequestInfo {
@@ -315,48 +327,208 @@ pub fn branch_stats(path: &Path) -> BranchStats {
 
 pub fn commit_history(path: &Path, limit: usize) -> CoreResult<Vec<CommitSummary>> {
     let capped_limit = limit.clamp(1, 50).to_string();
+    let pretty = "COMMIT_SEP%x1f%H%x1f%h%x1f%ct%x1f%s";
+
+    // Single command to get headers + numstat for all commits
+    let numstat_out = command_output(
+        "git",
+        &[
+            "log",
+            "--date=unix",
+            &format!("--max-count={capped_limit}"),
+            &format!("--pretty=format:{pretty}"),
+            "--numstat",
+            "--find-renames",
+        ],
+        Some(path),
+    )?;
+
+    // Single command to get headers + name-status for all commits
+    let status_out = command_output(
+        "git",
+        &[
+            "log",
+            "--date=unix",
+            &format!("--max-count={capped_limit}"),
+            &format!("--pretty=format:{pretty}"),
+            "--name-status",
+            "--find-renames",
+        ],
+        Some(path),
+    )?;
+
+    // Parse numstat output into per-commit stats keyed by commit hash
+    let numstat_map = parse_batch_numstat(&numstat_out);
+
+    // Parse name-status output and merge with numstat data
+    parse_batch_commits(&status_out, &numstat_map)
+}
+
+/// Parse batch `git log --numstat` output into a map of commit hash -> file stats.
+fn parse_batch_numstat(output: &str) -> HashMap<String, HashMap<String, (i64, i64)>> {
+    let mut map: HashMap<String, HashMap<String, (i64, i64)>> = HashMap::new();
+    let mut current_hash: Option<String> = None;
+
+    for line in output.lines() {
+        if let Some(header) = line.strip_prefix("COMMIT_SEP\x1f") {
+            current_hash = header.splitn(4, '\x1f').next().map(|s| s.to_string());
+        } else if !line.is_empty() {
+            if let Some(ref hash) = current_hash {
+                if let Some((file_path, additions, deletions)) =
+                    parse_commit_numstat_line(line)
+                {
+                    map.entry(hash.clone())
+                        .or_default()
+                        .insert(file_path, (additions, deletions));
+                }
+            }
+        }
+    }
+    map
+}
+
+/// Parse batch `git log --name-status` output and combine with numstat data to build commits.
+fn parse_batch_commits(
+    output: &str,
+    numstat_map: &HashMap<String, HashMap<String, (i64, i64)>>,
+) -> CoreResult<Vec<CommitSummary>> {
+    let empty_stats: HashMap<String, (i64, i64)> = HashMap::new();
+    let mut commits = Vec::new();
+    let mut current_header: Option<(String, String, i64, String)> = None;
+    let mut current_files: Vec<CommitFileSummary> = Vec::new();
+
+    for line in output.lines() {
+        if let Some(header) = line.strip_prefix("COMMIT_SEP\x1f") {
+            // Flush previous commit
+            if let Some((hash, short_hash, timestamp, subject)) = current_header.take() {
+                let (additions, deletions) =
+                    current_files.iter().fold((0, 0), |(a, d), f| {
+                        (a + f.additions, d + f.deletions)
+                    });
+                commits.push(CommitSummary {
+                    hash,
+                    short_hash,
+                    subject,
+                    timestamp,
+                    additions,
+                    deletions,
+                    files: std::mem::take(&mut current_files),
+                });
+            }
+            current_header = parse_commit_header(header);
+        } else if !line.is_empty() {
+            if let Some((ref hash, ..)) = current_header {
+                let stats = numstat_map.get(hash).unwrap_or(&empty_stats);
+                if let Some(file) = parse_commit_name_status_line(line, stats) {
+                    current_files.push(file);
+                }
+            }
+        }
+    }
+
+    // Flush the last commit
+    if let Some((hash, short_hash, timestamp, subject)) = current_header {
+        let (additions, deletions) =
+            current_files.iter().fold((0, 0), |(a, d), f| {
+                (a + f.additions, d + f.deletions)
+            });
+        commits.push(CommitSummary {
+            hash,
+            short_hash,
+            subject,
+            timestamp,
+            additions,
+            deletions,
+            files: current_files,
+        });
+    }
+
+    Ok(commits)
+}
+
+/// Phase 1: Lightweight commit history — only metadata + total stats (single git command).
+pub fn commit_history_summary(path: &Path, limit: usize) -> CoreResult<Vec<CommitMeta>> {
+    let capped_limit = limit.clamp(1, 50).to_string();
+    let pretty = "COMMIT_SEP%x1f%H%x1f%h%x1f%ct%x1f%s";
+
+    // Single command: git log with --shortstat gives total insertions/deletions per commit
     let out = command_output(
         "git",
         &[
             "log",
             "--date=unix",
             &format!("--max-count={capped_limit}"),
-            "--pretty=format:%H%x1f%h%x1f%ct%x1f%s",
+            &format!("--pretty=format:{pretty}"),
+            "--shortstat",
         ],
         Some(path),
     )?;
 
-    out.lines()
-        .filter_map(parse_commit_header)
-        .map(|(hash, short_hash, timestamp, subject)| {
-            let files = commit_files(path, &hash)?;
-            let (additions, deletions) =
-                files.iter().fold((0, 0), |(additions, deletions), file| {
-                    (additions + file.additions, deletions + file.deletions)
+    let mut commits = Vec::new();
+    let mut current_header: Option<(String, String, i64, String)> = None;
+    let mut current_additions: i64 = 0;
+    let mut current_deletions: i64 = 0;
+
+    for line in out.lines() {
+        if let Some(header) = line.strip_prefix("COMMIT_SEP\x1f") {
+            // Flush previous commit
+            if let Some((hash, short_hash, timestamp, subject)) = current_header.take() {
+                commits.push(CommitMeta {
+                    hash,
+                    short_hash,
+                    subject,
+                    timestamp,
+                    additions: current_additions,
+                    deletions: current_deletions,
                 });
-            Ok(CommitSummary {
-                hash,
-                short_hash,
-                subject,
-                timestamp,
-                additions,
-                deletions,
-                files,
-            })
-        })
-        .collect()
+            }
+            current_header = parse_commit_header(header);
+            current_additions = 0;
+            current_deletions = 0;
+        } else if !line.is_empty() {
+            // This is a shortstat line like " 3 files changed, 10 insertions(+), 2 deletions(-)"
+            let (additions, deletions) = parse_shortstat_line(line);
+            current_additions = additions;
+            current_deletions = deletions;
+        }
+    }
+
+    // Flush the last commit
+    if let Some((hash, short_hash, timestamp, subject)) = current_header {
+        commits.push(CommitMeta {
+            hash,
+            short_hash,
+            subject,
+            timestamp,
+            additions: current_additions,
+            deletions: current_deletions,
+        });
+    }
+
+    Ok(commits)
 }
 
-fn parse_commit_header(line: &str) -> Option<(String, String, i64, String)> {
-    let mut parts = line.splitn(4, '\x1f');
-    let hash = parts.next()?.to_string();
-    let short_hash = parts.next()?.to_string();
-    let timestamp = parts.next()?.parse::<i64>().ok()?;
-    let subject = parts.next()?.to_string();
-    Some((hash, short_hash, timestamp, subject))
+/// Parse a git shortstat line like " 3 files changed, 10 insertions(+), 2 deletions(-)"
+fn parse_shortstat_line(line: &str) -> (i64, i64) {
+    let mut additions: i64 = 0;
+    let mut deletions: i64 = 0;
+    for part in line.split(',') {
+        let trimmed = part.trim();
+        if trimmed.contains("insertion") {
+            if let Some(num) = trimmed.split_whitespace().next().and_then(|s| s.parse().ok()) {
+                additions = num;
+            }
+        } else if trimmed.contains("deletion") {
+            if let Some(num) = trimmed.split_whitespace().next().and_then(|s| s.parse().ok()) {
+                deletions = num;
+            }
+        }
+    }
+    (additions, deletions)
 }
 
-fn commit_files(path: &Path, hash: &str) -> CoreResult<Vec<CommitFileSummary>> {
+/// Phase 2: Load file details for a single commit (on-demand when user expands).
+pub fn commit_files(path: &Path, hash: &str) -> CoreResult<Vec<CommitFileSummary>> {
     let numstat_out = command_output(
         "git",
         &["show", "--format=", "--numstat", "--find-renames", hash],
@@ -379,6 +551,15 @@ fn commit_files(path: &Path, hash: &str) -> CoreResult<Vec<CommitFileSummary>> {
         .filter_map(|line| parse_commit_name_status_line(line, &stats))
         .collect();
     Ok(files)
+}
+
+fn parse_commit_header(line: &str) -> Option<(String, String, i64, String)> {
+    let mut parts = line.splitn(4, '\x1f');
+    let hash = parts.next()?.to_string();
+    let short_hash = parts.next()?.to_string();
+    let timestamp = parts.next()?.parse::<i64>().ok()?;
+    let subject = parts.next()?.to_string();
+    Some((hash, short_hash, timestamp, subject))
 }
 
 fn parse_commit_name_status_line(

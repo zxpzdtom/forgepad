@@ -817,7 +817,7 @@ export function TerminalPanel({ tab, workspace, active }: TerminalPanelProps) {
     // are handled by the live-update effect below without recreating the
     // terminal instance (which would trigger an expensive 8MB history replay).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fontSize, configuredFontFamily, tab.ptyId, workspace.name, tab.sessionId, tab.isAgent, tab.id, effectiveTerminalTheme]);
+  }, [fontSize, configuredFontFamily, tab.ptyId, workspace.name, tab.sessionId, tab.isAgent, tab.id]);
 
   // Live-update terminal theme when effective theme changes
   useEffect(() => {

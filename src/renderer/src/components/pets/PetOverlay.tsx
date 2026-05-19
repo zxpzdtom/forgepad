@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { SpriteAnimator } from 'codex-pets-react';
 import type { AgentStatus, AgentStatusUpdate } from '@shared/agent-lifecycle';
 import type {
   CompletionCard,
@@ -11,9 +10,11 @@ import type {
   PetStageSnapshot,
   PetStageWindow,
 } from '@shared/types';
-import { agentStatusToAnimation, forgePetAtlas, getPetSpritesheetUrl, type ForgePetAnimationName } from './pet-registry';
+import { SpriteAnimator } from 'codex-pets-react';
+
 import { PetApprovalPopup } from './PetApprovalPopup';
 import { PetCompletionCard, type WorkingAgentSummary } from './PetCompletionCard';
+import { agentStatusToAnimation, type ForgePetAnimationName, forgePetAtlas, getPetSpritesheetUrl } from './pet-registry';
 
 const BASE_SPRITE_WIDTH = 192;
 const BASE_SPRITE_HEIGHT = 208;
@@ -787,18 +788,26 @@ export function PetOverlay() {
     applyMotionLayout(normalMotionLayout(petSettingsRef.current));
   }, [applyMotionLayout]);
 
-  const cancelAutonomousMotion = useCallback((options?: { preserveLayout?: boolean }) => {
-    motionRunIdRef.current += 1;
-    isWanderingRef.current = false;
-    setPortalEffect(null);
-    setPropEffect(null);
-    setPetHidden(false);
-    clearAutonomousTimers();
-    if (!options?.preserveLayout && !blockingPanelRef.current) {
-      resetMotionLayout();
-    }
-    restoreStatusAnimation();
-  }, [clearAutonomousTimers, resetMotionLayout, restoreStatusAnimation]);
+  const resetMotionLayoutIfUnblocked = useCallback(() => {
+    if (blockingPanelRef.current || pendingPermissionRef.current || completionCardsRef.current.length > 0) return;
+    resetMotionLayout();
+  }, [resetMotionLayout]);
+
+  const cancelAutonomousMotion = useCallback(
+    (options?: { preserveLayout?: boolean }) => {
+      motionRunIdRef.current += 1;
+      isWanderingRef.current = false;
+      setPortalEffect(null);
+      setPropEffect(null);
+      setPetHidden(false);
+      clearAutonomousTimers();
+      if (!options?.preserveLayout) {
+        resetMotionLayoutIfUnblocked();
+      }
+      restoreStatusAnimation();
+    },
+    [clearAutonomousTimers, resetMotionLayoutIfUnblocked, restoreStatusAnimation],
+  );
 
   const applyAgentStatusUpdate = useCallback(
     (update: AgentStatusUpdate) => {
@@ -1478,12 +1487,12 @@ export function PetOverlay() {
         setPortalEffect(null);
         setPropEffect(null);
         setPetHidden(false);
-        resetMotionLayout();
+        resetMotionLayoutIfUnblocked();
         restoreStatusAnimation();
         scheduleNextRef.current();
       }
     }
-  }, [isAutonomousAllowed, playMotionAction, readStage, resetMotionLayout, restoreStatusAnimation]);
+  }, [isAutonomousAllowed, playMotionAction, readStage, resetMotionLayoutIfUnblocked, restoreStatusAnimation]);
 
   const scheduleNextAutonomous = useCallback(
     (delayOverride?: number) => {
@@ -1528,13 +1537,20 @@ export function PetOverlay() {
           setPortalEffect(null);
           setPropEffect(null);
           setPetHidden(false);
-          resetMotionLayout();
+          resetMotionLayoutIfUnblocked();
           restoreStatusAnimation();
           scheduleNextRef.current(1_400);
         }
       }
     },
-    [canPlayInteractiveAction, clearAutonomousTimers, playMotionAction, readStage, resetMotionLayout, restoreStatusAnimation],
+    [
+      canPlayInteractiveAction,
+      clearAutonomousTimers,
+      playMotionAction,
+      readStage,
+      resetMotionLayoutIfUnblocked,
+      restoreStatusAnimation,
+    ],
   );
 
   useEffect(() => {
@@ -1658,16 +1674,28 @@ export function PetOverlay() {
         aiResponse: data.aiMessage,
         timestamp: Date.now(),
       };
+      const nextCompletionCards = [...completionCardsRef.current, card];
       agentMessagesRef.current = nextMessages;
+      completionCardsRef.current = nextCompletionCards;
+      blockingPanelRef.current = true;
+      motionRunIdRef.current += 1;
+      isWanderingRef.current = false;
+      clearAutonomousTimers();
+      clearTimeout(hoverTimerRef.current);
+      clearTimeout(petHoverLeaveTimer.current);
+      setPortalEffect(null);
+      setPropEffect(null);
+      setPetHidden(false);
+      setPetSpriteHovered(false);
       setAgentMessages(nextMessages);
-      setCompletionCards((cards) => [...cards, card]);
+      setCompletionCards(nextCompletionCards);
 
       // Completion means the agent has finished its turn — transition to idle
       // so the pet returns to its default animation instead of staying in
       // the "review" state indefinitely until the user switches to that tab.
       applyAgentStatusUpdate({ ptyId: data.ptyId, status: 'idle' });
     });
-  }, [applyAgentStatusUpdate]);
+  }, [applyAgentStatusUpdate, clearAutonomousTimers]);
 
   useEffect(() => {
     const api = window.forgepadPet;
@@ -1935,6 +1963,7 @@ export function PetOverlay() {
 
   const prevShowApproval = useRef(false);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: panel content can replace the measured child while the panel kind stays the same.
   useLayoutEffect(() => {
     const wrapper =
       floatingPanelKind === 'approval'

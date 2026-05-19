@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties }
 import { useTranslation } from '@renderer/i18n';
 import { confirmNative } from '@renderer/lib/native-dialog';
 import { useAppStore } from '@renderer/store/app-store';
-import type { FileStatus, GitBucket, GitCommitFileSummary, GitCommitSummary, GitStatusKind, Workspace } from '@shared/types';
+import type { FileStatus, GitBucket, GitCommitFileSummary, GitCommitMeta, GitStatusKind, Workspace } from '@shared/types';
 import {
   ArrowDown,
   ArrowUp,
@@ -71,6 +71,11 @@ type ChangesViewMode = 'tree' | 'flat';
 type ChangesPanelTab = 'changes' | 'commits';
 
 const COMMIT_HISTORY_LIMIT = 14;
+
+/** Module-level cache for commit history summaries — survives tab switches. */
+const commitMetaCache = new Map<string, { metas: GitCommitMeta[]; epoch: number }>();
+/** Module-level cache for per-commit file details — avoids re-fetching on re-expand. */
+const commitFilesCacheMap = new Map<string, GitCommitFileSummary[]>();
 
 const STATUS_PRIORITY: GitStatusKind[] = ['conflicted', 'deleted', 'modified', 'renamed', 'added', 'untracked'];
 
@@ -286,18 +291,25 @@ function ChangeStats({ additions, deletions }: { additions: number; deletions: n
 
 function CommitHistorySection({
   commits,
+  commitFilesMap,
+  worktreePath,
   viewMode,
   activeCommitHash,
   activePath,
   onOpenCommitFile,
+  onFilesLoaded,
 }: {
-  commits: GitCommitSummary[];
+  commits: GitCommitMeta[];
+  commitFilesMap: Map<string, GitCommitFileSummary[]>;
+  worktreePath: string;
   viewMode: ChangesViewMode;
   activeCommitHash?: string;
   activePath?: string;
-  onOpenCommitFile: (commit: GitCommitSummary, file: GitCommitFileSummary) => void;
+  onOpenCommitFile: (commit: GitCommitMeta, file: GitCommitFileSummary) => void;
+  onFilesLoaded: (hash: string, files: GitCommitFileSummary[]) => void;
 }) {
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set(commits[0]?.hash ? [commits[0].hash] : []));
+  const loadingFilesRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     setExpanded((current) => {
@@ -307,6 +319,27 @@ function CommitHistorySection({
       return next;
     });
   }, [commits]);
+
+  // Load files for expanded commits that don't have data yet
+  useEffect(() => {
+    for (const hash of expanded) {
+      if (!commitFilesMap.has(hash) && !loadingFilesRef.current.has(hash)) {
+        loadingFilesRef.current.add(hash);
+        window.forgepad.git
+          .getCommitFiles(worktreePath, hash)
+          .then((files) => {
+            commitFilesCacheMap.set(`${worktreePath}:${hash}`, files);
+            onFilesLoaded(hash, files);
+          })
+          .catch(() => {
+            // Silently handle errors — row will just show no files
+          })
+          .finally(() => {
+            loadingFilesRef.current.delete(hash);
+          });
+      }
+    }
+  }, [expanded, commitFilesMap, worktreePath, onFilesLoaded]);
 
   const toggleCommit = useCallback((hash: string) => {
     setExpanded((current) => {
@@ -324,6 +357,7 @@ function CommitHistorySection({
       <div className="change-native-tree">
         {commits.map((commit) => {
           const isExpanded = expanded.has(commit.hash);
+          const files = commitFilesMap.get(commit.hash);
           return (
             <div className="commit-history-group" key={commit.hash}>
               <button
@@ -341,24 +375,30 @@ function CommitHistorySection({
               </button>
               {isExpanded ? (
                 <div className="change-native-children">
-                  {viewMode === 'flat' ? (
-                    [...commit.files]
-                      .sort((a, b) => a.path.localeCompare(b.path, undefined, { numeric: true, sensitivity: 'base' }))
-                      .map((file) => (
-                        <CommitFileRow
-                          key={`${commit.hash}:${file.path}:${file.oldPath ?? ''}`}
-                          file={file}
-                          active={commit.hash === activeCommitHash && file.path === activePath}
-                          showDirectory
-                          onOpen={() => onOpenCommitFile(commit, file)}
-                        />
-                      ))
+                  {files ? (
+                    viewMode === 'flat' ? (
+                      [...files]
+                        .sort((a, b) => a.path.localeCompare(b.path, undefined, { numeric: true, sensitivity: 'base' }))
+                        .map((file) => (
+                          <CommitFileRow
+                            key={`${commit.hash}:${file.path}:${file.oldPath ?? ''}`}
+                            file={file}
+                            active={commit.hash === activeCommitHash && file.path === activePath}
+                            showDirectory
+                            onOpen={() => onOpenCommitFile(commit, file)}
+                          />
+                        ))
+                    ) : (
+                      <CommitTree
+                        commit={{ ...commit, files }}
+                        active={commit.hash === activeCommitHash ? activePath : undefined}
+                        onOpenCommitFile={(c, f) => onOpenCommitFile(commit, f)}
+                      />
+                    )
                   ) : (
-                    <CommitTree
-                      commit={commit}
-                      active={commit.hash === activeCommitHash ? activePath : undefined}
-                      onOpenCommitFile={onOpenCommitFile}
-                    />
+                    <div className="flex items-center justify-center py-2 text-muted">
+                      <RefreshCw size={12} className="animate-spin" />
+                    </div>
                   )}
                 </div>
               ) : null}
@@ -375,9 +415,9 @@ function CommitTree({
   active,
   onOpenCommitFile,
 }: {
-  commit: GitCommitSummary;
+  commit: GitCommitMeta & { files: GitCommitFileSummary[] };
   active?: string;
-  onOpenCommitFile: (commit: GitCommitSummary, file: GitCommitFileSummary) => void;
+  onOpenCommitFile: (commit: GitCommitMeta, file: GitCommitFileSummary) => void;
 }) {
   const nodes = useMemo(() => buildCommitTree(commit.files), [commit.files]);
   const [expandedPaths, setExpandedPaths] = useState(() => defaultExpandedCommitPaths(nodes));
@@ -426,13 +466,13 @@ function CommitTreeRow({
   onToggleExpanded,
   onOpenCommitFile,
 }: {
-  commit: GitCommitSummary;
+  commit: GitCommitMeta & { files: GitCommitFileSummary[] };
   node: CommitTreeNode;
   depth: number;
   active?: string;
   expandedPaths: Set<string>;
   onToggleExpanded: (path: string) => void;
-  onOpenCommitFile: (commit: GitCommitSummary, file: GitCommitFileSummary) => void;
+  onOpenCommitFile: (commit: GitCommitMeta, file: GitCommitFileSummary) => void;
 }) {
   const isDirectory = node.kind === 'directory';
   const isExpanded = expandedPaths.has(node.path);
@@ -959,7 +999,8 @@ export function ChangesPanel({ mode = 'changes' }: { mode?: ChangesPanelTab }) {
   const workspaceId = workspace?.id;
   const worktreePath = workspace?.worktreePath;
   const [statuses, setStatuses] = useState<FileStatus[]>([]);
-  const [commitHistory, setCommitHistory] = useState<GitCommitSummary[]>([]);
+  const [commitMetas, setCommitMetas] = useState<GitCommitMeta[]>([]);
+  const [commitFilesMap, setCommitFilesMap] = useState<Map<string, GitCommitFileSummary[]>>(new Map());
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set());
   const [commitMessage, setCommitMessage] = useState('');
   const [loading, setLoading] = useState(false);
@@ -985,6 +1026,8 @@ export function ChangesPanel({ mode = 'changes' }: { mode?: ChangesPanelTab }) {
   const statusCacheRef = useRef<Map<string, FileStatus[]>>(new Map());
   const commitTextareaRef = useRef<HTMLTextAreaElement>(null);
   const lastDiscardConfirmedAtRef = useRef(0);
+  const gitRefreshEpochRef = useRef(gitRefreshEpoch);
+  gitRefreshEpochRef.current = gitRefreshEpoch;
 
   const load = useCallback(
     async (silent?: boolean) => {
@@ -996,10 +1039,35 @@ export function ChangesPanel({ mode = 'changes' }: { mode?: ChangesPanelTab }) {
       if (showBlockingLoading) setLoading(true);
       try {
         if (mode === 'commits') {
-          const nextCommitHistory = await window.forgepad.git.getCommitHistory(worktreePath, COMMIT_HISTORY_LIMIT);
-          if (requestId !== loadRequestIdRef.current) return;
-          setCommitHistory(nextCommitHistory);
-          loadedCommitWorkspaceIdRef.current = workspaceId;
+          const currentEpoch = gitRefreshEpochRef.current;
+          // Check module-level cache first (survives tab switches)
+          const cached = commitMetaCache.get(worktreePath);
+          if (cached && cached.epoch === currentEpoch && !silent) {
+            if (requestId !== loadRequestIdRef.current) return;
+            setCommitMetas(cached.metas);
+            // Restore per-commit file caches
+            const restoredFiles = new Map<string, GitCommitFileSummary[]>();
+            for (const meta of cached.metas) {
+              const filesCache = commitFilesCacheMap.get(`${worktreePath}:${meta.hash}`);
+              if (filesCache) restoredFiles.set(meta.hash, filesCache);
+            }
+            setCommitFilesMap(restoredFiles);
+            loadedCommitWorkspaceIdRef.current = workspaceId;
+          } else {
+            // Phase 1: lightweight summary (single git command)
+            const metas = await window.forgepad.git.getCommitHistorySummary(worktreePath, COMMIT_HISTORY_LIMIT);
+            if (requestId !== loadRequestIdRef.current) return;
+            setCommitMetas(metas);
+            commitMetaCache.set(worktreePath, { metas, epoch: currentEpoch });
+            // Clear stale file caches on refresh
+            if (silent) {
+              for (const meta of metas) {
+                commitFilesCacheMap.delete(`${worktreePath}:${meta.hash}`);
+              }
+              setCommitFilesMap(new Map());
+            }
+            loadedCommitWorkspaceIdRef.current = workspaceId;
+          }
         } else {
           const next = await window.forgepad.git.getStatus(worktreePath);
           if (requestId !== loadRequestIdRef.current) return;
@@ -1030,7 +1098,8 @@ export function ChangesPanel({ mode = 'changes' }: { mode?: ChangesPanelTab }) {
     loadedWorkspaceIdRef.current = cached && workspaceId ? workspaceId : null;
     loadedCommitWorkspaceIdRef.current = null;
     setStatuses(cached ?? []);
-    setCommitHistory([]);
+    setCommitMetas([]);
+    setCommitFilesMap(new Map());
     setSelectedKeys(new Set());
     setLoading(false);
   }, [workspaceId]);
@@ -1075,12 +1144,20 @@ export function ChangesPanel({ mode = 'changes' }: { mode?: ChangesPanelTab }) {
   );
 
   const onOpenCommitFile = useCallback(
-    (commit: GitCommitSummary, file: GitCommitFileSummary) => {
+    (commit: GitCommitMeta, file: GitCommitFileSummary) => {
       if (!workspace) return;
       openDiffTab(workspace.id, file.path, 'staged', file.status, file.oldPath, commit.hash, commit.subject);
     },
     [openDiffTab, workspace],
   );
+
+  const handleCommitFilesLoaded = useCallback((hash: string, files: GitCommitFileSummary[]) => {
+    setCommitFilesMap((current) => {
+      const next = new Map(current);
+      next.set(hash, files);
+      return next;
+    });
+  }, []);
 
   const mutateFiles = useCallback(
     async (kind: 'stage' | 'unstage' | 'discard', targetFiles: FileStatus[]) => {
@@ -1191,7 +1268,7 @@ export function ChangesPanel({ mode = 'changes' }: { mode?: ChangesPanelTab }) {
   }
 
   const sectionOrder: ChangeSection[] = ['staged', 'changes'];
-  const showInitialLoading = loading && (mode === 'changes' ? statuses.length === 0 : commitHistory.length === 0);
+  const showInitialLoading = loading && (mode === 'changes' ? statuses.length === 0 : commitMetas.length === 0);
   return (
     <section className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-hidden py-2.5 pl-2.5">
       <div className="flex min-h-8 items-center gap-2 pr-2.5">
@@ -1276,16 +1353,19 @@ export function ChangesPanel({ mode = 'changes' }: { mode?: ChangesPanelTab }) {
               />
             );
           })}
-        {mode === 'commits' && !loading && commitHistory.length === 0 ? (
+        {mode === 'commits' && !loading && commitMetas.length === 0 ? (
           <div className="grid min-h-[52px] place-items-center text-muted">{t('changes.noCommits')}</div>
         ) : null}
-        {mode === 'commits' && !showInitialLoading ? (
+        {mode === 'commits' && !showInitialLoading && worktreePath ? (
           <CommitHistorySection
-            commits={commitHistory}
+            commits={commitMetas}
+            commitFilesMap={commitFilesMap}
+            worktreePath={worktreePath}
             viewMode={viewMode}
             activeCommitHash={activeDiffTab?.commitHash}
             activePath={activeDiffTab?.activePath}
             onOpenCommitFile={onOpenCommitFile}
+            onFilesLoaded={handleCommitFilesLoaded}
           />
         ) : null}
       </div>

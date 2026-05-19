@@ -363,6 +363,22 @@ fn dispatch(
             serde_json::to_value(git::commit_history(Path::new(&worktree_path), limit)?)
                 .map_err(|e| e.to_string())
         }
+        "git.commitHistorySummary" => {
+            let worktree_path = string_param(&params, "worktreePath")?;
+            let limit = params
+                .get("limit")
+                .and_then(Value::as_u64)
+                .map(|value| value as usize)
+                .unwrap_or(14);
+            serde_json::to_value(git::commit_history_summary(Path::new(&worktree_path), limit)?)
+                .map_err(|e| e.to_string())
+        }
+        "git.commitFiles" => {
+            let worktree_path = string_param(&params, "worktreePath")?;
+            let hash = string_param(&params, "hash")?;
+            serde_json::to_value(git::commit_files(Path::new(&worktree_path), &hash)?)
+                .map_err(|e| e.to_string())
+        }
         "git.branchStats" => {
             let worktree_path = string_param(&params, "worktreePath")?;
             serde_json::to_value(git::branch_stats(Path::new(&worktree_path)))

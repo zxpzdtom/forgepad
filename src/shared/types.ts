@@ -177,6 +177,16 @@ export type GitCommitFileSummary = {
   deletions: number;
 };
 
+/** Lightweight commit metadata without per-file details (phase 1 of two-phase loading). */
+export type GitCommitMeta = {
+  hash: string;
+  shortHash: string;
+  subject: string;
+  timestamp: number;
+  additions: number;
+  deletions: number;
+};
+
 export type GitCommitSummary = {
   hash: string;
   shortHash: string;

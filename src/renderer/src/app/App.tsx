@@ -753,7 +753,37 @@ function AppInner() {
   useEffect(() => {
     if (!hydrated || !activeWorkspace) return;
     void importExternalAgentSessions(activeWorkspace.id);
+    const onFocus = () => void importExternalAgentSessions(activeWorkspace.id);
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
   }, [activeWorkspace, hydrated, importExternalAgentSessions]);
+
+  // Fix: Reset modifier key state on window blur/focus to prevent stale
+  // shiftKey/metaKey causing unintended drag or text-selection behavior.
+  // This handles the case where modifier keys are released while focus is
+  // on the pet panel (nonactivatingPanel) or another application.
+  useEffect(() => {
+    const handleWindowBlur = () => {
+      window.getSelection()?.removeAllRanges();
+    };
+    const handleWindowFocus = () => {
+      // Dispatch synthetic keyup events to clear stale modifier state in the
+      // browser engine. Without this, MouseEvent.shiftKey etc. can remain true
+      // after the user released the key while another window was focused.
+      for (const key of ["Shift", "Control", "Alt", "Meta"]) {
+        window.dispatchEvent(
+          new KeyboardEvent("keyup", { key, bubbles: true, cancelable: true }),
+        );
+      }
+      window.getSelection()?.removeAllRanges();
+    };
+    window.addEventListener("blur", handleWindowBlur);
+    window.addEventListener("focus", handleWindowFocus);
+    return () => {
+      window.removeEventListener("blur", handleWindowBlur);
+      window.removeEventListener("focus", handleWindowFocus);
+    };
+  }, []);
 
   const workspaceTabs = tabs.filter(
     (tab) => tab.workspaceId === activeWorkspaceId,
@@ -838,10 +868,17 @@ function AppInner() {
   }, [shellDockVisibleEarly]);
 
   const activeWorkspaceSessions = activeWorkspace
-    ? agentSessionHistory
-        .filter((session) => session.workspaceId === activeWorkspace.id)
-        .sort((a, b) => b.updatedAt - a.updatedAt)
-        .slice(0, 5)
+    ? (() => {
+        const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
+        const nowMs = Date.now();
+        const sorted = agentSessionHistory
+          .filter((session) => session.workspaceId === activeWorkspace.id)
+          .sort((a, b) => b.updatedAt - a.updatedAt);
+        const recent = sorted
+          .filter((s) => nowMs - s.updatedAt < THREE_DAYS_MS)
+          .slice(0, 20);
+        return recent.length > 0 ? recent : sorted.slice(0, 5);
+      })()
     : [];
 
   const renderEmptyState = () => {

@@ -118,6 +118,8 @@ enum HostBridgeBootstrap {
           getBranchStats: (worktreePath) => invoke("git.branchStats", { worktreePath }),
           getStatus: (worktreePath) => invoke("git.status", { worktreePath }),
           getCommitHistory: (worktreePath, limit) => invoke("git.commitHistory", { worktreePath, limit }),
+          getCommitHistorySummary: (worktreePath, limit) => invoke("git.commitHistorySummary", { worktreePath, limit }),
+          getCommitFiles: (worktreePath, hash) => invoke("git.commitFiles", { worktreePath, hash }),
           getFileDiff: (worktreePath, relPath, bucket, status, oldPath) => invoke("git.fileDiff", { worktreePath, relPath, bucket, status, oldPath }),
           getCommitFileDiff: (worktreePath, commitHash, relPath, status, oldPath) => invoke("git.commitFileDiff", { worktreePath, commitHash, relPath, status, oldPath }),
           stage: (worktreePath, paths) => invoke("git.stage", { worktreePath, paths }),

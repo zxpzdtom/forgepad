@@ -437,6 +437,12 @@ final class MainWindowController: NSWindowController, WKNavigationDelegate {
         case "agent.permissionRequest":
             emit(name: "agent:permission-request", payload: event["payload"] ?? NSNull())
             return
+        case "agent.permissionClear":
+            if let payloadDict = event["payload"] as? [String: Any],
+               let ptyId = payloadDict["ptyId"] as? String {
+                emit(name: "agent:permission-request", payload: ["ptyId": ptyId, "resolved": true])
+            }
+            return
         case "agent.userPrompt":
             emit(name: "agent:user-prompt", payload: event["payload"] ?? NSNull())
             return
