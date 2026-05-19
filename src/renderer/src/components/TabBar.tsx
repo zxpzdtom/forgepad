@@ -3,10 +3,16 @@ import { closestCenter, DndContext, type DragEndEvent, PointerSensor, useSensor,
 import { restrictToHorizontalAxis, restrictToParentElement } from '@dnd-kit/modifiers';
 import { horizontalListSortingStrategy, SortableContext } from '@dnd-kit/sortable';
 import { useHorizontalScroll } from '@renderer/hooks/useHorizontalScroll';
-import { getDroppedFileEntries, hasDraggableFiles, isInternalDrop } from '@renderer/lib/drag-utils';
+import {
+  getDroppedFileEntries,
+  hasDraggableFiles,
+  isInternalDrop,
+  joinWorkspacePath,
+  setForgepadPathDragData,
+} from '@renderer/lib/drag-utils';
 import { getTabTitle, useAppStore } from '@renderer/store/app-store';
 import type { Tab } from '@shared/types';
-import { Bot, ClipboardList, ExternalLink, GitCompare, Globe, TerminalSquare } from 'lucide-react';
+import { Bot, ClipboardList, ExternalLink, GitCompare, TerminalSquare } from 'lucide-react';
 
 import { FileIcon } from './FileIcon';
 import { SortableTabItem } from './SortableTabItem';
@@ -18,7 +24,6 @@ function tabIcon(tab: Tab) {
   if (tab.type === 'terminal') return tab.isAgent ? <Bot size={14} /> : <TerminalSquare size={14} />;
   if (tab.type === 'diff') return <GitCompare size={14} />;
   if (tab.type === 'context-preview') return <ClipboardList size={14} />;
-  if (tab.type === 'browser') return <Globe size={14} />;
   return <FileIcon filePath={tab.relPath} size={16} />;
 }
 
@@ -38,7 +43,7 @@ export function TabBar() {
   const openFileTab = useAppStore((state) => state.openFileTab);
   const openExternalFileTab = useAppStore((state) => state.openExternalFileTab);
 
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 10 } }));
 
   // tabListRef is also used by the scrollIntoView effect below
   const { ref: tabListRef, onWheel } = useHorizontalScroll<HTMLDivElement>();
@@ -147,6 +152,10 @@ export function TabBar() {
           >
             {workspaceTabs.map((tab) => {
               const isExternal = tab.type === 'file' && Boolean(tab.absPath);
+              const draggablePath =
+                tab.type === 'file' && activeWorkspace
+                  ? (tab.absPath ?? joinWorkspacePath(activeWorkspace.worktreePath, tab.relPath))
+                  : null;
               return (
                 <SortableTabItem
                   key={tab.id}
@@ -158,6 +167,11 @@ export function TabBar() {
                   onSelect={() => setActiveTab(tab.id)}
                   onClose={() => closeTab(tab.id)}
                   onContextMenu={(event) => handleContextMenu(event, tab)}
+                  draggable={Boolean(draggablePath)}
+                  onDragStart={(event) => {
+                    if (!draggablePath) return;
+                    setForgepadPathDragData(event.dataTransfer, draggablePath);
+                  }}
                   className="min-w-[64px] max-w-[220px]"
                   data-tab-id={tab.id}
                   suffix={isExternal ? <ExternalLink size={10} className="shrink-0 text-subtle" /> : undefined}

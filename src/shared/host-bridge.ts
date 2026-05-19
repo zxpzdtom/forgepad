@@ -7,7 +7,6 @@ import type {
   CreateBundleInput,
   CustomPetMeta,
   DeletePetResult,
-  ExtensionInfo,
   FileNode,
   FilePreviewResult,
   FileStatus,
@@ -74,12 +73,6 @@ export type NativeTerminal = {
   id: string;
   label: string;
   appName: string;
-};
-
-export type ExtensionTabCreateRequest = {
-  requestId: string;
-  url: string;
-  active: boolean;
 };
 
 export type SaveFileRequest = {
@@ -223,25 +216,8 @@ export type HostBridgeApi = {
   nativeFiles: {
     getPath: (file: File) => string;
   };
-  browser: {
-    openWindow?: (url: string, title?: string) => Promise<void>;
-  };
   lsp: {
     getDefinition: (worktreePath: string, token: string) => Promise<LspLocation[]>;
-  };
-  extension: {
-    list: () => Promise<ExtensionInfo[]>;
-    install: () => Promise<ExtensionInfo | null>;
-    uninstall: (id: string) => Promise<void>;
-    openPopup: (
-      extId: string,
-      popupPath: string,
-      x: number,
-      y: number,
-      activeTabId: number,
-      activeTabUrl?: string,
-    ) => Promise<void>;
-    onTabCreate: (callback: (data: ExtensionTabCreateRequest) => void) => Unsubscribe;
   };
   pet: {
     sendSettings: (settings: PetSettings) => void;

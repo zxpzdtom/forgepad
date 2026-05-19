@@ -1,18 +1,17 @@
 import { lazy, type MouseEvent, Suspense, useCallback, useMemo, useRef, useState } from 'react';
-import { useHorizontalScroll } from '@renderer/hooks/useHorizontalScroll';
-import { useTranslation } from '@renderer/i18n';
-import { getDroppedPaths, hasDraggableFiles } from '@renderer/lib/drag-utils';
 import { closestCenter, DndContext, type DragEndEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { horizontalListSortingStrategy, SortableContext } from '@dnd-kit/sortable';
+import { useHorizontalScroll } from '@renderer/hooks/useHorizontalScroll';
+import { useTranslation } from '@renderer/i18n';
+import { getDroppedPaths, hasDraggableFiles, quotePathForShell } from '@renderer/lib/drag-utils';
 import { useAppStore } from '@renderer/store/app-store';
 import type { Tab, Workspace } from '@shared/types';
+import clsx from 'clsx';
 import { Bot, Minimize2, Plus, TerminalSquare } from 'lucide-react';
 
 import { RenameModal } from './RenameModal';
 import { SortableTabItem } from './SortableTabItem';
 import { TabContextMenu } from './TabContextMenu';
-
-import clsx from 'clsx';
 
 type TerminalTab = Extract<Tab, { type: 'terminal' }>;
 
@@ -113,7 +112,7 @@ export function TerminalDock() {
       e.stopPropagation(); // prevent outer fallback handler from firing
       const activeTab = terminalTabs.find((t) => t.id === activeId);
       if (activeTab) {
-        window.forgepad.pty.write(activeTab.ptyId, paths.join(' '));
+        window.forgepad.pty.write(activeTab.ptyId, paths.map(quotePathForShell).join(' '));
       }
     },
     [terminalTabs, activeId],
@@ -134,43 +133,45 @@ export function TerminalDock() {
       onDrop={handleDrop}
     >
       <div className="column-tabbar flex h-9 shrink-0 items-center gap-1 border-border border-b bg-bg px-2">
-        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-          <SortableContext items={tabIds} strategy={horizontalListSortingStrategy}>
-            <div
-              ref={tabListRef}
-              className="tabs-scroll scrollbar-none scroll-mask-x flex min-w-0 flex-1 items-center overflow-x-auto"
-              role="tablist"
-              onWheel={onWheel}
-            >
-              {terminalTabs.map((tab) => (
-                <SortableTabItem
-                  key={tab.id}
-                  id={tab.id}
-                  className="min-w-[56px] max-w-[220px]"
-                  active={tab.id === activeId}
-                  icon={terminalIcon(tab)}
-                  title={tab.title}
-                  onSelect={() => {
-                    setTerminalPanelOpen(true);
-                    setActiveTab(tab.id);
-                  }}
-                  onClose={() => closeTab(tab.id)}
-                  closeTitle={t('terminalDock.closeTerminal')}
-                  onContextMenu={(event) => handleContextMenu(event, tab)}
-                />
-              ))}
-            </div>
-          </SortableContext>
-        </DndContext>
+        <div className="flex min-w-0 flex-1 items-center">
+          <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <SortableContext items={tabIds} strategy={horizontalListSortingStrategy}>
+              <div
+                ref={tabListRef}
+                className="tabs-scroll scrollbar-none scroll-mask-x flex min-w-0 flex-[0_1_auto] items-center overflow-x-auto"
+                role="tablist"
+                onWheel={onWheel}
+              >
+                {terminalTabs.map((tab) => (
+                  <SortableTabItem
+                    key={tab.id}
+                    id={tab.id}
+                    className="min-w-[56px] max-w-[220px]"
+                    active={tab.id === activeId}
+                    icon={terminalIcon(tab)}
+                    title={tab.title}
+                    onSelect={() => {
+                      setTerminalPanelOpen(true);
+                      setActiveTab(tab.id);
+                    }}
+                    onClose={() => closeTab(tab.id)}
+                    closeTitle={t('terminalDock.closeTerminal')}
+                    onContextMenu={(event) => handleContextMenu(event, tab)}
+                  />
+                ))}
+              </div>
+            </SortableContext>
+          </DndContext>
 
-        <button
-          className="icon-button small"
-          type="button"
-          title={t('terminalDock.newTerminal')}
-          onClick={() => void createTerminal(activeWorkspaceId ?? undefined)}
-        >
-          <Plus size={14} />
-        </button>
+          <button
+            className="icon-button small ml-1 shrink-0"
+            type="button"
+            title={t('terminalDock.newTerminal')}
+            onClick={() => void createTerminal(activeWorkspaceId ?? undefined)}
+          >
+            <Plus size={14} />
+          </button>
+        </div>
         <button
           className="icon-button small"
           type="button"

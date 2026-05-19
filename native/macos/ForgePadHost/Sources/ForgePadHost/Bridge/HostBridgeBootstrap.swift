@@ -199,17 +199,7 @@ enum HostBridgeBootstrap {
         },
         native: {},
         nativeFiles: { getPath: (file) => getNativeDroppedPath(file) || file.name },
-        browser: {
-          openWindow: (url, title) => invoke("browser.openWindow", { url, title })
-        },
         lsp: { getDefinition: (worktreePath, token) => invoke("lsp.getDefinition", { worktreePath, token }) },
-        extension: {
-          list: () => Promise.resolve([]),
-          install: () => Promise.resolve(null),
-          uninstall: noopVoidPromise,
-          openPopup: noopVoidPromise,
-          onTabCreate: () => noopUnsubscribe
-        },
         pet: {
           sendSettings: (settings) => { invoke("pet.sendSettings", { settings }); },
           command: (command) => { invoke("pet.command", { command }); },

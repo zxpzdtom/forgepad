@@ -19,6 +19,6 @@ pnpm build
 ```
 
 The bundle does not include Node or the legacy JS backend. Core backend behavior runs in the bundled Rust `forgepad-core-daemon`.
-The native package builds only the main renderer entry. Browser actions open Swift-owned `WKWebView` windows.
+The native package builds only the main renderer entry.
 
 The core path runs through a supervised Rust daemon and a Swift-owned `forgepad://` renderer scheme.

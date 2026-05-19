@@ -313,6 +313,7 @@ function setupClickToMoveCursor(
 
 function macTerminalEditSequence(event: KeyboardEvent): string | null {
   if (event.type !== 'keydown') return null;
+  if (isImeKeyboardEvent(event)) return null;
   if (event.shiftKey || event.ctrlKey) return null;
 
   const key = event.key.toLowerCase();
@@ -333,6 +334,42 @@ function macTerminalEditSequence(event: KeyboardEvent): string | null {
   }
 
   return null;
+}
+
+function isImeKeyboardEvent(event: KeyboardEvent): boolean {
+  return event.isComposing || event.key === 'Process' || event.keyCode === 229;
+}
+
+function isPasteShortcut(event: KeyboardEvent): boolean {
+  return (event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'v';
+}
+
+function getTerminalTextarea(terminal: Terminal): HTMLTextAreaElement | null {
+  return terminal.element?.querySelector('.xterm-helper-textarea') ?? null;
+}
+
+function tuneTerminalTextarea(terminal: Terminal) {
+  const textarea = getTerminalTextarea(terminal);
+  if (!textarea) return;
+
+  textarea.autocapitalize = 'off';
+  textarea.autocomplete = 'off';
+  textarea.spellcheck = false;
+  textarea.setAttribute('autocorrect', 'off');
+  textarea.setAttribute('inputmode', 'text');
+}
+
+function restoreTerminalInputFocus(terminal: Terminal) {
+  const focus = () => {
+    if (!terminal.element?.isConnected) return;
+    terminal.focus();
+    getTerminalTextarea(terminal)?.focus({ preventScroll: true });
+  };
+
+  window.requestAnimationFrame(() => {
+    focus();
+    window.setTimeout(focus, 0);
+  });
 }
 
 const TERMINAL_THEMES: Record<'dark' | 'light', ITheme> = {
@@ -407,20 +444,8 @@ const SESSION_ID_PATTERNS = [
 
 const DEFAULT_TERMINAL_FONT_FAMILY = 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace';
 
-const LOCAL_URL_RE = /\bhttps?:\/\/(?:localhost|127\.0\.0\.1|0\.0\.0\.0)(?::\d{1,5})?(?:\/[^\s\x1b]*)?/g;
-
-function stripTrailingUrlPunctuation(url: string): string {
-  return url.replace(/[.,);\]]+$/, '');
-}
-
 function normalizeSearchSelection(selection: string): string {
   return selection.replace(/\r?\n/g, ' ').trim();
-}
-
-function normalizeLocalPreviewUrl(url: string): string {
-  // 0.0.0.0 is a bind address printed by dev servers, not a useful browser
-  // destination. Open it through localhost instead.
-  return url.replace(/^(https?:\/\/)0\.0\.0\.0(?=[:/]|$)/, '$1localhost');
 }
 
 function tryExtractSessionId(data: string): string | null {
@@ -564,8 +589,8 @@ export function TerminalPanel({ tab, workspace, active }: TerminalPanelProps) {
   const searchRef = useRef<SearchAddon | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const activeRef = useRef(active);
+  const composingRef = useRef(false);
   const sessionIdDetectedRef = useRef(false);
-  const detectedLocalUrlsRef = useRef<Set<string>>(new Set());
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResult, setSearchResult] = useState<ISearchResultChangeEvent>({ resultIndex: -1, resultCount: 0 });
@@ -642,6 +667,8 @@ export function TerminalPanel({ tab, workspace, active }: TerminalPanelProps) {
     // without needing to recreate the terminal instance.
     terminal.attachCustomKeyEventHandler((event) => {
       if (event.type !== 'keydown') return true;
+      if (composingRef.current || isImeKeyboardEvent(event)) return true;
+      if (isPasteShortcut(event)) return true;
 
       // macOS native terminal editing gestures are not automatically translated
       // by the WebView. Map them to readline/zle sequences while ordinary shell
@@ -685,6 +712,7 @@ export function TerminalPanel({ tab, workspace, active }: TerminalPanelProps) {
     });
 
     terminal.open(host);
+    tuneTerminalTextarea(terminal);
     terminalRef.current = terminal;
     fitRef.current = fitAddon;
 
@@ -743,6 +771,22 @@ export function TerminalPanel({ tab, workspace, active }: TerminalPanelProps) {
     resizeObserver.observe(host);
     window.setTimeout(() => fitAndResize(true), 0);
 
+    const handleCompositionStart = () => {
+      composingRef.current = true;
+    };
+    const handleCompositionEnd = () => {
+      composingRef.current = false;
+      restoreTerminalInputFocus(terminal);
+    };
+    const handlePaste = () => {
+      tuneTerminalTextarea(terminal);
+      restoreTerminalInputFocus(terminal);
+    };
+
+    terminal.element?.addEventListener('compositionstart', handleCompositionStart, true);
+    terminal.element?.addEventListener('compositionend', handleCompositionEnd, true);
+    terminal.element?.addEventListener('paste', handlePaste, true);
+
     const dataDisposable = terminal.onData((data) => {
       // When the user types into an agent terminal, notify the store so it can
       // start a cancel-detection timer (handles ESC / Ctrl+C interrupts where
@@ -759,18 +803,15 @@ export function TerminalPanel({ tab, workspace, active }: TerminalPanelProps) {
       () => fitAndResize(true),
     );
 
-    const removeDataListener = window.forgepad.pty.onData(tab.ptyId, (data) => {
-      terminal.write(data);
+    let pendingData = '';
+    let pendingFlush: number | null = null;
 
-      LOCAL_URL_RE.lastIndex = 0;
-      const matches = data.match(LOCAL_URL_RE);
-      if (matches?.length) {
-        const url = normalizeLocalPreviewUrl(stripTrailingUrlPunctuation(matches[matches.length - 1]));
-        if (url && !detectedLocalUrlsRef.current.has(url)) {
-          detectedLocalUrlsRef.current.add(url);
-          useAppStore.getState().openBrowserPreview(url, workspace.id);
-        }
-      }
+    const flushPendingData = () => {
+      pendingFlush = null;
+      if (!pendingData) return;
+      const data = pendingData;
+      pendingData = '';
+      terminal.write(data);
 
       if (tab.isAgent && !tab.sessionId && !sessionIdDetectedRef.current) {
         const sessionId = tryExtractSessionId(data);
@@ -778,6 +819,13 @@ export function TerminalPanel({ tab, workspace, active }: TerminalPanelProps) {
           sessionIdDetectedRef.current = true;
           useAppStore.getState().updateTerminalSessionId(tab.id, sessionId);
         }
+      }
+    };
+
+    const removeDataListener = window.forgepad.pty.onData(tab.ptyId, (data) => {
+      pendingData += data;
+      if (pendingFlush === null) {
+        pendingFlush = window.requestAnimationFrame(flushPendingData);
       }
     });
     const removeExitListener = window.forgepad.pty.onExit(tab.ptyId, (exitCode) => {
@@ -801,6 +849,11 @@ export function TerminalPanel({ tab, workspace, active }: TerminalPanelProps) {
       resizeObserver.disconnect();
       if (fitTimer) clearTimeout(fitTimer);
       if (ptyResizeTimer) clearTimeout(ptyResizeTimer);
+      if (pendingFlush !== null) window.cancelAnimationFrame(pendingFlush);
+      pendingData = '';
+      terminal.element?.removeEventListener('compositionstart', handleCompositionStart, true);
+      terminal.element?.removeEventListener('compositionend', handleCompositionEnd, true);
+      terminal.element?.removeEventListener('paste', handlePaste, true);
       dataDisposable.dispose();
       searchResultsDisposable.dispose();
       filePathLinkDisposable.dispose();

@@ -5,7 +5,6 @@ import WebKit
 final class HostBridge: NSObject, WKScriptMessageHandler {
     private let coreSupervisor: CoreSupervisor
     private let workspaceFileSchemeHandler: WorkspaceFileSchemeHandler
-    private let openBrowserWindow: (URL, String?) -> Void
     private let sendPetSettings: (Any) -> Void
     private let sendPetCommand: (Any) -> Void
     private let stateURL: URL
@@ -13,13 +12,11 @@ final class HostBridge: NSObject, WKScriptMessageHandler {
     init(
         coreSupervisor: CoreSupervisor,
         workspaceFileSchemeHandler: WorkspaceFileSchemeHandler,
-        openBrowserWindow: @escaping (URL, String?) -> Void,
         sendPetSettings: @escaping (Any) -> Void,
         sendPetCommand: @escaping (Any) -> Void
     ) {
         self.coreSupervisor = coreSupervisor
         self.workspaceFileSchemeHandler = workspaceFileSchemeHandler
-        self.openBrowserWindow = openBrowserWindow
         self.sendPetSettings = sendPetSettings
         self.sendPetCommand = sendPetCommand
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
@@ -190,11 +187,6 @@ final class HostBridge: NSObject, WKScriptMessageHandler {
             return NSNull()
         case "agent.permissionDecision":
             return try await coreSupervisor.request(command: command, params: params)
-        case "browser.openWindow":
-            if let rawURL = params["url"] as? String, let url = URL(string: rawURL) {
-                openBrowserWindow(url, params["title"] as? String)
-            }
-            return NSNull()
         default:
             if isCoreCommand(command) {
                 return try await coreSupervisor.request(command: command, params: params)

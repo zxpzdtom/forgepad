@@ -38,9 +38,6 @@ const en = {
   "app.emptyState.detached": "detached",
   "app.emptyState.newAgent": "New Agent",
   "app.emptyState.terminal": "Terminal",
-  "app.emptyState.browser": "Browser",
-  "browser.nativeWindowOnly": "Browser tabs open in native windows in this build.",
-  "browser.openNativeWindow": "Open Native Window",
   "app.toast.failedLoadState": "Failed to load workspace state.",
   "app.toast.failedSaveState": "Failed to save workspace state.",
   "app.toast.failedWatchWorkspace": "Failed to watch workspace changes.",
@@ -59,18 +56,6 @@ const en = {
   "settings.nav.advanced": "Advanced",
   "settings.nav.shortcuts": "Shortcuts",
   "settings.nav.pets": "Pets",
-  "settings.nav.extensions": "Extensions",
-
-  // ── Settings > Extensions ──
-  "settings.extensions.title": "Browser Extensions",
-  "settings.extensions.description":
-    "Load unpacked Chrome extensions into the built-in browser. Extensions will apply to all browser tabs and persist across restarts.",
-  "settings.extensions.addExtension": "Add Extension",
-  "settings.extensions.installing": "Loading...",
-  "settings.extensions.uninstall": "Uninstall",
-  "settings.extensions.empty": "No extensions installed",
-  "settings.extensions.emptyHint":
-    'Click "Add Extension" to load an unpacked Chrome extension folder.',
 
   // ── Settings > Pets ──
   "settings.pets.title": "Desktop Pets",
@@ -132,9 +117,6 @@ const en = {
   "settings.general.loadingAnimation": "Loading Animation",
   "settings.general.loadingAnimationDesc":
     "Spinner shown in sidebar when an agent is working",
-  "settings.general.browserHomepage": "Browser Homepage",
-  "settings.general.browserHomepageDesc": "Default page for new browser tabs",
-  "settings.general.browserHomepage.custom": "Custom URL",
 
   // ── Settings > Agent ──
   "settings.agent.title": "Agent",
@@ -485,9 +467,6 @@ const en = {
   "rightPanel.commits": "Commits",
   "rightPanel.context": "Context",
 
-  // ── Tab Bar ──
-  "tabBar.openBrowser": "Open Browser",
-
   // ── Tab Context Menu ──
   "tabMenu.rename": "Rename",
   "tabMenu.close": "Close",
@@ -500,9 +479,6 @@ const en = {
   "tabMenu.revealInFinder": "Reveal in Finder",
   "tabMenu.pathCopied": "Path copied",
   "tabMenu.relativePathCopied": "Relative path copied",
-
-  // ── File Column ──
-  "fileColumn.browserCrashed": "Browser component crashed",
 
   // ── Terminal Dock ──
   "terminalDock.closeTerminal": "Close terminal",
@@ -583,97 +559,6 @@ const en = {
     "✗ origin/{branch} not found — will create new branch and push",
   "newWorktree.creating": "Creating…",
 
-  // ── Browser Tab ──
-  "browser.failedToLoad": "Failed to load",
-  "browser.couldNotLoad": "Could not load {host}",
-  "browser.pageNotFound": "Page not found",
-  "browser.pageNotFoundDetail": "The page at {host} could not be found",
-  "browser.connectionTimeout": "Connection timed out",
-  "browser.connectionTimeoutDetail": "{host} took too long to respond",
-  "browser.networkChanged": "Network changed",
-  "browser.networkChangedDetail":
-    "Your network connection changed during loading",
-  "browser.connectionClosed": "Connection closed",
-  "browser.connectionClosedDetail": "{host} closed the connection",
-  "browser.connectionReset": "Connection reset",
-  "browser.connectionResetDetail": "The connection to {host} was reset",
-  "browser.connectionRefused": "Connection refused",
-  "browser.connectionRefusedDetail":
-    "{host} refused to connect. Check if the server is running.",
-  "browser.connectionAborted": "Connection aborted",
-  "browser.connectionAbortedDetail": "The connection to {host} was aborted",
-  "browser.connectionFailed": "Connection failed",
-  "browser.connectionFailedDetail": "Could not connect to {host}",
-  "browser.addressNotFound": "Address not found",
-  "browser.addressNotFoundDetail":
-    "Could not resolve {host}. Check the URL or your DNS settings.",
-  "browser.noInternet": "No internet",
-  "browser.noInternetDetail": "Your device is not connected to the internet",
-  "browser.addressUnreachable": "Address unreachable",
-  "browser.addressUnreachableDetail": "{host} is unreachable",
-  "browser.certificateError": "Certificate error",
-  "browser.certificateErrorDetail":
-    "The security certificate for {host} is not trusted",
-  "browser.insecureConnection": "Insecure connection",
-  "browser.insecureConnectionDetail": "{host} sent an insecure response",
-  "browser.back": "Back",
-  "browser.forward": "Forward",
-  "browser.stop": "Stop",
-  "browser.switchDesktop": "Switch to desktop view",
-  "browser.switchMobile": "Switch to mobile view",
-  "browser.exitElementSelection": "Exit element selection",
-  "browser.selectElement": "Select element to comment",
-  "browser.selecting": "Selecting…",
-  "browser.inspect": "Inspect",
-  "browser.showConsole": "Show console",
-  "browser.hideConsole": "Hide console",
-  "browser.openDevTools": "Open DevTools",
-  "browser.popout": "Open in new window",
-  "browser.console": "Console",
-  "browser.selectHint": "Click any element on the page • ESC to cancel",
-  "browser.noActiveAgent":
-    "No active agent terminal. Please open an agent tab first.",
-  "browser.consoleLogHeader": "[Browser Console — {count} log]",
-  "browser.consoleLogHeaderPlural": "[Browser Console — {count} logs]",
-
-  // ── Browser Feedback Modal ──
-  "browserFeedback.title": "Element Feedback",
-  "browserFeedback.selectedElement": "Selected element",
-  "browserFeedback.tag": "Tag",
-  "browserFeedback.selector": "Selector",
-  "browserFeedback.page": "Page",
-  "browserFeedback.htmlSnippet": "HTML snippet",
-  "browserFeedback.describeLabel": "Describe what you want the agent to do",
-  "browserFeedback.placeholder":
-    "e.g. Change the button color to indigo, make it larger...",
-  "browserFeedback.pressHint": "Press",
-  "browserFeedback.toSend": "to send",
-  "browserFeedback.sendToAgent": "Send to Agent",
-
-  // ── Browser Console Panel ──
-  "browserConsole.title": "Console",
-  "browserConsole.all": "All",
-  "browserConsole.error": "Error",
-  "browserConsole.warn": "Warn",
-  "browserConsole.log": "Log",
-  "browserConsole.debug": "Debug",
-  "browserConsole.filterPlaceholder": "Filter logs...",
-  "browserConsole.deselectAll": "Deselect all",
-  "browserConsole.selectAll": "Select all",
-  "browserConsole.deselect": "Deselect",
-  "browserConsole.sendCount": "Send ({count})",
-  "browserConsole.clearConsole": "Clear console",
-  "browserConsole.noOutput": "No console output yet",
-  "browserConsole.noMatching": "No matching entries",
-  "browserConsole.noEntries": "No {level} entries",
-  "browserConsole.inputPlaceholder": "Enter script and press Enter to run...",
-  "browserConsole.runScript": "Run script (Enter)",
-
-  // ── URL Bar ──
-  "urlBar.placeholder": "Enter URL...",
-  "urlBar.closeHistory": "Close history",
-  "urlBar.showHistory": "Show history",
-
   // ── Shortcut Recorder ──
   "shortcutRecorder.conflict": 'Used by "{name}"',
   "shortcutRecorder.resetDefault": "Reset to default",
@@ -742,7 +627,6 @@ const en = {
   // ── Store (toast messages) ──
   "store.changes": "Changes",
   "store.context": "Context",
-  "store.browser": "Browser",
   "store.agent": "Agent",
   "store.terminal": "Terminal",
   "store.terminalN": "Terminal {n}",

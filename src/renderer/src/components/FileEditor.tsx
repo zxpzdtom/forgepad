@@ -17,7 +17,7 @@ import type { FileOptions, LineAnnotation, VirtualFileMetrics } from '@pierre/di
 import { File as PierreFile, VirtualizerContext } from '@pierre/diffs/react';
 import { useResolvedTheme } from '@renderer/app/theme-context';
 import { useLspTokenNavigation } from '@renderer/hooks/useLspTokenNavigation';
-import { setForgepadPathDragData } from '@renderer/lib/drag-utils';
+import { joinWorkspacePath, setForgepadPathDragData } from '@renderer/lib/drag-utils';
 import { useAppStore } from '@renderer/store/app-store';
 import type { CodeSelectionItem, FilePreviewResult, Tab, Workspace } from '@shared/types';
 import clsx from 'clsx';
@@ -1032,7 +1032,7 @@ export function FileEditor({ tab, workspace }: FileEditorProps) {
   const clearTabTargetLine = useAppStore((state) => state.clearTabTargetLine);
   /** True when this tab was opened from outside the workspace (read-only, no context actions). */
   const isExternal = Boolean(tab.absPath || tab.externalUrl);
-  const draggablePath = tab.absPath ?? (!tab.externalUrl ? tab.relPath : undefined);
+  const draggablePath = tab.absPath ?? (!tab.externalUrl ? joinWorkspacePath(workspace.worktreePath, tab.relPath) : undefined);
   const { onTokenClick, onTokenEnter, onTokenLeave } = useLspTokenNavigation(
     workspace.worktreePath,
     tab.relPath,

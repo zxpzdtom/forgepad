@@ -56,21 +56,6 @@
     --color-input: var(--input);
 }
 
-@keyframes browser-loading {
-    0% {
-        width: 0%;
-        margin-left: 0;
-    }
-    50% {
-        width: 60%;
-        margin-left: 20%;
-    }
-    100% {
-        width: 0%;
-        margin-left: 100%;
-    }
-}
-
 /* ── Console error badge (t-badge pattern) ──────────────────────────── */
 @keyframes badge-in {
     0% {
@@ -376,7 +361,62 @@ button,
 .context-preview pre,
 .scrollbar-thin {
     scrollbar-width: thin;
-    scrollbar-color: gray transparent;
+    scrollbar-color: color-mix(in srgb, var(--muted) 32%, transparent) transparent;
+}
+
+.code-viewer-scroll::-webkit-scrollbar,
+.markdown-viewer-scroll::-webkit-scrollbar,
+.image-preview-scroll::-webkit-scrollbar,
+.media-preview-scroll::-webkit-scrollbar,
+.video-preview-scroll::-webkit-scrollbar,
+.context-preview pre::-webkit-scrollbar,
+.scrollbar-thin::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+.code-viewer-scroll::-webkit-scrollbar-track,
+.markdown-viewer-scroll::-webkit-scrollbar-track,
+.image-preview-scroll::-webkit-scrollbar-track,
+.media-preview-scroll::-webkit-scrollbar-track,
+.video-preview-scroll::-webkit-scrollbar-track,
+.context-preview pre::-webkit-scrollbar-track,
+.scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.code-viewer-scroll::-webkit-scrollbar-thumb,
+.markdown-viewer-scroll::-webkit-scrollbar-thumb,
+.image-preview-scroll::-webkit-scrollbar-thumb,
+.media-preview-scroll::-webkit-scrollbar-thumb,
+.video-preview-scroll::-webkit-scrollbar-thumb,
+.context-preview pre::-webkit-scrollbar-thumb,
+.scrollbar-thin::-webkit-scrollbar-thumb {
+    min-height: 28px;
+    border: 3px solid transparent;
+    border-radius: 999px;
+    background-color: color-mix(in srgb, var(--muted) 28%, transparent);
+    background-clip: padding-box;
+}
+
+.code-viewer-scroll::-webkit-scrollbar-thumb:hover,
+.markdown-viewer-scroll::-webkit-scrollbar-thumb:hover,
+.image-preview-scroll::-webkit-scrollbar-thumb:hover,
+.media-preview-scroll::-webkit-scrollbar-thumb:hover,
+.video-preview-scroll::-webkit-scrollbar-thumb:hover,
+.context-preview pre::-webkit-scrollbar-thumb:hover,
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background-color: color-mix(in srgb, var(--muted) 42%, transparent);
+}
+
+.code-viewer-scroll::-webkit-scrollbar-thumb:active,
+.markdown-viewer-scroll::-webkit-scrollbar-thumb:active,
+.image-preview-scroll::-webkit-scrollbar-thumb:active,
+.media-preview-scroll::-webkit-scrollbar-thumb:active,
+.video-preview-scroll::-webkit-scrollbar-thumb:active,
+.context-preview pre::-webkit-scrollbar-thumb:active,
+.scrollbar-thin::-webkit-scrollbar-thumb:active {
+    background-color: color-mix(in srgb, var(--muted) 54%, transparent);
 }
 
 .media-preview-scroll.is-fit,
@@ -3509,49 +3549,6 @@ button,
 
 [data-sketchy] .grid.gap-2.border-border.border-t {
     border-top: 2px solid var(--border);
-}
-
-/* ── Browser toolbar remnants used by native-window placeholders ─────────── */
-
-[data-sketchy] .flex.h-10.shrink-0.items-center.gap-1.border-border.border-b {
-    border-bottom: 2px solid var(--border);
-}
-
-/* Browser preview container */
-[data-sketchy]
-    .relative.shrink-0.overflow-hidden.rounded-xl.border.border-border {
-    border: 2px solid var(--border);
-    border-radius: 4px;
-    filter: url(#sketchy-subtle);
-}
-
-/* ── BrowserConsolePanel ─────────────────────────────────────────────────── */
-
-[data-sketchy]
-    .surface-toolbar.flex.h-9.shrink-0.items-center.gap-1\\.5.border-border.border-b {
-    border-bottom: 2px solid var(--border);
-}
-
-/* Console search input */
-[data-sketchy] .h-\\[26px\\].w-36.rounded-\\[4px\\].border.border-border {
-    border: 1.5px solid var(--border);
-    border-radius: 3px;
-    filter: url(#sketchy-subtle);
-}
-
-/* ── UrlBar input ────────────────────────────────────────────────────────── */
-
-[data-sketchy] .h-7.w-full.rounded.border.border-border {
-    border: 1.5px solid var(--border);
-    border-radius: 3px;
-    filter: url(#sketchy-subtle);
-}
-
-/* UrlBar suggestions dropdown */
-[data-sketchy] .rounded-lg.border.border-border.bg-panel.shadow-xl {
-    border: 2px solid var(--border);
-    border-radius: 4px;
-    filter: url(#sketchy-subtle);
 }
 
 /* ── RunSetupDialog inputs ───────────────────────────────────────────────── */

@@ -21,7 +21,6 @@ import {
   Keyboard,
   Paintbrush,
   Plus,
-  Puzzle,
   RotateCcw,
   Rows2,
   Settings,
@@ -33,7 +32,6 @@ import {
 import { agentPresetIcon } from './AgentIcons';
 import { AppearancePanel } from './AppearancePanel';
 import { DOTMATRIX_SPINNERS } from './dotmatrix';
-import { ExtensionsSection } from './ExtensionsSection';
 import { NotificationsSection } from './NotificationsSection';
 import { PetsSection } from './PetsSection';
 import { SegmentedControl } from './SegmentedControl';
@@ -104,11 +102,6 @@ const NAV_ITEMS: { id: SectionId; label: string; icon: React.ReactNode }[] = [
     icon: <Keyboard size={15} />,
   },
   { id: 'pets', label: 'settings.nav.pets', icon: <Cat size={15} /> },
-  {
-    id: 'extensions',
-    label: 'settings.nav.extensions',
-    icon: <Puzzle size={15} />,
-  },
 ];
 
 /* ─── Reusable UI primitives ─── */
@@ -442,49 +435,6 @@ function GeneralSection() {
           <option value="vscode">{t('settings.general.openWith.vscode')}</option>
           <option value="terminal">{t('settings.general.openWith.terminal')}</option>
         </select>
-      </SettingRow>
-
-      <SettingRow label={t('settings.general.browserHomepage')} description={t('settings.general.browserHomepageDesc')}>
-        <div className="flex items-center gap-2">
-          <select
-            className="h-8 rounded-md border border-border bg-panel-2 px-2.5 text-[13px] text-text outline-none focus:border-accent/60"
-            value={
-              ['https://www.google.com', 'https://www.baidu.com', 'https://www.bing.com', 'about:blank'].includes(
-                settings.defaultBrowserHomepage,
-              )
-                ? settings.defaultBrowserHomepage
-                : '__custom__'
-            }
-            onChange={(e) => {
-              const v = e.currentTarget.value;
-              if (v === '__custom__') {
-                updateSettings({ defaultBrowserHomepage: 'https://' });
-              } else {
-                updateSettings({ defaultBrowserHomepage: v });
-              }
-            }}
-          >
-            <option value="https://www.google.com">Google</option>
-            <option value="https://www.baidu.com">Baidu</option>
-            <option value="https://www.bing.com">Bing</option>
-            <option value="about:blank">Blank</option>
-            <option value="__custom__">{t('settings.general.browserHomepage.custom')}</option>
-          </select>
-          {!['https://www.google.com', 'https://www.baidu.com', 'https://www.bing.com', 'about:blank'].includes(
-            settings.defaultBrowserHomepage,
-          ) && (
-            <input
-              className="h-8 w-48 rounded-md border border-border bg-panel-2 px-2.5 text-[13px] text-text outline-none focus:border-accent/60"
-              value={settings.defaultBrowserHomepage}
-              placeholder="https://example.com"
-              onChange={(e) =>
-                updateSettings({
-                  defaultBrowserHomepage: e.currentTarget.value,
-                })
-              }
-            />
-          )}
-        </div>
       </SettingRow>
 
       <Divider />
@@ -1085,7 +1035,6 @@ const SECTIONS: Record<SectionId, React.ComponentType> = {
   advanced: AdvancedSection,
   shortcuts: ShortcutsSection,
   pets: PetsSection,
-  extensions: ExtensionsSection,
 };
 
 export function SettingsPanel() {

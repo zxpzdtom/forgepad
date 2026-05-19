@@ -40,9 +40,6 @@ const zhCN: Record<TranslationKeys, string> = {
   "app.emptyState.detached": "已分离",
   "app.emptyState.newAgent": "新建代理",
   "app.emptyState.terminal": "终端",
-  "app.emptyState.browser": "浏览器",
-  "browser.nativeWindowOnly": "当前构建会使用原生窗口打开浏览器。",
-  "browser.openNativeWindow": "打开原生窗口",
   "app.toast.failedLoadState": "加载工作区状态失败。",
   "app.toast.failedSaveState": "保存工作区状态失败。",
   "app.toast.failedWatchWorkspace": "监听工作区变更失败。",
@@ -61,18 +58,6 @@ const zhCN: Record<TranslationKeys, string> = {
   "settings.nav.advanced": "高级",
   "settings.nav.shortcuts": "快捷键",
   "settings.nav.pets": "桌面宠物",
-  "settings.nav.extensions": "扩展",
-
-  // ── Settings > Extensions ──
-  "settings.extensions.title": "浏览器扩展",
-  "settings.extensions.description":
-    "将解压的 Chrome 扩展加载到内置浏览器中。扩展将应用于所有浏览器标签页，并在重启后自动加载。",
-  "settings.extensions.addExtension": "添加扩展",
-  "settings.extensions.installing": "加载中...",
-  "settings.extensions.uninstall": "卸载",
-  "settings.extensions.empty": "暂无已安装的扩展",
-  "settings.extensions.emptyHint":
-    '点击"添加扩展"选择一个解压的 Chrome 扩展文件夹。',
 
   // ── Settings > Pets ──
   "settings.pets.title": "桌面宠物",
@@ -127,9 +112,6 @@ const zhCN: Record<TranslationKeys, string> = {
   "settings.general.openWith.terminal": "终端",
   "settings.general.loadingAnimation": "加载动画",
   "settings.general.loadingAnimationDesc": "代理工作时侧边栏显示的加载动画",
-  "settings.general.browserHomepage": "浏览器主页",
-  "settings.general.browserHomepageDesc": "新标签页的默认页面",
-  "settings.general.browserHomepage.custom": "自定义 URL",
 
   // ── Settings > Agent ──
   "settings.agent.title": "代理",
@@ -456,9 +438,6 @@ const zhCN: Record<TranslationKeys, string> = {
   "rightPanel.commits": "提交",
   "rightPanel.context": "上下文",
 
-  // ── Tab Bar ──
-  "tabBar.openBrowser": "打开浏览器",
-
   // ── Tab Context Menu ──
   "tabMenu.rename": "重命名",
   "tabMenu.close": "关闭",
@@ -471,9 +450,6 @@ const zhCN: Record<TranslationKeys, string> = {
   "tabMenu.revealInFinder": "在访达中显示",
   "tabMenu.pathCopied": "路径已复制",
   "tabMenu.relativePathCopied": "相对路径已复制",
-
-  // ── File Column ──
-  "fileColumn.browserCrashed": "浏览器组件崩溃",
 
   // ── Terminal Dock ──
   "terminalDock.closeTerminal": "关闭终端",
@@ -551,92 +527,6 @@ const zhCN: Record<TranslationKeys, string> = {
   "newWorktree.remoteNotFound": "✗ 未找到 origin/{branch} — 将创建新分支并推送",
   "newWorktree.creating": "创建中…",
 
-  // ── Browser Tab ──
-  "browser.failedToLoad": "加载失败",
-  "browser.couldNotLoad": "无法加载 {host}",
-  "browser.pageNotFound": "页面未找到",
-  "browser.pageNotFoundDetail": "找不到 {host} 的页面",
-  "browser.connectionTimeout": "连接超时",
-  "browser.connectionTimeoutDetail": "{host} 响应时间过长",
-  "browser.networkChanged": "网络变更",
-  "browser.networkChangedDetail": "加载过程中网络连接发生变化",
-  "browser.connectionClosed": "连接关闭",
-  "browser.connectionClosedDetail": "{host} 关闭了连接",
-  "browser.connectionReset": "连接重置",
-  "browser.connectionResetDetail": "与 {host} 的连接被重置",
-  "browser.connectionRefused": "连接被拒绝",
-  "browser.connectionRefusedDetail":
-    "{host} 拒绝连接。请检查服务器是否正在运行。",
-  "browser.connectionAborted": "连接中断",
-  "browser.connectionAbortedDetail": "与 {host} 的连接被中断",
-  "browser.connectionFailed": "连接失败",
-  "browser.connectionFailedDetail": "无法连接到 {host}",
-  "browser.addressNotFound": "地址未找到",
-  "browser.addressNotFoundDetail": "无法解析 {host}。请检查 URL 或 DNS 设置。",
-  "browser.noInternet": "无网络",
-  "browser.noInternetDetail": "您的设备未连接到互联网",
-  "browser.addressUnreachable": "地址不可达",
-  "browser.addressUnreachableDetail": "无法访问 {host}",
-  "browser.certificateError": "证书错误",
-  "browser.certificateErrorDetail": "{host} 的安全证书不受信任",
-  "browser.insecureConnection": "不安全连接",
-  "browser.insecureConnectionDetail": "{host} 发送了不安全的响应",
-  "browser.back": "后退",
-  "browser.forward": "前进",
-  "browser.stop": "停止",
-  "browser.switchDesktop": "切换到桌面视图",
-  "browser.switchMobile": "切换到移动视图",
-  "browser.exitElementSelection": "退出元素选择",
-  "browser.selectElement": "选择要评论的元素",
-  "browser.selecting": "选择中…",
-  "browser.inspect": "检查",
-  "browser.showConsole": "显示控制台",
-  "browser.hideConsole": "隐藏控制台",
-  "browser.openDevTools": "打开开发者工具",
-  "browser.popout": "在新窗口中打开",
-  "browser.console": "控制台",
-  "browser.selectHint": "点击页面上的任意元素 • ESC 取消",
-  "browser.noActiveAgent": "没有活动的代理终端。请先打开一个代理标签页。",
-  "browser.consoleLogHeader": "[浏览器控制台 — {count} 条日志]",
-  "browser.consoleLogHeaderPlural": "[浏览器控制台 — {count} 条日志]",
-
-  // ── Browser Feedback Modal ──
-  "browserFeedback.title": "元素反馈",
-  "browserFeedback.selectedElement": "选中的元素",
-  "browserFeedback.tag": "标签",
-  "browserFeedback.selector": "选择器",
-  "browserFeedback.page": "页面",
-  "browserFeedback.htmlSnippet": "HTML 片段",
-  "browserFeedback.describeLabel": "描述你希望代理做什么",
-  "browserFeedback.placeholder": "例如：将按钮颜色改为靛蓝色，使其更大...",
-  "browserFeedback.pressHint": "按",
-  "browserFeedback.toSend": "发送",
-  "browserFeedback.sendToAgent": "发送给代理",
-
-  // ── Browser Console Panel ──
-  "browserConsole.title": "控制台",
-  "browserConsole.all": "全部",
-  "browserConsole.error": "错误",
-  "browserConsole.warn": "警告",
-  "browserConsole.log": "日志",
-  "browserConsole.debug": "调试",
-  "browserConsole.filterPlaceholder": "过滤日志...",
-  "browserConsole.deselectAll": "取消全选",
-  "browserConsole.selectAll": "全选",
-  "browserConsole.deselect": "取消选择",
-  "browserConsole.sendCount": "发送（{count}）",
-  "browserConsole.clearConsole": "清除控制台",
-  "browserConsole.noOutput": "暂无控制台输出",
-  "browserConsole.noMatching": "无匹配条目",
-  "browserConsole.noEntries": "无{level}条目",
-  "browserConsole.inputPlaceholder": "输入脚本并按回车执行...",
-  "browserConsole.runScript": "运行脚本（回车）",
-
-  // ── URL Bar ──
-  "urlBar.placeholder": "输入 URL...",
-  "urlBar.closeHistory": "关闭历史",
-  "urlBar.showHistory": "显示历史",
-
   // ── Shortcut Recorder ──
   "shortcutRecorder.conflict": "已被「{name}」使用",
   "shortcutRecorder.resetDefault": "重置为默认",
@@ -702,7 +592,6 @@ const zhCN: Record<TranslationKeys, string> = {
   // ── Store (toast messages) ──
   "store.changes": "变更",
   "store.context": "上下文",
-  "store.browser": "浏览器",
   "store.agent": "代理",
   "store.terminal": "终端",
   "store.terminalN": "终端 {n}",

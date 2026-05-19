@@ -5,7 +5,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var windowController: MainWindowController?
     private var petWindowController: PetWindowController?
     private let coreSupervisor = CoreSupervisor()
-    private var browserWindows: [BrowserWindowController] = []
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         coreSupervisor.startIfConfigured()
@@ -13,9 +12,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let controller = MainWindowController(
             coreSupervisor: coreSupervisor,
-            openBrowserWindow: { [weak self] url, title in
-                self?.openBrowserWindow(url: url, title: title)
-            },
             sendPetSettings: { [weak self] settings in
                 self?.petWindow().sendSettings(settings)
             },
@@ -40,16 +36,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationWillTerminate(_ notification: Notification) {
         coreSupervisor.stop()
-    }
-
-    private func openBrowserWindow(url: URL, title: String?) {
-        let controller = BrowserWindowController(url: url, title: title)
-        controller.onClose = { [weak self, weak controller] in
-            guard let self, let controller else { return }
-            self.browserWindows.removeAll { $0 === controller }
-        }
-        browserWindows.append(controller)
-        controller.show()
     }
 
     private func petWindow() -> PetWindowController {

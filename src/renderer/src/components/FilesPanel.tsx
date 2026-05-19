@@ -3,7 +3,7 @@ import type { FileTreeContextMenuItem, GitStatusEntry } from '@pierre/trees';
 import { useTranslation } from '@renderer/i18n';
 import { FileTree, useFileTree, useFileTreeSelection } from '@pierre/trees/react';
 import { TREE_THEMES } from '@renderer/lib/file-tree-theme';
-import { setForgepadPathDragData } from '@renderer/lib/drag-utils';
+import { joinWorkspacePath, setForgepadPathDragData } from '@renderer/lib/drag-utils';
 import { useResolvedTheme } from '@renderer/app/theme-context';
 import { useAppStore } from '@renderer/store/app-store';
 import type { FileNode, Tab, Workspace } from '@shared/types';
@@ -483,32 +483,19 @@ export function FilesPanel() {
     setManualContextMenu(null);
   }, [workspace?.id, treeData.paths]);
 
-  // ── Drag-to-terminal: drag file rows to paste relative path ──
+  // ── Drag-to-terminal: drag file rows to paste absolute path ──
   //
   // Strategy: We do NOT pre-set `draggable="true"` on Shadow DOM rows because
-  // that causes every click to start a native drag, blocking all pointer events
-  // and freezing the UI. Instead we:
-  //  1. Listen for mousedown (capture) on the container to record the target row
-  //  2. On mousemove, once movement exceeds a threshold, set `draggable="true"`
-  //     on THAT SPECIFIC ROW only, then immediately re-dispatch the mousemove
-  //     so the browser picks up the draggable state and fires dragstart
-  //  3. On dragstart (bubbles out of Shadow DOM), populate dataTransfer
-  //  4. On dragend / mouseup, remove `draggable` from the row
+  // that makes ordinary clicks feel sticky. Instead, mousedown temporarily
+  // promotes only the pressed row so the browser can start native drag
+  // immediately, then mouseup/dragend removes the attribute again.
   const treeContainerRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     const container = treeContainerRef.current;
     if (!container) return;
 
-    let pending: {
-      row: HTMLElement;
-      path: string;
-      x: number;
-      y: number;
-    } | null = null;
     let activeDragRow: HTMLElement | null = null;
-
-    const THRESHOLD = 6;
 
     const onContextMenu = (e: MouseEvent) => {
       const hit = findTreeItemHit(e);
@@ -519,44 +506,31 @@ export function FilesPanel() {
       openManualContextMenu(hit.path, e.clientX, e.clientY);
     };
 
-    // (1) Capture mousedown — record which row and position
     const onMouseDown = (e: MouseEvent) => {
       if (e.button !== 0) return;
       const hit = findTreeItemHit(e);
-      if (hit) {
-        pending = { row: hit.row, path: hit.path, x: e.clientX, y: e.clientY };
-      }
+      if (!hit) return;
+      activeDragRow?.removeAttribute('draggable');
+      activeDragRow = hit.row;
+      activeDragRow.setAttribute('draggable', 'true');
     };
 
-    // (2) On mousemove past threshold, enable draggable on the single row
-    const onMouseMove = (e: MouseEvent) => {
-      if (!pending) return;
-      const dx = e.clientX - pending.x;
-      const dy = e.clientY - pending.y;
-      if (dx * dx + dy * dy < THRESHOLD * THRESHOLD) return;
-
-      // Promote this row to draggable — the browser will fire dragstart
-      // on the next pointer move because the element under the cursor is
-      // now draggable.
-      pending.row.setAttribute('draggable', 'true');
-      activeDragRow = pending.row;
-      pending = null;
-    };
-
-    // (3) dragstart bubbles out of Shadow DOM — set the transfer data
     const onDragStart = (e: DragEvent) => {
-      if (!activeDragRow || !e.dataTransfer) return;
-      const path = activeDragRow.getAttribute('data-item-path');
+      const row = activeDragRow ?? findTreeItemHit(e)?.row;
+      if (!row || !e.dataTransfer) return;
+      const path = row.getAttribute('data-item-path');
       if (!path) {
         e.preventDefault();
         return;
       }
-      setForgepadPathDragData(e.dataTransfer, path);
+      if (!worktreePath) {
+        e.preventDefault();
+        return;
+      }
+      setForgepadPathDragData(e.dataTransfer, joinWorkspacePath(worktreePath, path));
     };
 
-    // (4) Cleanup: remove draggable from the row
     const cleanup = () => {
-      pending = null;
       if (activeDragRow) {
         activeDragRow.removeAttribute('draggable');
         activeDragRow = null;
@@ -565,20 +539,18 @@ export function FilesPanel() {
 
     container.addEventListener('contextmenu', onContextMenu, true);
     container.addEventListener('mousedown', onMouseDown, true);
-    container.addEventListener('mousemove', onMouseMove, true);
     container.addEventListener('dragstart', onDragStart);
     container.addEventListener('dragend', cleanup);
     container.addEventListener('mouseup', cleanup, true);
     return () => {
       container.removeEventListener('contextmenu', onContextMenu, true);
       container.removeEventListener('mousedown', onMouseDown, true);
-      container.removeEventListener('mousemove', onMouseMove, true);
       container.removeEventListener('dragstart', onDragStart);
       container.removeEventListener('dragend', cleanup);
       container.removeEventListener('mouseup', cleanup, true);
       cleanup();
     };
-  }, [openManualContextMenu]);
+  }, [openManualContextMenu, worktreePath]);
 
   if (!workspace) {
     return <div className="grid min-h-[90px] place-items-center text-muted">{t('files.openProjectFirst')}</div>;

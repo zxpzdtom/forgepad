@@ -30,6 +30,7 @@ import {
   getDroppedPaths,
   hasDraggableFiles,
   isInternalDrop,
+  quotePathForShell,
 } from "@renderer/lib/drag-utils";
 import { eventMatchesCombo } from "@renderer/lib/shortcut-utils";
 import { useAppStore } from "@renderer/store/app-store";
@@ -257,10 +258,6 @@ function AppInner() {
   const createAgentTerminal = useAppStore((state) => state.createAgentTerminal);
   const resumeAgentSession = useAppStore((state) => state.resumeAgentSession);
   const importExternalAgentSessions = useAppStore((state) => state.importExternalAgentSessions);
-  const createBrowserTab = useAppStore((state) => state.createBrowserTab);
-  const defaultBrowserHomepage = useAppStore(
-    (state) => state.settings.defaultBrowserHomepage,
-  );
   const closeTab = useAppStore((state) => state.closeTab);
   const setActiveTab = useAppStore((state) => state.setActiveTab);
   const navigatePanel = useAppStore((state) => state.navigatePanel);
@@ -378,29 +375,6 @@ function AppInner() {
       useAppStore.setState({ settingsOpen: true });
     });
   }, []);
-
-  // Listen for extension tab creation requests and hand them to the native browser window.
-  useEffect(() => {
-    return window.forgepad.extension.onTabCreate((data) => {
-      if (window.forgepad.browser.openWindow) {
-        void window.forgepad.browser.openWindow(data.url || "about:blank", "Browser");
-      }
-    });
-  }, []);
-
-  const openBrowser = useCallback(
-    (url?: string) => {
-      if (window.forgepad.browser.openWindow) {
-        void window.forgepad.browser.openWindow(
-          url || defaultBrowserHomepage || "about:blank",
-          "Browser",
-        );
-        return undefined;
-      }
-      return createBrowserTab(url);
-    },
-    [createBrowserTab, defaultBrowserHomepage],
-  );
 
   useEffect(() => {
     // Build action handler map for configurable keyboard shortcuts
@@ -997,14 +971,8 @@ function AppInner() {
     return <FileColumn />;
   };
 
-  // Whether any browser tabs exist across all workspaces; keep FileColumn mounted
-  // so native browser placeholders do not churn during workspace switches.
-  const hasBrowserTabsAnywhere = tabs.some((tab) => tab.type === "browser");
-  const keepFileColumnMounted = hasFileTabs || hasBrowserTabsAnywhere;
-
   const renderMiddleContent = () => {
-    // Empty state — no agent, no file tabs, no browser tabs to preserve
-    if (!hasAgentTabs && !keepFileColumnMounted) {
+    if (!hasAgentTabs && !hasFileTabs) {
       return renderWorkspaceArea();
     }
 
@@ -1067,10 +1035,7 @@ function AppInner() {
             </div>
           </Allotment.Pane>
 
-          {/* File pane — stays mounted to preserve browser tab placeholders.
-              When the current workspace has no file tabs but other workspaces
-              have browser tabs, this pane is hidden (visible=false) yet remains
-              in the React tree so tab state is not destroyed. */}
+          {/* File pane */}
           <Allotment.Pane
             preferredSize={hasAgentTabs && hasFileTabs ? "50%" : undefined}
             minSize={280}
@@ -1128,7 +1093,7 @@ function AppInner() {
       const agentTabId = state.activeAgentTabId ?? agentTabs[0]?.id;
       const agentTab = agentTabs.find((t) => t.id === agentTabId);
       if (agentTab?.type === "terminal") {
-        window.forgepad.pty.write(agentTab.ptyId, paths.join(" "));
+        window.forgepad.pty.write(agentTab.ptyId, paths.map(quotePathForShell).join(" "));
       }
       return;
     }

@@ -59,16 +59,6 @@ export type Tab =
       workspaceId: string;
       type: 'context-preview';
       bundleId?: string;
-    }
-  | {
-      id: string;
-      workspaceId: string;
-      type: 'browser';
-      url: string;
-      title: string;
-      isLoading: boolean;
-      canGoBack: boolean;
-      canGoForward: boolean;
     };
 
 export type AgentSessionHistoryItem = {
@@ -81,32 +71,6 @@ export type AgentSessionHistoryItem = {
   updatedAt: number;
 };
 
-/** A URL visited in the browser tab, stored for history/autocomplete */
-export type BrowserHistoryEntry = {
-  url: string;
-  title: string;
-  /** Google favicon API URL, empty string if unavailable */
-  favicon: string;
-  visitedAt: number;
-};
-
-/** Element selected via the in-browser element picker */
-export type SelectedElementInfo = {
-  /** Unique CSS selector path for the element */
-  selector: string;
-  /** Tag name e.g. "BUTTON", "DIV" */
-  tagName: string;
-  /** Element's outerHTML, truncated to 500 chars */
-  outerHTML: string;
-  /** Bounding rect relative to the page viewport */
-  boundingRect: { x: number; y: number; width: number; height: number };
-  /** Base64-encoded PNG screenshot of the element region */
-  screenshotBase64: string;
-  /** Page URL at time of selection */
-  pageUrl: string;
-  /** Page title at time of selection */
-  pageTitle: string;
-};
 export type WorkspacePanel = {
   id: string;
   name: string;
@@ -319,7 +283,6 @@ export type PersistedAppState = {
   contextItems: ContextItem[];
   composerText: string;
   settings: AppSettings;
-  browserHistory?: BrowserHistoryEntry[];
   /** Per-project last-selected run command index */
   projectActiveRunIndex?: Record<string, number>;
 };
@@ -1280,7 +1243,7 @@ export const DEFAULT_AGENT_PRESETS: AgentPreset[] = [
     command: 'codex',
     enabled: true,
     builtIn: true,
-    restoreTemplate: 'codex resume {sessionId}',
+    restoreTemplate: 'codex resume --include-non-interactive {sessionId}',
   },
   {
     id: 'gemini',
@@ -1628,17 +1591,6 @@ export type CompletionCard = {
   timestamp: number;
 };
 
-export type ExtensionInfo = {
-  id: string;
-  name: string;
-  version: string;
-  path: string;
-  /** Popup HTML path relative to extension root (from action.default_popup or browser_action.default_popup) */
-  popupPath: string | null;
-  /** Icon URL (chrome-extension://<id>/<icon-path>) for toolbar display */
-  iconUrl: string | null;
-};
-
 export type Locale = 'en' | 'zh-CN';
 
 export type AppSettings = {
@@ -1695,12 +1647,6 @@ export type AppSettings = {
   sketchyMode: boolean;
   /** Desktop pet settings */
   pets: PetSettings;
-  // ── Browser ──
-  /** Default homepage URL for new browser tabs (e.g. https://www.google.com) */
-  defaultBrowserHomepage: string;
-  // ── Browser Extensions ──
-  /** Paths to unpacked Chrome extensions to load on startup */
-  extensionPaths: string[];
 };
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -1758,8 +1704,6 @@ scope 从变更的文件路径或模块中提取。
   renameOnFirstMessageOnly: false,
   sketchyMode: false,
   pets: { ...DEFAULT_PET_SETTINGS },
-  defaultBrowserHomepage: 'https://www.google.com',
-  extensionPaths: [],
 };
 
 export type OpenProjectResult = {

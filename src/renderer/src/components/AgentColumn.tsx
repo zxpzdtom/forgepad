@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useRef, useState } from 'react';
 import { useAppStore } from '@renderer/store/app-store';
-import { getDroppedPaths, hasDraggableFiles } from '@renderer/lib/drag-utils';
+import { getDroppedPaths, hasDraggableFiles, quotePathForShell } from '@renderer/lib/drag-utils';
 import type { Workspace } from '@shared/types';
 
 import clsx from 'clsx';
@@ -60,7 +60,7 @@ export function AgentColumn() {
       e.stopPropagation(); // prevent outer fallback handler from firing
       const activeTab = terminalTabs.find((t) => t.id === columnActiveId);
       if (activeTab?.type === 'terminal') {
-        window.forgepad.pty.write(activeTab.ptyId, paths.join(' '));
+        window.forgepad.pty.write(activeTab.ptyId, paths.map(quotePathForShell).join(' '));
       }
     },
     [terminalTabs, columnActiveId],

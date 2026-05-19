@@ -5,8 +5,21 @@ export type DroppedFileEntry = {
   mimeType?: string;
 };
 
+const SHELL_SAFE_UNQUOTED_PATH = /^[A-Za-z0-9_./:@%+=,-]+$/;
+
 function isAbsolutePath(path: string): boolean {
   return path.startsWith('/') || /^[A-Za-z]:[\\/]/.test(path);
+}
+
+export function joinWorkspacePath(workspacePath: string, relPath: string): string {
+  if (isAbsolutePath(relPath)) return relPath;
+  return `${workspacePath.replace(/[\\/]+$/, '')}/${relPath.replace(/^[\\/]+/, '')}`;
+}
+
+export function quotePathForShell(path: string): string {
+  if (!path) return "''";
+  if (SHELL_SAFE_UNQUOTED_PATH.test(path)) return path;
+  return `'${path.replaceAll("'", "'\\''")}'`;
 }
 
 export function setForgepadPathDragData(dataTransfer: DataTransfer, path: string): void {

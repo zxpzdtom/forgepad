@@ -97,7 +97,6 @@ final class MainWindowController: NSWindowController, WKNavigationDelegate {
 
     convenience init(
         coreSupervisor: CoreSupervisor,
-        openBrowserWindow: @escaping (URL, String?) -> Void,
         sendPetSettings: @escaping (Any) -> Void,
         sendPetCommand: @escaping (Any) -> Void
     ) {
@@ -122,7 +121,6 @@ final class MainWindowController: NSWindowController, WKNavigationDelegate {
         self.init(
             window: window,
             coreSupervisor: coreSupervisor,
-            openBrowserWindow: openBrowserWindow,
             sendPetSettings: sendPetSettings,
             sendPetCommand: sendPetCommand
         )
@@ -131,14 +129,12 @@ final class MainWindowController: NSWindowController, WKNavigationDelegate {
     init(
         window: NSWindow,
         coreSupervisor: CoreSupervisor,
-        openBrowserWindow: @escaping (URL, String?) -> Void,
         sendPetSettings: @escaping (Any) -> Void,
         sendPetCommand: @escaping (Any) -> Void
     ) {
         self.bridge = HostBridge(
             coreSupervisor: coreSupervisor,
             workspaceFileSchemeHandler: workspaceFileSchemeHandler,
-            openBrowserWindow: openBrowserWindow,
             sendPetSettings: sendPetSettings,
             sendPetCommand: sendPetCommand
         )

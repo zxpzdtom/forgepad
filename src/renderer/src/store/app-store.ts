@@ -21,7 +21,6 @@ import type {
   PersistedAppState,
   Project,
   RightPanelMode,
-  SelectedElementInfo,
   ShortcutActionId,
   ShortcutCombo,
   Tab,
@@ -43,8 +42,7 @@ export type SettingsSection =
   | 'advanced'
   | 'shortcuts'
   | 'appearance'
-  | 'pets'
-  | 'extensions';
+  | 'pets';
 
 type Toast = {
   id: string;
@@ -66,6 +64,7 @@ type BranchStatsValue = {
 type PrInfoValue = { number: number; url: string; merged: boolean };
 
 const PR_INFO_CACHE_TTL_MS = 60_000;
+const LEGACY_CODEX_RESTORE_TEMPLATE = 'codex resume {sessionId}';
 const prInfoCache = new Map<string, { value: PrInfoValue | null; expiresAt: number }>();
 const prInfoInflight = new Map<string, Promise<PrInfoValue | null>>();
 
@@ -137,14 +136,6 @@ type AppState = {
   pendingPermission: import('@shared/types').PendingPermission | null;
   /** ptyIds whose process has exited */
   exitedPtyIds: Set<string>;
-  /** Browser select mode active state, keyed by tabId */
-  browserSelectMode: Record<string, boolean>;
-  /** Browser URL history for autocomplete, most recent first */
-  browserHistory: import('@shared/types').BrowserHistoryEntry[];
-  /** Whether the browser feedback modal is open */
-  feedbackModalOpen: boolean;
-  /** Pending element selection for feedback modal */
-  pendingFeedback: { tabId: string; element: SelectedElementInfo } | null;
   handleAgentStatusUpdate: (ptyId: string, status: AgentStatus) => void;
   setPendingPermission: (permission: import('@shared/types').PendingPermission | null) => void;
   setAgentUserPrompt: (ptyId: string, prompt: string) => void;
@@ -231,8 +222,6 @@ type AppState = {
   addAgentPreset: (preset: AgentPreset) => void;
   removeAgentPreset: (presetId: string) => void;
   updateAgentPreset: (presetId: string, partial: Partial<AgentPreset>) => void;
-  addExtensionPath: (path: string) => void;
-  removeExtensionPath: (path: string) => void;
   updateTerminalSessionId: (tabId: string, sessionId: string) => void;
   renameTab: (tabIdOrPtyId: string, title: string) => void;
   restoreAgentSessions: () => Promise<void>;
@@ -254,23 +243,6 @@ type AppState = {
   deleteWorktree: (workspaceId: string) => Promise<void>;
   createWorktree: (projectId: string, branch: string, trackRemote?: boolean) => Promise<void>;
   syncWorktreesFromDisk: () => Promise<void>;
-  // Browser tab actions
-  createBrowserTab: (url?: string) => string | undefined;
-  openBrowserPreview: (url: string, workspaceId?: string) => string | undefined;
-  addBrowserHistoryEntry: (url: string, title: string, favicon?: string) => void;
-  clearBrowserHistory: () => void;
-  updateBrowserNavState: (state: {
-    tabId: string;
-    url: string;
-    title: string;
-    isLoading: boolean;
-    canGoBack: boolean;
-    canGoForward: boolean;
-  }) => void;
-  setBrowserSelectMode: (tabId: string, active: boolean) => void;
-  openFeedbackModal: (tabId: string, element: SelectedElementInfo) => void;
-  closeFeedbackModal: () => void;
-  submitBrowserFeedback: (comment: string) => void;
   /** Per-project last-selected run command index */
   projectActiveRunIndex: Record<string, number>;
   setProjectActiveRunIndex: (projectId: string, index: number) => void;
@@ -299,7 +271,6 @@ function tabTitle(tab: Tab): string {
   if (tab.type === 'terminal') return tab.title;
   if (tab.type === 'diff') return 'Changes';
   if (tab.type === 'context-preview') return 'Context';
-  if (tab.type === 'browser') return tab.title || 'Browser';
   if (tab.type === 'file') return tab.relPath.split('/').pop() || tab.relPath;
   return 'Tab';
 }
@@ -361,7 +332,7 @@ function serializeForSave(state: AppState): PersistedAppState {
     workspaces: state.workspaces,
     tasks: state.tasks,
     tabs: state.tabs
-      .filter((tab) => (tab.type === 'browser' || tab.type !== 'terminal') && !(tab.type === 'file' && tab.externalUrl))
+      .filter((tab) => tab.type !== 'terminal' && !(tab.type === 'file' && tab.externalUrl))
       .map((tab) => (tab.type === 'file' ? { ...tab, targetLine: undefined } : tab)),
     agentSessionHistory,
     activeWorkspaceId: state.activeWorkspaceId,
@@ -376,7 +347,6 @@ function serializeForSave(state: AppState): PersistedAppState {
     contextItems: state.contextItems,
     composerText: state.composerText,
     settings: state.settings,
-    browserHistory: state.browserHistory,
     projectActiveRunIndex: state.projectActiveRunIndex,
   };
 }
@@ -515,10 +485,6 @@ export const useAppStore = create<AppState>((set, get) => ({
   completionCards: [],
   pendingPermission: null,
   exitedPtyIds: new Set<string>(),
-  browserSelectMode: {},
-  browserHistory: [],
-  feedbackModalOpen: false,
-  pendingFeedback: null,
   projectActiveRunIndex: {},
   handleAgentStatusUpdate: (ptyId, status) => {
     // Reset the working-timeout whenever we receive any hook event.
@@ -789,6 +755,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       themeId: (state?.settings as AppSettings | undefined)?.themeId ?? DEFAULT_SETTINGS.themeId,
       customThemes: (state?.settings as AppSettings | undefined)?.customThemes ?? [],
     };
+    delete (rawSettings as Record<string, unknown>).defaultBrowserHomepage;
+    delete (rawSettings as Record<string, unknown>).extensionPaths;
     // Migrate old runCommand (string) or runCommands (string[]) → runCommands ({ name, command }[])
     const oldRunCommand = (rawSettings as Record<string, unknown>).runCommand as string | undefined;
     const oldRunCommands = rawSettings.runCommands as unknown;
@@ -821,7 +789,10 @@ export const useAppStore = create<AppState>((set, get) => ({
         return {
           ...preset,
           sessionTemplate: preset.sessionTemplate ?? builtIn.sessionTemplate,
-          restoreTemplate: preset.restoreTemplate ?? builtIn.restoreTemplate,
+          restoreTemplate:
+            preset.id === 'codex' && preset.restoreTemplate === LEGACY_CODEX_RESTORE_TEMPLATE
+              ? builtIn.restoreTemplate
+              : (preset.restoreTemplate ?? builtIn.restoreTemplate),
         };
       });
     }
@@ -891,10 +862,7 @@ export const useAppStore = create<AppState>((set, get) => ({
     const tabs = (state?.tabs ?? [])
       .filter((tab) => workspaces.some((workspace) => workspace.id === tab.workspaceId))
       .filter((tab) => !(tab.type === 'terminal' && tab.isAgent))
-      .map((tab) =>
-        // Reset browser tab transient state on restore
-        tab.type === 'browser' ? { ...tab, isLoading: false } : tab,
-      );
+      .filter((tab) => (tab as { type: string }).type !== 'browser');
     const contextItems = (state?.contextItems ?? []).filter((item) => {
       if (!workspaces.some((workspace) => workspace.id === item.workspaceId)) return false;
       if (item.type === 'task') return tasks.some((task) => task.id === item.taskId);
@@ -967,7 +935,6 @@ export const useAppStore = create<AppState>((set, get) => ({
       composerText: state?.composerText ?? '',
       settings,
       branchStats,
-      browserHistory: state?.browserHistory ?? [],
       projectActiveRunIndex: state?.projectActiveRunIndex ?? {},
       hydrated: true,
     });
@@ -2103,23 +2070,6 @@ export const useAppStore = create<AppState>((set, get) => ({
       },
     })),
 
-  addExtensionPath: (extPath) =>
-    set((state) => {
-      const existing = state.settings.extensionPaths ?? [];
-      if (existing.includes(extPath)) return state;
-      return {
-        settings: { ...state.settings, extensionPaths: [...existing, extPath] },
-      };
-    }),
-
-  removeExtensionPath: (extPath) =>
-    set((state) => ({
-      settings: {
-        ...state.settings,
-        extensionPaths: (state.settings.extensionPaths ?? []).filter((p) => p !== extPath),
-      },
-    })),
-
   updateTerminalSessionId: (tabId, sessionId) =>
     set((state) => ({
       tabs: state.tabs.map((tab) =>
@@ -2633,157 +2583,6 @@ export const useAppStore = create<AppState>((set, get) => ({
         },
       },
     }));
-  },
-
-  // ── Browser tab actions ──────────────────────────────────────────────────
-
-  createBrowserTab: (url) => {
-    const state = get();
-    const workspaceId = state.activeWorkspaceId;
-    if (!workspaceId) return undefined;
-    const homepage = state.settings.defaultBrowserHomepage || 'about:blank';
-    const tab: Tab = {
-      id: id(),
-      workspaceId,
-      type: 'browser',
-      url: url || homepage,
-      title: 'Browser',
-      isLoading: false,
-      canGoBack: false,
-      canGoForward: false,
-    };
-    get().addTab(tab);
-    return tab.id;
-  },
-
-  openBrowserPreview: (url, workspaceId) => {
-    const state = get();
-    const targetWorkspaceId = workspaceId ?? state.activeWorkspaceId;
-    if (!targetWorkspaceId) return undefined;
-
-    const existing = state.tabs.find((tab) => tab.workspaceId === targetWorkspaceId && tab.type === 'browser' && tab.url === url);
-    if (existing) {
-      get().setActiveWorkspace(targetWorkspaceId);
-      get().setActiveTab(existing.id);
-      return existing.id;
-    }
-
-    const tab: Tab = {
-      id: id(),
-      workspaceId: targetWorkspaceId,
-      type: 'browser',
-      url,
-      title: 'Preview',
-      isLoading: false,
-      canGoBack: false,
-      canGoForward: false,
-    };
-    get().setActiveWorkspace(targetWorkspaceId);
-    get().addTab(tab);
-    return tab.id;
-  },
-
-  addBrowserHistoryEntry: (url, title, favicon = '') => {
-    if (!url || url === 'about:blank') return;
-    set((state) => {
-      const existing = state.browserHistory.findIndex((h) => h.url === url);
-      // Preserve existing favicon if no new one is provided
-      const prevFavicon = existing !== -1 ? state.browserHistory[existing].favicon : '';
-      const entry = {
-        url,
-        title: title || url,
-        favicon: favicon || prevFavicon,
-        visitedAt: Date.now(),
-      };
-      let next: import('@shared/types').BrowserHistoryEntry[];
-      if (existing !== -1) {
-        // Move to front with updated title/visitedAt
-        next = [entry, ...state.browserHistory.filter((_, i) => i !== existing)];
-      } else {
-        next = [entry, ...state.browserHistory];
-        if (next.length > 500) next = next.slice(0, 500);
-      }
-      return { browserHistory: next };
-    });
-  },
-
-  clearBrowserHistory: () => {
-    set({ browserHistory: [] });
-  },
-
-  updateBrowserNavState: (navState) => {
-    set((state) => ({
-      tabs: state.tabs.map((tab) =>
-        tab.id === navState.tabId && tab.type === 'browser'
-          ? {
-              ...tab,
-              url: navState.url,
-              title: navState.title || navState.url,
-              isLoading: navState.isLoading,
-              canGoBack: navState.canGoBack,
-              canGoForward: navState.canGoForward,
-            }
-          : tab,
-      ),
-    }));
-    // Record history when navigation completes (not mid-load)
-  },
-
-  setBrowserSelectMode: (tabId, active) => {
-    set((state) => ({
-      browserSelectMode: { ...state.browserSelectMode, [tabId]: active },
-    }));
-  },
-
-  openFeedbackModal: (tabId, element) => {
-    set({
-      pendingFeedback: { tabId, element },
-      feedbackModalOpen: true,
-      browserSelectMode: (() => {
-        const current = get().browserSelectMode;
-        return { ...current, [tabId]: false };
-      })(),
-    });
-  },
-
-  closeFeedbackModal: () => {
-    set({ feedbackModalOpen: false, pendingFeedback: null });
-  },
-
-  submitBrowserFeedback: (comment) => {
-    const state = get();
-    const { pendingFeedback } = state;
-    if (!pendingFeedback || !comment.trim()) return;
-
-    const { element } = pendingFeedback;
-
-    // Find the active agent tab's ptyId.
-    // First try the explicitly-active agent tab, then fall back to any agent
-    // tab in the current workspace (the user may have focus in the browser tab
-    // so activeAgentTabId might be stale or null).
-    const activeAgentTab =
-      state.tabs.find((tab) => tab.id === state.activeAgentTabId && tab.type === 'terminal' && tab.isAgent) ??
-      state.tabs.find((tab) => tab.workspaceId === state.activeWorkspaceId && tab.type === 'terminal' && tab.isAgent);
-
-    if (activeAgentTab?.type === 'terminal') {
-      const prompt = [
-        `[Browser Feedback] ${element.pageUrl}`,
-        '',
-        `Element: ${element.tagName} | Selector: \`${element.selector}\``,
-        '```html',
-        element.outerHTML,
-        '```',
-        '',
-        `Feedback: ${comment.trim()}`,
-        '',
-      ].join('\n');
-
-      window.forgepad.pty.write(activeAgentTab.ptyId, prompt);
-    } else {
-      get().addToast('error', 'No active agent terminal. Please open an agent tab first.');
-    }
-
-    get().closeFeedbackModal();
   },
 
   setProjectActiveRunIndex: (projectId, index) =>

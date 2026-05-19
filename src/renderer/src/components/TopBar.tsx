@@ -8,7 +8,6 @@ import {
   ChevronDown,
   Code2,
   Folder,
-  Globe,
   PanelLeftClose,
   PanelLeftOpen,
   PanelRightClose,
@@ -165,7 +164,6 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
   const addToast = useAppStore((state) => state.addToast);
   const settings = useAppStore((state) => state.settings);
   const createTerminal = useAppStore((state) => state.createTerminal);
-  const createBrowserTab = useAppStore((state) => state.createBrowserTab);
   const projectActiveRunIndex = useAppStore((state) => state.projectActiveRunIndex);
   const setProjectActiveRunIndex = useAppStore((state) => state.setProjectActiveRunIndex);
   const setSidebarOpen = useCallback(
@@ -509,7 +507,7 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
         </kbd>
       </button>
 
-      {/* ── Right toolbar: Run / Terminal / Browser / Panel / Open With ── */}
+      {/* ── Right toolbar: Run / Terminal / Panel / Open With ── */}
       <div className="ml-auto flex items-center gap-2" ref={menuRef}>
         {/* ── Run split button ── */}
         <div className="relative" ref={runMenuRef}>
@@ -625,18 +623,6 @@ export function TopBar({ onOpenSearch }: TopBarProps) {
             onClick={() => void createTerminal(activeWorkspaceId ?? undefined)}
           >
             <TerminalSquare size={17} />
-          </button>
-        </Tooltip>
-
-        {/* ── Browser button ── */}
-        <Tooltip label={t('tabBar.openBrowser')} position="bottom">
-          <button
-            className="icon-button border-transparent"
-            type="button"
-            disabled={!activeWorkspaceId}
-            onClick={() => createBrowserTab()}
-          >
-            <Globe size={17} />
           </button>
         </Tooltip>
 
