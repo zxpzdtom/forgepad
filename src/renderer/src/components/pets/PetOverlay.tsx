@@ -38,6 +38,11 @@ type MotionLayout = {
 };
 type FloatingPanelSize = { width: number; height: number };
 type PetDebugAction = MotionAction | 'random';
+
+type DragSettleState = {
+  anchor: MotionPoint;
+  until: number;
+};
 type AgentMessagePreview = { userPrompt?: string; aiResponse?: string };
 
 const STATUS_PRIORITY: Record<AgentStatus, number> = {
@@ -46,6 +51,8 @@ const STATUS_PRIORITY: Record<AgentStatus, number> = {
   review: 2,
   permission: 3,
 };
+
+const WORKING_PANEL_HIDE_DELAY_MS = 5000;
 
 const DEBUG_ACTIONS: MotionAction[] = [
   'stroll',
@@ -71,47 +78,86 @@ function highestAgentStatus(statuses: Record<string, AgentStatus>): AgentStatus 
 }
 
 const PLAY_MODE_INTERVALS: Record<PetSettings['petPlayMode'], { min: number; max: number }> = {
-  cozy: { min: 18_000, max: 35_000 },
-  playful: { min: 4_500, max: 10_000 },
-  adventure: { min: 3_000, max: 7_000 },
+  cozy: { min: 35_000, max: 75_000 },
+  playful: { min: 8_000, max: 18_000 },
+  adventure: { min: 2_500, max: 6_000 },
+};
+
+const DRAG_SETTLE_SETTINGS: Record<
+  PetSettings['petPlayMode'],
+  { duration: number; radius: number; firstDelay: number; actions: Array<{ action: MotionAction; weight: number }> }
+> = {
+  cozy: {
+    duration: 300_000,
+    radius: 48,
+    firstDelay: 30_000,
+    actions: [
+      { action: 'stroll', weight: 50 },
+      { action: 'stairs', weight: 16 },
+      { action: 'hop', weight: 8 },
+    ],
+  },
+  playful: {
+    duration: 180_000,
+    radius: 96,
+    firstDelay: 12_000,
+    actions: [
+      { action: 'stroll', weight: 30 },
+      { action: 'stairs', weight: 18 },
+      { action: 'hop', weight: 16 },
+      { action: 'zigzag', weight: 10 },
+    ],
+  },
+  adventure: {
+    duration: 90_000,
+    radius: 180,
+    firstDelay: 4_000,
+    actions: [
+      { action: 'stroll', weight: 16 },
+      { action: 'stairs', weight: 20 },
+      { action: 'hop', weight: 20 },
+      { action: 'zigzag', weight: 22 },
+      { action: 'spring', weight: 16 },
+    ],
+  },
 };
 
 const PLAY_MODE_WEIGHTS: Record<PetSettings['petPlayMode'], Array<{ action: MotionAction; weight: number }>> = {
   cozy: [
-    { action: 'stroll', weight: 32 },
-    { action: 'hop', weight: 18 },
-    { action: 'stairs', weight: 12 },
-    { action: 'portal', weight: 7 },
-    { action: 'windowTop', weight: 7 },
-    { action: 'zigzag', weight: 8 },
-    { action: 'spring', weight: 10 },
-    { action: 'peek', weight: 6 },
-    { action: 'balloon', weight: 5 },
-    { action: 'rocket', weight: 2 },
+    { action: 'stroll', weight: 52 },
+    { action: 'hop', weight: 14 },
+    { action: 'stairs', weight: 18 },
+    { action: 'portal', weight: 1 },
+    { action: 'windowTop', weight: 1 },
+    { action: 'zigzag', weight: 3 },
+    { action: 'spring', weight: 4 },
+    { action: 'peek', weight: 5 },
+    { action: 'balloon', weight: 1 },
+    { action: 'rocket', weight: 1 },
   ],
   playful: [
-    { action: 'stroll', weight: 16 },
-    { action: 'hop', weight: 17 },
-    { action: 'stairs', weight: 15 },
-    { action: 'portal', weight: 14 },
-    { action: 'windowTop', weight: 16 },
-    { action: 'zigzag', weight: 9 },
-    { action: 'spring', weight: 8 },
+    { action: 'stroll', weight: 24 },
+    { action: 'hop', weight: 20 },
+    { action: 'stairs', weight: 16 },
+    { action: 'portal', weight: 5 },
+    { action: 'windowTop', weight: 6 },
+    { action: 'zigzag', weight: 13 },
+    { action: 'spring', weight: 10 },
     { action: 'peek', weight: 5 },
-    { action: 'balloon', weight: 7 },
-    { action: 'rocket', weight: 4 },
+    { action: 'balloon', weight: 4 },
+    { action: 'rocket', weight: 2 },
   ],
   adventure: [
-    { action: 'stroll', weight: 8 },
-    { action: 'hop', weight: 14 },
-    { action: 'stairs', weight: 16 },
-    { action: 'portal', weight: 18 },
-    { action: 'windowTop', weight: 18 },
-    { action: 'zigzag', weight: 10 },
+    { action: 'stroll', weight: 4 },
+    { action: 'hop', weight: 8 },
+    { action: 'stairs', weight: 7 },
+    { action: 'portal', weight: 24 },
+    { action: 'windowTop', weight: 24 },
+    { action: 'zigzag', weight: 8 },
     { action: 'spring', weight: 8 },
-    { action: 'peek', weight: 8 },
-    { action: 'balloon', weight: 7 },
-    { action: 'rocket', weight: 6 },
+    { action: 'peek', weight: 6 },
+    { action: 'balloon', weight: 10 },
+    { action: 'rocket', weight: 9 },
   ],
 };
 
@@ -400,6 +446,10 @@ function choosePlayModeAction(stage: PetStageSnapshot, mode: PetSettings['petPla
           choice.action === 'windowTop' || choice.action === 'peek' ? { ...choice, action: 'spring' as const } : choice,
         );
   return chooseWeighted(weights);
+}
+
+function chooseDragSettleAction(mode: PetSettings['petPlayMode']): MotionAction {
+  return chooseWeighted(DRAG_SETTLE_SETTINGS[mode].actions);
 }
 
 function animationForDelta(dx: number): ForgePetAnimationName {
@@ -699,7 +749,9 @@ export function PetOverlay() {
   const agentStatusRef = useRef<AgentStatus>('idle');
   const isPermissionStatusRef = useRef(false);
   const isWanderingRef = useRef(false);
+  const isAutonomousMotionRef = useRef(false);
   const draggingRef = useRef(false);
+  const dragSettleRef = useRef<DragSettleState | null>(null);
   const blockingPanelRef = useRef(false);
   const petSettingsRef = useRef<PetSettings | null>(null);
   const pendingPermissionRef = useRef<PendingPermission | null>(null);
@@ -864,6 +916,33 @@ export function PetOverlay() {
     return baseMs / Math.sqrt(speed / 2);
   }, []);
 
+  const currentDragSettle = useCallback(() => {
+    const state = dragSettleRef.current;
+    if (!state) return null;
+    if (Date.now() <= state.until) return state;
+    dragSettleRef.current = null;
+    return null;
+  }, []);
+
+  const clampToDragSettle = useCallback(
+    (stage: PetStageSnapshot, point: MotionPoint, size: { width: number; height: number }) => {
+      const state = currentDragSettle();
+      if (!state || !isAutonomousMotionRef.current) return clampToStage(stage, point, size);
+
+      const mode = petSettingsRef.current?.petPlayMode ?? 'playful';
+      const radius = DRAG_SETTLE_SETTINGS[mode].radius;
+      return clampToStage(
+        stage,
+        {
+          x: clamp(point.x, state.anchor.x - radius, state.anchor.x + radius),
+          y: clamp(point.y, state.anchor.y - radius, state.anchor.y + radius),
+        },
+        size,
+      );
+    },
+    [currentDragSettle],
+  );
+
   const pause = useCallback(
     (ms: number, runId: number) =>
       new Promise<boolean>((resolve) => {
@@ -889,7 +968,7 @@ export function PetOverlay() {
         const stage = stageRef.current ?? fallbackStage();
         const size = spriteSize(petSettingsRef.current);
         const from = { ...positionRef.current };
-        const to = clampToStage(stage, target, size);
+        const to = clampToDragSettle(stage, target, size);
         const startedAt = performance.now();
         const duration = Math.max(80, scaledDuration(options.duration));
         setAnimation(options.animation ?? animationForDelta(to.x - from.x));
@@ -907,7 +986,7 @@ export function PetOverlay() {
           if (options.jumpHeight && !options.fall) {
             y -= Math.sin(Math.PI * t) * options.jumpHeight;
           }
-          moveWindowTo(clampToStage(stage, { x, y }, size));
+          moveWindowTo(clampToDragSettle(stage, { x, y }, size));
 
           if (t < 1) {
             frameRef.current = requestAnimationFrame(step);
@@ -919,7 +998,7 @@ export function PetOverlay() {
 
         frameRef.current = requestAnimationFrame(step);
       }),
-    [isMotionAllowed, moveWindowTo, scaledDuration],
+    [clampToDragSettle, isMotionAllowed, moveWindowTo, scaledDuration],
   );
 
   const doStroll = useCallback(
@@ -1480,8 +1559,11 @@ export function PetOverlay() {
       if (runId !== motionRunIdRef.current || !isAutonomousAllowed()) return;
 
       const mode = petSettingsRef.current?.petPlayMode ?? 'playful';
-      await playMotionAction(choosePlayModeAction(stage, mode), stage, runId);
+      const action = currentDragSettle() ? chooseDragSettleAction(mode) : choosePlayModeAction(stage, mode);
+      isAutonomousMotionRef.current = true;
+      await playMotionAction(action, stage, runId);
     } finally {
+      isAutonomousMotionRef.current = false;
       if (runId === motionRunIdRef.current) {
         isWanderingRef.current = false;
         setPortalEffect(null);
@@ -1492,7 +1574,14 @@ export function PetOverlay() {
         scheduleNextRef.current();
       }
     }
-  }, [isAutonomousAllowed, playMotionAction, readStage, resetMotionLayoutIfUnblocked, restoreStatusAnimation]);
+  }, [
+    currentDragSettle,
+    isAutonomousAllowed,
+    playMotionAction,
+    readStage,
+    resetMotionLayoutIfUnblocked,
+    restoreStatusAnimation,
+  ]);
 
   const scheduleNextAutonomous = useCallback(
     (delayOverride?: number) => {
@@ -1611,8 +1700,12 @@ export function PetOverlay() {
   useEffect(() => {
     draggingRef.current = dragging;
     if (dragging) cancelAutonomousMotion({ preserveLayout: true });
-    if (!dragging && isAutonomousAllowed()) scheduleNextRef.current(900);
-  }, [cancelAutonomousMotion, dragging, isAutonomousAllowed]);
+    if (!dragging && isAutonomousAllowed()) {
+      const mode = petSettingsRef.current?.petPlayMode ?? 'playful';
+      const settleDelay = currentDragSettle() ? DRAG_SETTLE_SETTINGS[mode].firstDelay : 900;
+      scheduleNextRef.current(settleDelay);
+    }
+  }, [cancelAutonomousMotion, currentDragSettle, dragging, isAutonomousAllowed]);
 
   useEffect(() => {
     isPermissionStatusRef.current = isPermissionStatus;
@@ -1627,6 +1720,7 @@ export function PetOverlay() {
     return () => {
       clearTimeout(idleTimer.current);
       clearTimeout(hoverTimerRef.current);
+      clearTimeout(petHoverLeaveTimer.current);
       clearAutonomousTimers();
     };
   }, [clearAutonomousTimers, resetIdleTimer]);
@@ -1831,7 +1925,16 @@ export function PetOverlay() {
       draggingRef.current = false;
       setDragging(false);
 
-      if (pointerDownPos.current && !didDragMove.current) {
+      const wasMovedByDrag = didDragMove.current;
+      if (wasMovedByDrag) {
+        const mode = petSettingsRef.current?.petPlayMode ?? 'playful';
+        dragSettleRef.current = {
+          anchor: { ...positionRef.current },
+          until: Date.now() + DRAG_SETTLE_SETTINGS[mode].duration,
+        };
+      }
+
+      if (pointerDownPos.current && !wasMovedByDrag) {
         const dx = e.screenX - pointerDownPos.current.x;
         const dy = e.screenY - pointerDownPos.current.y;
         if (Math.abs(dx) < 5 && Math.abs(dy) < 5) {
@@ -1852,7 +1955,10 @@ export function PetOverlay() {
       pointerDownPos.current = null;
 
       restoreStatusAnimation();
-      if (isAutonomousAllowed()) scheduleNextRef.current(900);
+      if (isAutonomousAllowed()) {
+        const mode = petSettingsRef.current?.petPlayMode ?? 'playful';
+        scheduleNextRef.current(wasMovedByDrag ? DRAG_SETTLE_SETTINGS[mode].firstDelay : 900);
+      }
     },
     [isAutonomousAllowed, playInteractiveAction, restoreStatusAnimation],
   );
@@ -1906,8 +2012,7 @@ export function PetOverlay() {
   const handlePointerLeave = useCallback(() => {
     if (blockingPanelRef.current) return;
     clearTimeout(hoverTimerRef.current);
-    // Small delay so moving from sprite → working-agents panel doesn't flicker
-    petHoverLeaveTimer.current = setTimeout(() => setPetSpriteHovered(false), 120);
+    petHoverLeaveTimer.current = setTimeout(() => setPetSpriteHovered(false), WORKING_PANEL_HIDE_DELAY_MS);
     if (!draggingRef.current && !isWanderingRef.current) restoreStatusAnimation();
   }, [restoreStatusAnimation]);
 
@@ -2126,7 +2231,7 @@ export function PetOverlay() {
             setPetSpriteHovered(true);
           }}
           onPointerLeave={() => {
-            petHoverLeaveTimer.current = setTimeout(() => setPetSpriteHovered(false), 120);
+            petHoverLeaveTimer.current = setTimeout(() => setPetSpriteHovered(false), WORKING_PANEL_HIDE_DELAY_MS);
           }}
           style={
             {

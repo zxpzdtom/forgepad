@@ -635,9 +635,12 @@ function SortableWorkspaceRow({
             {isLoading ? 'Creating…' : formatRelativeTime(workspace.createdAt, t)}
           </span>
           {!isLoading && hasDiffStats && (
-            <span className="flex shrink-0 items-center gap-1 font-mono text-[10px] tabular-nums" title="Local changes">
-              {stats.additions > 0 && <span className="text-text-addition">+{stats.additions}</span>}
-              {stats.deletions > 0 && <span className="text-text-deletion">-{stats.deletions}</span>}
+            <span
+              className="grid shrink-0 grid-flow-col auto-cols-[minmax(4.25ch,auto)] items-baseline gap-1 font-mono text-[10px] leading-[12px] tabular-nums"
+              title="Local changes"
+            >
+              {stats.additions > 0 && <span className="block text-right text-text-addition">+{stats.additions}</span>}
+              {stats.deletions > 0 && <span className="block text-right text-text-deletion">-{stats.deletions}</span>}
             </span>
           )}
           {!isLoading && globalIndex < 9 && (

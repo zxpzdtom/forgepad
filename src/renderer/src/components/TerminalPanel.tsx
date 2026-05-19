@@ -9,7 +9,6 @@ import type { ISearchResultChangeEvent } from '@xterm/addon-search';
 import { SearchAddon } from '@xterm/addon-search';
 import { Unicode11Addon } from '@xterm/addon-unicode11';
 import { WebLinksAddon } from '@xterm/addon-web-links';
-import { WebglAddon } from '@xterm/addon-webgl';
 import type { ILink, ILinkProvider, ITheme } from '@xterm/xterm';
 import { Terminal } from '@xterm/xterm';
 import { ChevronDown, ChevronUp, Search, X } from 'lucide-react';
@@ -344,34 +343,6 @@ function isPasteShortcut(event: KeyboardEvent): boolean {
   return (event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === 'v';
 }
 
-function getTerminalTextarea(terminal: Terminal): HTMLTextAreaElement | null {
-  return terminal.element?.querySelector('.xterm-helper-textarea') ?? null;
-}
-
-function tuneTerminalTextarea(terminal: Terminal) {
-  const textarea = getTerminalTextarea(terminal);
-  if (!textarea) return;
-
-  textarea.autocapitalize = 'off';
-  textarea.autocomplete = 'off';
-  textarea.spellcheck = false;
-  textarea.setAttribute('autocorrect', 'off');
-  textarea.setAttribute('inputmode', 'text');
-}
-
-function restoreTerminalInputFocus(terminal: Terminal) {
-  const focus = () => {
-    if (!terminal.element?.isConnected) return;
-    terminal.focus();
-    getTerminalTextarea(terminal)?.focus({ preventScroll: true });
-  };
-
-  window.requestAnimationFrame(() => {
-    focus();
-    window.setTimeout(focus, 0);
-  });
-}
-
 const TERMINAL_THEMES: Record<'dark' | 'light', ITheme> = {
   dark: {
     background: '#0d0f13',
@@ -589,7 +560,6 @@ export function TerminalPanel({ tab, workspace, active }: TerminalPanelProps) {
   const searchRef = useRef<SearchAddon | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const activeRef = useRef(active);
-  const composingRef = useRef(false);
   const sessionIdDetectedRef = useRef(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -610,7 +580,18 @@ export function TerminalPanel({ tab, workspace, active }: TerminalPanelProps) {
   useEffect(() => {
     activeRef.current = active;
     if (active) {
-      window.setTimeout(() => fitRef.current?.fit(), 0);
+      const restoreVisibleTerminal = () => {
+        const terminal = terminalRef.current;
+        const fit = fitRef.current;
+        if (!terminal || !fit) return;
+        fit.fit();
+        terminal.refresh(0, terminal.rows - 1);
+      };
+      window.requestAnimationFrame(() => {
+        restoreVisibleTerminal();
+        window.requestAnimationFrame(restoreVisibleTerminal);
+      });
+      window.setTimeout(restoreVisibleTerminal, 120);
     }
   }, [active]);
 
@@ -667,7 +648,7 @@ export function TerminalPanel({ tab, workspace, active }: TerminalPanelProps) {
     // without needing to recreate the terminal instance.
     terminal.attachCustomKeyEventHandler((event) => {
       if (event.type !== 'keydown') return true;
-      if (composingRef.current || isImeKeyboardEvent(event)) return true;
+      if (isImeKeyboardEvent(event)) return true;
       if (isPasteShortcut(event)) return true;
 
       // macOS native terminal editing gestures are not automatically translated
@@ -712,18 +693,8 @@ export function TerminalPanel({ tab, workspace, active }: TerminalPanelProps) {
     });
 
     terminal.open(host);
-    tuneTerminalTextarea(terminal);
     terminalRef.current = terminal;
     fitRef.current = fitAddon;
-
-    let webglAddon: WebglAddon | null = null;
-    try {
-      webglAddon = new WebglAddon();
-      webglAddon.onContextLoss(() => webglAddon?.dispose());
-      terminal.loadAddon(webglAddon);
-    } catch (error) {
-      console.warn('WebGL terminal renderer unavailable:', error);
-    }
 
     const FIT_DEBOUNCE_MS = 8;
     const PTY_RESIZE_DEBOUNCE_MS = 256;
@@ -771,21 +742,21 @@ export function TerminalPanel({ tab, workspace, active }: TerminalPanelProps) {
     resizeObserver.observe(host);
     window.setTimeout(() => fitAndResize(true), 0);
 
-    const handleCompositionStart = () => {
-      composingRef.current = true;
+    const restoreVisibleTerminal = () => {
+      if (!activeRef.current) return;
+      fitAndResize(true);
+      terminal.refresh(0, terminal.rows - 1);
     };
-    const handleCompositionEnd = () => {
-      composingRef.current = false;
-      restoreTerminalInputFocus(terminal);
+    const handleVisibilityRestore = () => {
+      if (document.visibilityState === 'hidden') return;
+      window.requestAnimationFrame(() => {
+        restoreVisibleTerminal();
+        window.requestAnimationFrame(restoreVisibleTerminal);
+      });
+      window.setTimeout(restoreVisibleTerminal, 160);
     };
-    const handlePaste = () => {
-      tuneTerminalTextarea(terminal);
-      restoreTerminalInputFocus(terminal);
-    };
-
-    terminal.element?.addEventListener('compositionstart', handleCompositionStart, true);
-    terminal.element?.addEventListener('compositionend', handleCompositionEnd, true);
-    terminal.element?.addEventListener('paste', handlePaste, true);
+    window.addEventListener('focus', handleVisibilityRestore);
+    document.addEventListener('visibilitychange', handleVisibilityRestore);
 
     const dataDisposable = terminal.onData((data) => {
       // When the user types into an agent terminal, notify the store so it can
@@ -794,14 +765,16 @@ export function TerminalPanel({ tab, workspace, active }: TerminalPanelProps) {
       writeUserInputToPty(data);
     });
 
-    // Click-to-move-cursor: clicking on the prompt line sends arrow-key sequences.
-    // Works for shell prompts and TUIs like Claude Code (Ink uses normal buffer).
-    // Automatically skips alternate-screen apps (vim, htop, etc.).
-    const cleanupClickToMove = setupClickToMoveCursor(
-      terminal,
-      (data) => window.forgepad.pty.write(tab.ptyId, data),
-      () => fitAndResize(true),
-    );
+    // Click-to-move-cursor is useful in agent TUIs, but in ordinary shell
+    // terminals a click while a command is still starting can leak raw arrow
+    // escape sequences like ^[[D into the prompt.
+    const cleanupClickToMove = tab.isAgent
+      ? setupClickToMoveCursor(
+          terminal,
+          (data) => window.forgepad.pty.write(tab.ptyId, data),
+          () => fitAndResize(true),
+        )
+      : () => {};
 
     let pendingData = '';
     let pendingFlush: number | null = null;
@@ -822,12 +795,16 @@ export function TerminalPanel({ tab, workspace, active }: TerminalPanelProps) {
       }
     };
 
-    const removeDataListener = window.forgepad.pty.onData(tab.ptyId, (data) => {
-      pendingData += data;
-      if (pendingFlush === null) {
-        pendingFlush = window.requestAnimationFrame(flushPendingData);
-      }
-    });
+    let removeDataListener: (() => void) | null = null;
+    const attachDataListener = () => {
+      if (removeDataListener) return;
+      removeDataListener = window.forgepad.pty.onData(tab.ptyId, (data) => {
+        pendingData += data;
+        if (pendingFlush === null) {
+          pendingFlush = window.requestAnimationFrame(flushPendingData);
+        }
+      });
+    };
     const removeExitListener = window.forgepad.pty.onExit(tab.ptyId, (exitCode) => {
       terminal.writeln('');
       terminal.writeln(`[process exited with code ${exitCode}]`);
@@ -838,8 +815,10 @@ export function TerminalPanel({ tab, workspace, active }: TerminalPanelProps) {
       .reattach(tab.ptyId)
       .then((result) => {
         if (result.replay) terminal.write(result.replay);
+        attachDataListener();
       })
       .catch((error) => {
+        attachDataListener();
         useAppStore
           .getState()
           .addToast('error', error instanceof Error ? error.message : `Could not reattach ${workspace.name}.`);
@@ -851,16 +830,14 @@ export function TerminalPanel({ tab, workspace, active }: TerminalPanelProps) {
       if (ptyResizeTimer) clearTimeout(ptyResizeTimer);
       if (pendingFlush !== null) window.cancelAnimationFrame(pendingFlush);
       pendingData = '';
-      terminal.element?.removeEventListener('compositionstart', handleCompositionStart, true);
-      terminal.element?.removeEventListener('compositionend', handleCompositionEnd, true);
-      terminal.element?.removeEventListener('paste', handlePaste, true);
+      window.removeEventListener('focus', handleVisibilityRestore);
+      document.removeEventListener('visibilitychange', handleVisibilityRestore);
       dataDisposable.dispose();
       searchResultsDisposable.dispose();
       filePathLinkDisposable.dispose();
       cleanupClickToMove();
-      removeDataListener();
+      removeDataListener?.();
       removeExitListener();
-      webglAddon?.dispose();
       terminal.dispose();
       terminalRef.current = null;
       fitRef.current = null;
