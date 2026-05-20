@@ -547,6 +547,18 @@ function AgentSection() {
 
       <Divider />
 
+      <SettingRow label={t('settings.agent.displayMode')} description={t('settings.agent.displayModeDesc')}>
+        <SegmentedControl
+          value={settings.agentDisplayMode}
+          label="Agent display mode"
+          options={[
+            { value: 'terminal', label: t('settings.agent.displayMode.terminal'), icon: <Terminal size={13} /> },
+            { value: 'ui', label: t('settings.agent.displayMode.ui'), icon: <Bot size={13} /> },
+          ]}
+          onChange={(v) => updateSettings({ agentDisplayMode: v })}
+        />
+      </SettingRow>
+
       <SettingRow label={t('settings.agent.agentTheme')} description={t('settings.agent.agentThemeDesc')}>
         <ThemePicker
           value={settings.agentThemeMode}

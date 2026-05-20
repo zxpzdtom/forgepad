@@ -23,6 +23,22 @@ pub struct ExternalAgentSession {
     pub updated_at: i64,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentTranscriptMessage {
+    pub id: String,
+    pub role: String,
+    pub text: String,
+    pub timestamp: i64,
+    pub source: String,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentSessionTranscriptResult {
+    pub messages: Vec<AgentTranscriptMessage>,
+}
+
 pub fn list_external_sessions(
     workspace_id: &str,
     worktree_path: &str,
@@ -33,6 +49,18 @@ pub fn list_external_sessions(
         workspace_id,
         worktree_path,
     ))
+}
+
+pub fn session_transcript(session_id: &str) -> CoreResult<AgentSessionTranscriptResult> {
+    let home = dirs::home_dir().ok_or_else(|| "Unable to locate home directory.".to_string())?;
+    let Some(path) = codex_rollout_path(&home, session_id) else {
+        return Ok(AgentSessionTranscriptResult {
+            messages: Vec::new(),
+        });
+    };
+    Ok(AgentSessionTranscriptResult {
+        messages: transcript_from_rollout(&path),
+    })
 }
 
 fn list_external_sessions_from_home(
@@ -260,6 +288,155 @@ fn codex_sessions_from_sqlite(
             })
             .collect(),
     )
+}
+
+fn codex_rollout_path(home: &Path, session_id: &str) -> Option<PathBuf> {
+    let db_path = home.join(".codex").join("state_5.sqlite");
+    if !db_path.exists() {
+        return None;
+    }
+    let escaped_session_id = session_id.replace('\'', "''");
+    let query = format!("SELECT rollout_path AS rolloutPath FROM threads WHERE id = '{escaped_session_id}' LIMIT 1;");
+    let output = Command::new("sqlite3")
+        .arg("-readonly")
+        .arg("-json")
+        .arg(db_path)
+        .arg(query)
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    let rows = serde_json::from_slice::<Vec<Value>>(&output.stdout).ok()?;
+    rows.first()
+        .and_then(|value| value.get("rolloutPath"))
+        .and_then(Value::as_str)
+        .filter(|path| !path.trim().is_empty())
+        .map(PathBuf::from)
+}
+
+fn transcript_from_rollout(path: &Path) -> Vec<AgentTranscriptMessage> {
+    let Ok(raw) = fs::read_to_string(path) else {
+        return Vec::new();
+    };
+    let mut visible_messages = Vec::new();
+    let mut fallback_messages = Vec::new();
+    let mut last_role: Option<String> = None;
+    let mut last_text = String::new();
+    let mut last_fallback_role: Option<String> = None;
+    let mut last_fallback_text = String::new();
+
+    for (index, line) in raw.lines().enumerate() {
+        let Ok(value) = serde_json::from_str::<Value>(line) else {
+            continue;
+        };
+        if let Some((role, text)) = visible_transcript_line(&value) {
+            if !text.trim().is_empty()
+                && text.len() <= 16_000
+                && !(last_role.as_deref() == Some(&role) && last_text == text)
+            {
+                last_role = Some(role.clone());
+                last_text = text.clone();
+                visible_messages.push(transcript_message(path, index, role, text, &value));
+            }
+        } else if let Some((role, text)) = fallback_transcript_line(&value) {
+            if !text.trim().is_empty()
+                && text.len() <= 16_000
+                && !(last_fallback_role.as_deref() == Some(&role) && last_fallback_text == text)
+            {
+                last_fallback_role = Some(role.clone());
+                last_fallback_text = text.clone();
+                fallback_messages.push(transcript_message(path, index, role, text, &value));
+            }
+        }
+    }
+
+    if visible_messages.is_empty() {
+        fallback_messages
+    } else {
+        visible_messages
+    }
+}
+
+fn transcript_message(
+    path: &Path,
+    index: usize,
+    role: String,
+    text: String,
+    value: &Value,
+) -> AgentTranscriptMessage {
+    let timestamp = value
+        .get("timestamp")
+        .and_then(Value::as_str)
+        .and_then(parse_timestamp_ms)
+        .unwrap_or(0);
+    AgentTranscriptMessage {
+        id: format!(
+            "history-{}-{}",
+            path.file_stem()
+                .and_then(|name| name.to_str())
+                .unwrap_or("session"),
+            index
+        ),
+        role,
+        text,
+        timestamp,
+        source: "cli".to_string(),
+    }
+}
+
+fn visible_transcript_line(value: &Value) -> Option<(String, String)> {
+    let payload = value.get("payload")?;
+    match value.get("type").and_then(Value::as_str) {
+        Some("event_msg") => match payload.get("type").and_then(Value::as_str) {
+            Some("user_message") => payload
+                .get("message")
+                .and_then(Value::as_str)
+                .map(|text| ("user".to_string(), text.to_string())),
+            Some("agent_message") => payload
+                .get("message")
+                .and_then(Value::as_str)
+                .map(|text| ("assistant".to_string(), text.to_string())),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
+fn fallback_transcript_line(value: &Value) -> Option<(String, String)> {
+    let payload = value.get("payload")?;
+    match value.get("type").and_then(Value::as_str) {
+        Some("response_item") if payload.get("type").and_then(Value::as_str) == Some("message") => {
+            let role = payload.get("role").and_then(Value::as_str)?;
+            let text = text_from_content(payload.get("content")?)?;
+            match role {
+                "user" => Some(("user".to_string(), text)),
+                "assistant" => Some(("assistant".to_string(), text)),
+                _ => None,
+            }
+        }
+        _ => None,
+    }
+}
+
+fn text_from_content(content: &Value) -> Option<String> {
+    match content {
+        Value::String(text) => Some(text.clone()),
+        Value::Array(items) => {
+            let parts = items
+                .iter()
+                .filter_map(|item| {
+                    item.get("text")
+                        .or_else(|| item.get("message"))
+                        .and_then(Value::as_str)
+                })
+                .filter(|text| !text.trim().is_empty())
+                .map(str::to_string)
+                .collect::<Vec<_>>();
+            (!parts.is_empty()).then(|| parts.join("\n\n"))
+        }
+        _ => None,
+    }
 }
 
 fn gemini_sessions(
@@ -557,6 +734,46 @@ mod tests {
     }
 
     #[test]
+    fn codex_transcript_uses_visible_events_over_internal_input_items() {
+        let temp = tempfile::tempdir().unwrap();
+        let rollout = temp.path().join("rollout-session.jsonl");
+        let content = [
+            serde_json::json!({
+                "type": "response_item",
+                "timestamp": "2026-05-20T02:16:22.000Z",
+                "payload": {
+                    "type": "message",
+                    "role": "user",
+                    "content": [{ "type": "input_text", "text": "# AGENTS.md instructions\nhidden context" }]
+                }
+            })
+            .to_string(),
+            serde_json::json!({
+                "type": "event_msg",
+                "timestamp": "2026-05-20T02:16:23.000Z",
+                "payload": { "type": "user_message", "message": "Visible prompt" }
+            })
+            .to_string(),
+            serde_json::json!({
+                "type": "event_msg",
+                "timestamp": "2026-05-20T02:16:24.000Z",
+                "payload": { "type": "agent_message", "message": "Visible answer" }
+            })
+            .to_string(),
+        ]
+        .join("\n");
+        fs::write(&rollout, content).unwrap();
+
+        let transcript = transcript_from_rollout(&rollout);
+
+        assert_eq!(transcript.len(), 2);
+        assert_eq!(transcript[0].role, "user");
+        assert_eq!(transcript[0].text, "Visible prompt");
+        assert_eq!(transcript[1].role, "assistant");
+        assert_eq!(transcript[1].text, "Visible answer");
+    }
+
+    #[test]
     fn imports_gemini_project_chats_from_registry() {
         let temp = tempfile::tempdir().unwrap();
         let gemini_dir = temp.path().join(".gemini");
@@ -615,8 +832,7 @@ mod tests {
         .join("\n");
         fs::write(&session_file, content).unwrap();
 
-        let sessions =
-            list_external_sessions_from_home(temp.path(), "workspace-1", "/tmp/project");
+        let sessions = list_external_sessions_from_home(temp.path(), "workspace-1", "/tmp/project");
         assert_eq!(sessions.len(), 1);
         assert_eq!(sessions[0].agent_preset_id, "claude");
         assert_eq!(sessions[0].session_id, "abc-123-def");
@@ -642,8 +858,7 @@ mod tests {
         .join("\n");
         fs::write(&session_file, content).unwrap();
 
-        let sessions =
-            list_external_sessions_from_home(temp.path(), "workspace-1", "/tmp/project");
+        let sessions = list_external_sessions_from_home(temp.path(), "workspace-1", "/tmp/project");
         assert_eq!(sessions.len(), 1);
         assert_eq!(sessions[0].title, "My custom title");
     }
@@ -659,12 +874,10 @@ mod tests {
         fs::create_dir_all(&project_dir).unwrap();
 
         let session_file = project_dir.join("no-title-session.jsonl");
-        let content =
-            r#"{"type":"user","message":{"content":"Refactor the database layer"},"sessionId":"no-title-session"}"#;
+        let content = r#"{"type":"user","message":{"content":"Refactor the database layer"},"sessionId":"no-title-session"}"#;
         fs::write(&session_file, content).unwrap();
 
-        let sessions =
-            list_external_sessions_from_home(temp.path(), "workspace-1", "/tmp/project");
+        let sessions = list_external_sessions_from_home(temp.path(), "workspace-1", "/tmp/project");
         assert_eq!(sessions.len(), 1);
         assert_eq!(sessions[0].title, "Refactor the database layer");
     }

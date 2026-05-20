@@ -268,7 +268,10 @@ fn handle_user_prompt_submit(
     // a better title asynchronously and broadcast an update when ready.
     let (auto_generate, template) = {
         let s = settings.lock().unwrap();
-        (s.auto_generate_tab_title, s.tab_title_prompt_template.clone())
+        (
+            s.auto_generate_tab_title,
+            s.tab_title_prompt_template.clone(),
+        )
     };
     if auto_generate && !template.is_empty() {
         let pty_id_owned = pty_id.to_string();
@@ -665,10 +668,7 @@ fn generate_title_with_claude(full_prompt: &str, user_path: &str) -> Option<Stri
 }
 
 fn generate_title_with_codex(full_prompt: &str, user_path: &str) -> Option<String> {
-    let tmp_dir = std::env::temp_dir().join(format!(
-        "forgepad-title-{}",
-        std::process::id()
-    ));
+    let tmp_dir = std::env::temp_dir().join(format!("forgepad-title-{}", std::process::id()));
     let _ = std::fs::create_dir_all(&tmp_dir);
     let output_path = tmp_dir.join("title.txt");
 

@@ -20,6 +20,7 @@ export type Tab =
       title: string;
       ptyId: string;
       isAgent?: boolean;
+      agentTransport?: 'pty' | 'cli';
       agentPresetId?: string;
       agentCommand?: string;
       sessionId?: string;
@@ -69,6 +70,36 @@ export type AgentSessionHistoryItem = {
   agentPresetId?: string;
   agentCommand?: string;
   updatedAt: number;
+};
+
+export type AgentTranscriptMessage = {
+  id: string;
+  role: 'user' | 'assistant' | 'system';
+  text: string;
+  timestamp: number;
+  source: 'gui' | 'hook' | 'terminal' | 'cli';
+};
+
+export type AgentRunTurnResult = {
+  runId: string;
+};
+
+export type AgentSessionTranscriptResult = {
+  messages: AgentTranscriptMessage[];
+};
+
+export type AgentTokenUsage = {
+  inputTokens: number;
+  cachedInputTokens?: number;
+  outputTokens: number;
+  reasoningOutputTokens?: number;
+  totalTokens: number;
+};
+
+export type AgentPlanItem = {
+  id: string;
+  title: string;
+  status: 'pending' | 'in_progress' | 'completed';
 };
 
 export type WorkspacePanel = {
@@ -289,6 +320,7 @@ export type PersistedAppState = {
 
 export type ThemePreference = 'dark' | 'light' | 'system';
 export type TerminalThemeMode = 'follow' | 'dark' | 'light';
+export type AgentDisplayMode = 'terminal' | 'ui';
 export type AppIconVariant =
   | 'graphite'
   | 'aurora'
@@ -1611,6 +1643,7 @@ export type AppSettings = {
   terminalFontFamily: string;
   terminalThemeMode: TerminalThemeMode;
   agentThemeMode: TerminalThemeMode;
+  agentDisplayMode: AgentDisplayMode;
   editorFontSize: number;
   diffInline: boolean;
   diffStyle: DiffViewStyle;
@@ -1662,6 +1695,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   terminalFontFamily: '',
   terminalThemeMode: 'follow',
   agentThemeMode: 'follow',
+  agentDisplayMode: 'terminal',
   editorFontSize: 13,
   diffInline: false,
   diffStyle: 'split',

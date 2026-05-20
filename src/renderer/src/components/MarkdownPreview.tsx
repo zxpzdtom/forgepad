@@ -6,6 +6,8 @@ import type { AllowedTags, Components } from 'streamdown';
 import { Streamdown } from 'streamdown';
 import 'streamdown/styles.css';
 
+import { markdownCodeBlockRenderer } from './MarkdownCodeBlock';
+
 type MarkdownPreviewProps = {
   components: Components;
   markdownPath: string;
@@ -18,7 +20,8 @@ type MarkdownPreviewProps = {
 
 type StreamdownPlugins = NonNullable<React.ComponentProps<typeof Streamdown>['plugins']>;
 
-const streamdownBasePlugins = { code: streamdownCode } satisfies StreamdownPlugins;
+const streamdownBasePlugins = { code: streamdownCode, renderers: [markdownCodeBlockRenderer] } satisfies StreamdownPlugins;
+const markdownPreviewControls = { table: false, code: false } satisfies React.ComponentProps<typeof Streamdown>['controls'];
 
 function containsMermaid(markdownText: string): boolean {
   return /^```mermaid\b/im.test(markdownText) || /<pre[^>]+class=["'][^"']*\bmermaid\b/i.test(markdownText);
@@ -426,6 +429,7 @@ export function MarkdownPreview({
       <Streamdown
         allowedTags={markdownAllowedTags}
         components={previewComponents}
+        controls={markdownPreviewControls}
         linkSafety={{ enabled: false }}
         plugins={plugins}
       >

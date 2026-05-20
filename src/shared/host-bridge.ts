@@ -1,7 +1,9 @@
 import type { AgentStatusUpdate } from "./agent-lifecycle";
 import type {
   AgentCompletionData,
+  AgentRunTurnResult,
   AgentSessionHistoryItem,
+  AgentSessionTranscriptResult,
   AgentUserPromptData,
   ContextBundleResult,
   CreateBundleInput,
@@ -166,6 +168,26 @@ export type HostBridgeApi = {
   };
   agent: {
     externalSessions?: (workspaceId: string, worktreePath: string) => Promise<AgentSessionHistoryItem[]>;
+    runTurn?: (input: {
+      runId?: string;
+      ptyId?: string;
+      worktreePath: string;
+      agentCommand: string;
+      prompt: string;
+      sessionId?: string;
+      imageDataUrls?: string[];
+    }) => Promise<AgentRunTurnResult>;
+    cancelTurn?: (runId: string) => Promise<boolean>;
+    undoTurn?: (runId: string) => Promise<boolean>;
+    sessionTranscript?: (sessionId: string) => Promise<AgentSessionTranscriptResult>;
+    onTurnStarted?: (callback: (data: unknown) => void) => Unsubscribe;
+    onTurnItem?: (callback: (data: unknown) => void) => Unsubscribe;
+    onTurnDiff?: (callback: (data: unknown) => void) => Unsubscribe;
+    onTurnDelta?: (callback: (data: unknown) => void) => Unsubscribe;
+    onTurnMessage?: (callback: (data: unknown) => void) => Unsubscribe;
+    onTurnCompleted?: (callback: (data: unknown) => void) => Unsubscribe;
+    onTurnFailed?: (callback: (data: unknown) => void) => Unsubscribe;
+    onTokenUsage?: (callback: (data: unknown) => void) => Unsubscribe;
     updateSettings: (settings: Record<string, unknown>) => Promise<void>;
     onStatusUpdate: (callback: (update: AgentStatusUpdate) => void) => Unsubscribe;
     onFocusTab: (callback: (ptyId: string) => void) => Unsubscribe;

@@ -8,7 +8,9 @@ use std::sync::{Arc, Mutex, OnceLock};
 use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use forgepad_core::{agent_history, app, context, files, git, hooks, lsp, pets, pty, state};
+use forgepad_core::{
+    agent_history, agent_runner, app, context, files, git, hooks, lsp, pets, pty, state,
+};
 use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -283,7 +285,13 @@ fn main() {
         let response = match serde_json::from_str::<Request>(&line) {
             Ok(request) => {
                 should_shutdown = request.command == "core.shutdown";
-                handle_request(&ptys, &watchers, hooks.as_ref(), request)
+                handle_request(
+                    &ptys,
+                    &watchers,
+                    hooks.as_ref(),
+                    Arc::clone(&output),
+                    request,
+                )
             }
             Err(error) => Response {
                 id: "unknown".into(),
@@ -304,9 +312,17 @@ fn handle_request(
     ptys: &pty::PtyManager,
     watchers: &FsWatchManager,
     hooks: Option<&hooks::HookServer>,
+    output: Arc<Mutex<io::Stdout>>,
     request: Request,
 ) -> Response {
-    match dispatch(ptys, watchers, hooks, &request.command, request.params) {
+    match dispatch(
+        ptys,
+        watchers,
+        hooks,
+        output,
+        &request.command,
+        request.params,
+    ) {
         Ok(value) => Response {
             id: request.id,
             value: Some(value),
@@ -324,6 +340,7 @@ fn dispatch(
     ptys: &pty::PtyManager,
     watchers: &FsWatchManager,
     hooks: Option<&hooks::HookServer>,
+    output: Arc<Mutex<io::Stdout>>,
     command: &str,
     params: Value,
 ) -> Result<Value, String> {
@@ -370,8 +387,11 @@ fn dispatch(
                 .and_then(Value::as_u64)
                 .map(|value| value as usize)
                 .unwrap_or(14);
-            serde_json::to_value(git::commit_history_summary(Path::new(&worktree_path), limit)?)
-                .map_err(|e| e.to_string())
+            serde_json::to_value(git::commit_history_summary(
+                Path::new(&worktree_path),
+                limit,
+            )?)
+            .map_err(|e| e.to_string())
         }
         "git.commitFiles" => {
             let worktree_path = string_param(&params, "worktreePath")?;
@@ -497,6 +517,50 @@ fn dispatch(
             )?)
             .map_err(|e| e.to_string())
         }
+        "agent.sessionTranscript" => {
+            let session_id = string_param(&params, "sessionId")?;
+            serde_json::to_value(agent_history::session_transcript(&session_id)?)
+                .map_err(|e| e.to_string())
+        }
+        "agent.runTurn" => {
+            let worktree_path = string_param(&params, "worktreePath")?;
+            let agent_command = string_param(&params, "agentCommand")?;
+            let prompt = string_param(&params, "prompt")?;
+            let session_id = params.get("sessionId").and_then(Value::as_str);
+            let pty_id = params.get("ptyId").and_then(Value::as_str);
+            let run_id = params.get("runId").and_then(Value::as_str);
+            let image_data_urls = params
+                .get("imageDataUrls")
+                .and_then(Value::as_array)
+                .map(|values| {
+                    values
+                        .iter()
+                        .filter_map(Value::as_str)
+                        .map(str::to_string)
+                        .collect::<Vec<_>>()
+                })
+                .unwrap_or_default();
+            let event_output = Arc::clone(&output);
+            serde_json::to_value(agent_runner::run_turn(
+                &worktree_path,
+                &agent_command,
+                &prompt,
+                session_id,
+                pty_id,
+                run_id,
+                image_data_urls,
+                Arc::new(move |event| emit(&event_output, event)),
+            )?)
+            .map_err(|e| e.to_string())
+        }
+        "agent.cancelTurn" => {
+            let run_id = string_param(&params, "runId")?;
+            Ok(json!(agent_runner::cancel_turn(&run_id)?))
+        }
+        "agent.undoTurn" => {
+            let run_id = string_param(&params, "runId")?;
+            Ok(json!(agent_runner::undo_turn(&run_id)?))
+        }
         "fs.treeWithStatus" => {
             let worktree_path = string_param(&params, "worktreePath")?;
             serde_json::to_value(workspace_snapshot(&worktree_path)?.tree)
@@ -615,8 +679,18 @@ fn dispatch(
             .map_err(|e| e.to_string()),
         "agent.permissionDecision" => {
             let pty_id = string_param(&params, "ptyId")?;
-            let hooks = hooks.ok_or_else(|| "Hook server is not running.".to_string())?;
-            hooks.resolve_permission(&pty_id, hooks::decision_from_params(&params)?);
+            let decision = params
+                .get("decision")
+                .and_then(Value::as_str)
+                .unwrap_or("allow")
+                .to_string();
+            let answers = params.get("answers").cloned();
+            let resolved_runner = agent_runner::resolve_permission(&pty_id, &decision, answers)?;
+            if let Some(hooks) = hooks {
+                hooks.resolve_permission(&pty_id, hooks::decision_from_params(&params)?);
+            } else if !resolved_runner {
+                return Err("No pending permission request.".to_string());
+            }
             Ok(Value::Null)
         }
         "agent.settingsUpdate" => {

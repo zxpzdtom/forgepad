@@ -1,4 +1,5 @@
 pub mod agent_history;
+pub mod agent_runner;
 pub mod app;
 pub mod command;
 pub mod context;

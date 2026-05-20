@@ -1,9 +1,10 @@
 import { lazy, Suspense, useCallback, useRef, useState } from 'react';
-import { useAppStore } from '@renderer/store/app-store';
 import { getDroppedPaths, hasDraggableFiles, quotePathForShell } from '@renderer/lib/drag-utils';
+import { useAppStore } from '@renderer/store/app-store';
 import type { Workspace } from '@shared/types';
-
 import clsx from 'clsx';
+
+import { AgentChatPanel } from './AgentChatPanel';
 
 const TerminalPanel = lazy(() => import('./TerminalPanel').then((module) => ({ default: module.TerminalPanel })));
 
@@ -13,6 +14,7 @@ export function AgentColumn() {
   const activeAgentTabId = useAppStore((state) => state.activeAgentTabId);
   const workspaces = useAppStore((state) => state.workspaces);
   const setFocusedColumn = useAppStore((state) => state.setFocusedColumn);
+  const agentDisplayMode = useAppStore((state) => state.settings.agentDisplayMode);
   const [dropHighlight, setDropHighlight] = useState(false);
   const dragCounterRef = useRef(0);
 
@@ -56,10 +58,10 @@ export function AgentColumn() {
       const paths = getDroppedPaths(e);
       if (paths.length === 0) return;
 
-      // Write path(s) to the active agent terminal (no Enter — user decides)
       e.stopPropagation(); // prevent outer fallback handler from firing
       const activeTab = terminalTabs.find((t) => t.id === columnActiveId);
-      if (activeTab?.type === 'terminal') {
+      if (activeTab?.type === 'terminal' && activeTab.agentTransport !== 'cli') {
+        // Write path(s) to the active agent terminal (no Enter — user decides).
         window.forgepad.pty.write(activeTab.ptyId, paths.map(quotePathForShell).join(' '));
       }
     },
@@ -78,15 +80,39 @@ export function AgentColumn() {
       onDrop={handleDrop}
     >
       <div className="relative min-h-0 flex-1 overflow-hidden">
-        {terminalTabs.map((tab) => {
-          const workspace = workspaces.find((w) => w.id === tab.workspaceId) as Workspace | undefined;
-          if (!workspace) return null;
-          return (
-            <Suspense key={tab.id} fallback={null}>
-              <TerminalPanel tab={tab} workspace={workspace} active={tab.id === columnActiveId} />
-            </Suspense>
-          );
-        })}
+        {terminalTabs
+          .filter((tab) => agentDisplayMode === 'ui' || tab.agentTransport === 'cli')
+          .map((tab) => {
+            if (tab.id !== columnActiveId) return null;
+            const workspace = workspaces.find((w) => w.id === tab.workspaceId) as Workspace | undefined;
+            if (!workspace) return null;
+            return <AgentChatPanel key={`chat-${tab.id}`} tab={tab} workspace={workspace} active={true} />;
+          })}
+        {terminalTabs
+          .filter((tab) => tab.agentTransport !== 'cli')
+          .map((tab) => {
+            const workspace = workspaces.find((w) => w.id === tab.workspaceId) as Workspace | undefined;
+            if (!workspace) return null;
+            return (
+              <div
+                key={tab.id}
+                className={clsx(
+                  'absolute inset-0',
+                  agentDisplayMode === 'ui' && 'pointer-events-none opacity-0',
+                  agentDisplayMode === 'terminal' && tab.id !== columnActiveId && 'pointer-events-none opacity-0',
+                )}
+                aria-hidden={agentDisplayMode !== 'terminal' || tab.id !== columnActiveId}
+              >
+                <Suspense fallback={null}>
+                  <TerminalPanel
+                    tab={tab}
+                    workspace={workspace}
+                    active={agentDisplayMode === 'terminal' && tab.id === columnActiveId}
+                  />
+                </Suspense>
+              </div>
+            );
+          })}
       </div>
     </div>
   );

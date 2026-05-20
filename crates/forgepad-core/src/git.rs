@@ -374,9 +374,7 @@ fn parse_batch_numstat(output: &str) -> HashMap<String, HashMap<String, (i64, i6
             current_hash = header.splitn(4, '\x1f').next().map(|s| s.to_string());
         } else if !line.is_empty() {
             if let Some(ref hash) = current_hash {
-                if let Some((file_path, additions, deletions)) =
-                    parse_commit_numstat_line(line)
-                {
+                if let Some((file_path, additions, deletions)) = parse_commit_numstat_line(line) {
                     map.entry(hash.clone())
                         .or_default()
                         .insert(file_path, (additions, deletions));
@@ -401,10 +399,9 @@ fn parse_batch_commits(
         if let Some(header) = line.strip_prefix("COMMIT_SEP\x1f") {
             // Flush previous commit
             if let Some((hash, short_hash, timestamp, subject)) = current_header.take() {
-                let (additions, deletions) =
-                    current_files.iter().fold((0, 0), |(a, d), f| {
-                        (a + f.additions, d + f.deletions)
-                    });
+                let (additions, deletions) = current_files
+                    .iter()
+                    .fold((0, 0), |(a, d), f| (a + f.additions, d + f.deletions));
                 commits.push(CommitSummary {
                     hash,
                     short_hash,
@@ -428,10 +425,9 @@ fn parse_batch_commits(
 
     // Flush the last commit
     if let Some((hash, short_hash, timestamp, subject)) = current_header {
-        let (additions, deletions) =
-            current_files.iter().fold((0, 0), |(a, d), f| {
-                (a + f.additions, d + f.deletions)
-            });
+        let (additions, deletions) = current_files
+            .iter()
+            .fold((0, 0), |(a, d), f| (a + f.additions, d + f.deletions));
         commits.push(CommitSummary {
             hash,
             short_hash,
@@ -515,11 +511,19 @@ fn parse_shortstat_line(line: &str) -> (i64, i64) {
     for part in line.split(',') {
         let trimmed = part.trim();
         if trimmed.contains("insertion") {
-            if let Some(num) = trimmed.split_whitespace().next().and_then(|s| s.parse().ok()) {
+            if let Some(num) = trimmed
+                .split_whitespace()
+                .next()
+                .and_then(|s| s.parse().ok())
+            {
                 additions = num;
             }
         } else if trimmed.contains("deletion") {
-            if let Some(num) = trimmed.split_whitespace().next().and_then(|s| s.parse().ok()) {
+            if let Some(num) = trimmed
+                .split_whitespace()
+                .next()
+                .and_then(|s| s.parse().ok())
+            {
                 deletions = num;
             }
         }

@@ -3,8 +3,6 @@ import Foundation
 enum HostBridgeBootstrap {
     static let script = """
     (() => {
-      if (window.forgepad) return;
-
       const shouldKeepWarm = window.top === window && !/\\/pet\\.html(?:$|[?#])/.test(window.location.pathname);
       if (shouldKeepWarm && !window.__forgepadKeepWarm) {
         window.__forgepadKeepWarm = true;
@@ -162,6 +160,9 @@ enum HostBridgeBootstrap {
         context: { createBundle: (input) => invoke("context.createBundle", { input }) },
         agent: {
           externalSessions: (workspaceId, worktreePath) => invoke("agent.externalSessions", { workspaceId, worktreePath }),
+          runTurn: (input) => invoke("agent.runTurn", input || {}),
+          cancelTurn: (runId) => invoke("agent.cancelTurn", { runId }),
+          sessionTranscript: (sessionId) => invoke("agent.sessionTranscript", { sessionId }),
           updateSettings: (settings) => invoke("agent.settingsUpdate", { settings }),
           onStatusUpdate: (callback) => on("agent:status-update", callback),
           onFocusTab: (callback) => on("agent:focus-tab", callback),
@@ -169,7 +170,16 @@ enum HostBridgeBootstrap {
           onPermissionRequest: (callback) => on("agent:permission-request", callback),
           sendPermissionDecision: (ptyId, decision, answers) => { invoke("agent.permissionDecision", { ptyId, decision, answers }); },
           onUserPrompt: (callback) => on("agent:user-prompt", callback),
-          onCompletion: (callback) => on("agent:completion", callback)
+          onCompletion: (callback) => on("agent:completion", callback),
+          undoTurn: (runId) => invoke("agent.undoTurn", { runId }),
+          onTurnStarted: (callback) => on("agent.turnStarted", callback),
+          onTurnItem: (callback) => on("agent.turnItem", callback),
+          onTurnDiff: (callback) => on("agent.turnDiff", callback),
+          onTurnDelta: (callback) => on("agent.turnDelta", callback),
+          onTurnMessage: (callback) => on("agent.turnMessage", callback),
+          onTurnCompleted: (callback) => on("agent.turnCompleted", callback),
+          onTurnFailed: (callback) => on("agent.turnFailed", callback),
+          onTokenUsage: (callback) => on("agent.tokenUsage", callback)
         },
         menu: { onOpenSettings: (callback) => on("menu.openSettings", callback) },
         shell: {

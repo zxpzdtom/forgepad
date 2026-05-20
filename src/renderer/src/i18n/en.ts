@@ -134,6 +134,11 @@ const en = {
   "settings.agent.restoreTemplate": "Restore command template",
   "settings.agent.restoreTemplateOptional": "(optional, use {sessionId})",
   "settings.agent.restoreTemplatePlaceholder": "my-agent --resume {sessionId}",
+  "settings.agent.displayMode": "Agent View",
+  "settings.agent.displayModeDesc":
+    "Choose whether agent sessions open as the raw CLI terminal or a rendered conversation UI.",
+  "settings.agent.displayMode.terminal": "Terminal",
+  "settings.agent.displayMode.ui": "UI",
   "settings.agent.agentTheme": "Agent Theme",
   "settings.agent.agentThemeDesc":
     "Override agent terminal color scheme independently from the app theme",
